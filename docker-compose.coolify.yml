@@ -6,7 +6,6 @@ services:
     restart: unless-stopped
     working_dir: /var/www/html
     volumes:
-      - ./:/var/www/html
       - elive_storage:/var/www/html/storage
     depends_on:
       - postgres
@@ -16,12 +15,9 @@ services:
 
   nginx:
     build:
-      context: ./docker/nginx
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/nginx/Dockerfile
     restart: unless-stopped
-    volumes:
-      - ./:/var/www/html
-      - elive_storage:/var/www/html/storage
     depends_on:
       - app
     networks:
