@@ -1,0 +1,55 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - elive_storage:/var/www/html/storage
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - elive_network
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - elive_storage:/var/www/html/storage
+    depends_on:
+      - app
+    networks:
+      - elive_network
+    ports:
+      - "80"
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: elive_events
+      POSTGRES_USER: elive_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - elive_postgres_data:/var/lib/postgresql/data
+    networks:
+      - elive_network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - elive_network
+
+volumes:
+  elive_postgres_data:
+  elive_storage:
+
+networks:
+  elive_network:
+    driver: bridge
