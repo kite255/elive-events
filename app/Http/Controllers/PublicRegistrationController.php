@@ -37,7 +37,6 @@ class PublicRegistrationController extends Controller
             ->get();
 
         $eventDays = $this->registrationDays($event);
-        $merchandiseItems = $this->registrationMerchandise($event);
 
         return view('public.events.register', [
             'event' => $event,
@@ -58,7 +57,7 @@ class PublicRegistrationController extends Controller
 
             'fields' => $fields,
             'eventDays' => $eventDays,
-            'merchandiseItems' => $merchandiseItems,
+            'merchandiseItems' => $this->registrationMerchandise($event),
         ]);
     }
 
@@ -72,10 +71,7 @@ class PublicRegistrationController extends Controller
         if (! $event->registration_is_open) {
             return back()
                 ->withInput()
-                ->with(
-                    'error',
-                    'Registration for this event is currently closed.'
-                );
+                ->with('error', 'Registration for this event is currently closed.');
         }
 
         $isFull = $event->isRegistrationFull();
@@ -84,10 +80,7 @@ class PublicRegistrationController extends Controller
         if ($isFull && ! $waitlistEnabled) {
             return back()
                 ->withInput()
-                ->with(
-                    'error',
-                    'Registration is full. The event has reached its capacity.'
-                );
+                ->with('error', 'Registration is full. The event has reached its capacity.');
         }
 
         $fields = $event->registrationFields()
@@ -101,6 +94,7 @@ class PublicRegistrationController extends Controller
 
         $validated = $request->validate(
             $this->registrationRules(
+                $event,
                 $fields,
                 $eventDays,
                 $merchandiseItems
@@ -112,27 +106,18 @@ class PublicRegistrationController extends Controller
         );
 
         $fullName = trim($validated['full_name']);
-        $phone = $this->normalizePhone(
-            $validated['phone'] ?? null
-        );
-        $email = strtolower(
-            trim($validated['email'] ?? '')
-        );
+        $phone = $event->registration_show_phone
+            ? $this->normalizePhone($validated['phone'] ?? null)
+            : null;
 
-        if (
-            $this->alreadyRegistered(
-                $event,
-                $fullName,
-                $phone,
-                $email
-            )
-        ) {
+        $email = $event->registration_show_email
+            ? strtolower(trim($validated['email'] ?? ''))
+            : '';
+
+        if ($this->alreadyRegistered($event, $fullName, $phone, $email)) {
             return back()
                 ->withInput()
-                ->with(
-                    'error',
-                    'This attendee already exists for this event.'
-                );
+                ->with('error', 'This attendee already exists for this event.');
         }
 
         $status = match (true) {
@@ -141,7 +126,9 @@ class PublicRegistrationController extends Controller
             default => 'registered',
         };
 
-        $badgeTypeId = $validated['badge_type_id'] ?? null;
+        $badgeTypeId = $event->registration_show_badge_type
+            ? ($validated['badge_type_id'] ?? null)
+            : null;
 
         if (! $badgeTypeId) {
             $badgeTypeId = BadgeType::query()
@@ -168,17 +155,32 @@ class PublicRegistrationController extends Controller
                     $attendee = Attendee::create([
                         'event_id' => $event->id,
                         'category_id' =>
-                            $validated['category_id'] ?? null,
+                            $event->registration_show_category
+                                ? ($validated['category_id'] ?? null)
+                                : null,
+
                         'badge_type_id' => $badgeTypeId,
                         'full_name' => $fullName,
                         'phone' => $phone,
                         'email' => $email ?: null,
-                        'organization_name' => trim(
-                            $validated['organization_name'] ?? ''
-                        ) ?: null,
-                        'position' => trim(
-                            $validated['position'] ?? ''
-                        ) ?: null,
+
+                        'organization_name' =>
+                            $event->registration_show_organization
+                                ? (
+                                    trim(
+                                        $validated['organization_name'] ?? ''
+                                    ) ?: null
+                                )
+                                : null,
+
+                        'position' =>
+                            $event->registration_show_position
+                                ? (
+                                    trim(
+                                        $validated['position'] ?? ''
+                                    ) ?: null
+                                )
+                                : null,
                         'status' => $status,
                         'registration_source' => 'public',
                         'registered_at' => now(),
@@ -222,8 +224,7 @@ class PublicRegistrationController extends Controller
                 );
         }
 
-        app(QrTokenService::class)
-            ->generateForAttendee($attendee);
+        app(QrTokenService::class)->generateForAttendee($attendee);
 
         if (
             $event->registration_auto_generate_badge
@@ -242,10 +243,8 @@ class PublicRegistrationController extends Controller
         );
     }
 
-    public function success(
-        Event $event,
-        Attendee $attendee
-    ): View {
+    public function success(Event $event, Attendee $attendee): View
+    {
         abort_unless(
             (int) $attendee->event_id === (int) $event->id,
             404
@@ -263,12 +262,12 @@ class PublicRegistrationController extends Controller
             'event' => $event,
             'attendee' => $attendee,
             'branding' => $this->branding($event),
-            'registrationStats' =>
-                $this->registrationStats($event),
+            'registrationStats' => $this->registrationStats($event),
         ]);
     }
 
     protected function registrationRules(
+        Event $event,
         Collection $fields,
         Collection $eventDays,
         Collection $merchandiseItems
@@ -281,39 +280,68 @@ class PublicRegistrationController extends Controller
             ],
 
             'phone' => [
-                'nullable',
+                $this->standardFieldRule(
+                    (bool) $event->registration_show_phone,
+                    (bool) $event->registration_require_phone
+                ),
                 'string',
                 'max:255',
             ],
 
             'email' => [
-                'nullable',
+                $this->standardFieldRule(
+                    (bool) $event->registration_show_email,
+                    (bool) $event->registration_require_email
+                ),
                 'email',
                 'max:255',
             ],
 
             'organization_name' => [
-                'nullable',
+                $this->standardFieldRule(
+                    (bool) $event->registration_show_organization,
+                    (bool) $event->registration_require_organization
+                ),
                 'string',
                 'max:255',
             ],
 
             'position' => [
-                'nullable',
+                $this->standardFieldRule(
+                    (bool) $event->registration_show_position,
+                    (bool) $event->registration_require_position
+                ),
                 'string',
                 'max:255',
             ],
 
             'category_id' => [
-                'nullable',
+                $this->standardFieldRule(
+                    (bool) $event->registration_show_category,
+                    (bool) $event->registration_require_category
+                ),
                 'integer',
-                'exists:attendee_categories,id',
+
+                Rule::exists('attendee_categories', 'id')
+                    ->where(
+                        fn ($query) => $query
+                            ->where('event_id', $event->id)
+                    ),
             ],
 
             'badge_type_id' => [
-                'nullable',
+                $this->standardFieldRule(
+                    (bool) $event->registration_show_badge_type,
+                    (bool) $event->registration_require_badge_type
+                ),
                 'integer',
-                'exists:badge_types,id',
+
+                Rule::exists('badge_types', 'id')
+                    ->where(
+                        fn ($query) => $query
+                            ->where('event_id', $event->id)
+                            ->where('is_active', true)
+                    ),
             ],
 
             'answers' => [
@@ -322,30 +350,21 @@ class PublicRegistrationController extends Controller
             ],
 
             'event_days' => [
-                $eventDays->isNotEmpty()
-                    ? 'required'
-                    : 'nullable',
+                $eventDays->isNotEmpty() ? 'required' : 'nullable',
                 'array',
-                $eventDays->isNotEmpty()
-                    ? 'min:1'
-                    : 'min:0',
+                $eventDays->isNotEmpty() ? 'min:1' : 'min:0',
             ],
 
             'event_days.*' => [
                 'integer',
 
-                Rule::exists(
-                    'event_days',
-                    'id'
-                )->where(
-                    fn ($query) => $query
-                        ->where(
-                            'event_id',
-                            $eventDays->first()?->event_id ?? 0
-                        )
-                        ->where('status', 'active')
-                        ->where('is_registration_open', true)
-                ),
+                Rule::exists('event_days', 'id')
+                    ->where(
+                        fn ($query) => $query
+                            ->where('event_id', $event->id)
+                            ->where('status', 'active')
+                            ->where('is_registration_open', true)
+                    ),
             ],
 
             'merchandise' => [
@@ -356,14 +375,25 @@ class PublicRegistrationController extends Controller
 
         foreach ($fields as $field) {
             $fieldRules = [
-                $field->is_required
-                    ? 'required'
-                    : 'nullable',
+                $field->is_required ? 'required' : 'nullable',
             ];
 
             $fieldType = $field->field_type
                 ?? $field->type
                 ?? 'text';
+
+            if ($fieldType === 'checkbox') {
+                $fieldRules[] = 'array';
+                $fieldRules[] = 'max:100';
+
+                $rules["answers.{$field->id}"] = $fieldRules;
+                $rules["answers.{$field->id}.*"] = [
+                    'string',
+                    'max:1000',
+                ];
+
+                continue;
+            }
 
             match ($fieldType) {
                 'email' => $fieldRules[] = 'email',
@@ -384,50 +414,31 @@ class PublicRegistrationController extends Controller
             $variantPath = "{$itemPath}.variant_id";
             $quantityPath = "{$itemPath}.quantity";
 
-            $rules[$itemPath] = [
-                'nullable',
-                'array',
-            ];
+            $rules[$itemPath] = ['nullable', 'array'];
+            $rules[$selectedPath] = ['nullable', 'boolean'];
 
-            $rules[$selectedPath] = [
-                'nullable',
-                'boolean',
-            ];
-
-            $isRequiredItem =
-                $item->selection_type === 'required';
-
+            $isRequiredItem = $item->selection_type === 'required';
             $isSelected = $isRequiredItem
                 || request()->boolean($selectedPath);
 
             $rules[$variantPath] = [
-                $isSelected
-                    ? 'required'
-                    : 'nullable',
-
+                $isSelected ? 'required' : 'nullable',
                 'integer',
-
-                Rule::exists(
-                    'merchandise_variants',
-                    'id'
-                )->where(
-                    fn ($query) => $query
-                        ->where(
-                            'event_merchandise_id',
-                            $item->id
-                        )
-                        ->where('is_active', true)
-                ),
+                Rule::exists('merchandise_variants', 'id')
+                    ->where(
+                        fn ($query) => $query
+                            ->where(
+                                'event_merchandise_id',
+                                $item->id
+                            )
+                            ->where('is_active', true)
+                    ),
             ];
 
             $rules[$quantityPath] = [
-                $isSelected
-                    ? 'required'
-                    : 'nullable',
-
+                $isSelected ? 'required' : 'nullable',
                 'integer',
                 'min:1',
-
                 'max:' . max(
                     1,
                     (int) $item->maximum_per_attendee
@@ -438,21 +449,61 @@ class PublicRegistrationController extends Controller
         return $rules;
     }
 
+    protected function standardFieldRule(
+        bool $isShown,
+        bool $isRequired
+    ): string {
+        if (! $isShown) {
+            return 'prohibited';
+        }
+
+        return $isRequired
+            ? 'required'
+            : 'nullable';
+    }
+
     protected function validationMessages(
         Collection $eventDays,
         Collection $merchandiseItems
     ): array {
-        $messages = [];
+        $messages = [
+            'phone.required' =>
+                'Please enter your phone number.',
+
+            'email.required' =>
+                'Please enter your email address.',
+
+            'email.email' =>
+                'Please enter a valid email address.',
+
+            'organization_name.required' =>
+                'Please enter your organization or company.',
+
+            'position.required' =>
+                'Please enter your position or title.',
+
+            'category_id.required' =>
+                'Please select an attendee category.',
+
+            'category_id.exists' =>
+                'The selected attendee category is unavailable.',
+
+            'badge_type_id.required' =>
+                'Please select a badge type.',
+
+            'badge_type_id.exists' =>
+                'The selected badge type is unavailable.',
+        ];
 
         if ($eventDays->isNotEmpty()) {
             $messages['event_days.required'] =
-                'Please select at least one day you expect to attend.';
+                'Please select at least one day or session.';
 
             $messages['event_days.min'] =
-                'Please select at least one day you expect to attend.';
+                'Please select at least one day or session.';
 
             $messages['event_days.*.exists'] =
-                'One of the selected event days is unavailable.';
+                'One of the selected days or sessions is unavailable.';
         }
 
         foreach ($merchandiseItems as $item) {
@@ -503,8 +554,7 @@ class PublicRegistrationController extends Controller
             AttendeeRegistrationAnswer::create([
                 'event_id' => $event->id,
                 'attendee_id' => $attendee->id,
-                'event_registration_field_id' =>
-                    $field->id,
+                'event_registration_field_id' => $field->id,
                 'value' => $answer,
             ]);
         }
@@ -535,7 +585,7 @@ class PublicRegistrationController extends Controller
         if ($selectedDayIds->isEmpty()) {
             throw ValidationException::withMessages([
                 'event_days' =>
-                    'Please select at least one day you expect to attend.',
+                    'Please select at least one day or session.',
             ]);
         }
 
@@ -560,12 +610,9 @@ class PublicRegistrationController extends Controller
         string $attendeeStatus
     ): void {
         foreach ($merchandiseItems as $item) {
-            $selection =
-                $submittedMerchandise[$item->id]
-                ?? [];
+            $selection = $submittedMerchandise[$item->id] ?? [];
 
-            $isRequired =
-                $item->selection_type === 'required';
+            $isRequired = $item->selection_type === 'required';
 
             $isSelected = $isRequired
                 || filter_var(
@@ -577,8 +624,7 @@ class PublicRegistrationController extends Controller
                 continue;
             }
 
-            $variantId =
-                $selection['variant_id'] ?? null;
+            $variantId = $selection['variant_id'] ?? null;
 
             if (! $variantId) {
                 throw ValidationException::withMessages([
@@ -589,10 +635,7 @@ class PublicRegistrationController extends Controller
 
             $variant = MerchandiseVariant::query()
                 ->whereKey($variantId)
-                ->where(
-                    'event_merchandise_id',
-                    $item->id
-                )
+                ->where('event_merchandise_id', $item->id)
                 ->where('is_active', true)
                 ->lockForUpdate()
                 ->first();
@@ -604,10 +647,7 @@ class PublicRegistrationController extends Controller
                 ]);
             }
 
-            $quantity = (int) (
-                $selection['quantity'] ?? 1
-            );
-
+            $quantity = (int) ($selection['quantity'] ?? 1);
             $maximum = max(
                 1,
                 (int) $item->maximum_per_attendee
@@ -628,8 +668,8 @@ class PublicRegistrationController extends Controller
             }
 
             /*
-             * Exact remaining stock is intentionally hidden from attendees.
-             * The row is locked before stock is checked.
+             * Exact remaining stock is intentionally not disclosed publicly.
+             * The stock check still runs while the row is locked.
              */
             if (! $variant->hasAvailableStock($quantity)) {
                 throw ValidationException::withMessages([
@@ -638,12 +678,8 @@ class PublicRegistrationController extends Controller
                 ]);
             }
 
-            $unitPrice = (float) (
-                $variant->price ?? 0
-            );
-
-            $totalPrice =
-                $unitPrice * $quantity;
+            $unitPrice = (float) ($variant->price ?? 0);
+            $totalPrice = $unitPrice * $quantity;
 
             $selectionStatus = match ($attendeeStatus) {
                 'waitlisted' => 'waitlisted',
@@ -654,30 +690,19 @@ class PublicRegistrationController extends Controller
             AttendeeMerchandise::create([
                 'event_id' => $event->id,
                 'attendee_id' => $attendee->id,
-
-                'event_merchandise_id' =>
-                    $item->id,
-
-                'merchandise_variant_id' =>
-                    $variant->id,
+                'event_merchandise_id' => $item->id,
+                'merchandise_variant_id' => $variant->id,
 
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'total_price' => $totalPrice,
-
-                'currency' =>
-                    $variant->currency ?: 'TZS',
-
-                'payment_status' =>
-                    $unitPrice > 0
-                        ? 'pending'
-                        : 'not_required',
+                'currency' => $variant->currency ?: 'TZS',
+                'payment_status' => $unitPrice > 0
+                    ? 'pending'
+                    : 'not_required',
 
                 'status' => $selectionStatus,
-
-                'selection_source' =>
-                    'public_registration',
-
+                'selection_source' => 'public_registration',
                 'selected_at' => now(),
             ]);
         }
@@ -695,9 +720,8 @@ class PublicRegistrationController extends Controller
             ->get();
     }
 
-    protected function registrationMerchandise(
-        Event $event
-    ): Collection {
+    protected function registrationMerchandise(Event $event): Collection
+    {
         return $event->merchandise()
             ->where('is_active', true)
             ->whereIn('selection_type', [
@@ -758,10 +782,7 @@ class PublicRegistrationController extends Controller
                         );
 
                         if (filled($phone)) {
-                            $query->where(
-                                'phone',
-                                $phone
-                            );
+                            $query->where('phone', $phone);
                         }
                     }
                 );
@@ -780,22 +801,14 @@ class PublicRegistrationController extends Controller
             ->exists();
     }
 
-    protected function registrationStats(
-        Event $event
-    ): array {
-        $capacity = (int) (
-            $event->capacity ?? 0
-        );
-
-        $accepted =
-            $event->acceptedAttendeesCount();
+    protected function registrationStats(Event $event): array
+    {
+        $capacity = (int) ($event->capacity ?? 0);
+        $accepted = $event->acceptedAttendeesCount();
 
         $pending = Attendee::query()
             ->where('event_id', $event->id)
-            ->where(
-                'status',
-                'pending_approval'
-            )
+            ->where('status', 'pending_approval')
             ->count();
 
         $registered = Attendee::query()
@@ -807,80 +820,60 @@ class PublicRegistrationController extends Controller
             ])
             ->count();
 
-        $waitlisted =
-            $event->waitlistedAttendeesCount();
+        $waitlisted = $event->waitlistedAttendeesCount();
 
         return [
-            'capacity' =>
-                $capacity > 0
-                    ? $capacity
-                    : null,
-
+            'capacity' => $capacity > 0
+                ? $capacity
+                : null,
             'accepted' => $accepted,
             'pending' => $pending,
             'registered' => $registered,
             'waitlisted' => $waitlisted,
-
-            'remaining' =>
-                $event->remainingCapacity(),
-
-            'is_full' =>
-                $event->isRegistrationFull(),
+            'remaining' => $event->remainingCapacity(),
+            'is_full' => $event->isRegistrationFull(),
         ];
     }
 
-    protected function branding(
-        Event $event
-    ): array {
+    protected function branding(Event $event): array
+    {
         $organization = $event->organization;
 
         return [
-            'logo' =>
-                $event->registration_logo_path
+            'logo' => $event->registration_logo_path
                 ?: $organization?->logo_path,
 
-            'banner' =>
-                $event->registration_banner_image_path,
+            'banner' => $event->registration_banner_image_path,
 
-            'primary_color' =>
-                $event->registration_primary_color
+            'primary_color' => $event->registration_primary_color
                 ?: $organization?->primary_color
                 ?: '#233F7E',
 
-            'background_color' =>
-                $event->registration_background_color
+            'background_color' => $event->registration_background_color
                 ?: $organization?->background_color
                 ?: '#F8FAFC',
 
-            'button_color' =>
-                $event->registration_button_color
+            'button_color' => $event->registration_button_color
                 ?: $organization?->button_color
                 ?: '#233F7E',
 
-            'support_email' =>
-                $organization?->support_email
+            'support_email' => $organization?->support_email
                 ?: $organization?->email,
 
-            'support_phone' =>
-                $organization?->support_phone
+            'support_phone' => $organization?->support_phone
                 ?: $organization?->phone,
         ];
     }
 
-    protected function normalizePhone(
-        ?string $phone
-    ): ?string {
+    protected function normalizePhone(?string $phone): ?string
+    {
         $phone = trim((string) $phone);
 
         if ($phone === '') {
             return null;
         }
 
-        $phone = preg_replace(
-            '/[^0-9+]/',
-            '',
-            $phone
-        );
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
 
         if (str_starts_with($phone, '+')) {
             $phone = substr($phone, 1);
@@ -890,8 +883,7 @@ class PublicRegistrationController extends Controller
             str_starts_with($phone, '0')
             && strlen($phone) === 10
         ) {
-            return '255'
-                . substr($phone, 1);
+            return '255' . substr($phone, 1);
         }
 
         if (

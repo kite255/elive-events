@@ -4,6 +4,381 @@
     <meta charset="UTF-8">
     <title>{{ $event->registration_welcome_title ?: 'Register for ' . $event->name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        :root {
+            --elive-primary: {{ $branding['primary_color'] }};
+            --elive-button: {{ $branding['button_color'] }};
+            --elive-bg: {{ $branding['background_color'] }};
+            --elive-text: #0f172a;
+            --elive-muted: #64748b;
+            --elive-border: #e2e8f0;
+            --elive-soft: #f8fafc;
+            --elive-danger: #dc2626;
+            --elive-radius-lg: 24px;
+            --elive-radius-md: 18px;
+            --elive-radius-sm: 12px;
+            --elive-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+            --elive-shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.07);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, color-mix(in srgb, var(--elive-primary) 12%, transparent), transparent 34%),
+                linear-gradient(180deg, #f8fafc 0%, var(--elive-bg) 42%, #eef2f7 100%) !important;
+            color: var(--elive-text) !important;
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif !important;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        .elive-page {
+            min-height: 100vh;
+            padding: 36px 18px 28px !important;
+        }
+
+        .elive-container {
+            width: min(100%, 1040px);
+            margin: 0 auto !important;
+        }
+
+        .elive-shell {
+            background: rgba(255, 255, 255, 0.96) !important;
+            border: 1px solid rgba(226, 232, 240, 0.95) !important;
+            border-radius: 28px !important;
+            box-shadow: var(--elive-shadow) !important;
+            backdrop-filter: blur(12px);
+        }
+
+        .elive-banner {
+            position: relative;
+            height: 280px !important;
+            background-position: center !important;
+        }
+
+        .elive-banner::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                180deg,
+                rgba(15, 23, 42, 0.02) 10%,
+                rgba(15, 23, 42, 0.08) 55%,
+                rgba(15, 23, 42, 0.26) 100%
+            );
+            pointer-events: none;
+        }
+
+        .elive-content {
+            padding: 34px !important;
+        }
+
+        .elive-heading {
+            display: flex !important;
+            align-items: center !important;
+            gap: 18px !important;
+            padding-bottom: 6px;
+        }
+
+        .elive-heading img {
+            width: 78px !important;
+            height: 78px !important;
+            border-radius: 20px !important;
+            border: 1px solid var(--elive-border) !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .elive-title {
+            font-size: clamp(28px, 4vw, 42px) !important;
+            letter-spacing: -0.03em;
+            color: var(--elive-primary) !important;
+        }
+
+        .elive-description {
+            max-width: 760px;
+            margin-top: 10px !important;
+            color: var(--elive-muted) !important;
+            font-size: 15px !important;
+            line-height: 1.7;
+        }
+
+        .event-summary {
+            margin-top: 26px !important;
+            gap: 14px !important;
+        }
+
+        .event-summary > div {
+            position: relative;
+            overflow: hidden;
+            min-height: 102px;
+            padding: 18px !important;
+            background:
+                linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid var(--elive-border) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+        }
+
+        .event-summary > div::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--elive-primary);
+            opacity: 0.85;
+        }
+
+        .event-summary > div > div:first-child {
+            color: var(--elive-muted) !important;
+            letter-spacing: 0.08em;
+            font-size: 10px !important;
+        }
+
+        .event-summary > div > div:last-child {
+            margin-top: 8px !important;
+            color: var(--elive-text);
+            font-size: 15px !important;
+            line-height: 1.45;
+        }
+
+        form {
+            margin-top: 30px !important;
+        }
+
+        form > div {
+            margin-top: 20px !important;
+            padding: 24px !important;
+            background: #ffffff !important;
+            border: 1px solid var(--elive-border) !important;
+            border-radius: 22px !important;
+            box-shadow: var(--elive-shadow-soft) !important;
+            transition:
+                transform 160ms ease,
+                box-shadow 160ms ease,
+                border-color 160ms ease;
+        }
+
+        form > div:first-of-type {
+            margin-top: 0 !important;
+        }
+
+        form > div:hover {
+            border-color: color-mix(in srgb, var(--elive-primary) 28%, var(--elive-border)) !important;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.09) !important;
+        }
+
+        form h2 {
+            position: relative;
+            margin: 0 0 20px !important;
+            padding-left: 16px;
+            color: var(--elive-primary) !important;
+            font-size: 21px !important;
+            letter-spacing: -0.02em;
+        }
+
+        form h2::before {
+            content: "";
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            left: 0;
+            width: 5px;
+            border-radius: 999px;
+            background: var(--elive-primary);
+        }
+
+        form label {
+            color: #1e293b;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        form input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+        form select,
+        form textarea {
+            min-height: 46px;
+            width: 100%;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 13px !important;
+            background: #ffffff !important;
+            color: var(--elive-text);
+            font: inherit;
+            outline: none;
+            transition:
+                border-color 150ms ease,
+                box-shadow 150ms ease,
+                background 150ms ease;
+        }
+
+        form textarea {
+            min-height: 116px;
+            resize: vertical;
+        }
+
+        form input:not([type="checkbox"]):not([type="radio"]):focus,
+        form select:focus,
+        form textarea:focus {
+            border-color: var(--elive-primary) !important;
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--elive-primary) 15%, transparent);
+            background: #ffffff !important;
+        }
+
+        form input::placeholder,
+        form textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        form input[type="checkbox"],
+        form input[type="radio"] {
+            accent-color: var(--elive-primary);
+        }
+
+        [data-merchandise-card] {
+            background:
+                linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid var(--elive-border) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+            transition:
+                border-color 150ms ease,
+                transform 150ms ease,
+                box-shadow 150ms ease;
+        }
+
+        [data-merchandise-card]:hover {
+            transform: translateY(-1px);
+            border-color: color-mix(in srgb, var(--elive-primary) 30%, var(--elive-border)) !important;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+        }
+
+        [data-merchandise-card] img {
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        }
+
+        [data-payment-section] {
+            background:
+                linear-gradient(
+                    145deg,
+                    color-mix(in srgb, var(--elive-primary) 5%, #ffffff),
+                    #ffffff
+                ) !important;
+        }
+
+        [data-submit-button] {
+            min-height: 54px;
+            margin-top: 22px !important;
+            border-radius: 15px !important;
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--elive-button),
+                    color-mix(in srgb, var(--elive-button) 78%, #0f172a)
+                ) !important;
+            box-shadow: 0 12px 26px color-mix(in srgb, var(--elive-button) 28%, transparent);
+            letter-spacing: 0.01em;
+            transition:
+                transform 150ms ease,
+                box-shadow 150ms ease,
+                opacity 150ms ease;
+        }
+
+        [data-submit-button]:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 32px color-mix(in srgb, var(--elive-button) 34%, transparent);
+        }
+
+        [data-submit-button]:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .elive-footer {
+            padding: 8px 12px 0;
+            color: #64748b !important;
+            font-size: 12px !important;
+            line-height: 1.7;
+        }
+
+        @media (max-width: 720px) {
+            .elive-page {
+                padding: 14px 10px 22px !important;
+            }
+
+            .elive-shell {
+                border-radius: 20px !important;
+            }
+
+            .elive-banner {
+                height: 190px !important;
+            }
+
+            .elive-content {
+                padding: 20px 16px !important;
+            }
+
+            .elive-heading {
+                align-items: flex-start !important;
+            }
+
+            .elive-heading img {
+                width: 62px !important;
+                height: 62px !important;
+            }
+
+            .elive-title {
+                font-size: 27px !important;
+            }
+
+            .event-summary {
+                grid-template-columns: 1fr !important;
+            }
+
+            form > div {
+                padding: 18px !important;
+                border-radius: 18px !important;
+            }
+
+            form h2 {
+                font-size: 19px !important;
+            }
+
+            [data-merchandise-card] {
+                padding: 14px !important;
+            }
+
+            [data-merchandise-card] img {
+                width: 86px !important;
+                height: 86px !important;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                transition: none !important;
+            }
+        }
+    </style>
+
 </head>
 
 <body style="
@@ -12,9 +387,9 @@
     color: #0f172a;
     font-family: Arial, sans-serif;
 ">
-    <div style="min-height: 100vh; padding: 28px 16px;">
-        <div style="max-width: 980px; margin: 0 auto;">
-            <div style="
+    <div class="elive-page" style="min-height: 100vh; padding: 28px 16px;">
+        <div class="elive-container" style="max-width: 980px; margin: 0 auto;">
+            <div class="elive-shell" style="
                 background: #ffffff;
                 border-radius: 24px;
                 overflow: hidden;
@@ -22,18 +397,18 @@
                 border: 1px solid #e5e7eb;
             ">
                 @if ($branding['banner'])
-                    <div style="
+                    <div class="elive-banner" style="
                         height: 230px;
                         background-image: url('{{ asset('storage/' . $branding['banner']) }}');
                         background-size: cover;
                         background-position: center;
                     "></div>
                 @else
-                    <div style="height: 16px; background: {{ $branding['primary_color'] }};"></div>
+                    <div class="elive-banner" style="height: 16px; background: {{ $branding['primary_color'] }};"></div>
                 @endif
 
-                <div style="padding: 28px;">
-                    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+                <div class="elive-content" style="padding: 28px;">
+                    <div class="elive-heading" style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
                         @if ($branding['logo'])
                             <img
                                 src="{{ asset('storage/' . $branding['logo']) }}"
@@ -51,7 +426,7 @@
                         @endif
 
                         <div style="flex: 1; min-width: 260px;">
-                            <h1 style="
+                            <h1 class="elive-title" style="
                                 margin: 0;
                                 color: {{ $branding['primary_color'] }};
                                 font-size: 30px;
@@ -61,13 +436,13 @@
                                 {{ $event->registration_welcome_title ?: 'Register for ' . $event->name }}
                             </h1>
 
-                            <p style="margin: 8px 0 0 0; color: #64748b; font-size: 15px;">
+                            <p class="elive-description" style="margin: 8px 0 0 0; color: #64748b; font-size: 15px;">
                                 {{ $event->registration_welcome_message ?: 'Complete the form below to register for this event.' }}
                             </p>
                         </div>
                     </div>
 
-                    <div style="
+                    <div class="event-summary" style="
                         margin-top: 24px;
                         display: grid;
                         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -171,8 +546,44 @@
                             </div>
                         @endif
 
-                        <form method="POST" action="{{ route('public.registration.store', $event) }}" style="margin-top: 28px;">
+                        <form method="POST" action="{{ route('public.registration.store', $event) }}" data-registration-form style="margin-top: 28px;">
                             @csrf
+
+                            @php
+                                /*
+                                 * Multi-purpose standard field configuration.
+                                 *
+                                 * These values are read from the Event model when the
+                                 * corresponding database columns exist. Safe defaults
+                                 * preserve the current registration experience.
+                                 */
+                                $standardFields = [
+                                    'phone' => [
+                                        'show' => (bool) ($event->registration_show_phone ?? true),
+                                        'required' => (bool) ($event->registration_require_phone ?? true),
+                                    ],
+                                    'email' => [
+                                        'show' => (bool) ($event->registration_show_email ?? true),
+                                        'required' => (bool) ($event->registration_require_email ?? false),
+                                    ],
+                                    'organization' => [
+                                        'show' => (bool) ($event->registration_show_organization ?? true),
+                                        'required' => (bool) ($event->registration_require_organization ?? false),
+                                    ],
+                                    'position' => [
+                                        'show' => (bool) ($event->registration_show_position ?? true),
+                                        'required' => (bool) ($event->registration_require_position ?? false),
+                                    ],
+                                    'category' => [
+                                        'show' => (bool) ($event->registration_show_category ?? true),
+                                        'required' => (bool) ($event->registration_require_category ?? false),
+                                    ],
+                                    'badge_type' => [
+                                        'show' => (bool) ($event->registration_show_badge_type ?? false),
+                                        'required' => (bool) ($event->registration_require_badge_type ?? false),
+                                    ],
+                                ];
+                            @endphp
 
                             @if ($isFull && $waitlistEnabled)
                                 <input type="hidden" name="join_waitlist" value="1">
@@ -191,7 +602,7 @@
                                     font-size: 22px;
                                     font-weight: 900;
                                 ">
-                                    Attendee Information
+                                    Core Attendee Details
                                 </h2>
 
                                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
@@ -201,92 +612,83 @@
                                             name="full_name"
                                             value="{{ old('full_name') }}"
                                             required
+                                            autocomplete="name"
                                             style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                         >
+                                        @error('full_name')
+                                            <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                {{ $message }}
+                                            </div>
+                                        @enderror
                                     </div>
 
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Phone Number</label>
-                                        <input
-                                            type="tel"
-                                            name="phone"
-                                            value="{{ old('phone') }}"
-                                            placeholder="255712345678"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Email Address</label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value="{{ old('email') }}"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Organization / Company</label>
-                                        <input
-                                            name="organization_name"
-                                            value="{{ old('organization_name') }}"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Position / Title</label>
-                                        <input
-                                            name="position"
-                                            value="{{ old('position') }}"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    @if (($categories ?? collect())->count())
+                                    @if ($standardFields['phone']['show'])
                                         <div>
-                                            <label style="display:block;font-weight:800;margin-bottom:7px;">Category</label>
-                                            <select
-                                                name="category_id"
-                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                            <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                Phone Number
+                                                @if ($standardFields['phone']['required'])
+                                                    <span style="color:#dc2626;">*</span>
+                                                @endif
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                name="phone"
+                                                value="{{ old('phone') }}"
+                                                placeholder="255712345678"
+                                                inputmode="tel"
+                                                autocomplete="tel"
+                                                @required($standardFields['phone']['required'])
+                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                             >
-                                                <option value="">Select category</option>
-                                                @foreach ($categories as $category)
-                                                    <option value="{{ $category->id }}" @selected(old('category_id') == $category->id)>
-                                                        {{ $category->name }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                            @error('phone')
+                                                <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                    {{ $message }}
+                                                </div>
+                                            @enderror
                                         </div>
                                     @endif
 
-                                    @if (($badgeTypes ?? collect())->count())
+                                    @if ($standardFields['email']['show'])
                                         <div>
-                                            <label style="display:block;font-weight:800;margin-bottom:7px;">Badge Type</label>
-                                            <select
-                                                name="badge_type_id"
-                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                            <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                Email Address
+                                                @if ($standardFields['email']['required'])
+                                                    <span style="color:#dc2626;">*</span>
+                                                @endif
+                                            </label>
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                value="{{ old('email') }}"
+                                                autocomplete="email"
+                                                @required($standardFields['email']['required'])
+                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                             >
-                                                <option value="">Select badge type</option>
-                                                @foreach ($badgeTypes as $badgeType)
-                                                    <option value="{{ $badgeType->id }}" @selected(old('badge_type_id') == $badgeType->id)>
-                                                        {{ $badgeType->name }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                            @error('email')
+                                                <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                    {{ $message }}
+                                                </div>
+                                            @enderror
                                         </div>
                                     @endif
                                 </div>
                             </div>
 
-                            @if (($eventDays ?? collect())->count())
-                                @php
-                                    $oldEventDays = collect(old('event_days', []))
-                                        ->map(fn ($id) => (int) $id)
-                                        ->all();
-                                @endphp
+                            @php
+                                $showOptionalStandardDetails =
+                                    $standardFields['organization']['show']
+                                    || $standardFields['position']['show']
+                                    || (
+                                        $standardFields['category']['show']
+                                        && ($categories ?? collect())->isNotEmpty()
+                                    )
+                                    || (
+                                        $standardFields['badge_type']['show']
+                                        && ($badgeTypes ?? collect())->isNotEmpty()
+                                    );
+                            @endphp
 
+                            @if ($showOptionalStandardDetails)
                                 <div style="
                                     margin-top:22px;
                                     background:#ffffff;
@@ -295,142 +697,120 @@
                                     padding:22px;
                                     box-shadow:0 8px 22px rgba(15,23,42,0.06);
                                 ">
-                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-                                        <div>
-                                            <h2 style="
-                                                margin:0;
-                                                color:{{ $branding['primary_color'] }};
-                                                font-size:22px;
-                                                font-weight:900;
-                                            ">
-                                                Attendance Days
-                                            </h2>
-
-                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
-                                                Select all days you expect to attend.
-                                            </p>
-                                        </div>
-
-                                        <div style="
-                                            background:#eef2ff;
-                                            border:1px solid #c7d2fe;
-                                            color:#3730a3;
-                                            border-radius:12px;
-                                            padding:10px 12px;
-                                            font-size:12px;
-                                            font-weight:800;
-                                        ">
-                                            Select at least one day
-                                        </div>
-                                    </div>
-
-                                    <div style="
-                                        display:grid;
-                                        grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
-                                        gap:12px;
-                                        margin-top:18px;
+                                    <h2 style="
+                                        margin:0 0 18px 0;
+                                        color:{{ $branding['primary_color'] }};
+                                        font-size:22px;
+                                        font-weight:900;
                                     ">
-                                        @foreach ($eventDays as $day)
-                                            @php
-                                                $daySelected = in_array(
-                                                    (int) $day->id,
-                                                    $oldEventDays,
-                                                    true
-                                                );
-                                            @endphp
+                                        Optional Standard Details
+                                    </h2>
 
-                                            <label style="
-                                                display:flex;
-                                                align-items:flex-start;
-                                                gap:12px;
-                                                padding:16px;
-                                                border:1px solid #e2e8f0;
-                                                border-radius:16px;
-                                                background:#f8fafc;
-                                                cursor:pointer;
-                                            ">
-                                                <input
-                                                    type="checkbox"
-                                                    name="event_days[]"
-                                                    value="{{ $day->id }}"
-                                                    @checked($daySelected)
-                                                    style="
-                                                        width:19px;
-                                                        height:19px;
-                                                        margin-top:2px;
-                                                        flex:0 0 auto;
-                                                    "
-                                                >
-
-                                                <span style="display:block;min-width:0;">
-                                                    <strong style="
-                                                        display:block;
-                                                        color:#0f172a;
-                                                        font-size:15px;
-                                                        line-height:1.35;
-                                                    ">
-                                                        {{ $day->name }}
-                                                    </strong>
-
-                                                    <span style="
-                                                        display:block;
-                                                        margin-top:5px;
-                                                        color:#64748b;
-                                                        font-size:13px;
-                                                        line-height:1.5;
-                                                    ">
-                                                        {{ $day->event_date?->format('d M Y') }}
-
-                                                        @if ($day->starts_at)
-                                                            — {{ $day->starts_at?->format('H:i') }}
-                                                        @endif
-
-                                                        @if ($day->ends_at)
-                                                            to {{ $day->ends_at?->format('H:i') }}
-                                                        @endif
-                                                    </span>
-
-                                                    @if (filled($day->venue_name))
-                                                        <span style="
-                                                            display:block;
-                                                            margin-top:4px;
-                                                            color:#475569;
-                                                            font-size:12px;
-                                                            font-weight:700;
-                                                        ">
-                                                            {{ $day->venue_name }}
-                                                        </span>
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
+                                        @if ($standardFields['organization']['show'])
+                                            <div>
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    Organization / Company
+                                                    @if ($standardFields['organization']['required'])
+                                                        <span style="color:#dc2626;">*</span>
                                                     @endif
-                                                </span>
-                                            </label>
-                                        @endforeach
+                                                </label>
+                                                <input
+                                                    name="organization_name"
+                                                    value="{{ old('organization_name') }}"
+                                                    @required($standardFields['organization']['required'])
+                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
+                                                >
+                                                @error('organization_name')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
+
+                                        @if ($standardFields['position']['show'])
+                                            <div>
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    Position / Title
+                                                    @if ($standardFields['position']['required'])
+                                                        <span style="color:#dc2626;">*</span>
+                                                    @endif
+                                                </label>
+                                                <input
+                                                    name="position"
+                                                    value="{{ old('position') }}"
+                                                    @required($standardFields['position']['required'])
+                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
+                                                >
+                                                @error('position')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
+
+                                        @if ($standardFields['category']['show'] && ($categories ?? collect())->isNotEmpty())
+                                            <div>
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    Category
+                                                    @if ($standardFields['category']['required'])
+                                                        <span style="color:#dc2626;">*</span>
+                                                    @endif
+                                                </label>
+                                                <select
+                                                    name="category_id"
+                                                    @required($standardFields['category']['required'])
+                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                                >
+                                                    <option value="">Select category</option>
+                                                    @foreach ($categories as $category)
+                                                        <option value="{{ $category->id }}" @selected(old('category_id') == $category->id)>
+                                                            {{ $category->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                @error('category_id')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
+
+                                        @if ($standardFields['badge_type']['show'] && ($badgeTypes ?? collect())->isNotEmpty())
+                                            <div>
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    Badge Type
+                                                    @if ($standardFields['badge_type']['required'])
+                                                        <span style="color:#dc2626;">*</span>
+                                                    @endif
+                                                </label>
+                                                <select
+                                                    name="badge_type_id"
+                                                    @required($standardFields['badge_type']['required'])
+                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                                >
+                                                    <option value="">Select badge type</option>
+                                                    @foreach ($badgeTypes as $badgeType)
+                                                        <option value="{{ $badgeType->id }}" @selected(old('badge_type_id') == $badgeType->id)>
+                                                            {{ $badgeType->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                @error('badge_type_id')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
                                     </div>
-
-                                    @error('event_days')
-                                        <div style="
-                                            margin-top:12px;
-                                            color:#dc2626;
-                                            font-size:13px;
-                                            font-weight:800;
-                                        ">
-                                            {{ $message }}
-                                        </div>
-                                    @enderror
-
-                                    @error('event_days.*')
-                                        <div style="
-                                            margin-top:12px;
-                                            color:#dc2626;
-                                            font-size:13px;
-                                            font-weight:800;
-                                        ">
-                                            {{ $message }}
-                                        </div>
-                                    @enderror
                                 </div>
                             @endif
 
-                            @if (($fields ?? collect())->count())
+                            @if (($fields ?? collect())->isNotEmpty())
                                 <div style="
                                     margin-top: 22px;
                                     background: #ffffff;
@@ -623,9 +1003,165 @@
                                                         {{ $helpText }}
                                                     </div>
                                                 @endif
+
+                                                @error('answers.' . $field->id)
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
                                             </div>
                                         @endforeach
                                     </div>
+                                </div>
+                            @endif
+
+                            @if (($eventDays ?? collect())->count())
+                                @php
+                                    $oldEventDays = collect(old('event_days', []))
+                                        ->map(fn ($id) => (int) $id)
+                                        ->all();
+                                @endphp
+
+                                <div style="
+                                    margin-top:22px;
+                                    background:#ffffff;
+                                    border:1px solid #e2e8f0;
+                                    border-radius:20px;
+                                    padding:22px;
+                                    box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                ">
+                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+                                        <div>
+                                            <h2 style="
+                                                margin:0;
+                                                color:{{ $branding['primary_color'] }};
+                                                font-size:22px;
+                                                font-weight:900;
+                                            ">
+                                                Attendance Selection
+                                            </h2>
+
+                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                                Choose the event days or sessions you plan to attend.
+                                            </p>
+                                        </div>
+
+                                        <div style="
+                                            background:#eef2ff;
+                                            border:1px solid #c7d2fe;
+                                            color:#3730a3;
+                                            border-radius:12px;
+                                            padding:10px 12px;
+                                            font-size:12px;
+                                            font-weight:800;
+                                        ">
+                                            Select at least one day
+                                        </div>
+                                    </div>
+
+                                    <div style="
+                                        display:grid;
+                                        grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+                                        gap:12px;
+                                        margin-top:18px;
+                                    ">
+                                        @foreach ($eventDays as $day)
+                                            @php
+                                                $daySelected = in_array(
+                                                    (int) $day->id,
+                                                    $oldEventDays,
+                                                    true
+                                                );
+                                            @endphp
+
+                                            <label style="
+                                                display:flex;
+                                                align-items:flex-start;
+                                                gap:12px;
+                                                padding:16px;
+                                                border:1px solid #e2e8f0;
+                                                border-radius:16px;
+                                                background:#f8fafc;
+                                                cursor:pointer;
+                                            ">
+                                                <input
+                                                    type="checkbox"
+                                                    name="event_days[]"
+                                                    value="{{ $day->id }}"
+                                                    @checked($daySelected)
+                                                    style="
+                                                        width:19px;
+                                                        height:19px;
+                                                        margin-top:2px;
+                                                        flex:0 0 auto;
+                                                    "
+                                                >
+
+                                                <span style="display:block;min-width:0;">
+                                                    <strong style="
+                                                        display:block;
+                                                        color:#0f172a;
+                                                        font-size:15px;
+                                                        line-height:1.35;
+                                                    ">
+                                                        {{ $day->name }}
+                                                    </strong>
+
+                                                    <span style="
+                                                        display:block;
+                                                        margin-top:5px;
+                                                        color:#64748b;
+                                                        font-size:13px;
+                                                        line-height:1.5;
+                                                    ">
+                                                        {{ $day->event_date?->format('d M Y') }}
+
+                                                        @if ($day->starts_at)
+                                                            — {{ $day->starts_at?->format('H:i') }}
+                                                        @endif
+
+                                                        @if ($day->ends_at)
+                                                            to {{ $day->ends_at?->format('H:i') }}
+                                                        @endif
+                                                    </span>
+
+                                                    @if (filled($day->venue_name))
+                                                        <span style="
+                                                            display:block;
+                                                            margin-top:4px;
+                                                            color:#475569;
+                                                            font-size:12px;
+                                                            font-weight:700;
+                                                        ">
+                                                            {{ $day->venue_name }}
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+
+                                    @error('event_days')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+
+                                    @error('event_days.*')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
                                 </div>
                             @endif
 
@@ -856,8 +1392,56 @@
                                 </div>
                             @endif
 
+                            @if (($merchandiseItems ?? collect())->isNotEmpty())
+                            <div
+                                data-payment-section
+                                style="
+                                    margin-top:22px;
+                                    background:#ffffff;
+                                    border:1px solid #e2e8f0;
+                                    border-radius:20px;
+                                    padding:22px;
+                                    box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                "
+                            >
+                                <h2 style="
+                                    margin:0;
+                                    color:{{ $branding['primary_color'] }};
+                                    font-size:22px;
+                                    font-weight:900;
+                                ">
+                                    Payment
+                                </h2>
+
+                                <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                    Payment is only required when a paid item or paid registration option is selected.
+                                </p>
+
+                                <div style="
+                                    margin-top:16px;
+                                    background:#f8fafc;
+                                    border:1px solid #e2e8f0;
+                                    border-radius:14px;
+                                    padding:14px;
+                                ">
+                                    <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;color:#475569;">
+                                        <span>Amount payable</span>
+                                        <strong data-payment-total>No payment required</strong>
+                                    </div>
+
+                                    <div style="margin-top:8px;font-size:12px;color:#64748b;">
+                                        Final payment instructions will be shown after registration.
+                                    </div>
+                                </div>
+                            </div>
+
+                            @endif
+
                             <button
                                 type="submit"
+                                data-submit-button
+                                data-default-label="{{ $isFull && $waitlistEnabled ? 'Join Waitlist' : 'Submit Registration' }}"
+                                data-order-label="Submit Registration and Order"
                                 style="
                                     margin-top: 22px;
                                     width: 100%;
@@ -873,16 +1457,14 @@
                             >
                                 {{ $isFull && $waitlistEnabled
                                     ? 'Join Waitlist'
-                                    : (($merchandiseItems ?? collect())->count()
-                                        ? 'Submit Registration and Order'
-                                        : 'Submit Registration') }}
+                                    : 'Submit Registration' }}
                             </button>
                         </form>
                     @endif
                 </div>
             </div>
 
-            <div style="text-align:center;color:#64748b;font-size:13px;margin-top:18px;">
+            <div class="elive-footer" style="text-align:center;color:#64748b;font-size:13px;margin-top:18px;">
                 Powered by eLive Events
                 @if ($branding['support_email'])
                     | Support: {{ $branding['support_email'] }}
@@ -908,6 +1490,77 @@
                 maximumFractionDigits: 2,
             })}`;
         };
+
+        const registrationForm = document.querySelector('[data-registration-form]');
+        const submitButton = document.querySelector('[data-submit-button]');
+        const paymentTotal = document.querySelector('[data-payment-total]');
+
+        const refreshSubmitLabel = () => {
+            if (!submitButton) {
+                return;
+            }
+
+            const hasSelectedMerchandise = Array.from(
+                document.querySelectorAll('[data-merchandise-card]')
+            ).some((card) => {
+                const required = card.dataset.required === '1';
+                const toggle = card.querySelector('[data-merchandise-toggle]');
+
+                return required || Boolean(toggle?.checked);
+            });
+
+            submitButton.textContent = hasSelectedMerchandise
+                ? submitButton.dataset.orderLabel
+                : submitButton.dataset.defaultLabel;
+        };
+
+        const refreshPaymentTotal = () => {
+            if (!paymentTotal) {
+                return;
+            }
+
+            let total = 0;
+            let currency = 'TZS';
+
+            document.querySelectorAll('[data-merchandise-card]').forEach((card) => {
+                const required = card.dataset.required === '1';
+                const toggle = card.querySelector('[data-merchandise-toggle]');
+                const selected = required || Boolean(toggle?.checked);
+
+                if (!selected) {
+                    return;
+                }
+
+                const variantSelect = card.querySelector('[data-variant-select]');
+                const quantityInput = card.querySelector('[data-quantity-input]');
+                const option = variantSelect?.options[variantSelect.selectedIndex];
+
+                if (!option?.value) {
+                    return;
+                }
+
+                const price = Number(option.dataset.price || 0);
+                const quantity = Number(quantityInput?.value || 1);
+
+                currency = option.dataset.currency || currency;
+                total += price * quantity;
+            });
+
+            paymentTotal.textContent = total > 0
+                ? formatMoney(total, currency)
+                : 'No payment required';
+        };
+
+        registrationForm?.addEventListener('submit', () => {
+            if (!submitButton) {
+                return;
+            }
+
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.7';
+            submitButton.style.cursor = 'not-allowed';
+            submitButton.textContent = 'Submitting...';
+        });
 
         document.querySelectorAll('[data-merchandise-card]').forEach((card) => {
             const required = card.dataset.required === '1';
@@ -945,6 +1598,8 @@
                 }
 
                 refreshSummary();
+                refreshSubmitLabel();
+                refreshPaymentTotal();
             };
 
             const refreshSummary = () => {
@@ -981,12 +1636,26 @@
             };
 
             toggle?.addEventListener('change', refreshVisibility);
-            variantSelect?.addEventListener('change', refreshSummary);
-            quantityInput?.addEventListener('input', refreshSummary);
-            quantityInput?.addEventListener('change', refreshSummary);
+            variantSelect?.addEventListener('change', () => {
+                refreshSummary();
+                refreshPaymentTotal();
+            });
+
+            quantityInput?.addEventListener('input', () => {
+                refreshSummary();
+                refreshPaymentTotal();
+            });
+
+            quantityInput?.addEventListener('change', () => {
+                refreshSummary();
+                refreshPaymentTotal();
+            });
 
             refreshVisibility();
         });
+
+        refreshSubmitLabel();
+        refreshPaymentTotal();
     });
 </script>
 

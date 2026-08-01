@@ -10,6 +10,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -162,6 +164,146 @@ class EventForm
                             ->columnSpanFull(),
                     ])
                     ->columns(3)
+                    ->collapsible(),
+
+                Section::make('Public Registration Fields')
+                    ->description(
+                        'Choose which standard attendee fields appear on the public form and whether they are optional or required.'
+                    )
+                    ->schema([
+                        Toggle::make('registration_show_phone')
+                            ->label('Show Phone Number')
+                            ->helperText('Display the phone number field in Core Attendee Details.')
+                            ->default(true)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (bool $state, Set $set): void {
+                                    if (! $state) {
+                                        $set('registration_require_phone', false);
+                                    }
+                                }
+                            ),
+
+                        Toggle::make('registration_require_phone')
+                            ->label('Require Phone Number')
+                            ->helperText('Attendees must provide a phone number.')
+                            ->default(true)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get('registration_show_phone')
+                            ),
+
+                        Toggle::make('registration_show_email')
+                            ->label('Show Email Address')
+                            ->helperText('Display the email address field in Core Attendee Details.')
+                            ->default(true)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (bool $state, Set $set): void {
+                                    if (! $state) {
+                                        $set('registration_require_email', false);
+                                    }
+                                }
+                            ),
+
+                        Toggle::make('registration_require_email')
+                            ->label('Require Email Address')
+                            ->helperText('Attendees must provide a valid email address.')
+                            ->default(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get('registration_show_email')
+                            ),
+
+                        Toggle::make('registration_show_organization')
+                            ->label('Show Organization / Company')
+                            ->helperText('Display Organization / Company under Optional Standard Details.')
+                            ->default(false)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (bool $state, Set $set): void {
+                                    if (! $state) {
+                                        $set('registration_require_organization', false);
+                                    }
+                                }
+                            ),
+
+                        Toggle::make('registration_require_organization')
+                            ->label('Require Organization / Company')
+                            ->helperText('Attendees must provide their organization or company.')
+                            ->default(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get('registration_show_organization')
+                            ),
+
+                        Toggle::make('registration_show_position')
+                            ->label('Show Position / Title')
+                            ->helperText('Display Position / Title under Optional Standard Details.')
+                            ->default(false)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (bool $state, Set $set): void {
+                                    if (! $state) {
+                                        $set('registration_require_position', false);
+                                    }
+                                }
+                            ),
+
+                        Toggle::make('registration_require_position')
+                            ->label('Require Position / Title')
+                            ->helperText('Attendees must provide their position or title.')
+                            ->default(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get('registration_show_position')
+                            ),
+
+                        Toggle::make('registration_show_category')
+                            ->label('Show Attendee Category')
+                            ->helperText('Allow attendees to select an event category.')
+                            ->default(false)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (bool $state, Set $set): void {
+                                    if (! $state) {
+                                        $set('registration_require_category', false);
+                                    }
+                                }
+                            ),
+
+                        Toggle::make('registration_require_category')
+                            ->label('Require Attendee Category')
+                            ->helperText('Attendees must select a category.')
+                            ->default(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get('registration_show_category')
+                            ),
+
+                        Toggle::make('registration_show_badge_type')
+                            ->label('Show Badge Type')
+                            ->helperText('Allow attendees to select an active badge type.')
+                            ->default(false)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (bool $state, Set $set): void {
+                                    if (! $state) {
+                                        $set('registration_require_badge_type', false);
+                                    }
+                                }
+                            ),
+
+                        Toggle::make('registration_require_badge_type')
+                            ->label('Require Badge Type')
+                            ->helperText('Attendees must select a badge type.')
+                            ->default(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get('registration_show_badge_type')
+                            ),
+                    ])
+                    ->columns(2)
                     ->collapsible(),
 
                 Section::make('Registration Branding')

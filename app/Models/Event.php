@@ -39,6 +39,24 @@ class Event extends Model
         'registration_waitlist_enabled',
         'registration_waitlist_message',
 
+        'registration_show_phone',
+        'registration_require_phone',
+
+        'registration_show_email',
+        'registration_require_email',
+
+        'registration_show_organization',
+        'registration_require_organization',
+
+        'registration_show_position',
+        'registration_require_position',
+
+        'registration_show_category',
+        'registration_require_category',
+
+        'registration_show_badge_type',
+        'registration_require_badge_type',
+
         'show_merchandise_images',
     ];
 
@@ -53,6 +71,24 @@ class Event extends Model
             'registration_requires_approval' => 'boolean',
             'registration_auto_generate_badge' => 'boolean',
             'registration_waitlist_enabled' => 'boolean',
+
+            'registration_show_phone' => 'boolean',
+            'registration_require_phone' => 'boolean',
+
+            'registration_show_email' => 'boolean',
+            'registration_require_email' => 'boolean',
+
+            'registration_show_organization' => 'boolean',
+            'registration_require_organization' => 'boolean',
+
+            'registration_show_position' => 'boolean',
+            'registration_require_position' => 'boolean',
+
+            'registration_show_category' => 'boolean',
+            'registration_require_category' => 'boolean',
+
+            'registration_show_badge_type' => 'boolean',
+            'registration_require_badge_type' => 'boolean',
 
             'show_merchandise_images' => 'boolean',
         ];
@@ -211,11 +247,6 @@ class Event extends Model
             ->where('is_active', true);
     }
 
-    /**
-     * All attendee merchandise orders for this event.
-     *
-     * Event -> Attendees -> AttendeeMerchandise
-     */
     public function attendeeMerchandiseOrders(): HasManyThrough
     {
         return $this->hasManyThrough(
