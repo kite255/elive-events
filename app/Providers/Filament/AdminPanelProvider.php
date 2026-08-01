@@ -29,7 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('eLive Events')
-            ->brandLogo(asset('elive-Logo.png'))
+            ->brandLogo(asset('eLive-Logo.png'))
             ->brandLogoHeight('2.5rem')
             ->favicon(asset('favicon.ico'))
             ->colors([

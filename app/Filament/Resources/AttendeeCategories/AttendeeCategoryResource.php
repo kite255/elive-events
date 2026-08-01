@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class AttendeeCategoryResource extends Resource
 {
@@ -28,7 +29,9 @@ class AttendeeCategoryResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Attendee Categories';
 
-    protected static ?int $navigationSort = 3;
+    protected static string|UnitEnum|null $navigationGroup = 'Event Management';
+
+    protected static ?int $navigationSort = 4;
 
     public static function form(Schema $schema): Schema
     {

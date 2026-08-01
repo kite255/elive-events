@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class CheckInPointResource extends Resource
 {
@@ -27,6 +28,8 @@ class CheckInPointResource extends Resource
     protected static ?string $modelLabel = 'Check-in Point';
 
     protected static ?string $pluralModelLabel = 'Check-in Points';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Event Management';
 
     protected static ?int $navigationSort = 6;
 

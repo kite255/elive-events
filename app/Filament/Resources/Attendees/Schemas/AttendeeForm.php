@@ -6,7 +6,10 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
 class AttendeeForm
 {
@@ -15,26 +18,80 @@ class AttendeeForm
         return $schema
             ->components([
                 Section::make('Event and Badge')
+                    ->description('Select the event, attendee category, and badge type for this attendee.')
                     ->schema([
                         Select::make('event_id')
                             ->label('Event')
                             ->relationship('event', 'name')
                             ->searchable()
-                            ->required(),
+                            ->preload()
+                            ->native(false)
+                            ->required()
+                            ->placeholder('Select event')
+                            ->optionsLimit(50)
+                            ->default(fn () => request()->integer('event_id') ?: null)
+                            ->disabled(fn () => request()->filled('event_id'))
+                            ->dehydrated()
+                            ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('category_id', null);
+                                $set('badge_type_id', null);
+                            }),
 
                         Select::make('category_id')
                             ->label('Attendee Category')
-                            ->relationship('category', 'name')
-                            ->searchable(),
+                            ->relationship(
+                                name: 'category',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: function (Builder $query, Get $get) {
+                                    $eventId = $get('event_id') ?: request()->integer('event_id');
+
+                                    if ($eventId) {
+                                        $query->where('event_id', $eventId);
+                                    }
+
+                                    return $query;
+                                }
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->placeholder('Select category')
+                            ->optionsLimit(50)
+                            ->disabled(fn (Get $get) => blank($get('event_id')) && ! request()->filled('event_id'))
+                            ->helperText('Only categories for the selected event will appear.'),
 
                         Select::make('badge_type_id')
                             ->label('Badge Type')
-                            ->relationship('badgeType', 'name')
-                            ->searchable(),
+                            ->relationship(
+                                name: 'badgeType',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: function (Builder $query, Get $get) {
+                                    $eventId = $get('event_id') ?: request()->integer('event_id');
+
+                                    if ($eventId) {
+                                        $query->where('event_id', $eventId);
+                                    }
+
+                                    return $query;
+                                }
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->placeholder('Select badge type')
+                            ->optionsLimit(50)
+                            ->disabled(fn (Get $get) => blank($get('event_id')) && ! request()->filled('event_id'))
+                            ->helperText('Only badge types for the selected event will appear.'),
                     ])
-                    ->columns(3),
+                    ->columns([
+                        'default' => 1,
+                        'md' => 3,
+                    ])
+                    ->columnSpanFull(),
 
                 Section::make('Attendee Information')
+                    ->description('Basic attendee details used for badge generation, reports, and check-in.')
                     ->schema([
                         TextInput::make('full_name')
                             ->label('Full Name')
@@ -59,9 +116,14 @@ class AttendeeForm
                             ->label('Position / Title')
                             ->maxLength(255),
                     ])
-                    ->columns(2),
+                    ->columns([
+                        'default' => 1,
+                        'md' => 2,
+                    ])
+                    ->columnSpanFull(),
 
                 Section::make('Registration Status')
+                    ->description('Control how the attendee was registered and their attendance state.')
                     ->schema([
                         Select::make('status')
                             ->label('Status')
@@ -72,6 +134,7 @@ class AttendeeForm
                                 'checked_in' => 'Checked In',
                             ])
                             ->default('registered')
+                            ->native(false)
                             ->required(),
 
                         Select::make('registration_source')
@@ -83,19 +146,26 @@ class AttendeeForm
                                 'onsite' => 'Onsite',
                             ])
                             ->default('manual')
+                            ->native(false)
                             ->required(),
 
                         DateTimePicker::make('registered_at')
                             ->label('Registered At')
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->default(now()),
 
                         DateTimePicker::make('checked_in_at')
                             ->label('Checked In At')
                             ->seconds(false),
                     ])
-                    ->columns(2),
+                    ->columns([
+                        'default' => 1,
+                        'md' => 2,
+                    ])
+                    ->columnSpanFull(),
 
                 Section::make('Badge Information')
+                    ->description('Badge number and generated badge file details.')
                     ->schema([
                         TextInput::make('badge_number')
                             ->label('Badge Number')
@@ -107,8 +177,12 @@ class AttendeeForm
                             ->disabled()
                             ->dehydrated(),
                     ])
-                    ->columns(2)
-                    ->collapsible(),
+                    ->columns([
+                        'default' => 1,
+                        'md' => 2,
+                    ])
+                    ->collapsible()
+                    ->columnSpanFull(),
             ]);
     }
 }

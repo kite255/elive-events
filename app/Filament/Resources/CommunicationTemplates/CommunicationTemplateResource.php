@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class CommunicationTemplateResource extends Resource
 {
@@ -28,7 +29,9 @@ class CommunicationTemplateResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Message Templates';
 
-    protected static ?int $navigationSort = 7;
+    protected static string|UnitEnum|null $navigationGroup = 'Registration & Communication';
+
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {

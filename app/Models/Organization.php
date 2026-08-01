@@ -15,6 +15,13 @@ class Organization extends Model
         'logo_path',
         'website',
         'status',
+
+        'primary_color',
+        'secondary_color',
+        'background_color',
+        'button_color',
+        'support_email',
+        'support_phone',
     ];
 
     public function events(): HasMany

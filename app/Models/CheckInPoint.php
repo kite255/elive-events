@@ -22,6 +22,12 @@ class CheckInPoint extends Model
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
@@ -30,5 +36,32 @@ class CheckInPoint extends Model
     public function checkIns(): HasMany
     {
         return $this->hasMany(CheckIn::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeForEvent($query, int $eventId)
+    {
+        return $query->where('event_id', $eventId);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    public function getTotalCheckInsAttribute(): int
+    {
+        return $this->checkIns()->count();
     }
 }

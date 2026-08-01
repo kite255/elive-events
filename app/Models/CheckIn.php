@@ -26,6 +26,12 @@ class CheckIn extends Model
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
@@ -44,5 +50,36 @@ class CheckIn extends Model
     public function checkedInBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'checked_in_by');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeForEvent($query, int $eventId)
+    {
+        return $query->where('event_id', $eventId);
+    }
+
+    public function scopeManual($query)
+    {
+        return $query->where('method', 'manual');
+    }
+
+    public function scopeQr($query)
+    {
+        return $query->where('method', 'qr');
+    }
+
+    public function scopeToday($query)
+    {
+        return $query->whereDate('checked_in_at', today());
+    }
+
+    public function scopeLatestCheckIns($query)
+    {
+        return $query->latest('checked_in_at');
     }
 }

@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class OrganizationResource extends Resource
 {
@@ -25,6 +26,8 @@ class OrganizationResource extends Resource
     protected static ?string $modelLabel = 'Organization';
 
     protected static ?string $pluralModelLabel = 'Organizations';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Event Management';
 
     protected static ?int $navigationSort = 1;
 
