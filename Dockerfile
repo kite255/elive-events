@@ -1,8 +1,10 @@
 FROM php:8.3-fpm
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /var/www/html
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     zip \
@@ -16,8 +18,7 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libicu-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install \
-        pdo \
+    && docker-php-ext-install -j2 \
         pdo_pgsql \
         pgsql \
         mbstring \
