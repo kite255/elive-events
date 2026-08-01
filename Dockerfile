@@ -26,24 +26,41 @@ RUN apt-get update && apt-get install -y \
         bcmath \
         gd \
         zip \
-        intl
+        intl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pecl install redis \
     && docker-php-ext-enable redis
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
+
 COPY composer.json composer.lock ./
 
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-scripts
 
 COPY . .
 
-COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
-
 RUN composer dump-autoload --optimize \
-    && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache public
+    && mkdir -p \
+        storage/app/public \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/testing \
+        storage/framework/views \
+        storage/framework/livewire-tmp \
+        storage/logs \
+        bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache public \
+    && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 9000
 
