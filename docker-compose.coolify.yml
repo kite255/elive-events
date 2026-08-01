@@ -22,7 +22,7 @@ services:
       - app
     networks:
       - elive_network
-    ports:
+    expose:
       - "80"
 
   postgres:
