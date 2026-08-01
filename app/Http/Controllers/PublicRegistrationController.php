@@ -505,7 +505,7 @@ class PublicRegistrationController extends Controller
                 'attendee_id' => $attendee->id,
                 'event_registration_field_id' =>
                     $field->id,
-                'answer' => $answer,
+                'value' => $answer,
             ]);
         }
     }
