@@ -10,8 +10,6 @@ services:
     depends_on:
       - postgres
       - redis
-    networks:
-      - elive_network
 
   nginx:
     build:
@@ -20,8 +18,6 @@ services:
     restart: unless-stopped
     depends_on:
       - app
-    networks:
-      - elive_network
     expose:
       - "80"
 
@@ -34,19 +30,11 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - elive_postgres_data:/var/lib/postgresql/data
-    networks:
-      - elive_network
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    networks:
-      - elive_network
 
 volumes:
   elive_postgres_data:
   elive_storage:
-
-networks:
-  elive_network:
-    driver: bridge
