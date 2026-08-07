@@ -3,6 +3,15 @@
         $attendee = $this->getRecord();
 
         $days = $attendee->eventDays ?? collect();
+
+        $selectedAllDays = $days->contains(
+            fn ($day) =>
+                data_get(
+                    $day,
+                    'pivot.selection_source'
+                ) === 'public_registration_all_days'
+        );
+
         $orders = $attendee->merchandiseSelections ?? collect();
         $answers = $attendee->registrationAnswers ?? collect();
         $checkIns = $attendee->checkIns ?? collect();
@@ -55,9 +64,30 @@
         <x-filament::section>
             <x-slot name="heading">Selected Attendance Days</x-slot>
 
+            <x-slot name="description">
+                @if ($days->isEmpty())
+                    No event days selected
+                @else
+                    {{ $days->count() }}
+                    {{ \Illuminate\Support\Str::plural('event day', $days->count()) }}
+                    selected
+                    @if ($selectedAllDays)
+                        • All event days
+                    @endif
+                @endif
+            </x-slot>
+
             @if ($days->isEmpty())
                 <p class="text-sm text-gray-500">No attendance days selected.</p>
             @else
+                @if ($selectedAllDays)
+                    <div class="mb-4">
+                        <x-filament::badge color="success" icon="heroicon-o-calendar-days">
+                            All Event Days
+                        </x-filament::badge>
+                    </div>
+                @endif
+
                 <div class="grid gap-3">
                     @foreach ($days as $day)
                         <div class="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-gray-200 p-4 dark:border-white/10">
@@ -75,8 +105,18 @@
                                     @endif
                                 </div>
                             </div>
-                            <div class="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                {{ $day->venue_name ?: 'Main event venue' }}
+                            <div class="text-right">
+                                <div class="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                    {{ $day->venue_name ?: 'Main event venue' }}
+                                </div>
+
+                                @if (filled(data_get($day, 'pivot.selection_source')))
+                                    <div class="mt-2 text-xs text-gray-500">
+                                        {{ str(
+                                            data_get($day, 'pivot.selection_source')
+                                        )->replace('_', ' ')->title() }}
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endforeach

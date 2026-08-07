@@ -1,6 +1,8 @@
 <x-filament-panels::page>
     @php
         $events = $this->events;
+        $eventDays = $this->eventDays;
+        $selectedEventDay = $this->selectedEventDay;
         $categories = $this->categories;
         $checkInPoints = $this->checkInPoints;
         $methods = $this->methods;
@@ -111,6 +113,15 @@
             color: white;
         }
 
+        .elive-loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: rgb(79 70 229);
+        }
+
         .elive-actions {
             display: flex;
             flex-wrap: wrap;
@@ -181,6 +192,24 @@
 
         .dark .elive-stat-value {
             color: white;
+        }
+
+        .elive-day-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.9rem 1rem;
+            border: 1px solid rgb(191 219 254);
+            border-radius: 0.9rem;
+            background: rgb(239 246 255);
+            color: rgb(30 64 175);
+        }
+
+        .dark .elive-day-banner {
+            border-color: rgb(30 64 175);
+            background: rgb(30 58 138 / 0.25);
+            color: rgb(191 219 254);
         }
 
         .elive-table-wrap {
@@ -270,7 +299,8 @@
                 grid-template-columns: 1fr;
             }
 
-            .elive-panel-header {
+            .elive-panel-header,
+            .elive-day-banner {
                 align-items: flex-start;
                 flex-direction: column;
             }
@@ -282,16 +312,16 @@
             <div class="elive-panel-header">
                 <div>
                     <h2 class="elive-title">
-                        Attendance Filters
+                        Check-in Attendance Filters
                     </h2>
 
                     <p class="elive-subtitle">
-                        Filter attendance records and export the result to CSV.
+                        Review attendance by event day, category, point, method, officer, and date range.
                     </p>
                 </div>
 
-                <div wire:loading>
-                    Updating...
+                <div class="elive-loading" wire:loading>
+                    Updating report...
                 </div>
             </div>
 
@@ -312,6 +342,30 @@
                             @foreach ($events as $event)
                                 <option value="{{ $event->id }}">
                                     {{ $event->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="elive-form-group">
+                        <label class="elive-label" for="attendance-day">
+                            Event Day
+                        </label>
+
+                        <select
+                            id="attendance-day"
+                            class="elive-select"
+                            wire:model.live="eventDayId"
+                            @disabled(! $eventId || $eventDays->isEmpty())
+                        >
+                            <option value="">All event days</option>
+
+                            @foreach ($eventDays as $day)
+                                <option value="{{ $day->id }}">
+                                    {{ $day->name }}
+                                    @if ($day->event_date)
+                                        — {{ $day->event_date->format('d M Y') }}
+                                    @endif
                                 </option>
                             @endforeach
                         </select>
@@ -484,30 +538,60 @@
             </div>
         </section>
 
+        @if ($selectedEventDay)
+            <div class="elive-day-banner">
+                <div>
+                    <strong>{{ $selectedEventDay->name }}</strong>
+
+                    @if ($selectedEventDay->event_date)
+                        <span>
+                            · {{ $selectedEventDay->event_date->format('l, d M Y') }}
+                        </span>
+                    @endif
+                </div>
+
+                <div>
+                    Reporting expected attendance and actual check-ins for this day.
+                </div>
+            </div>
+        @endif
+
         <section class="elive-stat-grid">
             <div class="elive-stat">
-                <div class="elive-stat-label">Registered</div>
+                <div class="elive-stat-label">
+                    {{ $selectedEventDay ? 'Expected for Day' : 'Registered Attendees' }}
+                </div>
+
                 <div class="elive-stat-value">
                     {{ number_format($summary['total']) }}
                 </div>
             </div>
 
             <div class="elive-stat">
-                <div class="elive-stat-label">Checked In</div>
+                <div class="elive-stat-label">
+                    {{ $selectedEventDay ? 'Checked In for Day' : 'Actually Checked In' }}
+                </div>
+
                 <div class="elive-stat-value">
                     {{ number_format($summary['checked_in']) }}
                 </div>
             </div>
 
             <div class="elive-stat">
-                <div class="elive-stat-label">Not Checked In</div>
+                <div class="elive-stat-label">
+                    {{ $selectedEventDay ? 'Not Checked In for Day' : 'Not Yet Checked In' }}
+                </div>
+
                 <div class="elive-stat-value">
                     {{ number_format($summary['not_checked_in']) }}
                 </div>
             </div>
 
             <div class="elive-stat">
-                <div class="elive-stat-label">Attendance Rate</div>
+                <div class="elive-stat-label">
+                    Attendance Rate
+                </div>
+
                 <div class="elive-stat-value">
                     {{ number_format($summary['attendance_rate'], 1) }}%
                 </div>
@@ -518,11 +602,11 @@
             <div class="elive-panel-header">
                 <div>
                     <h2 class="elive-title">
-                        Attendance Records
+                        Check-in Attendance Records
                     </h2>
 
                     <p class="elive-subtitle">
-                        Showing {{ number_format($attendees->total()) }} matching attendees.
+                        Showing {{ number_format($attendees->total()) }} attendees matching the selected attendance filters.
                     </p>
                 </div>
 
@@ -550,6 +634,7 @@
                         <thead>
                             <tr>
                                 <th>Attendee</th>
+                                <th>Day</th>
                                 <th>Badge</th>
                                 <th>Category</th>
                                 <th>Organization</th>
@@ -578,6 +663,11 @@
                                                 {{ $attendee->event->name }}
                                             </div>
                                         @endif
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn?->eventDay?->name
+                                            ?? ($selectedEventDay?->name ?? '—') }}
                                     </td>
 
                                     <td>
@@ -627,7 +717,7 @@
                 </div>
             @else
                 <div class="elive-empty">
-                    No attendance records matched the selected filters.
+                    No attendee check-in records matched the selected filters.
                 </div>
             @endif
         </section>

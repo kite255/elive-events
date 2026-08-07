@@ -11,11 +11,15 @@ use App\Filament\Resources\Attendees\Pages\ViewAttendeeQrCode;
 use App\Filament\Resources\Attendees\Schemas\AttendeeForm;
 use App\Filament\Resources\Attendees\Tables\AttendeesTable;
 use App\Models\Attendee;
+use App\Models\Organization;
+use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class AttendeeResource extends Resource
@@ -38,6 +42,12 @@ class AttendeeResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    /*
+    |--------------------------------------------------------------------------
+    | Form and table
+    |--------------------------------------------------------------------------
+    */
+
     public static function form(Schema $schema): Schema
     {
         return AttendeeForm::configure($schema);
@@ -48,22 +58,338 @@ class AttendeeResource extends Resource
         return AttendeesTable::configure($table);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Organization-scoped query
+    |--------------------------------------------------------------------------
+    */
+
+    public static function getEloquentQuery(): Builder
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return parent::getEloquentQuery()
+                ->whereRaw('1 = 0');
+        }
+
+        if ($user->isSuperAdmin()) {
+            return parent::getEloquentQuery();
+        }
+
+        return parent::getEloquentQuery()
+            ->whereHas(
+                'event',
+                function (Builder $query) use ($user): Builder {
+                    return $query->accessibleBy($user);
+                }
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | General resource authorization
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $user->activeOrganizations()
+            ->get()
+            ->contains(
+                fn (Organization $organization): bool =>
+                    static::userCanViewAttendees(
+                        $user,
+                        $organization
+                    )
+            );
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $user->activeOrganizations()
+            ->get()
+            ->contains(
+                fn (Organization $organization): bool =>
+                    $user->canManageRegistration($organization)
+            );
+    }
+
+    public static function canView(Model $record): bool
+    {
+        if (! $record instanceof Attendee) {
+            return false;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $event = $record->event;
+
+        if (! $event || ! $event->organization_id) {
+            return false;
+        }
+
+        if (! $event->isAccessibleBy($user)) {
+            return false;
+        }
+
+        return static::userCanViewAttendees(
+            $user,
+            $event->organization
+        );
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        if (! $record instanceof Attendee) {
+            return false;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $event = $record->event;
+
+        if (! $event || ! $event->organization_id) {
+            return false;
+        }
+
+        return $event->canManageRegistrationBy($user);
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        if (! $record instanceof Attendee) {
+            return false;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $event = $record->event;
+
+        if (! $event || ! $event->organization_id) {
+            return false;
+        }
+
+        /*
+         * Permanent attendee removal is restricted to organization
+         * owners and organization administrators.
+         */
+        return $user->canManageOrganization(
+            $event->organization_id
+        );
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $user->activeOrganizations()
+            ->get()
+            ->contains(
+                fn (Organization $organization): bool =>
+                    $user->canManageOrganization($organization)
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Import authorization
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canImport(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $user->activeOrganizations()
+            ->get()
+            ->contains(
+                fn (Organization $organization): bool =>
+                    $user->canManageRegistration($organization)
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Badge and QR authorization
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canViewQrCode(
+        Attendee $attendee
+    ): bool {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $event = $attendee->event;
+
+        if (! $event || ! $event->organization_id) {
+            return false;
+        }
+
+        if (! $event->isAccessibleBy($user)) {
+            return false;
+        }
+
+        return $event->canManageRegistrationBy($user)
+            || $event->canManageBadgesBy($user)
+            || $event->canBeCheckedInBy($user);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Navigation
+    |--------------------------------------------------------------------------
+    */
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canViewAny();
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        if (! static::canViewAny()) {
+            return null;
+        }
+
+        $count = static::getEloquentQuery()->count();
+
+        return $count > 0
+            ? (string) $count
+            : null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public static function getRelations(): array
     {
         return [];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pages
+    |--------------------------------------------------------------------------
+    */
+
     public static function getPages(): array
     {
         return [
             'index' => ListAttendees::route('/'),
+
             'create' => CreateAttendee::route('/create'),
+
             'import' => ImportAttendees::route('/import'),
+
             'view' => ViewAttendee::route('/{record}'),
-            'edit' => EditAttendee::route('/{record}/edit'),
+
+            'edit' => EditAttendee::route(
+                '/{record}/edit'
+            ),
+
             'qr-code' => ViewAttendeeQrCode::route(
                 '/{record}/qr-code'
             ),
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Internal authorization helpers
+    |--------------------------------------------------------------------------
+    */
+
+    private static function userCanViewAttendees(
+        User $user,
+        Organization $organization
+    ): bool {
+        if (! $user->hasActiveOrganizationAccess($organization)) {
+            return false;
+        }
+
+        return $user->hasOrganizationRole(
+            $organization,
+            [
+                User::ORGANIZATION_ROLE_OWNER,
+                User::ORGANIZATION_ROLE_ADMIN,
+                User::ORGANIZATION_ROLE_EVENT_MANAGER,
+                User::ORGANIZATION_ROLE_REGISTRATION_OFFICER,
+                User::ORGANIZATION_ROLE_CHECK_IN_OFFICER,
+                User::ORGANIZATION_ROLE_BADGE_OFFICER,
+                User::ORGANIZATION_ROLE_REPORT_VIEWER,
+            ]
+        );
     }
 }

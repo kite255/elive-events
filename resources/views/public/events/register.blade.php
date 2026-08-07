@@ -251,6 +251,131 @@
             accent-color: var(--elive-primary);
         }
 
+        .elive-field-invalid input,
+        .elive-field-invalid select,
+        .elive-field-invalid textarea {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
+        }
+
+        .elive-field-invalid label {
+            color: #991b1b;
+        }
+
+        .elive-validation-summary {
+            margin-top: 22px;
+            background: #fff7f7;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-weight: 700;
+        }
+
+        .elive-validation-summary ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .elive-session-day-group {
+            display: grid;
+            gap: 12px;
+        }
+
+        .elive-session-day-group[hidden] {
+            display: none !important;
+        }
+
+        .elive-session-day-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--elive-primary) 7%, #ffffff);
+            border: 1px solid color-mix(in srgb, var(--elive-primary) 20%, var(--elive-border));
+        }
+
+        .elive-session-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        .elive-session-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            border: 1px solid var(--elive-border);
+            border-radius: 16px;
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            cursor: pointer;
+            transition:
+                border-color 150ms ease,
+                transform 150ms ease,
+                box-shadow 150ms ease,
+                opacity 150ms ease;
+        }
+
+        .elive-session-card:hover {
+            transform: translateY(-1px);
+            border-color: color-mix(in srgb, var(--elive-primary) 30%, var(--elive-border));
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+        }
+
+        .elive-session-card[data-full="1"] {
+            cursor: not-allowed;
+            opacity: 0.62;
+        }
+
+        .elive-session-card input {
+            width: 19px;
+            height: 19px;
+            margin-top: 2px;
+            flex: 0 0 auto;
+        }
+
+        .elive-session-type {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 7px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .elive-session-meta {
+            display: block;
+            margin-top: 5px;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .elive-session-capacity {
+            display: block;
+            margin-top: 7px;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .elive-session-empty {
+            padding: 16px;
+            border: 1px dashed var(--elive-border);
+            border-radius: 14px;
+            color: #64748b;
+            font-size: 13px;
+            text-align: center;
+        }
+
         [data-merchandise-card] {
             background:
                 linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
@@ -461,7 +586,19 @@
                         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;">
                             <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Date</div>
                             <div style="font-size:15px;font-weight:800;margin-top:5px;">
-                                {{ $event->starts_at?->format('d M Y, H:i') ?? 'To be announced' }}
+                                @if ($event->starts_at && $event->ends_at)
+                                    @if ($event->starts_at->isSameDay($event->ends_at))
+                                        {{ $event->starts_at->format('d M Y, H:i') }}
+                                        – {{ $event->ends_at->format('H:i') }}
+                                    @else
+                                        {{ $event->starts_at->format('d M Y') }}
+                                        – {{ $event->ends_at->format('d M Y') }}
+                                    @endif
+                                @elseif ($event->starts_at)
+                                    {{ $event->starts_at->format('d M Y, H:i') }}
+                                @else
+                                    To be announced
+                                @endif
                             </div>
                         </div>
 
@@ -482,16 +619,13 @@
                     @endif
 
                     @if ($errors->any())
-                        <div style="
-                            margin-top: 22px;
-                            background: #fee2e2;
-                            color: #991b1b;
-                            border: 1px solid #fecaca;
-                            border-radius: 14px;
-                            padding: 14px;
-                            font-weight: 700;
-                        ">
-                            {{ $errors->first() }}
+                        <div class="elive-validation-summary" role="alert">
+                            Please review the highlighted field{{ $errors->count() === 1 ? '' : 's' }} below.
+                            <ul>
+                                @foreach ($errors->all() as $message)
+                                    <li>{{ $message }}</li>
+                                @endforeach
+                            </ul>
                         </div>
                     @endif
 
@@ -583,6 +717,24 @@
                                         'required' => (bool) ($event->registration_require_badge_type ?? false),
                                     ],
                                 ];
+
+                                $allowDaySelection = (bool) (
+                                    $allowDaySelection
+                                    ?? $event->allowsDaySelection()
+                                );
+
+                                $allowAllDaysSelection = (bool) (
+                                    $allowAllDaysSelection
+                                    ?? $event->allowsAllDaysSelection()
+                                );
+
+                                $allowSessionRegistration = (bool) (
+                                    $allowSessionRegistration
+                                    ?? $event->allowsSessionRegistration()
+                                );
+
+                                $sectionLabels = $registrationSectionLabels
+                                    ?? $event->registrationSectionLabels();
                             @endphp
 
                             @if ($isFull && $waitlistEnabled)
@@ -602,11 +754,11 @@
                                     font-size: 22px;
                                     font-weight: 900;
                                 ">
-                                    Core Attendee Details
+                                    {{ $sectionLabels['personal'] ?? 'Personal Details' }}
                                 </h2>
 
                                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
-                                    <div>
+                                    <div id="field-full-name" class="@error('full_name') elive-field-invalid @enderror">
                                         <label style="display:block;font-weight:800;margin-bottom:7px;">Full Name *</label>
                                         <input
                                             name="full_name"
@@ -623,7 +775,7 @@
                                     </div>
 
                                     @if ($standardFields['phone']['show'])
-                                        <div>
+                                        <div id="field-phone" class="@error('phone') elive-field-invalid @enderror">
                                             <label style="display:block;font-weight:800;margin-bottom:7px;">
                                                 Phone Number
                                                 @if ($standardFields['phone']['required'])
@@ -649,7 +801,7 @@
                                     @endif
 
                                     @if ($standardFields['email']['show'])
-                                        <div>
+                                        <div id="field-email" class="@error('email') elive-field-invalid @enderror">
                                             <label style="display:block;font-weight:800;margin-bottom:7px;">
                                                 Email Address
                                                 @if ($standardFields['email']['required'])
@@ -703,12 +855,12 @@
                                         font-size:22px;
                                         font-weight:900;
                                     ">
-                                        Optional Standard Details
+                                        {{ $sectionLabels['professional'] ?? 'Professional / Registration Details' }}
                                     </h2>
 
                                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
                                         @if ($standardFields['organization']['show'])
-                                            <div>
+                                            <div id="field-organization-name" class="@error('organization_name') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
                                                     Organization / Company
                                                     @if ($standardFields['organization']['required'])
@@ -730,7 +882,7 @@
                                         @endif
 
                                         @if ($standardFields['position']['show'])
-                                            <div>
+                                            <div id="field-position" class="@error('position') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
                                                     Position / Title
                                                     @if ($standardFields['position']['required'])
@@ -752,7 +904,7 @@
                                         @endif
 
                                         @if ($standardFields['category']['show'] && ($categories ?? collect())->isNotEmpty())
-                                            <div>
+                                            <div id="field-category-id" class="@error('category_id') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
                                                     Category
                                                     @if ($standardFields['category']['required'])
@@ -780,7 +932,7 @@
                                         @endif
 
                                         @if ($standardFields['badge_type']['show'] && ($badgeTypes ?? collect())->isNotEmpty())
-                                            <div>
+                                            <div id="field-badge-type-id" class="@error('badge_type_id') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
                                                     Badge Type
                                                     @if ($standardFields['badge_type']['required'])
@@ -825,7 +977,7 @@
                                         font-size: 22px;
                                         font-weight: 900;
                                     ">
-                                        Additional Information
+                                        {{ $sectionLabels['additional'] ?? 'Additional Information' }}
                                     </h2>
 
                                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
@@ -1015,9 +1167,19 @@
                                 </div>
                             @endif
 
-                            @if (($eventDays ?? collect())->count())
+                            @if (
+                                $allowDaySelection
+                                && ($eventDays ?? collect())->count()
+                            )
                                 @php
-                                    $oldEventDays = collect(old('event_days', []))
+                                    $oldEventDaysRaw = collect(old('event_days', []))
+                                        ->map(fn ($value) => (string) $value);
+
+                                    $allDaysPreviouslySelected = $oldEventDaysRaw
+                                        ->contains('all');
+
+                                    $oldEventDays = $oldEventDaysRaw
+                                        ->filter(fn ($value) => is_numeric($value))
                                         ->map(fn ($id) => (int) $id)
                                         ->all();
                                 @endphp
@@ -1038,11 +1200,14 @@
                                                 font-size:22px;
                                                 font-weight:900;
                                             ">
-                                                Attendance Selection
+                                                {{ $sectionLabels['attendance'] ?? 'Attendance Selection' }}
                                             </h2>
 
                                             <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
-                                                Choose the event days or sessions you plan to attend.
+                                                Choose the event days you plan to attend.
+                                                @if ($allowAllDaysSelection)
+                                                    You may also select all available days at once.
+                                                @endif
                                             </p>
                                         </div>
 
@@ -1059,11 +1224,63 @@
                                         </div>
                                     </div>
 
+                                    @if ($allowAllDaysSelection)
+                                    <label
+                                        data-all-days-card
+                                        style="
+                                            display:flex;
+                                            align-items:flex-start;
+                                            gap:12px;
+                                            margin-top:18px;
+                                            padding:17px;
+                                            border:2px solid {{ $branding['primary_color'] }};
+                                            border-radius:16px;
+                                            background:color-mix(in srgb, {{ $branding['primary_color'] }} 8%, #ffffff);
+                                            cursor:pointer;
+                                        "
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            name="event_days[]"
+                                            value="all"
+                                            data-all-days-checkbox
+                                            @checked($allDaysPreviouslySelected)
+                                            style="
+                                                width:20px;
+                                                height:20px;
+                                                margin-top:2px;
+                                                flex:0 0 auto;
+                                            "
+                                        >
+
+                                        <span style="display:block;min-width:0;">
+                                            <strong style="
+                                                display:block;
+                                                color:{{ $branding['primary_color'] }};
+                                                font-size:16px;
+                                                line-height:1.35;
+                                            ">
+                                                All Event Days
+                                            </strong>
+
+                                            <span style="
+                                                display:block;
+                                                margin-top:5px;
+                                                color:#475569;
+                                                font-size:13px;
+                                                line-height:1.5;
+                                            ">
+                                                Register me for every available day of this event.
+                                            </span>
+                                        </span>
+                                    </label>
+                                    @endif
+
                                     <div style="
                                         display:grid;
                                         grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
                                         gap:12px;
-                                        margin-top:18px;
+                                        margin-top:12px;
                                     ">
                                         @foreach ($eventDays as $day)
                                             @php
@@ -1088,7 +1305,8 @@
                                                     type="checkbox"
                                                     name="event_days[]"
                                                     value="{{ $day->id }}"
-                                                    @checked($daySelected)
+                                                    data-event-day-checkbox
+                                                    @checked($daySelected || $allDaysPreviouslySelected)
                                                     style="
                                                         width:19px;
                                                         height:19px;
@@ -1153,6 +1371,282 @@
                                     @enderror
 
                                     @error('event_days.*')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+                                </div>
+                            @endif
+
+                            @if (
+                                $allowSessionRegistration
+                                && ($eventSessions ?? collect())->isNotEmpty()
+                            )
+                                @php
+                                    $oldEventSessions = collect(
+                                        old('event_sessions', [])
+                                    )
+                                        ->filter(
+                                            fn ($value) =>
+                                                is_numeric($value)
+                                        )
+                                        ->map(
+                                            fn ($value) =>
+                                                (int) $value
+                                        )
+                                        ->all();
+
+                                    $sessionsByDay = $eventSessions
+                                        ->groupBy('event_day_id');
+                                @endphp
+
+                                <div
+                                    data-session-section
+                                    style="
+                                        margin-top:22px;
+                                        background:#ffffff;
+                                        border:1px solid #e2e8f0;
+                                        border-radius:20px;
+                                        padding:22px;
+                                        box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                    "
+                                >
+                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+                                        <div>
+                                            <h2 style="
+                                                margin:0;
+                                                color:{{ $branding['primary_color'] }};
+                                                font-size:22px;
+                                                font-weight:900;
+                                            ">
+                                                {{ $sectionLabels['sessions'] ?? 'Sessions / Activities' }}
+                                            </h2>
+
+                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                                Select the sessions or activities you would like to attend.
+                                                @if ($allowDaySelection)
+                                                    Only sessions belonging to your selected event days are shown.
+                                                @else
+                                                    Available sessions are shown for all event days assigned to your registration.
+                                                @endif
+                                            </p>
+                                        </div>
+
+                                        <div style="
+                                            background:#f8fafc;
+                                            border:1px solid #e2e8f0;
+                                            border-radius:12px;
+                                            padding:10px 12px;
+                                            font-size:12px;
+                                            color:#475569;
+                                            font-weight:800;
+                                        ">
+                                            Session selection is optional unless specified by the organizer.
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        data-session-groups
+                                        style="
+                                            display:grid;
+                                            gap:18px;
+                                            margin-top:18px;
+                                        "
+                                    >
+                                        @foreach ($eventDays as $day)
+                                            @php
+                                                $daySessions = $sessionsByDay
+                                                    ->get($day->id, collect());
+                                            @endphp
+
+                                            @if ($daySessions->isNotEmpty())
+                                                <div
+                                                    class="elive-session-day-group"
+                                                    data-session-day-group="{{ $day->id }}"
+                                                    @if ($allowDaySelection) hidden @endif
+                                                >
+                                                    <div class="elive-session-day-title">
+                                                        <div>
+                                                            <strong style="
+                                                                display:block;
+                                                                color:{{ $branding['primary_color'] }};
+                                                                font-size:15px;
+                                                            ">
+                                                                {{ $day->name }}
+                                                            </strong>
+
+                                                            <span style="
+                                                                display:block;
+                                                                margin-top:3px;
+                                                                color:#64748b;
+                                                                font-size:12px;
+                                                            ">
+                                                                {{ $day->event_date?->format('d M Y') }}
+                                                            </span>
+                                                        </div>
+
+                                                        <span style="
+                                                            font-size:11px;
+                                                            font-weight:900;
+                                                            color:#475569;
+                                                        ">
+                                                            {{ $daySessions->count() }}
+                                                            {{ \Illuminate\Support\Str::plural('session', $daySessions->count()) }}
+                                                        </span>
+                                                    </div>
+
+                                                    <div class="elive-session-grid">
+                                                        @foreach ($daySessions as $session)
+                                                            @php
+                                                                $capacity = $session->capacity;
+                                                                $registeredCount = (int) (
+                                                                    $session->registered_attendees_count
+                                                                    ?? 0
+                                                                );
+
+                                                                $remainingCapacity = $capacity !== null
+                                                                    && (int) $capacity > 0
+                                                                        ? max(
+                                                                            (int) $capacity
+                                                                            - $registeredCount,
+                                                                            0
+                                                                        )
+                                                                        : null;
+
+                                                                $sessionIsFull =
+                                                                    $remainingCapacity !== null
+                                                                    && $remainingCapacity <= 0;
+
+                                                                $sessionSelected = in_array(
+                                                                    (int) $session->id,
+                                                                    $oldEventSessions,
+                                                                    true
+                                                                );
+
+                                                                $sessionType = ucwords(
+                                                                    str_replace(
+                                                                        '_',
+                                                                        ' ',
+                                                                        $session->session_type
+                                                                            ?: 'session'
+                                                                    )
+                                                                );
+                                                            @endphp
+
+                                                            <label
+                                                                class="elive-session-card"
+                                                                data-session-card
+                                                                data-session-day="{{ $day->id }}"
+                                                                data-full="{{ $sessionIsFull ? '1' : '0' }}"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="event_sessions[]"
+                                                                    value="{{ $session->id }}"
+                                                                    data-session-checkbox
+                                                                    data-session-day="{{ $day->id }}"
+                                                                    @checked($sessionSelected && ! $sessionIsFull)
+                                                                    @disabled($sessionIsFull)
+                                                                >
+
+                                                                <span style="display:block;min-width:0;">
+                                                                    <strong style="
+                                                                        display:block;
+                                                                        color:#0f172a;
+                                                                        font-size:15px;
+                                                                        line-height:1.35;
+                                                                    ">
+                                                                        {{ $session->name }}
+                                                                    </strong>
+
+                                                                    <span class="elive-session-type">
+                                                                        {{ $sessionType }}
+                                                                    </span>
+
+                                                                    @if ($session->starts_at || $session->ends_at)
+                                                                        <span class="elive-session-meta">
+                                                                            @if ($session->starts_at)
+                                                                                {{ $session->starts_at->format('H:i') }}
+                                                                            @endif
+
+                                                                            @if ($session->ends_at)
+                                                                                @if ($session->starts_at)
+                                                                                    –
+                                                                                @endif
+                                                                                {{ $session->ends_at->format('H:i') }}
+                                                                            @endif
+                                                                        </span>
+                                                                    @endif
+
+                                                                    @if (filled($session->venue_name))
+                                                                        <span class="elive-session-meta">
+                                                                            {{ $session->venue_name }}
+                                                                        </span>
+                                                                    @endif
+
+                                                                    @if (filled($session->description))
+                                                                        <span class="elive-session-meta">
+                                                                            {{ \Illuminate\Support\Str::limit($session->description, 120) }}
+                                                                        </span>
+                                                                    @endif
+
+                                                                    @if ($sessionIsFull)
+                                                                        <span
+                                                                            class="elive-session-capacity"
+                                                                            style="color:#b91c1c;"
+                                                                        >
+                                                                            Session full
+                                                                        </span>
+                                                                    @elseif ($remainingCapacity !== null)
+                                                                        <span class="elive-session-capacity">
+                                                                            {{ $remainingCapacity }}
+                                                                            {{ \Illuminate\Support\Str::plural('place', $remainingCapacity) }}
+                                                                            available
+                                                                        </span>
+                                                                    @else
+                                                                        <span class="elive-session-capacity">
+                                                                            Open capacity
+                                                                        </span>
+                                                                    @endif
+                                                                </span>
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+
+                                    <div
+                                        data-session-empty
+                                        class="elive-session-empty"
+                                        hidden
+                                        style="margin-top:16px;"
+                                    >
+                                        @if ($allowDaySelection)
+                                            Select an event day above to view the sessions available for that day.
+                                        @else
+                                            No public sessions are currently available.
+                                        @endif
+                                    </div>
+
+                                    @error('event_sessions')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+
+                                    @error('event_sessions.*')
                                         <div style="
                                             margin-top:12px;
                                             color:#dc2626;
@@ -1478,6 +1972,27 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const firstInvalidField = document.querySelector('.elive-field-invalid');
+
+        if (firstInvalidField) {
+            window.setTimeout(() => {
+                firstInvalidField.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+
+                const focusable = firstInvalidField.querySelector(
+                    'input:not([type="hidden"]), select, textarea'
+                );
+
+                focusable?.focus({ preventScroll: true });
+            }, 120);
+        }
+
+        const allowDaySelection = @json($allowDaySelection);
+        const allowAllDaysSelection = @json($allowAllDaysSelection);
+        const allowSessionRegistration = @json($allowSessionRegistration);
+
         const formatMoney = (amount, currency) => {
             const numericAmount = Number(amount || 0);
 
@@ -1494,6 +2009,151 @@
         const registrationForm = document.querySelector('[data-registration-form]');
         const submitButton = document.querySelector('[data-submit-button]');
         const paymentTotal = document.querySelector('[data-payment-total]');
+        const allDaysCheckbox = document.querySelector('[data-all-days-checkbox]');
+        const eventDayCheckboxes = Array.from(
+            document.querySelectorAll('[data-event-day-checkbox]')
+        );
+
+        const sessionSection = document.querySelector(
+            '[data-session-section]'
+        );
+
+        const sessionDayGroups = Array.from(
+            document.querySelectorAll('[data-session-day-group]')
+        );
+
+        const sessionCheckboxes = Array.from(
+            document.querySelectorAll('[data-session-checkbox]')
+        );
+
+        const sessionEmpty = document.querySelector(
+            '[data-session-empty]'
+        );
+
+        const selectedEventDayIds = () => {
+            if (!allowDaySelection) {
+                return sessionDayGroups
+                    .map(
+                        (group) =>
+                            String(
+                                group.dataset.sessionDayGroup
+                                || ''
+                            )
+                    )
+                    .filter(Boolean);
+            }
+
+            return eventDayCheckboxes
+                .filter((checkbox) => checkbox.checked)
+                .map((checkbox) => String(checkbox.value));
+        };
+
+        const refreshSessionVisibility = () => {
+            if (!sessionSection || !allowSessionRegistration) {
+                return;
+            }
+
+            const selectedDays = new Set(
+                selectedEventDayIds()
+            );
+
+            let visibleGroups = 0;
+
+            sessionDayGroups.forEach((group) => {
+                const dayId = String(
+                    group.dataset.sessionDayGroup || ''
+                );
+
+                const visible =
+                    !allowDaySelection
+                    || selectedDays.has(dayId);
+
+                group.hidden = !visible;
+
+                if (visible) {
+                    visibleGroups += 1;
+                }
+            });
+
+            sessionCheckboxes.forEach((checkbox) => {
+                const dayId = String(
+                    checkbox.dataset.sessionDay || ''
+                );
+
+                const daySelected =
+                    !allowDaySelection
+                    || selectedDays.has(dayId);
+
+                const card = checkbox.closest(
+                    '[data-session-card]'
+                );
+
+                const full = card?.dataset.full === '1';
+
+                checkbox.disabled =
+                    !daySelected || full;
+
+                if (
+                    allowDaySelection
+                    && !daySelected
+                ) {
+                    checkbox.checked = false;
+                }
+            });
+
+            if (sessionEmpty) {
+                sessionEmpty.hidden = visibleGroups > 0;
+            }
+        };
+
+        const refreshAllDaysSelection = () => {
+            if (
+                !allowDaySelection
+                || !allowAllDaysSelection
+                || !allDaysCheckbox
+                || eventDayCheckboxes.length === 0
+            ) {
+                return;
+            }
+
+            const everyDaySelected = eventDayCheckboxes.every(
+                (checkbox) => checkbox.checked
+            );
+
+            const noDaySelected = eventDayCheckboxes.every(
+                (checkbox) => !checkbox.checked
+            );
+
+            allDaysCheckbox.checked = everyDaySelected;
+            allDaysCheckbox.indeterminate = !everyDaySelected && !noDaySelected;
+        };
+
+        if (
+            allowDaySelection
+            && allowAllDaysSelection
+        ) {
+            allDaysCheckbox?.addEventListener('change', () => {
+            eventDayCheckboxes.forEach((checkbox) => {
+                checkbox.checked = allDaysCheckbox.checked;
+            });
+
+            allDaysCheckbox.indeterminate = false;
+
+                refreshSessionVisibility();
+            });
+        }
+
+        if (allowDaySelection) {
+            eventDayCheckboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', () => {
+                    refreshAllDaysSelection();
+                    refreshSessionVisibility();
+                });
+            });
+        }
+
+        refreshAllDaysSelection();
+        refreshSessionVisibility();
 
         const refreshSubmitLabel = () => {
             if (!submitButton) {
@@ -1551,7 +2211,25 @@
                 : 'No payment required';
         };
 
-        registrationForm?.addEventListener('submit', () => {
+        registrationForm?.addEventListener('submit', (event) => {
+            if (
+                allowDaySelection
+                && eventDayCheckboxes.length > 0
+                && (
+                    !allowAllDaysSelection
+                    || !allDaysCheckbox?.checked
+                )
+                && !eventDayCheckboxes.some(
+                    (checkbox) => checkbox.checked
+                )
+            ) {
+                event.preventDefault();
+
+                window.alert('Please select at least one event day.');
+
+                return;
+            }
+
             if (!submitButton) {
                 return;
             }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventDay extends Model
 {
@@ -49,5 +50,75 @@ class EventDay extends Model
                 'selected_at',
             ])
             ->withTimestamps();
+    }
+
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(EventSession::class)
+            ->orderBy('display_order')
+            ->orderBy('starts_at')
+            ->orderBy('id');
+    }
+
+    public function activeSessions(): HasMany
+    {
+        return $this->sessions()
+            ->where('status', EventSession::STATUS_ACTIVE);
+    }
+
+    public function registrationOpenSessions(): HasMany
+    {
+        return $this->sessions()
+            ->where('status', EventSession::STATUS_ACTIVE)
+            ->where('requires_registration', true)
+            ->where('registration_is_open', true);
+    }
+
+    public function hasSessions(): bool
+    {
+        return $this->sessions()->exists();
+    }
+
+    public function sessionsCount(): int
+    {
+        return $this->sessions()->count();
+    }
+
+    public function activeSessionsCount(): int
+    {
+        return $this->activeSessions()->count();
+    }
+
+    public function attendeesCount(): int
+    {
+        return $this->attendees()->count();
+    }
+
+    public function remainingCapacity(): ?int
+    {
+        if (
+            blank($this->capacity)
+            || (int) $this->capacity <= 0
+        ) {
+            return null;
+        }
+
+        return max(
+            (int) $this->capacity - $this->attendeesCount(),
+            0
+        );
+    }
+
+    public function isFull(): bool
+    {
+        if (
+            blank($this->capacity)
+            || (int) $this->capacity <= 0
+        ) {
+            return false;
+        }
+
+        return $this->attendeesCount()
+            >= (int) $this->capacity;
     }
 }
