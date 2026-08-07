@@ -2,21 +2,19 @@
     @php
         $events = $this->events;
         $categories = $this->categories;
-        $checkInPoints = $this->checkInPoints;
-        $methods = $this->methods;
-        $officers = $this->officers;
+        $statusOptions = $this->statusOptions;
+        $sourceOptions = $this->sourceOptions;
         $attendees = $this->attendees;
-        $latestCheckIns = $this->latestCheckIns;
         $summary = $this->summary;
     @endphp
 
     <style>
-        .elive-attendance-report {
+        .elive-report {
             display: grid;
             gap: 1.25rem;
         }
 
-        .elive-panel {
+        .elive-report-panel {
             overflow: hidden;
             border: 1px solid rgb(229 231 235);
             border-radius: 1rem;
@@ -24,12 +22,12 @@
             box-shadow: 0 1px 3px rgb(15 23 42 / 0.08);
         }
 
-        .dark .elive-panel {
+        .dark .elive-report-panel {
             border-color: rgb(55 65 81);
             background: rgb(17 24 39);
         }
 
-        .elive-panel-header {
+        .elive-report-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -38,38 +36,42 @@
             border-bottom: 1px solid rgb(229 231 235);
         }
 
-        .dark .elive-panel-header {
+        .dark .elive-report-header {
             border-color: rgb(55 65 81);
         }
 
-        .elive-panel-body {
-            padding: 1.25rem;
-        }
-
-        .elive-title {
+        .elive-report-title {
             margin: 0;
             font-size: 1rem;
             font-weight: 800;
             color: rgb(17 24 39);
         }
 
-        .dark .elive-title {
+        .dark .elive-report-title {
             color: white;
         }
 
-        .elive-subtitle {
+        .elive-report-subtitle {
             margin: 0.25rem 0 0;
             font-size: 0.875rem;
             color: rgb(107 114 128);
         }
 
-        .dark .elive-subtitle {
+        .dark .elive-report-subtitle {
             color: rgb(156 163 175);
+        }
+
+        .elive-report-body {
+            padding: 1.25rem;
         }
 
         .elive-filter-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns:
+                minmax(0, 1fr)
+                minmax(0, 0.8fr)
+                minmax(0, 0.8fr)
+                minmax(0, 0.8fr);
             gap: 1rem;
         }
 
@@ -111,6 +113,21 @@
             color: white;
         }
 
+        .elive-input:focus,
+        .elive-select:focus {
+            border-color: rgb(79 70 229);
+            box-shadow: 0 0 0 3px rgb(79 70 229 / 0.15);
+        }
+
+        .elive-loading {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: rgb(79 70 229);
+        }
+
         .elive-actions {
             display: flex;
             flex-wrap: wrap;
@@ -148,7 +165,7 @@
 
         .elive-stat-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 1rem;
         }
 
@@ -229,16 +246,32 @@
             display: inline-flex;
             padding: 0.25rem 0.55rem;
             border-radius: 999px;
+            background: rgb(238 242 255);
+            color: rgb(67 56 202);
             font-size: 0.72rem;
             font-weight: 800;
         }
 
-        .elive-status-in {
+        .elive-status-registered,
+        .elive-status-approved,
+        .elive-status-checked-in {
             background: rgb(220 252 231);
             color: rgb(22 101 52);
         }
 
-        .elive-status-out {
+        .elive-status-pending,
+        .elive-status-pending-approval {
+            background: rgb(254 243 199);
+            color: rgb(146 64 14);
+        }
+
+        .elive-status-waitlisted {
+            background: rgb(219 234 254);
+            color: rgb(30 64 175);
+        }
+
+        .elive-status-cancelled,
+        .elive-status-rejected {
             background: rgb(254 226 226);
             color: rgb(153 27 27);
         }
@@ -254,13 +287,16 @@
         }
 
         @media (max-width: 1100px) {
-            .elive-filter-grid,
-            .elive-stat-grid {
+            .elive-filter-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
             .elive-filter-search {
                 grid-column: span 1;
+            }
+
+            .elive-stat-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
         }
 
@@ -270,40 +306,43 @@
                 grid-template-columns: 1fr;
             }
 
-            .elive-panel-header {
+            .elive-report-header {
                 align-items: flex-start;
                 flex-direction: column;
             }
         }
     </style>
 
-    <div class="elive-attendance-report">
-        <section class="elive-panel">
-            <div class="elive-panel-header">
+    <div class="elive-report">
+        <section class="elive-report-panel">
+            <div class="elive-report-header">
                 <div>
-                    <h2 class="elive-title">
-                        Attendance Filters
+                    <h2 class="elive-report-title">
+                        Registration & Attendee Filters
                     </h2>
 
-                    <p class="elive-subtitle">
-                        Filter attendance records and export the result to CSV.
+                    <p class="elive-report-subtitle">
+                        Review registration records, apply attendee filters, and export the current result to CSV.
                     </p>
                 </div>
 
-                <div wire:loading>
-                    Updating...
+                <div
+                    class="elive-loading"
+                    wire:loading
+                >
+                    Updating report...
                 </div>
             </div>
 
-            <div class="elive-panel-body">
+            <div class="elive-report-body">
                 <div class="elive-filter-grid">
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-event">
+                        <label class="elive-label" for="report-event">
                             Event
                         </label>
 
                         <select
-                            id="attendance-event"
+                            id="report-event"
                             class="elive-select"
                             wire:model.live="eventId"
                         >
@@ -318,12 +357,12 @@
                     </div>
 
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-category">
+                        <label class="elive-label" for="report-category">
                             Category
                         </label>
 
                         <select
-                            id="attendance-category"
+                            id="report-category"
                             class="elive-select"
                             wire:model.live="categoryId"
                             @disabled(! $eventId)
@@ -339,115 +378,52 @@
                     </div>
 
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-status">
-                            Attendance Status
+                        <label class="elive-label" for="report-status">
+                            Registration Status
                         </label>
 
                         <select
-                            id="attendance-status"
+                            id="report-status"
                             class="elive-select"
-                            wire:model.live="attendanceStatus"
+                            wire:model.live="status"
                         >
-                            <option value="all">All attendees</option>
-                            <option value="checked_in">Checked in</option>
-                            <option value="not_checked_in">Not checked in</option>
-                        </select>
-                    </div>
+                            <option value="all">All statuses</option>
 
-                    <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-point">
-                            Check-in Point
-                        </label>
-
-                        <select
-                            id="attendance-point"
-                            class="elive-select"
-                            wire:model.live="checkInPointId"
-                            @disabled(! $eventId)
-                        >
-                            <option value="">All points</option>
-
-                            @foreach ($checkInPoints as $point)
-                                <option value="{{ $point->id }}">
-                                    {{ $point->name }}
+                            @foreach ($statusOptions as $statusOption)
+                                <option value="{{ $statusOption }}">
+                                    {{ ucwords(str_replace('_', ' ', $statusOption)) }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-method">
-                            Method
+                        <label class="elive-label" for="report-source">
+                            Registration Source
                         </label>
 
                         <select
-                            id="attendance-method"
+                            id="report-source"
                             class="elive-select"
-                            wire:model.live="method"
+                            wire:model.live="registrationSource"
                         >
-                            <option value="all">All methods</option>
+                            <option value="all">All sources</option>
 
-                            @foreach ($methods as $methodOption)
-                                <option value="{{ $methodOption }}">
-                                    {{ ucwords(str_replace('_', ' ', $methodOption)) }}
+                            @foreach ($sourceOptions as $sourceOption)
+                                <option value="{{ $sourceOption }}">
+                                    {{ ucwords(str_replace('_', ' ', $sourceOption)) }}
                                 </option>
                             @endforeach
                         </select>
-                    </div>
-
-                    <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-officer">
-                            Officer
-                        </label>
-
-                        <select
-                            id="attendance-officer"
-                            class="elive-select"
-                            wire:model.live="officerId"
-                        >
-                            <option value="">All officers</option>
-
-                            @foreach ($officers as $officer)
-                                <option value="{{ $officer->id }}">
-                                    {{ $officer->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-from">
-                            Date From
-                        </label>
-
-                        <input
-                            id="attendance-from"
-                            type="date"
-                            class="elive-input"
-                            wire:model.live="dateFrom"
-                        >
-                    </div>
-
-                    <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-to">
-                            Date To
-                        </label>
-
-                        <input
-                            id="attendance-to"
-                            type="date"
-                            class="elive-input"
-                            wire:model.live="dateTo"
-                        >
                     </div>
 
                     <div class="elive-form-group elive-filter-search">
-                        <label class="elive-label" for="attendance-search">
+                        <label class="elive-label" for="report-search">
                             Search
                         </label>
 
                         <input
-                            id="attendance-search"
+                            id="report-search"
                             type="search"
                             class="elive-input"
                             wire:model.live.debounce.400ms="search"
@@ -486,7 +462,7 @@
 
         <section class="elive-stat-grid">
             <div class="elive-stat">
-                <div class="elive-stat-label">Registered</div>
+                <div class="elive-stat-label">Total Registered</div>
                 <div class="elive-stat-value">
                     {{ number_format($summary['total']) }}
                 </div>
@@ -507,32 +483,39 @@
             </div>
 
             <div class="elive-stat">
-                <div class="elive-stat-label">Attendance Rate</div>
+                <div class="elive-stat-label">Pending Approval</div>
                 <div class="elive-stat-value">
-                    {{ number_format($summary['attendance_rate'], 1) }}%
+                    {{ number_format($summary['pending_approval']) }}
+                </div>
+            </div>
+
+            <div class="elive-stat">
+                <div class="elive-stat-label">Waitlisted</div>
+                <div class="elive-stat-value">
+                    {{ number_format($summary['waitlisted']) }}
                 </div>
             </div>
         </section>
 
-        <section class="elive-panel">
-            <div class="elive-panel-header">
+        <section class="elive-report-panel">
+            <div class="elive-report-header">
                 <div>
-                    <h2 class="elive-title">
-                        Attendance Records
+                    <h2 class="elive-report-title">
+                        Registered Attendees
                     </h2>
 
-                    <p class="elive-subtitle">
-                        Showing {{ number_format($attendees->total()) }} matching attendees.
+                    <p class="elive-report-subtitle">
+                        Showing {{ number_format($attendees->total()) }} attendee registration records matching the selected filters.
                     </p>
                 </div>
 
                 <div class="elive-form-group" style="min-width: 8rem;">
-                    <label class="elive-label" for="attendance-per-page">
+                    <label class="elive-label" for="report-per-page">
                         Per Page
                     </label>
 
                     <select
-                        id="attendance-per-page"
+                        id="report-per-page"
                         class="elive-select"
                         wire:model.live="perPage"
                     >
@@ -549,27 +532,32 @@
                     <table class="elive-table">
                         <thead>
                             <tr>
-                                <th>Attendee</th>
+                                <th>Name</th>
                                 <th>Badge</th>
                                 <th>Category</th>
                                 <th>Organization</th>
+                                <th>Phone</th>
                                 <th>Status</th>
-                                <th>Check-in Point</th>
-                                <th>Method</th>
-                                <th>Officer</th>
-                                <th>Checked-in Time</th>
+                                <th>Source</th>
+                                <th>Registered</th>
+                                <th>Checked In</th>
                             </tr>
                         </thead>
 
                         <tbody>
                             @foreach ($attendees as $attendee)
                                 @php
-                                    $checkIn = $latestCheckIns->get(
-                                        $attendee->id
-                                    );
+                                    $statusValue = $attendee->status
+                                        ?? 'unknown';
+
+                                    $statusClass = 'elive-status-'
+                                        . str($statusValue)
+                                            ->lower()
+                                            ->replace('_', '-')
+                                            ->slug('-');
                                 @endphp
 
-                                <tr wire:key="attendance-report-{{ $attendee->id }}">
+                                <tr wire:key="attendee-report-{{ $attendee->id }}">
                                     <td>
                                         <strong>{{ $attendee->full_name }}</strong>
 
@@ -593,28 +581,25 @@
                                     </td>
 
                                     <td>
-                                        <span class="elive-status {{ $checkIn ? 'elive-status-in' : 'elive-status-out' }}">
-                                            {{ $checkIn ? 'Checked In' : 'Not Checked In' }}
+                                        {{ $attendee->phone ?? '—' }}
+                                    </td>
+
+                                    <td>
+                                        <span class="elive-status {{ $statusClass }}">
+                                            {{ ucwords(str_replace('_', ' ', $statusValue)) }}
                                         </span>
                                     </td>
 
                                     <td>
-                                        {{ $checkIn?->checkInPoint?->name ?? '—' }}
+                                        {{ ucwords(str_replace('_', ' ', $attendee->registration_source ?? '—')) }}
                                     </td>
 
                                     <td>
-                                        {{ $checkIn
-                                            ? ucwords(str_replace('_', ' ', $checkIn->method ?? ''))
-                                            : '—' }}
+                                        {{ $attendee->registered_at?->format('d/m/Y H:i') ?? '—' }}
                                     </td>
 
                                     <td>
-                                        {{ $checkIn?->checkedInBy?->name
-                                            ?? ($checkIn ? 'System' : '—') }}
-                                    </td>
-
-                                    <td>
-                                        {{ $checkIn?->checked_in_at?->format('d/m/Y H:i:s') ?? '—' }}
+                                        {{ $attendee->checked_in_at?->format('d/m/Y H:i') ?? '—' }}
                                     </td>
                                 </tr>
                             @endforeach
@@ -627,7 +612,7 @@
                 </div>
             @else
                 <div class="elive-empty">
-                    No attendance records matched the selected filters.
+                    No attendee registration records matched the selected filters.
                 </div>
             @endif
         </section>

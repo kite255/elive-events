@@ -1,0 +1,4483 @@
+<x-filament-panels::page>
+    @php
+        $events = $this->getAvailableEvents();
+        $checkInPoints = $this->getAvailableCheckInPoints();
+        $searchResults = $this->getSearchResults();
+        $selectedAttendee = $this->getSelectedAttendee();
+        $recentCheckIns = $this->getRecentCheckIns();
+        $counters = $this->getCounters();
+        $categories = $this->getAvailableCategories();
+        $badgeTypes = $this->getAvailableBadgeTypes();
+
+        $resultStatus = $lastResult['status'] ?? null;
+        $resultSuccess = (bool) ($lastResult['success'] ?? false);
+
+        $resultClass = match ($resultStatus) {
+            'checked_in',
+            'onsite_registered' => 'elive-result-success',
+            'already_checked_in' => 'elive-result-warning',
+            'invalid_code',
+            'attendee_not_found',
+            'attendee_not_eligible',
+            'access_denied',
+            'check_in_failed' => 'elive-result-danger',
+            default => 'elive-result-neutral',
+        };
+    @endphp
+
+    <style>
+        .elive-station {
+            display: grid;
+            gap: 1.25rem;
+        }
+
+        .elive-card {
+            overflow: hidden;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 1rem;
+            background: white;
+            box-shadow: 0 1px 3px rgb(15 23 42 / 0.08);
+        }
+
+        .dark .elive-card {
+            border-color: rgb(55 65 81);
+            background: rgb(17 24 39);
+        }
+
+        .elive-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgb(229 231 235);
+        }
+
+        .dark .elive-card-header {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-card-body {
+            padding: 1.25rem;
+        }
+
+        .elive-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+            color: rgb(17 24 39);
+        }
+
+        .dark .elive-title {
+            color: white;
+        }
+
+        .elive-subtitle {
+            margin: 0.25rem 0 0;
+            font-size: 0.875rem;
+            color: rgb(107 114 128);
+        }
+
+        .dark .elive-subtitle {
+            color: rgb(156 163 175);
+        }
+
+        .elive-station-settings {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .elive-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .elive-stat {
+            padding: 1rem;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 0.875rem;
+            background: rgb(249 250 251);
+        }
+
+        .dark .elive-stat {
+            border-color: rgb(55 65 81);
+            background: rgb(31 41 55);
+        }
+
+        .elive-stat-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: rgb(107 114 128);
+        }
+
+        .elive-stat-value {
+            margin-top: 0.35rem;
+            font-size: 1.75rem;
+            line-height: 1;
+            font-weight: 800;
+            color: rgb(17 24 39);
+        }
+
+        .dark .elive-stat-value {
+            color: white;
+        }
+
+        .elive-main-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+            gap: 1.25rem;
+            align-items: start;
+        }
+
+        .elive-form-group {
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .elive-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: rgb(55 65 81);
+        }
+
+        .dark .elive-label {
+            color: rgb(209 213 219);
+        }
+
+        .elive-input,
+        .elive-select {
+            width: 100%;
+            min-height: 2.75rem;
+            padding: 0.65rem 0.8rem;
+            border: 1px solid rgb(209 213 219);
+            border-radius: 0.75rem;
+            background: white;
+            color: rgb(17 24 39);
+            outline: none;
+        }
+
+        .dark .elive-input,
+        .dark .elive-select {
+            border-color: rgb(75 85 99);
+            background: rgb(31 41 55);
+            color: white;
+        }
+
+        .elive-input:focus,
+        .elive-select:focus {
+            border-color: rgb(99 102 241);
+            box-shadow: 0 0 0 3px rgb(99 102 241 / 0.15);
+        }
+
+        .elive-input:disabled,
+        .elive-select:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .elive-error {
+            font-size: 0.8rem;
+            color: rgb(220 38 38);
+        }
+
+        .elive-scan-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.75rem;
+        }
+
+        .elive-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            min-height: 2.75rem;
+            padding: 0.65rem 1rem;
+            border: 0;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .elive-button:hover {
+            opacity: 0.9;
+        }
+
+        .elive-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .elive-button-primary {
+            background: rgb(79 70 229);
+            color: white;
+        }
+
+        .elive-button-success {
+            background: rgb(22 163 74);
+            color: white;
+        }
+
+        .elive-button-secondary {
+            background: rgb(229 231 235);
+            color: rgb(31 41 55);
+        }
+
+        .dark .elive-button-secondary {
+            background: rgb(55 65 81);
+            color: white;
+        }
+
+        .elive-help {
+            margin-top: 0.65rem;
+            font-size: 0.82rem;
+            color: rgb(107 114 128);
+        }
+
+        .elive-result {
+            padding: 1.25rem;
+            border: 1px solid transparent;
+            border-radius: 1rem;
+        }
+
+        .elive-result-success {
+            border-color: rgb(134 239 172);
+            background: rgb(240 253 244);
+            color: rgb(20 83 45);
+        }
+
+        .elive-result-warning {
+            border-color: rgb(253 224 71);
+            background: rgb(254 252 232);
+            color: rgb(113 63 18);
+        }
+
+        .elive-result-danger {
+            border-color: rgb(252 165 165);
+            background: rgb(254 242 242);
+            color: rgb(127 29 29);
+        }
+
+        .elive-result-neutral {
+            border-color: rgb(209 213 219);
+            background: rgb(249 250 251);
+            color: rgb(55 65 81);
+        }
+
+        .dark .elive-result-success {
+            border-color: rgb(22 101 52);
+            background: rgb(20 83 45 / 0.35);
+            color: rgb(187 247 208);
+        }
+
+        .dark .elive-result-warning {
+            border-color: rgb(161 98 7);
+            background: rgb(113 63 18 / 0.35);
+            color: rgb(254 240 138);
+        }
+
+        .dark .elive-result-danger {
+            border-color: rgb(153 27 27);
+            background: rgb(127 29 29 / 0.35);
+            color: rgb(254 202 202);
+        }
+
+        .dark .elive-result-neutral {
+            border-color: rgb(75 85 99);
+            background: rgb(31 41 55);
+            color: rgb(229 231 235);
+        }
+
+        .elive-result-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+
+        .elive-result-message {
+            margin: 0.35rem 0 0;
+            font-size: 0.9rem;
+        }
+
+        .elive-details {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .elive-detail {
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            background: rgb(255 255 255 / 0.65);
+        }
+
+        .dark .elive-detail {
+            background: rgb(17 24 39 / 0.55);
+        }
+
+        .elive-detail-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        .elive-detail-value {
+            margin-top: 0.2rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .elive-empty {
+            display: grid;
+            place-items: center;
+            min-height: 13rem;
+            padding: 2rem;
+            text-align: center;
+            color: rgb(107 114 128);
+        }
+
+        .elive-search-results {
+            display: grid;
+            gap: 0.65rem;
+            margin-top: 1rem;
+        }
+
+        .elive-person {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.85rem;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 0.8rem;
+        }
+
+        .dark .elive-person {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-person-name {
+            font-weight: 700;
+            color: rgb(17 24 39);
+        }
+
+        .dark .elive-person-name {
+            color: white;
+        }
+
+        .elive-person-meta {
+            margin-top: 0.15rem;
+            font-size: 0.8rem;
+            color: rgb(107 114 128);
+        }
+
+        .elive-status-badge {
+            display: inline-flex;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: rgb(238 242 255);
+            color: rgb(67 56 202);
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .dark .elive-status-badge {
+            background: rgb(49 46 129 / 0.5);
+            color: rgb(199 210 254);
+        }
+
+        .elive-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .elive-table {
+            width: 100%;
+            border-collapse: collapse;
+            white-space: nowrap;
+        }
+
+        .elive-table th,
+        .elive-table td {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid rgb(229 231 235);
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        .dark .elive-table th,
+        .dark .elive-table td {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-table th {
+            color: rgb(75 85 99);
+            font-weight: 700;
+        }
+
+        .dark .elive-table th {
+            color: rgb(209 213 219);
+        }
+
+        .elive-loading {
+            font-size: 0.8rem;
+            color: rgb(79 70 229);
+        }
+
+
+        .elive-camera-panel {
+            display: grid;
+            gap: 0.85rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgb(229 231 235);
+        }
+
+        .dark .elive-camera-panel {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-camera-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .elive-camera-reader {
+            overflow: hidden;
+            width: 100%;
+            min-height: 18rem;
+            border: 2px dashed rgb(209 213 219);
+            border-radius: 1rem;
+            background: rgb(17 24 39);
+        }
+
+        .elive-camera-reader video {
+            width: 100% !important;
+            height: auto !important;
+            border-radius: 0.9rem;
+        }
+
+        .elive-camera-placeholder {
+            display: grid;
+            min-height: 18rem;
+            place-items: center;
+            padding: 1.5rem;
+            text-align: center;
+            color: rgb(156 163 175);
+        }
+
+        .elive-camera-status {
+            font-size: 0.84rem;
+            font-weight: 600;
+            color: rgb(75 85 99);
+        }
+
+        .dark .elive-camera-status {
+            color: rgb(209 213 219);
+        }
+
+        .elive-camera-status[data-state="success"] {
+            color: rgb(22 163 74);
+        }
+
+        .elive-camera-status[data-state="error"] {
+            color: rgb(220 38 38);
+        }
+
+        .elive-button-danger {
+            background: rgb(220 38 38);
+            color: white;
+        }
+
+
+        .elive-onsite-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .elive-onsite-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .elive-checkbox-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.75rem 0.9rem;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 0.75rem;
+            background: rgb(249 250 251);
+            color: rgb(55 65 81);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .dark .elive-checkbox-row {
+            border-color: rgb(55 65 81);
+            background: rgb(31 41 55);
+            color: rgb(229 231 235);
+        }
+
+        .elive-checkbox-row input {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .elive-onsite-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+        }
+
+        .elive-header-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .elive-scan-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+            background: rgb(15 23 42 / 0.82);
+            backdrop-filter: blur(6px);
+        }
+
+        .elive-scan-overlay[data-open="true"] {
+            display: flex;
+        }
+
+        .elive-scan-overlay-card {
+            width: min(42rem, 100%);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            text-align: center;
+            box-shadow: 0 24px 70px rgb(0 0 0 / 0.35);
+            transform: scale(0.96);
+            animation: elive-overlay-enter 180ms ease-out forwards;
+        }
+
+        .elive-scan-overlay[data-status="success"] .elive-scan-overlay-card {
+            background: rgb(240 253 244);
+            color: rgb(20 83 45);
+            border: 3px solid rgb(34 197 94);
+        }
+
+        .elive-scan-overlay[data-status="warning"] .elive-scan-overlay-card {
+            background: rgb(254 252 232);
+            color: rgb(113 63 18);
+            border: 3px solid rgb(234 179 8);
+        }
+
+        .elive-scan-overlay[data-status="error"] .elive-scan-overlay-card {
+            background: rgb(254 242 242);
+            color: rgb(127 29 29);
+            border: 3px solid rgb(239 68 68);
+        }
+
+        .elive-scan-overlay-icon {
+            display: grid;
+            place-items: center;
+            width: 5.5rem;
+            height: 5.5rem;
+            margin: 0 auto 1rem;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 0.72);
+            font-size: 3rem;
+            font-weight: 900;
+        }
+
+        .elive-scan-overlay-title {
+            margin: 0;
+            font-size: clamp(1.75rem, 5vw, 3rem);
+            line-height: 1.05;
+            font-weight: 900;
+        }
+
+        .elive-scan-overlay-message {
+            margin: 0.75rem auto 0;
+            max-width: 34rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .elive-scan-overlay-name {
+            margin-top: 1.25rem;
+            font-size: clamp(1.25rem, 3.5vw, 2rem);
+            font-weight: 900;
+        }
+
+        .elive-scan-overlay-meta {
+            margin-top: 0.4rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            opacity: 0.78;
+        }
+
+        .elive-scan-overlay-close {
+            margin-top: 1.5rem;
+            min-width: 10rem;
+        }
+
+        @keyframes elive-overlay-enter {
+            to {
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .elive-main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-stat-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .elive-station-settings,
+            .elive-stat-grid,
+            .elive-details {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-scan-row {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-card-body {
+                padding: 1rem;
+            }
+
+            .elive-person {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .elive-onsite-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-card-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+
+    <div
+        class="elive-station"
+        wire:poll.15s
+    >
+        {{-- Event and station selection --}}
+        <section class="elive-card">
+            <div class="elive-card-header">
+                <div>
+                    <h2 class="elive-title">
+                        Station Setup
+                    </h2>
+
+                    <p class="elive-subtitle">
+                        Select the event and entrance point before checking in attendees.
+                    </p>
+                </div>
+
+                <div class="elive-header-actions">
+                    <button
+                        type="button"
+                        class="elive-button elive-button-primary"
+                        wire:click="openOnsiteRegistration"
+                        wire:loading.attr="disabled"
+                        wire:target="openOnsiteRegistration"
+                        @disabled(! $eventId)
+                    >
+                        Register Onsite Attendee
+                    </button>
+
+                    <div
+                        class="elive-loading"
+                        wire:loading
+                    >
+                        Updating...
+                    </div>
+                </div>
+            </div>
+
+            <div class="elive-card-body">
+                <div class="elive-station-settings">
+                    <div class="elive-form-group">
+                        <label
+                            class="elive-label"
+                            for="eventId"
+                        >
+                            Assigned Event
+                        </label>
+
+                        <select
+                            id="eventId"
+                            class="elive-select"
+                            wire:model.live="eventId"
+                        >
+                            <option value="">
+                                Select event
+                            </option>
+
+                            @foreach ($events as $event)
+                                <option value="{{ $event->getKey() }}">
+                                    {{ $event->name }}
+                                </option>
+                            @endforeach
+                        </select>
+
+                        @error('eventId')
+                            <span class="elive-error">
+                                {{ $message }}
+                            </span>
+                        @enderror
+                    </div>
+
+                    <div class="elive-form-group">
+                        <label
+                            class="elive-label"
+                            for="checkInPointId"
+                        >
+                            Check-in Point
+                        </label>
+
+                        <select
+                            id="checkInPointId"
+                            class="elive-select"
+                            wire:model.live="checkInPointId"
+                            @disabled(! $eventId)
+                        >
+                            <option value="">
+                                Select check-in point
+                            </option>
+
+                            @foreach ($checkInPoints as $point)
+                                <option value="{{ $point->getKey() }}">
+                                    {{ $point->name }}
+
+                                    @if (filled($point->location))
+                                        — {{ $point->location }}
+                                    @endif
+                                </option>
+                            @endforeach
+                        </select>
+
+                        @error('checkInPointId')
+                            <span class="elive-error">
+                                {{ $message }}
+                            </span>
+                        @enderror
+
+                        @if ($eventId && $checkInPoints->isEmpty())
+                            <span class="elive-error">
+                                This event has no active check-in point.
+                            </span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {{-- Onsite registration --}}
+        @if ($showOnsiteRegistration)
+            <section class="elive-card">
+                <div class="elive-card-header">
+                    <div>
+                        <h2 class="elive-title">
+                            Onsite Registration
+                        </h2>
+
+                        <p class="elive-subtitle">
+                            Register a walk-in attendee, generate the badge, and optionally check the attendee in immediately.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="elive-button elive-button-secondary"
+                        wire:click="closeOnsiteRegistration"
+                    >
+                        Close
+                    </button>
+                </div>
+
+                <div class="elive-card-body">
+                    <form wire:submit="registerOnsiteAttendee">
+                        <div class="elive-onsite-grid">
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteFullName"
+                                >
+                                    Full Name
+                                </label>
+
+                                <input
+                                    id="onsiteFullName"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="onsiteFullName"
+                                    placeholder="Enter attendee full name"
+                                    autocomplete="name"
+                                    autofocus
+                                >
+
+                                @error('onsiteFullName')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsitePhone"
+                                >
+                                    Phone
+                                </label>
+
+                                <input
+                                    id="onsitePhone"
+                                    type="tel"
+                                    class="elive-input"
+                                    wire:model="onsitePhone"
+                                    placeholder="2557XXXXXXXX"
+                                    autocomplete="tel"
+                                >
+
+                                @error('onsitePhone')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteEmail"
+                                >
+                                    Email
+                                </label>
+
+                                <input
+                                    id="onsiteEmail"
+                                    type="email"
+                                    class="elive-input"
+                                    wire:model="onsiteEmail"
+                                    placeholder="name@example.com"
+                                    autocomplete="email"
+                                >
+
+                                @error('onsiteEmail')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteOrganizationName"
+                                >
+                                    Organization
+                                </label>
+
+                                <input
+                                    id="onsiteOrganizationName"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="onsiteOrganizationName"
+                                    placeholder="Company or institution"
+                                    autocomplete="organization"
+                                >
+
+                                @error('onsiteOrganizationName')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsitePosition"
+                                >
+                                    Position
+                                </label>
+
+                                <input
+                                    id="onsitePosition"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="onsitePosition"
+                                    placeholder="Job title or event role"
+                                    autocomplete="organization-title"
+                                >
+
+                                @error('onsitePosition')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteCategoryId"
+                                >
+                                    Attendee Category
+                                </label>
+
+                                <select
+                                    id="onsiteCategoryId"
+                                    class="elive-select"
+                                    wire:model="onsiteCategoryId"
+                                >
+                                    <option value="">
+                                        Select category
+                                    </option>
+
+                                    @foreach ($categories as $category)
+                                        <option value="{{ $category->getKey() }}">
+                                            {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('onsiteCategoryId')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+
+                                @if ($categories->isEmpty())
+                                    <span class="elive-help">
+                                        No attendee categories have been configured for this event.
+                                    </span>
+                                @endif
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteBadgeTypeId"
+                                >
+                                    Badge Type
+                                </label>
+
+                                <select
+                                    id="onsiteBadgeTypeId"
+                                    class="elive-select"
+                                    wire:model="onsiteBadgeTypeId"
+                                >
+                                    <option value="">
+                                        Select badge type
+                                    </option>
+
+                                    @foreach ($badgeTypes as $badgeType)
+                                        <option value="{{ $badgeType->getKey() }}">
+                                            {{ $badgeType->name }}
+
+                                            @if ($badgeType->is_default)
+                                                — Default
+                                            @endif
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('onsiteBadgeTypeId')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+
+                                @if ($badgeTypes->isEmpty())
+                                    <span class="elive-help">
+                                        No active badge types have been configured for this event.
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="elive-onsite-options">
+                            <label class="elive-checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    wire:model="onsiteGenerateBadge"
+                                >
+
+                                <span>
+                                    Generate badge immediately
+                                </span>
+                            </label>
+
+                            <label class="elive-checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    wire:model="onsiteCheckInImmediately"
+                                >
+
+                                <span>
+                                    Check in attendee immediately
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="elive-onsite-actions">
+                            <button
+                                type="submit"
+                                class="elive-button elive-button-success"
+                                wire:loading.attr="disabled"
+                                wire:target="registerOnsiteAttendee"
+                            >
+                                <span
+                                    wire:loading.remove
+                                    wire:target="registerOnsiteAttendee"
+                                >
+                                    Register Attendee
+                                </span>
+
+                                <span
+                                    wire:loading
+                                    wire:target="registerOnsiteAttendee"
+                                >
+                                    Registering...
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="elive-button elive-button-secondary"
+                                wire:click="closeOnsiteRegistration"
+                                wire:loading.attr="disabled"
+                                wire:target="registerOnsiteAttendee"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        @endif
+
+        {{-- Counters --}}
+        <section class="elive-stat-grid">
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Registered
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['registered']) }}
+                </div>
+            </div>
+
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Checked In
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['checked_in']) }}
+                </div>
+            </div>
+
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Remaining
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['remaining']) }}
+                </div>
+            </div>
+
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Checked In Today
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['today']) }}
+                </div>
+            </div>
+        </section>
+
+        <div class="elive-main-grid">
+            {{-- Scanner --}}
+            <section class="elive-card">
+                <div class="elive-card-header">
+                    <div>
+                        <h2 class="elive-title">
+                            QR and Badge Scanner
+                        </h2>
+
+                        <p class="elive-subtitle">
+                            Scan a QR code or enter a badge number.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="elive-card-body">
+                    <form
+                        wire:submit="processScan"
+                    >
+                        <div class="elive-form-group">
+                            <label
+                                class="elive-label"
+                                for="scanValue"
+                            >
+                                QR Token or Badge Number
+                            </label>
+
+                            <div class="elive-scan-row">
+                                <input
+                                    id="scanValue"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="scanValue"
+                                    placeholder="Scan or enter ELV-000123"
+                                    autocomplete="off"
+                                    autofocus
+                                    @disabled(! $eventId || ! $checkInPointId)
+                                >
+
+                                <button
+                                    type="submit"
+                                    class="elive-button elive-button-primary"
+                                    wire:loading.attr="disabled"
+                                    wire:target="processScan"
+                                    @disabled(! $eventId || ! $checkInPointId)
+                                >
+                                    <span wire:loading.remove wire:target="processScan">
+                                        Check In
+                                    </span>
+
+                                    <span wire:loading wire:target="processScan">
+                                        Processing...
+                                    </span>
+                                </button>
+                            </div>
+
+                            @error('scanValue')
+                                <span class="elive-error">
+                                    {{ $message }}
+                                </span>
+                            @enderror
+                        </div>
+                    </form>
+
+                    <p class="elive-help">
+                        USB and Bluetooth barcode scanners can type directly into this field and submit using Enter.
+                    </p>
+
+                    <div
+                        class="elive-camera-panel"
+                        wire:ignore
+                    >
+                        <div class="elive-camera-actions">
+                            <button
+                                id="elive-start-camera"
+                                type="button"
+                                class="elive-button elive-button-success"
+                                @disabled(! $eventId || ! $checkInPointId)
+                            >
+                                Start Camera
+                            </button>
+
+                            <button
+                                id="elive-stop-camera"
+                                type="button"
+                                class="elive-button elive-button-danger"
+                                disabled
+                            >
+                                Stop Camera
+                            </button>
+
+                            <button
+                                id="elive-switch-camera"
+                                type="button"
+                                class="elive-button elive-button-secondary"
+                                disabled
+                            >
+                                Switch Camera
+                            </button>
+                        </div>
+
+                        <div
+                            id="elive-camera-status"
+                            class="elive-camera-status"
+                            data-state="idle"
+                        >
+                            Camera is stopped.
+                        </div>
+
+                        <div
+                            id="elive-qr-reader"
+                            class="elive-camera-reader"
+                        >
+                            <div class="elive-camera-placeholder">
+                                Start the camera to scan an attendee QR code.
+                            </div>
+                        </div>
+
+                        <p class="elive-help">
+                            Camera access requires HTTPS in production. Localhost works during local development.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            {{-- Latest result --}}
+            <section class="elive-card">
+                <div class="elive-card-header">
+                    <div>
+                        <h2 class="elive-title">
+                            Latest Result
+                        </h2>
+
+                        <p class="elive-subtitle">
+                            The most recent check-in response appears here.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="elive-card-body">
+                    @if ($lastResult)
+                        <div class="elive-result {{ $resultClass }}">
+                            <h3 class="elive-result-title">
+                                {{ $lastResult['title'] ?? 'Check-in result' }}
+                            </h3>
+
+                            <p class="elive-result-message">
+                                {{ $lastResult['message'] ?? '' }}
+                            </p>
+
+                            @if (! empty($lastResult['attendee']))
+                                <div class="elive-details">
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Attendee
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['attendee']['name'] ?? 'Not available' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Badge Number
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['attendee']['badge_number'] ?? 'Not assigned' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Organization
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['attendee']['organization'] ?? 'Not provided' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Check-in Point
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['check_in_point'] ?? 'Not available' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Method
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ ucwords(str_replace('_', ' ', $lastResult['method'] ?? '')) }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Time
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            @php
+                                                $checkedInAt = $lastResult['checked_in_at'] ?? null;
+                                            @endphp
+
+                                            @if ($checkedInAt instanceof \Carbon\CarbonInterface)
+                                                {{ $checkedInAt->format('d/m/Y H:i:s') }}
+                                            @elseif ($checkedInAt)
+                                                {{ $checkedInAt }}
+                                            @else
+                                                Not available
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                        <div class="elive-empty">
+                            <div>
+                                <strong>
+                                    No scan performed yet
+                                </strong>
+
+                                <p>
+                                    Select an event and check-in point, then scan an attendee QR code.
+                                </p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </section>
+        </div>
+
+        {{-- Manual search --}}
+        <section class="elive-card">
+            <div class="elive-card-header">
+                <div>
+                    <h2 class="elive-title">
+                        Manual Attendee Search
+                    </h2>
+
+                    <p class="elive-subtitle">
+                        Search by name, phone, email, badge number, or organization.
+                    </p>
+                </div>
+            </div>
+
+            <div class="elive-card-body">
+                <div class="elive-form-group">
+                    <label
+                        class="elive-label"
+                        for="search"
+                    >
+                        Search Attendees
+                    </label>
+
+                    <input
+                        id="search"
+                        type="search"
+                        class="elive-input"
+                        wire:model.live.debounce.400ms="search"
+                        placeholder="Type at least two characters"
+                        autocomplete="off"
+                        @disabled(! $eventId)
+                    >
+                </div>
+
+                @if (
+                    $eventId
+                    && mb_strlen(trim($search)) >= 2
+                )
+                    <div class="elive-search-results">
+                        @forelse ($searchResults as $attendee)
+                            <div class="elive-person">
+                                <div>
+                                    <div class="elive-person-name">
+                                        {{ $attendee->full_name }}
+                                    </div>
+
+                                    <div class="elive-person-meta">
+                                        {{ $attendee->badge_number ?: 'No badge number' }}
+
+                                        @if (filled($attendee->organization_name))
+                                            · {{ $attendee->organization_name }}
+                                        @endif
+
+                                        @if (filled($attendee->phone))
+                                            · {{ $attendee->phone }}
+                                        @endif
+                                    </div>
+
+                                    <div style="margin-top: 0.4rem;">
+                                        <span class="elive-status-badge">
+                                            {{ ucwords(str_replace('_', ' ', $attendee->status)) }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    class="elive-button elive-button-secondary"
+                                    wire:click="selectAttendee({{ $attendee->getKey() }})"
+                                >
+                                    Select
+                                </button>
+                            </div>
+                        @empty
+                            <div class="elive-empty">
+                                No attendee matched your search.
+                            </div>
+                        @endforelse
+                    </div>
+                @endif
+
+                @if ($selectedAttendee)
+                    <div
+                        class="elive-result elive-result-neutral"
+                        style="margin-top: 1rem;"
+                    >
+                        <h3 class="elive-result-title">
+                            Selected Attendee
+                        </h3>
+
+                        <div class="elive-details">
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Full Name
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ $selectedAttendee->full_name }}
+                                </div>
+                            </div>
+
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Badge Number
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ $selectedAttendee->badge_number ?: 'Not assigned' }}
+                                </div>
+                            </div>
+
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Organization
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ $selectedAttendee->organization_name ?: 'Not provided' }}
+                                </div>
+                            </div>
+
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Registration Status
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ ucwords(str_replace('_', ' ', $selectedAttendee->status)) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            style="
+                                display: flex;
+                                flex-wrap: wrap;
+                                gap: 0.75rem;
+                                margin-top: 1rem;
+                            "
+                        >
+                            <button
+                                type="button"
+                                class="elive-button elive-button-success"
+                                wire:click="checkInSelectedAttendee"
+                                wire:loading.attr="disabled"
+                                wire:target="checkInSelectedAttendee"
+                                @disabled(! $checkInPointId)
+                            >
+                                <span
+                                    wire:loading.remove
+                                    wire:target="checkInSelectedAttendee"
+                                >
+                                    Check In Attendee
+                                </span>
+
+                                <span
+                                    wire:loading
+                                    wire:target="checkInSelectedAttendee"
+                                >
+                                    Processing...
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="elive-button elive-button-secondary"
+                                wire:click="clearSelectedAttendee"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+
+                        @error('selectedAttendeeId')
+                            <div class="elive-error">
+                                {{ $message }}
+                            </div>
+                        @enderror
+                    </div>
+                @endif
+            </div>
+        </section>
+
+        {{-- Recent check-ins --}}
+        <section class="elive-card">
+            <div class="elive-card-header">
+                <div>
+                    <h2 class="elive-title">
+                        Recent Check-ins
+                    </h2>
+
+                    <p class="elive-subtitle">
+                        Latest check-in activity for the selected event.
+                    </p>
+                </div>
+            </div>
+
+            @if ($recentCheckIns->isNotEmpty())
+                <div class="elive-table-wrapper">
+                    <table class="elive-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Attendee</th>
+                                <th>Badge</th>
+                                <th>Point</th>
+                                <th>Method</th>
+                                <th>Officer</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($recentCheckIns as $checkIn)
+                                <tr>
+                                    <td>
+                                        {{ $checkIn->checked_in_at?->format('H:i:s') ?? '—' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->attendee?->full_name ?? 'Unknown attendee' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->attendee?->badge_number ?? '—' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->checkInPoint?->name ?? 'Not specified' }}
+                                    </td>
+
+                                    <td>
+                                        {{ ucwords(str_replace('_', ' ', $checkIn->method ?? '')) }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->checkedInBy?->name ?? 'System' }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="elive-empty">
+                    No check-ins recorded for the selected event.
+                </div>
+            @endif
+        </section>
+    </div>
+
+
+    <div
+        id="elive-scan-overlay"
+        class="elive-scan-overlay"
+        data-open="false"
+        data-status="success"
+        wire:ignore
+        role="dialog"
+        aria-modal="true"
+        aria-live="assertive"
+    >
+        <div class="elive-scan-overlay-card">
+            <div
+                id="elive-scan-overlay-icon"
+                class="elive-scan-overlay-icon"
+            >
+                ✓
+            </div>
+
+            <h2
+                id="elive-scan-overlay-title"
+                class="elive-scan-overlay-title"
+            >
+                Check-in successful
+            </h2>
+
+            <p
+                id="elive-scan-overlay-message"
+                class="elive-scan-overlay-message"
+            ></p>
+
+            <div
+                id="elive-scan-overlay-name"
+                class="elive-scan-overlay-name"
+            ></div>
+
+            <div
+                id="elive-scan-overlay-meta"
+                class="elive-scan-overlay-meta"
+            ></div>
+
+            <button
+                id="elive-scan-overlay-close"
+                type="button"
+                class="elive-button elive-button-secondary elive-scan-overlay-close"
+            >
+                Continue Scanning
+            </button>
+        </div>
+    </div>
+
+    @script
+        <script>
+            (() => {
+                const libraryUrl =
+                    'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+
+                let scanner = null;
+                let cameras = [];
+                let cameraIndex = 0;
+                let running = false;
+                let processing = false;
+                let lastDecodedText = null;
+                let lastDecodedAt = 0;
+                let overlayTimer = null;
+                let audioContext = null;
+
+                const getElement = (id) =>
+                    document.getElementById(id);
+
+                const startButton = getElement('elive-start-camera');
+                const stopButton = getElement('elive-stop-camera');
+                const switchButton = getElement('elive-switch-camera');
+                const statusElement = getElement('elive-camera-status');
+                const readerElement = getElement('elive-qr-reader');
+                const overlayElement = getElement('elive-scan-overlay');
+                const overlayIcon = getElement('elive-scan-overlay-icon');
+                const overlayTitle = getElement('elive-scan-overlay-title');
+                const overlayMessage = getElement('elive-scan-overlay-message');
+                const overlayName = getElement('elive-scan-overlay-name');
+                const overlayMeta = getElement('elive-scan-overlay-meta');
+                const overlayCloseButton = getElement(
+                    'elive-scan-overlay-close'
+                );
+
+
+                const getAudioContext = () => {
+                    if (! audioContext) {
+                        const AudioContextClass =
+                            window.AudioContext
+                            || window.webkitAudioContext;
+
+                        if (AudioContextClass) {
+                            audioContext = new AudioContextClass();
+                        }
+                    }
+
+                    return audioContext;
+                };
+
+                const playTone = async (type) => {
+                    const context = getAudioContext();
+
+                    if (! context) {
+                        return;
+                    }
+
+                    if (context.state === 'suspended') {
+                        await context.resume();
+                    }
+
+                    const patterns = {
+                        success: [
+                            [740, 0, 0.11],
+                            [980, 0.13, 0.16],
+                        ],
+                        warning: [
+                            [520, 0, 0.16],
+                            [420, 0.19, 0.2],
+                        ],
+                        error: [
+                            [250, 0, 0.22],
+                            [190, 0.24, 0.25],
+                        ],
+                    };
+
+                    const pattern = patterns[type] ?? patterns.error;
+                    const startAt = context.currentTime;
+
+                    pattern.forEach(([frequency, offset, duration]) => {
+                        const oscillator = context.createOscillator();
+                        const gain = context.createGain();
+
+                        oscillator.type = 'sine';
+                        oscillator.frequency.value = frequency;
+
+                        gain.gain.setValueAtTime(
+                            0.0001,
+                            startAt + offset
+                        );
+                        gain.gain.exponentialRampToValueAtTime(
+                            0.18,
+                            startAt + offset + 0.01
+                        );
+                        gain.gain.exponentialRampToValueAtTime(
+                            0.0001,
+                            startAt + offset + duration
+                        );
+
+                        oscillator.connect(gain);
+                        gain.connect(context.destination);
+
+                        oscillator.start(startAt + offset);
+                        oscillator.stop(startAt + offset + duration + 0.03);
+                    });
+                };
+
+                const closeResultOverlay = () => {
+                    if (overlayTimer) {
+                        window.clearTimeout(overlayTimer);
+                        overlayTimer = null;
+                    }
+
+                    if (overlayElement) {
+                        overlayElement.dataset.open = 'false';
+                    }
+                };
+
+                const showResultOverlay = (result = {}) => {
+                    if (! overlayElement) {
+                        return;
+                    }
+
+                    const status = String(
+                        result.status ?? 'check_in_failed'
+                    );
+
+                    let visualStatus = 'error';
+                    let icon = '✕';
+
+                    if (
+                        status === 'checked_in'
+                        || status === 'onsite_registered'
+                        || result.success === true
+                    ) {
+                        visualStatus = 'success';
+                        icon = '✓';
+                    } else if (status === 'already_checked_in') {
+                        visualStatus = 'warning';
+                        icon = '!';
+                    }
+
+                    overlayElement.dataset.status = visualStatus;
+                    overlayElement.dataset.open = 'true';
+
+                    if (overlayIcon) {
+                        overlayIcon.textContent = icon;
+                    }
+
+                    if (overlayTitle) {
+                        overlayTitle.textContent =
+                            result.title
+                            ?? (
+                                visualStatus === 'success'
+                                    ? 'Check-in successful'
+                                    : visualStatus === 'warning'
+                                        ? 'Already checked in'
+                                        : 'Check-in failed'
+                            );
+                    }
+
+                    if (overlayMessage) {
+                        overlayMessage.textContent =
+                            result.message ?? '';
+                    }
+
+                    const attendee = result.attendee ?? {};
+
+                    if (overlayName) {
+                        overlayName.textContent =
+                            attendee.name ?? '';
+                    }
+
+                    if (overlayMeta) {
+                        const parts = [
+                            attendee.badge_number,
+                            result.check_in_point,
+                        ].filter(Boolean);
+
+                        overlayMeta.textContent = parts.join(' · ');
+                    }
+
+                    void playTone(visualStatus);
+
+                    if (navigator.vibrate) {
+                        navigator.vibrate(
+                            visualStatus === 'success'
+                                ? [100]
+                                : visualStatus === 'warning'
+                                    ? [160, 80, 160]
+                                    : [250, 100, 250]
+                        );
+                    }
+
+                    if (overlayTimer) {
+                        window.clearTimeout(overlayTimer);
+                    }
+
+                    overlayTimer = window.setTimeout(
+                        closeResultOverlay,
+                        visualStatus === 'success' ? 2600 : 3600
+                    );
+                };
+
+                const setStatus = (message, state = 'idle') => {
+                    if (! statusElement) {
+                        return;
+                    }
+
+                    statusElement.textContent = message;
+                    statusElement.dataset.state = state;
+                };
+
+                const setControls = () => {
+                    if (startButton) {
+                        startButton.disabled = running;
+                    }
+
+                    if (stopButton) {
+                        stopButton.disabled = ! running;
+                    }
+
+                    if (switchButton) {
+                        switchButton.disabled =
+                            ! running || cameras.length < 2;
+                    }
+                };
+
+                const loadLibrary = () => {
+                    if (window.Html5Qrcode) {
+                        return Promise.resolve();
+                    }
+
+                    return new Promise((resolve, reject) => {
+                        const existing = document.querySelector(
+                            'script[data-elive-html5-qrcode]'
+                        );
+
+                        if (existing) {
+                            existing.addEventListener('load', resolve, {
+                                once: true,
+                            });
+
+                            existing.addEventListener('error', reject, {
+                                once: true,
+                            });
+
+                            return;
+                        }
+
+                        const script = document.createElement('script');
+
+                        script.src = libraryUrl;
+                        script.async = true;
+                        script.dataset.eliveHtml5Qrcode = 'true';
+                        script.onload = resolve;
+                        script.onerror = () => reject(
+                            new Error(
+                                'The camera scanner library could not be loaded.'
+                            )
+                        );
+
+                        document.head.appendChild(script);
+                    });
+                };
+
+                const stopScanner = async () => {
+                    if (! scanner || ! running) {
+                        running = false;
+                        setControls();
+
+                        return;
+                    }
+
+                    try {
+                        await scanner.stop();
+                    } catch (error) {
+                        console.warn(
+                            'Unable to stop QR scanner cleanly.',
+                            error
+                        );
+                    }
+
+                    try {
+                        await scanner.clear();
+                    } catch (error) {
+                        console.warn(
+                            'Unable to clear QR scanner cleanly.',
+                            error
+                        );
+                    }
+
+                    scanner = null;
+                    running = false;
+                    processing = false;
+
+                    if (readerElement) {
+                        readerElement.innerHTML = `
+                            <div class="elive-camera-placeholder">
+                                Start the camera to scan an attendee QR code.
+                            </div>
+                        `;
+                    }
+
+                    setStatus('Camera is stopped.');
+                    setControls();
+                };
+
+                const handleDecodedText = async (decodedText) => {
+                    const value = String(decodedText ?? '').trim();
+
+                    if (! value || processing) {
+                        return;
+                    }
+
+                    const now = Date.now();
+
+                    if (
+                        value === lastDecodedText
+                        && now - lastDecodedAt < 4500
+                    ) {
+                        return;
+                    }
+
+                    lastDecodedText = value;
+                    lastDecodedAt = now;
+                    processing = true;
+
+                    setStatus(
+                        'QR code detected. Processing check-in...',
+                        'success'
+                    );
+
+                    try {
+                        $wire.set('scanValue', value);
+
+                        await $wire.processScan();
+
+                        const result = await $wire.get('lastResult');
+
+                        showResultOverlay(result ?? {});
+
+                        setStatus(
+                            'Scan processed. Ready for the next attendee.',
+                            result?.success
+                                ? 'success'
+                                : result?.status === 'already_checked_in'
+                                    ? 'success'
+                                    : 'error'
+                        );
+                    } catch (error) {
+                        console.error(error);
+
+                        setStatus(
+                            error?.message
+                                ?? 'The scanned QR code could not be processed.',
+                            'error'
+                        );
+                    } finally {
+                        window.setTimeout(() => {
+                            processing = false;
+                        }, 2400);
+                    }
+                };
+
+                const startScanner = async (
+                    preferredCameraId = null
+                ) => {
+                    if (running) {
+                        return;
+                    }
+
+                    const eventId = await $wire.get('eventId');
+                    const checkInPointId = await $wire.get(
+                        'checkInPointId'
+                    );
+
+                    if (! eventId || ! checkInPointId) {
+                        setStatus(
+                            'Select an event and check-in point first.',
+                            'error'
+                        );
+
+                        return;
+                    }
+
+                    setStatus('Requesting camera access...');
+
+                    try {
+                        await loadLibrary();
+
+                        cameras = await window.Html5Qrcode.getCameras();
+
+                        if (! cameras.length) {
+                            throw new Error(
+                                'No camera was found on this device.'
+                            );
+                        }
+
+                        let cameraId = preferredCameraId;
+
+                        if (! cameraId) {
+                            const backCameraIndex = cameras.findIndex(
+                                (camera) =>
+                                    /back|rear|environment/i.test(
+                                        camera.label
+                                    )
+                            );
+
+                            cameraIndex =
+                                backCameraIndex >= 0
+                                    ? backCameraIndex
+                                    : 0;
+
+                            cameraId = cameras[cameraIndex].id;
+                        } else {
+                            const selectedIndex = cameras.findIndex(
+                                (camera) =>
+                                    camera.id === preferredCameraId
+                            );
+
+                            cameraIndex =
+                                selectedIndex >= 0
+                                    ? selectedIndex
+                                    : 0;
+                        }
+
+                        if (readerElement) {
+                            readerElement.innerHTML = '';
+                        }
+
+                        scanner = new window.Html5Qrcode(
+                            'elive-qr-reader',
+                            {
+                                verbose: false,
+                            }
+                        );
+
+                        await scanner.start(
+                            cameraId,
+                            {
+                                fps: 12,
+                                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                                    const size = Math.floor(
+                                        Math.min(
+                                            viewfinderWidth,
+                                            viewfinderHeight
+                                        ) * 0.72
+                                    );
+
+                                    return {
+                                        width: Math.max(size, 180),
+                                        height: Math.max(size, 180),
+                                    };
+                                },
+                                aspectRatio: 1,
+                            },
+                            handleDecodedText,
+                            () => {
+                                // Decode failures are normal while searching
+                                // for a QR code, so they are intentionally ignored.
+                            }
+                        );
+
+                        running = true;
+
+                        setStatus(
+                            `Camera active: ${
+                                cameras[cameraIndex]?.label
+                                    || `Camera ${cameraIndex + 1}`
+                            }`,
+                            'success'
+                        );
+
+                        setControls();
+                    } catch (error) {
+                        console.error(error);
+
+                        scanner = null;
+                        running = false;
+
+                        setStatus(
+                            error?.message
+                                ?? 'Camera access failed. Confirm camera permission and HTTPS.',
+                            'error'
+                        );
+
+                        setControls();
+                    }
+                };
+
+                const switchCamera = async () => {
+                    if (cameras.length < 2) {
+                        return;
+                    }
+
+                    cameraIndex =
+                        (cameraIndex + 1) % cameras.length;
+
+                    const nextCameraId =
+                        cameras[cameraIndex].id;
+
+                    await stopScanner();
+                    await startScanner(nextCameraId);
+                };
+
+                startButton?.addEventListener(
+                    'click',
+                    () => startScanner()
+                );
+
+                stopButton?.addEventListener(
+                    'click',
+                    stopScanner
+                );
+
+                switchButton?.addEventListener(
+                    'click',
+                    switchCamera
+                );
+
+                window.addEventListener(
+                    'beforeunload',
+                    () => {
+                        void stopScanner();
+                    },
+                    {
+                        once: true,
+                    }
+                );
+
+                document.addEventListener(
+                    'livewire:navigating',
+                    () => {
+                        void stopScanner();
+                    },
+                    {
+                        once: true,
+                    }
+                );
+
+                overlayCloseButton?.addEventListener(
+                    'click',
+                    closeResultOverlay
+                );
+
+                overlayElement?.addEventListener(
+                    'click',
+                    (event) => {
+                        if (event.target === overlayElement) {
+                            closeResultOverlay();
+                        }
+                    }
+                );
+
+                document.addEventListener(
+                    'keydown',
+                    (event) => {
+                        if (event.key === 'Escape') {
+                            closeResultOverlay();
+                        }
+                    }
+                );
+
+                setControls();
+            })();
+        </script>
+    @endscript
+
+</x-filament-panels::page><x-filament-panels::page>
+    @php
+        $events = $this->getAvailableEvents();
+        $checkInPoints = $this->getAvailableCheckInPoints();
+        $searchResults = $this->getSearchResults();
+        $selectedAttendee = $this->getSelectedAttendee();
+        $recentCheckIns = $this->getRecentCheckIns();
+        $counters = $this->getCounters();
+        $categories = $this->getAvailableCategories();
+        $badgeTypes = $this->getAvailableBadgeTypes();
+
+        $resultStatus = $lastResult['status'] ?? null;
+        $resultSuccess = (bool) ($lastResult['success'] ?? false);
+
+        $resultClass = match ($resultStatus) {
+            'checked_in',
+            'onsite_registered' => 'elive-result-success',
+            'already_checked_in' => 'elive-result-warning',
+            'invalid_code',
+            'attendee_not_found',
+            'attendee_not_eligible',
+            'access_denied',
+            'check_in_failed' => 'elive-result-danger',
+            default => 'elive-result-neutral',
+        };
+    @endphp
+
+    <style>
+        .elive-station {
+            display: grid;
+            gap: 1.25rem;
+        }
+
+        .elive-card {
+            overflow: hidden;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 1rem;
+            background: white;
+            box-shadow: 0 1px 3px rgb(15 23 42 / 0.08);
+        }
+
+        .dark .elive-card {
+            border-color: rgb(55 65 81);
+            background: rgb(17 24 39);
+        }
+
+        .elive-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgb(229 231 235);
+        }
+
+        .dark .elive-card-header {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-card-body {
+            padding: 1.25rem;
+        }
+
+        .elive-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+            color: rgb(17 24 39);
+        }
+
+        .dark .elive-title {
+            color: white;
+        }
+
+        .elive-subtitle {
+            margin: 0.25rem 0 0;
+            font-size: 0.875rem;
+            color: rgb(107 114 128);
+        }
+
+        .dark .elive-subtitle {
+            color: rgb(156 163 175);
+        }
+
+        .elive-station-settings {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .elive-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .elive-stat {
+            padding: 1rem;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 0.875rem;
+            background: rgb(249 250 251);
+        }
+
+        .dark .elive-stat {
+            border-color: rgb(55 65 81);
+            background: rgb(31 41 55);
+        }
+
+        .elive-stat-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: rgb(107 114 128);
+        }
+
+        .elive-stat-value {
+            margin-top: 0.35rem;
+            font-size: 1.75rem;
+            line-height: 1;
+            font-weight: 800;
+            color: rgb(17 24 39);
+        }
+
+        .dark .elive-stat-value {
+            color: white;
+        }
+
+        .elive-main-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+            gap: 1.25rem;
+            align-items: start;
+        }
+
+        .elive-form-group {
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .elive-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: rgb(55 65 81);
+        }
+
+        .dark .elive-label {
+            color: rgb(209 213 219);
+        }
+
+        .elive-input,
+        .elive-select {
+            width: 100%;
+            min-height: 2.75rem;
+            padding: 0.65rem 0.8rem;
+            border: 1px solid rgb(209 213 219);
+            border-radius: 0.75rem;
+            background: white;
+            color: rgb(17 24 39);
+            outline: none;
+        }
+
+        .dark .elive-input,
+        .dark .elive-select {
+            border-color: rgb(75 85 99);
+            background: rgb(31 41 55);
+            color: white;
+        }
+
+        .elive-input:focus,
+        .elive-select:focus {
+            border-color: rgb(99 102 241);
+            box-shadow: 0 0 0 3px rgb(99 102 241 / 0.15);
+        }
+
+        .elive-input:disabled,
+        .elive-select:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .elive-error {
+            font-size: 0.8rem;
+            color: rgb(220 38 38);
+        }
+
+        .elive-scan-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.75rem;
+        }
+
+        .elive-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            min-height: 2.75rem;
+            padding: 0.65rem 1rem;
+            border: 0;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .elive-button:hover {
+            opacity: 0.9;
+        }
+
+        .elive-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .elive-button-primary {
+            background: rgb(79 70 229);
+            color: white;
+        }
+
+        .elive-button-success {
+            background: rgb(22 163 74);
+            color: white;
+        }
+
+        .elive-button-secondary {
+            background: rgb(229 231 235);
+            color: rgb(31 41 55);
+        }
+
+        .dark .elive-button-secondary {
+            background: rgb(55 65 81);
+            color: white;
+        }
+
+        .elive-help {
+            margin-top: 0.65rem;
+            font-size: 0.82rem;
+            color: rgb(107 114 128);
+        }
+
+        .elive-result {
+            padding: 1.25rem;
+            border: 1px solid transparent;
+            border-radius: 1rem;
+        }
+
+        .elive-result-success {
+            border-color: rgb(134 239 172);
+            background: rgb(240 253 244);
+            color: rgb(20 83 45);
+        }
+
+        .elive-result-warning {
+            border-color: rgb(253 224 71);
+            background: rgb(254 252 232);
+            color: rgb(113 63 18);
+        }
+
+        .elive-result-danger {
+            border-color: rgb(252 165 165);
+            background: rgb(254 242 242);
+            color: rgb(127 29 29);
+        }
+
+        .elive-result-neutral {
+            border-color: rgb(209 213 219);
+            background: rgb(249 250 251);
+            color: rgb(55 65 81);
+        }
+
+        .dark .elive-result-success {
+            border-color: rgb(22 101 52);
+            background: rgb(20 83 45 / 0.35);
+            color: rgb(187 247 208);
+        }
+
+        .dark .elive-result-warning {
+            border-color: rgb(161 98 7);
+            background: rgb(113 63 18 / 0.35);
+            color: rgb(254 240 138);
+        }
+
+        .dark .elive-result-danger {
+            border-color: rgb(153 27 27);
+            background: rgb(127 29 29 / 0.35);
+            color: rgb(254 202 202);
+        }
+
+        .dark .elive-result-neutral {
+            border-color: rgb(75 85 99);
+            background: rgb(31 41 55);
+            color: rgb(229 231 235);
+        }
+
+        .elive-result-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+
+        .elive-result-message {
+            margin: 0.35rem 0 0;
+            font-size: 0.9rem;
+        }
+
+        .elive-details {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .elive-detail {
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            background: rgb(255 255 255 / 0.65);
+        }
+
+        .dark .elive-detail {
+            background: rgb(17 24 39 / 0.55);
+        }
+
+        .elive-detail-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        .elive-detail-value {
+            margin-top: 0.2rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .elive-empty {
+            display: grid;
+            place-items: center;
+            min-height: 13rem;
+            padding: 2rem;
+            text-align: center;
+            color: rgb(107 114 128);
+        }
+
+        .elive-search-results {
+            display: grid;
+            gap: 0.65rem;
+            margin-top: 1rem;
+        }
+
+        .elive-person {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.85rem;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 0.8rem;
+        }
+
+        .dark .elive-person {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-person-name {
+            font-weight: 700;
+            color: rgb(17 24 39);
+        }
+
+        .dark .elive-person-name {
+            color: white;
+        }
+
+        .elive-person-meta {
+            margin-top: 0.15rem;
+            font-size: 0.8rem;
+            color: rgb(107 114 128);
+        }
+
+        .elive-status-badge {
+            display: inline-flex;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: rgb(238 242 255);
+            color: rgb(67 56 202);
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .dark .elive-status-badge {
+            background: rgb(49 46 129 / 0.5);
+            color: rgb(199 210 254);
+        }
+
+        .elive-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .elive-table {
+            width: 100%;
+            border-collapse: collapse;
+            white-space: nowrap;
+        }
+
+        .elive-table th,
+        .elive-table td {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid rgb(229 231 235);
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        .dark .elive-table th,
+        .dark .elive-table td {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-table th {
+            color: rgb(75 85 99);
+            font-weight: 700;
+        }
+
+        .dark .elive-table th {
+            color: rgb(209 213 219);
+        }
+
+        .elive-loading {
+            font-size: 0.8rem;
+            color: rgb(79 70 229);
+        }
+
+
+        .elive-camera-panel {
+            display: grid;
+            gap: 0.85rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgb(229 231 235);
+        }
+
+        .dark .elive-camera-panel {
+            border-color: rgb(55 65 81);
+        }
+
+        .elive-camera-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .elive-camera-reader {
+            overflow: hidden;
+            width: 100%;
+            min-height: 18rem;
+            border: 2px dashed rgb(209 213 219);
+            border-radius: 1rem;
+            background: rgb(17 24 39);
+        }
+
+        .elive-camera-reader video {
+            width: 100% !important;
+            height: auto !important;
+            border-radius: 0.9rem;
+        }
+
+        .elive-camera-placeholder {
+            display: grid;
+            min-height: 18rem;
+            place-items: center;
+            padding: 1.5rem;
+            text-align: center;
+            color: rgb(156 163 175);
+        }
+
+        .elive-camera-status {
+            font-size: 0.84rem;
+            font-weight: 600;
+            color: rgb(75 85 99);
+        }
+
+        .dark .elive-camera-status {
+            color: rgb(209 213 219);
+        }
+
+        .elive-camera-status[data-state="success"] {
+            color: rgb(22 163 74);
+        }
+
+        .elive-camera-status[data-state="error"] {
+            color: rgb(220 38 38);
+        }
+
+        .elive-button-danger {
+            background: rgb(220 38 38);
+            color: white;
+        }
+
+
+        .elive-onsite-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .elive-onsite-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .elive-checkbox-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.75rem 0.9rem;
+            border: 1px solid rgb(229 231 235);
+            border-radius: 0.75rem;
+            background: rgb(249 250 251);
+            color: rgb(55 65 81);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .dark .elive-checkbox-row {
+            border-color: rgb(55 65 81);
+            background: rgb(31 41 55);
+            color: rgb(229 231 235);
+        }
+
+        .elive-checkbox-row input {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .elive-onsite-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+        }
+
+        .elive-header-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .elive-scan-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+            background: rgb(15 23 42 / 0.82);
+            backdrop-filter: blur(6px);
+        }
+
+        .elive-scan-overlay[data-open="true"] {
+            display: flex;
+        }
+
+        .elive-scan-overlay-card {
+            width: min(42rem, 100%);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            text-align: center;
+            box-shadow: 0 24px 70px rgb(0 0 0 / 0.35);
+            transform: scale(0.96);
+            animation: elive-overlay-enter 180ms ease-out forwards;
+        }
+
+        .elive-scan-overlay[data-status="success"] .elive-scan-overlay-card {
+            background: rgb(240 253 244);
+            color: rgb(20 83 45);
+            border: 3px solid rgb(34 197 94);
+        }
+
+        .elive-scan-overlay[data-status="warning"] .elive-scan-overlay-card {
+            background: rgb(254 252 232);
+            color: rgb(113 63 18);
+            border: 3px solid rgb(234 179 8);
+        }
+
+        .elive-scan-overlay[data-status="error"] .elive-scan-overlay-card {
+            background: rgb(254 242 242);
+            color: rgb(127 29 29);
+            border: 3px solid rgb(239 68 68);
+        }
+
+        .elive-scan-overlay-icon {
+            display: grid;
+            place-items: center;
+            width: 5.5rem;
+            height: 5.5rem;
+            margin: 0 auto 1rem;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 0.72);
+            font-size: 3rem;
+            font-weight: 900;
+        }
+
+        .elive-scan-overlay-title {
+            margin: 0;
+            font-size: clamp(1.75rem, 5vw, 3rem);
+            line-height: 1.05;
+            font-weight: 900;
+        }
+
+        .elive-scan-overlay-message {
+            margin: 0.75rem auto 0;
+            max-width: 34rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .elive-scan-overlay-name {
+            margin-top: 1.25rem;
+            font-size: clamp(1.25rem, 3.5vw, 2rem);
+            font-weight: 900;
+        }
+
+        .elive-scan-overlay-meta {
+            margin-top: 0.4rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            opacity: 0.78;
+        }
+
+        .elive-scan-overlay-close {
+            margin-top: 1.5rem;
+            min-width: 10rem;
+        }
+
+        @keyframes elive-overlay-enter {
+            to {
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .elive-main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-stat-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .elive-station-settings,
+            .elive-stat-grid,
+            .elive-details {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-scan-row {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-card-body {
+                padding: 1rem;
+            }
+
+            .elive-person {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .elive-onsite-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-card-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+
+    <div
+        class="elive-station"
+        wire:poll.15s
+    >
+        {{-- Event and station selection --}}
+        <section class="elive-card">
+            <div class="elive-card-header">
+                <div>
+                    <h2 class="elive-title">
+                        Station Setup
+                    </h2>
+
+                    <p class="elive-subtitle">
+                        Select the event and entrance point before checking in attendees.
+                    </p>
+                </div>
+
+                <div class="elive-header-actions">
+                    <button
+                        type="button"
+                        class="elive-button elive-button-primary"
+                        wire:click="openOnsiteRegistration"
+                        wire:loading.attr="disabled"
+                        wire:target="openOnsiteRegistration"
+                        @disabled(! $eventId)
+                    >
+                        Register Onsite Attendee
+                    </button>
+
+                    <div
+                        class="elive-loading"
+                        wire:loading
+                    >
+                        Updating...
+                    </div>
+                </div>
+            </div>
+
+            <div class="elive-card-body">
+                <div class="elive-station-settings">
+                    <div class="elive-form-group">
+                        <label
+                            class="elive-label"
+                            for="eventId"
+                        >
+                            Assigned Event
+                        </label>
+
+                        <select
+                            id="eventId"
+                            class="elive-select"
+                            wire:model.live="eventId"
+                        >
+                            <option value="">
+                                Select event
+                            </option>
+
+                            @foreach ($events as $event)
+                                <option value="{{ $event->getKey() }}">
+                                    {{ $event->name }}
+                                </option>
+                            @endforeach
+                        </select>
+
+                        @error('eventId')
+                            <span class="elive-error">
+                                {{ $message }}
+                            </span>
+                        @enderror
+                    </div>
+
+                    <div class="elive-form-group">
+                        <label
+                            class="elive-label"
+                            for="checkInPointId"
+                        >
+                            Check-in Point
+                        </label>
+
+                        <select
+                            id="checkInPointId"
+                            class="elive-select"
+                            wire:model.live="checkInPointId"
+                            @disabled(! $eventId)
+                        >
+                            <option value="">
+                                Select check-in point
+                            </option>
+
+                            @foreach ($checkInPoints as $point)
+                                <option value="{{ $point->getKey() }}">
+                                    {{ $point->name }}
+
+                                    @if (filled($point->location))
+                                        — {{ $point->location }}
+                                    @endif
+                                </option>
+                            @endforeach
+                        </select>
+
+                        @error('checkInPointId')
+                            <span class="elive-error">
+                                {{ $message }}
+                            </span>
+                        @enderror
+
+                        @if ($eventId && $checkInPoints->isEmpty())
+                            <span class="elive-error">
+                                This event has no active check-in point.
+                            </span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {{-- Onsite registration --}}
+        @if ($showOnsiteRegistration)
+            <section class="elive-card">
+                <div class="elive-card-header">
+                    <div>
+                        <h2 class="elive-title">
+                            Onsite Registration
+                        </h2>
+
+                        <p class="elive-subtitle">
+                            Register a walk-in attendee, generate the badge, and optionally check the attendee in immediately.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="elive-button elive-button-secondary"
+                        wire:click="closeOnsiteRegistration"
+                    >
+                        Close
+                    </button>
+                </div>
+
+                <div class="elive-card-body">
+                    <form wire:submit="registerOnsiteAttendee">
+                        <div class="elive-onsite-grid">
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteFullName"
+                                >
+                                    Full Name
+                                </label>
+
+                                <input
+                                    id="onsiteFullName"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="onsiteFullName"
+                                    placeholder="Enter attendee full name"
+                                    autocomplete="name"
+                                    autofocus
+                                >
+
+                                @error('onsiteFullName')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsitePhone"
+                                >
+                                    Phone
+                                </label>
+
+                                <input
+                                    id="onsitePhone"
+                                    type="tel"
+                                    class="elive-input"
+                                    wire:model="onsitePhone"
+                                    placeholder="2557XXXXXXXX"
+                                    autocomplete="tel"
+                                >
+
+                                @error('onsitePhone')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteEmail"
+                                >
+                                    Email
+                                </label>
+
+                                <input
+                                    id="onsiteEmail"
+                                    type="email"
+                                    class="elive-input"
+                                    wire:model="onsiteEmail"
+                                    placeholder="name@example.com"
+                                    autocomplete="email"
+                                >
+
+                                @error('onsiteEmail')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteOrganizationName"
+                                >
+                                    Organization
+                                </label>
+
+                                <input
+                                    id="onsiteOrganizationName"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="onsiteOrganizationName"
+                                    placeholder="Company or institution"
+                                    autocomplete="organization"
+                                >
+
+                                @error('onsiteOrganizationName')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsitePosition"
+                                >
+                                    Position
+                                </label>
+
+                                <input
+                                    id="onsitePosition"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="onsitePosition"
+                                    placeholder="Job title or event role"
+                                    autocomplete="organization-title"
+                                >
+
+                                @error('onsitePosition')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteCategoryId"
+                                >
+                                    Attendee Category
+                                </label>
+
+                                <select
+                                    id="onsiteCategoryId"
+                                    class="elive-select"
+                                    wire:model="onsiteCategoryId"
+                                >
+                                    <option value="">
+                                        Select category
+                                    </option>
+
+                                    @foreach ($categories as $category)
+                                        <option value="{{ $category->getKey() }}">
+                                            {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('onsiteCategoryId')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+
+                                @if ($categories->isEmpty())
+                                    <span class="elive-help">
+                                        No attendee categories have been configured for this event.
+                                    </span>
+                                @endif
+                            </div>
+
+                            <div class="elive-form-group">
+                                <label
+                                    class="elive-label"
+                                    for="onsiteBadgeTypeId"
+                                >
+                                    Badge Type
+                                </label>
+
+                                <select
+                                    id="onsiteBadgeTypeId"
+                                    class="elive-select"
+                                    wire:model="onsiteBadgeTypeId"
+                                >
+                                    <option value="">
+                                        Select badge type
+                                    </option>
+
+                                    @foreach ($badgeTypes as $badgeType)
+                                        <option value="{{ $badgeType->getKey() }}">
+                                            {{ $badgeType->name }}
+
+                                            @if ($badgeType->is_default)
+                                                — Default
+                                            @endif
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('onsiteBadgeTypeId')
+                                    <span class="elive-error">
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+
+                                @if ($badgeTypes->isEmpty())
+                                    <span class="elive-help">
+                                        No active badge types have been configured for this event.
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="elive-onsite-options">
+                            <label class="elive-checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    wire:model="onsiteGenerateBadge"
+                                >
+
+                                <span>
+                                    Generate badge immediately
+                                </span>
+                            </label>
+
+                            <label class="elive-checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    wire:model="onsiteCheckInImmediately"
+                                >
+
+                                <span>
+                                    Check in attendee immediately
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="elive-onsite-actions">
+                            <button
+                                type="submit"
+                                class="elive-button elive-button-success"
+                                wire:loading.attr="disabled"
+                                wire:target="registerOnsiteAttendee"
+                            >
+                                <span
+                                    wire:loading.remove
+                                    wire:target="registerOnsiteAttendee"
+                                >
+                                    Register Attendee
+                                </span>
+
+                                <span
+                                    wire:loading
+                                    wire:target="registerOnsiteAttendee"
+                                >
+                                    Registering...
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="elive-button elive-button-secondary"
+                                wire:click="closeOnsiteRegistration"
+                                wire:loading.attr="disabled"
+                                wire:target="registerOnsiteAttendee"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        @endif
+
+        {{-- Counters --}}
+        <section class="elive-stat-grid">
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Registered
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['registered']) }}
+                </div>
+            </div>
+
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Checked In
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['checked_in']) }}
+                </div>
+            </div>
+
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Remaining
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['remaining']) }}
+                </div>
+            </div>
+
+            <div class="elive-stat">
+                <div class="elive-stat-label">
+                    Checked In Today
+                </div>
+
+                <div class="elive-stat-value">
+                    {{ number_format($counters['today']) }}
+                </div>
+            </div>
+        </section>
+
+        <div class="elive-main-grid">
+            {{-- Scanner --}}
+            <section class="elive-card">
+                <div class="elive-card-header">
+                    <div>
+                        <h2 class="elive-title">
+                            QR and Badge Scanner
+                        </h2>
+
+                        <p class="elive-subtitle">
+                            Scan a QR code or enter a badge number.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="elive-card-body">
+                    <form
+                        wire:submit="processScan"
+                    >
+                        <div class="elive-form-group">
+                            <label
+                                class="elive-label"
+                                for="scanValue"
+                            >
+                                QR Token or Badge Number
+                            </label>
+
+                            <div class="elive-scan-row">
+                                <input
+                                    id="scanValue"
+                                    type="text"
+                                    class="elive-input"
+                                    wire:model="scanValue"
+                                    placeholder="Scan or enter ELV-000123"
+                                    autocomplete="off"
+                                    autofocus
+                                    @disabled(! $eventId || ! $checkInPointId)
+                                >
+
+                                <button
+                                    type="submit"
+                                    class="elive-button elive-button-primary"
+                                    wire:loading.attr="disabled"
+                                    wire:target="processScan"
+                                    @disabled(! $eventId || ! $checkInPointId)
+                                >
+                                    <span wire:loading.remove wire:target="processScan">
+                                        Check In
+                                    </span>
+
+                                    <span wire:loading wire:target="processScan">
+                                        Processing...
+                                    </span>
+                                </button>
+                            </div>
+
+                            @error('scanValue')
+                                <span class="elive-error">
+                                    {{ $message }}
+                                </span>
+                            @enderror
+                        </div>
+                    </form>
+
+                    <p class="elive-help">
+                        USB and Bluetooth barcode scanners can type directly into this field and submit using Enter.
+                    </p>
+
+                    <div
+                        class="elive-camera-panel"
+                        wire:ignore
+                    >
+                        <div class="elive-camera-actions">
+                            <button
+                                id="elive-start-camera"
+                                type="button"
+                                class="elive-button elive-button-success"
+                                @disabled(! $eventId || ! $checkInPointId)
+                            >
+                                Start Camera
+                            </button>
+
+                            <button
+                                id="elive-stop-camera"
+                                type="button"
+                                class="elive-button elive-button-danger"
+                                disabled
+                            >
+                                Stop Camera
+                            </button>
+
+                            <button
+                                id="elive-switch-camera"
+                                type="button"
+                                class="elive-button elive-button-secondary"
+                                disabled
+                            >
+                                Switch Camera
+                            </button>
+                        </div>
+
+                        <div
+                            id="elive-camera-status"
+                            class="elive-camera-status"
+                            data-state="idle"
+                        >
+                            Camera is stopped.
+                        </div>
+
+                        <div
+                            id="elive-qr-reader"
+                            class="elive-camera-reader"
+                        >
+                            <div class="elive-camera-placeholder">
+                                Start the camera to scan an attendee QR code.
+                            </div>
+                        </div>
+
+                        <p class="elive-help">
+                            Camera access requires HTTPS in production. Localhost works during local development.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            {{-- Latest result --}}
+            <section class="elive-card">
+                <div class="elive-card-header">
+                    <div>
+                        <h2 class="elive-title">
+                            Latest Result
+                        </h2>
+
+                        <p class="elive-subtitle">
+                            The most recent check-in response appears here.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="elive-card-body">
+                    @if ($lastResult)
+                        <div class="elive-result {{ $resultClass }}">
+                            <h3 class="elive-result-title">
+                                {{ $lastResult['title'] ?? 'Check-in result' }}
+                            </h3>
+
+                            <p class="elive-result-message">
+                                {{ $lastResult['message'] ?? '' }}
+                            </p>
+
+                            @if (! empty($lastResult['attendee']))
+                                <div class="elive-details">
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Attendee
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['attendee']['name'] ?? 'Not available' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Badge Number
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['attendee']['badge_number'] ?? 'Not assigned' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Organization
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['attendee']['organization'] ?? 'Not provided' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Check-in Point
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ $lastResult['check_in_point'] ?? 'Not available' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Method
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            {{ ucwords(str_replace('_', ' ', $lastResult['method'] ?? '')) }}
+                                        </div>
+                                    </div>
+
+                                    <div class="elive-detail">
+                                        <div class="elive-detail-label">
+                                            Time
+                                        </div>
+
+                                        <div class="elive-detail-value">
+                                            @php
+                                                $checkedInAt = $lastResult['checked_in_at'] ?? null;
+                                            @endphp
+
+                                            @if ($checkedInAt instanceof \Carbon\CarbonInterface)
+                                                {{ $checkedInAt->format('d/m/Y H:i:s') }}
+                                            @elseif ($checkedInAt)
+                                                {{ $checkedInAt }}
+                                            @else
+                                                Not available
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                        <div class="elive-empty">
+                            <div>
+                                <strong>
+                                    No scan performed yet
+                                </strong>
+
+                                <p>
+                                    Select an event and check-in point, then scan an attendee QR code.
+                                </p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </section>
+        </div>
+
+        {{-- Manual search --}}
+        <section class="elive-card">
+            <div class="elive-card-header">
+                <div>
+                    <h2 class="elive-title">
+                        Manual Attendee Search
+                    </h2>
+
+                    <p class="elive-subtitle">
+                        Search by name, phone, email, badge number, or organization.
+                    </p>
+                </div>
+            </div>
+
+            <div class="elive-card-body">
+                <div class="elive-form-group">
+                    <label
+                        class="elive-label"
+                        for="search"
+                    >
+                        Search Attendees
+                    </label>
+
+                    <input
+                        id="search"
+                        type="search"
+                        class="elive-input"
+                        wire:model.live.debounce.400ms="search"
+                        placeholder="Type at least two characters"
+                        autocomplete="off"
+                        @disabled(! $eventId)
+                    >
+                </div>
+
+                @if (
+                    $eventId
+                    && mb_strlen(trim($search)) >= 2
+                )
+                    <div class="elive-search-results">
+                        @forelse ($searchResults as $attendee)
+                            <div class="elive-person">
+                                <div>
+                                    <div class="elive-person-name">
+                                        {{ $attendee->full_name }}
+                                    </div>
+
+                                    <div class="elive-person-meta">
+                                        {{ $attendee->badge_number ?: 'No badge number' }}
+
+                                        @if (filled($attendee->organization_name))
+                                            · {{ $attendee->organization_name }}
+                                        @endif
+
+                                        @if (filled($attendee->phone))
+                                            · {{ $attendee->phone }}
+                                        @endif
+                                    </div>
+
+                                    <div style="margin-top: 0.4rem;">
+                                        <span class="elive-status-badge">
+                                            {{ ucwords(str_replace('_', ' ', $attendee->status)) }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    class="elive-button elive-button-secondary"
+                                    wire:click="selectAttendee({{ $attendee->getKey() }})"
+                                >
+                                    Select
+                                </button>
+                            </div>
+                        @empty
+                            <div class="elive-empty">
+                                No attendee matched your search.
+                            </div>
+                        @endforelse
+                    </div>
+                @endif
+
+                @if ($selectedAttendee)
+                    <div
+                        class="elive-result elive-result-neutral"
+                        style="margin-top: 1rem;"
+                    >
+                        <h3 class="elive-result-title">
+                            Selected Attendee
+                        </h3>
+
+                        <div class="elive-details">
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Full Name
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ $selectedAttendee->full_name }}
+                                </div>
+                            </div>
+
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Badge Number
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ $selectedAttendee->badge_number ?: 'Not assigned' }}
+                                </div>
+                            </div>
+
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Organization
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ $selectedAttendee->organization_name ?: 'Not provided' }}
+                                </div>
+                            </div>
+
+                            <div class="elive-detail">
+                                <div class="elive-detail-label">
+                                    Registration Status
+                                </div>
+
+                                <div class="elive-detail-value">
+                                    {{ ucwords(str_replace('_', ' ', $selectedAttendee->status)) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            style="
+                                display: flex;
+                                flex-wrap: wrap;
+                                gap: 0.75rem;
+                                margin-top: 1rem;
+                            "
+                        >
+                            <button
+                                type="button"
+                                class="elive-button elive-button-success"
+                                wire:click="checkInSelectedAttendee"
+                                wire:loading.attr="disabled"
+                                wire:target="checkInSelectedAttendee"
+                                @disabled(! $checkInPointId)
+                            >
+                                <span
+                                    wire:loading.remove
+                                    wire:target="checkInSelectedAttendee"
+                                >
+                                    Check In Attendee
+                                </span>
+
+                                <span
+                                    wire:loading
+                                    wire:target="checkInSelectedAttendee"
+                                >
+                                    Processing...
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="elive-button elive-button-secondary"
+                                wire:click="clearSelectedAttendee"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+
+                        @error('selectedAttendeeId')
+                            <div class="elive-error">
+                                {{ $message }}
+                            </div>
+                        @enderror
+                    </div>
+                @endif
+            </div>
+        </section>
+
+        {{-- Recent check-ins --}}
+        <section class="elive-card">
+            <div class="elive-card-header">
+                <div>
+                    <h2 class="elive-title">
+                        Recent Check-ins
+                    </h2>
+
+                    <p class="elive-subtitle">
+                        Latest check-in activity for the selected event.
+                    </p>
+                </div>
+            </div>
+
+            @if ($recentCheckIns->isNotEmpty())
+                <div class="elive-table-wrapper">
+                    <table class="elive-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Attendee</th>
+                                <th>Badge</th>
+                                <th>Point</th>
+                                <th>Method</th>
+                                <th>Officer</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($recentCheckIns as $checkIn)
+                                <tr>
+                                    <td>
+                                        {{ $checkIn->checked_in_at?->format('H:i:s') ?? '—' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->attendee?->full_name ?? 'Unknown attendee' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->attendee?->badge_number ?? '—' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->checkInPoint?->name ?? 'Not specified' }}
+                                    </td>
+
+                                    <td>
+                                        {{ ucwords(str_replace('_', ' ', $checkIn->method ?? '')) }}
+                                    </td>
+
+                                    <td>
+                                        {{ $checkIn->checkedInBy?->name ?? 'System' }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="elive-empty">
+                    No check-ins recorded for the selected event.
+                </div>
+            @endif
+        </section>
+    </div>
+
+
+    <div
+        id="elive-scan-overlay"
+        class="elive-scan-overlay"
+        data-open="false"
+        data-status="success"
+        wire:ignore
+        role="dialog"
+        aria-modal="true"
+        aria-live="assertive"
+    >
+        <div class="elive-scan-overlay-card">
+            <div
+                id="elive-scan-overlay-icon"
+                class="elive-scan-overlay-icon"
+            >
+                ✓
+            </div>
+
+            <h2
+                id="elive-scan-overlay-title"
+                class="elive-scan-overlay-title"
+            >
+                Check-in successful
+            </h2>
+
+            <p
+                id="elive-scan-overlay-message"
+                class="elive-scan-overlay-message"
+            ></p>
+
+            <div
+                id="elive-scan-overlay-name"
+                class="elive-scan-overlay-name"
+            ></div>
+
+            <div
+                id="elive-scan-overlay-meta"
+                class="elive-scan-overlay-meta"
+            ></div>
+
+            <button
+                id="elive-scan-overlay-close"
+                type="button"
+                class="elive-button elive-button-secondary elive-scan-overlay-close"
+            >
+                Continue Scanning
+            </button>
+        </div>
+    </div>
+
+    @script
+        <script>
+            (() => {
+                const libraryUrl =
+                    'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+
+                let scanner = null;
+                let cameras = [];
+                let cameraIndex = 0;
+                let running = false;
+                let processing = false;
+                let lastDecodedText = null;
+                let lastDecodedAt = 0;
+                let overlayTimer = null;
+                let audioContext = null;
+
+                const getElement = (id) =>
+                    document.getElementById(id);
+
+                const startButton = getElement('elive-start-camera');
+                const stopButton = getElement('elive-stop-camera');
+                const switchButton = getElement('elive-switch-camera');
+                const statusElement = getElement('elive-camera-status');
+                const readerElement = getElement('elive-qr-reader');
+                const overlayElement = getElement('elive-scan-overlay');
+                const overlayIcon = getElement('elive-scan-overlay-icon');
+                const overlayTitle = getElement('elive-scan-overlay-title');
+                const overlayMessage = getElement('elive-scan-overlay-message');
+                const overlayName = getElement('elive-scan-overlay-name');
+                const overlayMeta = getElement('elive-scan-overlay-meta');
+                const overlayCloseButton = getElement(
+                    'elive-scan-overlay-close'
+                );
+
+
+                const getAudioContext = () => {
+                    if (! audioContext) {
+                        const AudioContextClass =
+                            window.AudioContext
+                            || window.webkitAudioContext;
+
+                        if (AudioContextClass) {
+                            audioContext = new AudioContextClass();
+                        }
+                    }
+
+                    return audioContext;
+                };
+
+                const playTone = async (type) => {
+                    const context = getAudioContext();
+
+                    if (! context) {
+                        return;
+                    }
+
+                    if (context.state === 'suspended') {
+                        await context.resume();
+                    }
+
+                    const patterns = {
+                        success: [
+                            [740, 0, 0.11],
+                            [980, 0.13, 0.16],
+                        ],
+                        warning: [
+                            [520, 0, 0.16],
+                            [420, 0.19, 0.2],
+                        ],
+                        error: [
+                            [250, 0, 0.22],
+                            [190, 0.24, 0.25],
+                        ],
+                    };
+
+                    const pattern = patterns[type] ?? patterns.error;
+                    const startAt = context.currentTime;
+
+                    pattern.forEach(([frequency, offset, duration]) => {
+                        const oscillator = context.createOscillator();
+                        const gain = context.createGain();
+
+                        oscillator.type = 'sine';
+                        oscillator.frequency.value = frequency;
+
+                        gain.gain.setValueAtTime(
+                            0.0001,
+                            startAt + offset
+                        );
+                        gain.gain.exponentialRampToValueAtTime(
+                            0.18,
+                            startAt + offset + 0.01
+                        );
+                        gain.gain.exponentialRampToValueAtTime(
+                            0.0001,
+                            startAt + offset + duration
+                        );
+
+                        oscillator.connect(gain);
+                        gain.connect(context.destination);
+
+                        oscillator.start(startAt + offset);
+                        oscillator.stop(startAt + offset + duration + 0.03);
+                    });
+                };
+
+                const closeResultOverlay = () => {
+                    if (overlayTimer) {
+                        window.clearTimeout(overlayTimer);
+                        overlayTimer = null;
+                    }
+
+                    if (overlayElement) {
+                        overlayElement.dataset.open = 'false';
+                    }
+                };
+
+                const showResultOverlay = (result = {}) => {
+                    if (! overlayElement) {
+                        return;
+                    }
+
+                    const status = String(
+                        result.status ?? 'check_in_failed'
+                    );
+
+                    let visualStatus = 'error';
+                    let icon = '✕';
+
+                    if (
+                        status === 'checked_in'
+                        || status === 'onsite_registered'
+                        || result.success === true
+                    ) {
+                        visualStatus = 'success';
+                        icon = '✓';
+                    } else if (status === 'already_checked_in') {
+                        visualStatus = 'warning';
+                        icon = '!';
+                    }
+
+                    overlayElement.dataset.status = visualStatus;
+                    overlayElement.dataset.open = 'true';
+
+                    if (overlayIcon) {
+                        overlayIcon.textContent = icon;
+                    }
+
+                    if (overlayTitle) {
+                        overlayTitle.textContent =
+                            result.title
+                            ?? (
+                                visualStatus === 'success'
+                                    ? 'Check-in successful'
+                                    : visualStatus === 'warning'
+                                        ? 'Already checked in'
+                                        : 'Check-in failed'
+                            );
+                    }
+
+                    if (overlayMessage) {
+                        overlayMessage.textContent =
+                            result.message ?? '';
+                    }
+
+                    const attendee = result.attendee ?? {};
+
+                    if (overlayName) {
+                        overlayName.textContent =
+                            attendee.name ?? '';
+                    }
+
+                    if (overlayMeta) {
+                        const parts = [
+                            attendee.badge_number,
+                            result.check_in_point,
+                        ].filter(Boolean);
+
+                        overlayMeta.textContent = parts.join(' · ');
+                    }
+
+                    void playTone(visualStatus);
+
+                    if (navigator.vibrate) {
+                        navigator.vibrate(
+                            visualStatus === 'success'
+                                ? [100]
+                                : visualStatus === 'warning'
+                                    ? [160, 80, 160]
+                                    : [250, 100, 250]
+                        );
+                    }
+
+                    if (overlayTimer) {
+                        window.clearTimeout(overlayTimer);
+                    }
+
+                    overlayTimer = window.setTimeout(
+                        closeResultOverlay,
+                        visualStatus === 'success' ? 2600 : 3600
+                    );
+                };
+
+                const setStatus = (message, state = 'idle') => {
+                    if (! statusElement) {
+                        return;
+                    }
+
+                    statusElement.textContent = message;
+                    statusElement.dataset.state = state;
+                };
+
+                const setControls = () => {
+                    if (startButton) {
+                        startButton.disabled = running;
+                    }
+
+                    if (stopButton) {
+                        stopButton.disabled = ! running;
+                    }
+
+                    if (switchButton) {
+                        switchButton.disabled =
+                            ! running || cameras.length < 2;
+                    }
+                };
+
+                const loadLibrary = () => {
+                    if (window.Html5Qrcode) {
+                        return Promise.resolve();
+                    }
+
+                    return new Promise((resolve, reject) => {
+                        const existing = document.querySelector(
+                            'script[data-elive-html5-qrcode]'
+                        );
+
+                        if (existing) {
+                            existing.addEventListener('load', resolve, {
+                                once: true,
+                            });
+
+                            existing.addEventListener('error', reject, {
+                                once: true,
+                            });
+
+                            return;
+                        }
+
+                        const script = document.createElement('script');
+
+                        script.src = libraryUrl;
+                        script.async = true;
+                        script.dataset.eliveHtml5Qrcode = 'true';
+                        script.onload = resolve;
+                        script.onerror = () => reject(
+                            new Error(
+                                'The camera scanner library could not be loaded.'
+                            )
+                        );
+
+                        document.head.appendChild(script);
+                    });
+                };
+
+                const stopScanner = async () => {
+                    if (! scanner || ! running) {
+                        running = false;
+                        setControls();
+
+                        return;
+                    }
+
+                    try {
+                        await scanner.stop();
+                    } catch (error) {
+                        console.warn(
+                            'Unable to stop QR scanner cleanly.',
+                            error
+                        );
+                    }
+
+                    try {
+                        await scanner.clear();
+                    } catch (error) {
+                        console.warn(
+                            'Unable to clear QR scanner cleanly.',
+                            error
+                        );
+                    }
+
+                    scanner = null;
+                    running = false;
+                    processing = false;
+
+                    if (readerElement) {
+                        readerElement.innerHTML = `
+                            <div class="elive-camera-placeholder">
+                                Start the camera to scan an attendee QR code.
+                            </div>
+                        `;
+                    }
+
+                    setStatus('Camera is stopped.');
+                    setControls();
+                };
+
+                const handleDecodedText = async (decodedText) => {
+                    const value = String(decodedText ?? '').trim();
+
+                    if (! value || processing) {
+                        return;
+                    }
+
+                    const now = Date.now();
+
+                    if (
+                        value === lastDecodedText
+                        && now - lastDecodedAt < 4500
+                    ) {
+                        return;
+                    }
+
+                    lastDecodedText = value;
+                    lastDecodedAt = now;
+                    processing = true;
+
+                    setStatus(
+                        'QR code detected. Processing check-in...',
+                        'success'
+                    );
+
+                    try {
+                        $wire.set('scanValue', value);
+
+                        await $wire.processScan();
+
+                        const result = await $wire.get('lastResult');
+
+                        showResultOverlay(result ?? {});
+
+                        setStatus(
+                            'Scan processed. Ready for the next attendee.',
+                            result?.success
+                                ? 'success'
+                                : result?.status === 'already_checked_in'
+                                    ? 'success'
+                                    : 'error'
+                        );
+                    } catch (error) {
+                        console.error(error);
+
+                        setStatus(
+                            error?.message
+                                ?? 'The scanned QR code could not be processed.',
+                            'error'
+                        );
+                    } finally {
+                        window.setTimeout(() => {
+                            processing = false;
+                        }, 2400);
+                    }
+                };
+
+                const startScanner = async (
+                    preferredCameraId = null
+                ) => {
+                    if (running) {
+                        return;
+                    }
+
+                    const eventId = await $wire.get('eventId');
+                    const checkInPointId = await $wire.get(
+                        'checkInPointId'
+                    );
+
+                    if (! eventId || ! checkInPointId) {
+                        setStatus(
+                            'Select an event and check-in point first.',
+                            'error'
+                        );
+
+                        return;
+                    }
+
+                    setStatus('Requesting camera access...');
+
+                    try {
+                        await loadLibrary();
+
+                        cameras = await window.Html5Qrcode.getCameras();
+
+                        if (! cameras.length) {
+                            throw new Error(
+                                'No camera was found on this device.'
+                            );
+                        }
+
+                        let cameraId = preferredCameraId;
+
+                        if (! cameraId) {
+                            const backCameraIndex = cameras.findIndex(
+                                (camera) =>
+                                    /back|rear|environment/i.test(
+                                        camera.label
+                                    )
+                            );
+
+                            cameraIndex =
+                                backCameraIndex >= 0
+                                    ? backCameraIndex
+                                    : 0;
+
+                            cameraId = cameras[cameraIndex].id;
+                        } else {
+                            const selectedIndex = cameras.findIndex(
+                                (camera) =>
+                                    camera.id === preferredCameraId
+                            );
+
+                            cameraIndex =
+                                selectedIndex >= 0
+                                    ? selectedIndex
+                                    : 0;
+                        }
+
+                        if (readerElement) {
+                            readerElement.innerHTML = '';
+                        }
+
+                        scanner = new window.Html5Qrcode(
+                            'elive-qr-reader',
+                            {
+                                verbose: false,
+                            }
+                        );
+
+                        await scanner.start(
+                            cameraId,
+                            {
+                                fps: 12,
+                                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                                    const size = Math.floor(
+                                        Math.min(
+                                            viewfinderWidth,
+                                            viewfinderHeight
+                                        ) * 0.72
+                                    );
+
+                                    return {
+                                        width: Math.max(size, 180),
+                                        height: Math.max(size, 180),
+                                    };
+                                },
+                                aspectRatio: 1,
+                            },
+                            handleDecodedText,
+                            () => {
+                                // Decode failures are normal while searching
+                                // for a QR code, so they are intentionally ignored.
+                            }
+                        );
+
+                        running = true;
+
+                        setStatus(
+                            `Camera active: ${
+                                cameras[cameraIndex]?.label
+                                    || `Camera ${cameraIndex + 1}`
+                            }`,
+                            'success'
+                        );
+
+                        setControls();
+                    } catch (error) {
+                        console.error(error);
+
+                        scanner = null;
+                        running = false;
+
+                        setStatus(
+                            error?.message
+                                ?? 'Camera access failed. Confirm camera permission and HTTPS.',
+                            'error'
+                        );
+
+                        setControls();
+                    }
+                };
+
+                const switchCamera = async () => {
+                    if (cameras.length < 2) {
+                        return;
+                    }
+
+                    cameraIndex =
+                        (cameraIndex + 1) % cameras.length;
+
+                    const nextCameraId =
+                        cameras[cameraIndex].id;
+
+                    await stopScanner();
+                    await startScanner(nextCameraId);
+                };
+
+                startButton?.addEventListener(
+                    'click',
+                    () => startScanner()
+                );
+
+                stopButton?.addEventListener(
+                    'click',
+                    stopScanner
+                );
+
+                switchButton?.addEventListener(
+                    'click',
+                    switchCamera
+                );
+
+                window.addEventListener(
+                    'beforeunload',
+                    () => {
+                        void stopScanner();
+                    },
+                    {
+                        once: true,
+                    }
+                );
+
+                document.addEventListener(
+                    'livewire:navigating',
+                    () => {
+                        void stopScanner();
+                    },
+                    {
+                        once: true,
+                    }
+                );
+
+                overlayCloseButton?.addEventListener(
+                    'click',
+                    closeResultOverlay
+                );
+
+                overlayElement?.addEventListener(
+                    'click',
+                    (event) => {
+                        if (event.target === overlayElement) {
+                            closeResultOverlay();
+                        }
+                    }
+                );
+
+                document.addEventListener(
+                    'keydown',
+                    (event) => {
+                        if (event.key === 'Escape') {
+                            closeResultOverlay();
+                        }
+                    }
+                );
+
+                setControls();
+            })();
+        </script>
+    @endscript
+
+</x-filament-panels::page>

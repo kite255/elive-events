@@ -156,6 +156,42 @@ class Attendee extends Model
 
     /*
     |--------------------------------------------------------------------------
+    | Sessions / Activities
+    |--------------------------------------------------------------------------
+    */
+
+    public function eventSessions(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            EventSession::class,
+            'attendee_event_session'
+        )
+            ->withPivot([
+                'status',
+                'selection_source',
+                'selected_at',
+            ])
+            ->withTimestamps()
+            ->orderBy('event_sessions.event_day_id')
+            ->orderBy('event_sessions.display_order')
+            ->orderBy('event_sessions.starts_at')
+            ->orderBy('event_sessions.id');
+    }
+
+    public function activeEventSessions(): BelongsToMany
+    {
+        return $this->eventSessions()
+            ->where('event_sessions.status', EventSession::STATUS_ACTIVE);
+    }
+
+    public function registeredEventSessions(): BelongsToMany
+    {
+        return $this->eventSessions()
+            ->wherePivot('status', 'registered');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Merchandise
     |--------------------------------------------------------------------------
     */
@@ -291,6 +327,31 @@ class Attendee extends Model
             ]);
     }
 
+    public function scopeExpectedForSession(
+        Builder $query,
+        int $eventSessionId
+    ): Builder {
+        return $query
+            ->whereHas(
+                'eventSessions',
+                fn (Builder $sessionQuery) => $sessionQuery
+                    ->where(
+                        'event_sessions.id',
+                        $eventSessionId
+                    )
+                    ->where(
+                        'attendee_event_session.status',
+                        'registered'
+                    )
+            )
+            ->whereIn('status', [
+                'registered',
+                'confirmed',
+                'approved',
+                'checked_in',
+            ]);
+    }
+
     public function scopeWithReservedMerchandise(
         Builder $query
     ): Builder {
@@ -401,6 +462,53 @@ class Attendee extends Model
         return $days->isEmpty()
             ? 'No days selected'
             : $days->implode(', ');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session / Activity Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    public function hasSelectedEventSessions(): bool
+    {
+        return $this->registeredEventSessions()->exists();
+    }
+
+    public function hasSelectedEventSession(
+        int|EventSession $eventSession
+    ): bool {
+        $eventSessionId = $eventSession instanceof EventSession
+            ? $eventSession->id
+            : $eventSession;
+
+        return $this->registeredEventSessions()
+            ->where(
+                'event_sessions.id',
+                $eventSessionId
+            )
+            ->exists();
+    }
+
+    public function selectedEventSessionsCount(): int
+    {
+        return $this->registeredEventSessions()->count();
+    }
+
+    public function selectedEventSessionsLabel(): string
+    {
+        $sessions = $this->registeredEventSessions()
+            ->get()
+            ->map(
+                fn (EventSession $session) =>
+                    $session->name
+            )
+            ->filter()
+            ->values();
+
+        return $sessions->isEmpty()
+            ? 'No sessions selected'
+            : $sessions->implode(', ');
     }
 
     /*

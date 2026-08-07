@@ -3,12 +3,16 @@
 namespace App\Filament\Pages;
 
 use App\Models\Attendee;
+use App\Models\BadgePrintLog;
 use App\Models\Event;
+use App\Models\User;
 use App\Services\BadgeGenerationService;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Livewire\WithPagination;
@@ -33,30 +37,88 @@ class BadgePrintStation extends Page
 
     public ?int $eventId = null;
 
+    public ?int $attendeeId = null;
+
     public string $search = '';
 
     public string $badgeStatus = 'generated';
 
     public int $perPage = 12;
 
+    public array $printCopies = [];
+
+    public array $printerNames = [];
+
+    public array $reprintReasons = [];
+
     public function mount(): void
     {
-        $this->eventId = Event::query()
-            ->latest('id')
-            ->value('id');
+        abort_unless(static::canAccess(), 403);
+
+        $requestedAttendeeId = request()->integer('attendee');
+
+        if ($requestedAttendeeId > 0) {
+            $attendee = $this->authorizedAttendeeQuery()
+                ->whereKey($requestedAttendeeId)
+                ->first();
+
+            if ($attendee) {
+                $this->attendeeId = (int) $attendee->getKey();
+                $this->eventId = (int) $attendee->event_id;
+                $this->badgeStatus = 'all';
+                $this->search = filled($attendee->badge_number)
+                    ? (string) $attendee->badge_number
+                    : (string) $attendee->full_name;
+
+                return;
+            }
+        }
+
+        $this->eventId = $this->getEventsProperty()
+            ->first()?->getKey();
+    }
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return Event::query()
+            ->accessibleBy($user)
+            ->exists();
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
     }
 
     public function updatedEventId(): void
     {
+        $this->attendeeId = null;
         $this->resetPageState();
     }
 
     public function updatedSearch(): void
     {
+        $this->attendeeId = null;
         $this->resetPageState();
     }
 
     public function updatedBadgeStatus(): void
+    {
+        $this->attendeeId = null;
+        $this->resetPageState();
+    }
+
+    public function updatedPerPage(): void
     {
         $this->resetPageState();
     }
@@ -66,44 +128,67 @@ class BadgePrintStation extends Page
         $this->resetPage();
     }
 
-    public function getEventsProperty()
+    public function getEventsProperty(): Collection
     {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return collect();
+        }
+
         return Event::query()
+            ->accessibleBy($user)
             ->orderByDesc('id')
             ->get(['id', 'name']);
     }
 
     public function getAttendeesProperty(): LengthAwarePaginator
     {
-        return Attendee::query()
+        return $this->authorizedAttendeeQuery()
             ->with(['event', 'category', 'badgeType'])
-            ->when($this->eventId, fn ($query) => $query->where('event_id', $this->eventId))
-            ->when($this->badgeStatus !== 'all', function ($query) {
-                if (Schema::hasColumn('attendees', 'badge_status')) {
-                    $query->where('badge_status', $this->badgeStatus);
+            ->when(
+                $this->eventId,
+                fn (Builder $query): Builder =>
+                    $query->where('event_id', $this->eventId)
+            )
+            ->when(
+                $this->attendeeId,
+                fn (Builder $query): Builder =>
+                    $query->whereKey($this->attendeeId)
+            )
+            ->when(
+                $this->badgeStatus !== 'all',
+                function (Builder $query): void {
+                    if (Schema::hasColumn('attendees', 'badge_status')) {
+                        $query->where('badge_status', $this->badgeStatus);
+                    }
                 }
-            })
-            ->when(filled($this->search), function ($query) {
-                $search = trim($this->search);
+            )
+            ->when(
+                filled($this->search),
+                function (Builder $query): void {
+                    $search = trim($this->search);
 
-                $query->where(function ($query) use ($search) {
-                    $query
-                        ->where('full_name', 'ilike', "%{$search}%")
-                        ->orWhere('phone', 'ilike', "%{$search}%")
-                        ->orWhere('email', 'ilike', "%{$search}%")
-                        ->orWhere('badge_number', 'ilike', "%{$search}%")
-                        ->orWhere('organization_name', 'ilike', "%{$search}%");
-                });
-            })
+                    $query->where(function (Builder $query) use ($search): void {
+                        $query
+                            ->where('full_name', 'ilike', "%{$search}%")
+                            ->orWhere('phone', 'ilike', "%{$search}%")
+                            ->orWhere('email', 'ilike', "%{$search}%")
+                            ->orWhere('badge_number', 'ilike', "%{$search}%")
+                            ->orWhere('organization_name', 'ilike', "%{$search}%");
+                    });
+                }
+            )
             ->orderBy('full_name')
             ->paginate($this->perPage);
     }
 
     public function generateBadge(int $attendeeId): void
     {
-        $attendee = Attendee::query()
+        $attendee = $this->authorizedAttendeeQuery()
             ->with(['event', 'category', 'badgeType', 'qrToken'])
-            ->find($attendeeId);
+            ->whereKey($attendeeId)
+            ->first();
 
         if (! $attendee) {
             Notification::make()
@@ -115,15 +200,18 @@ class BadgePrintStation extends Page
         }
 
         try {
-            app(BadgeGenerationService::class)->generateForAttendee($attendee);
+            app(BadgeGenerationService::class)
+                ->generateForAttendee($attendee);
+
+            $attendee->refresh();
 
             Notification::make()
                 ->title('Badge generated')
                 ->body($attendee->full_name . ' badge is ready for printing.')
                 ->success()
                 ->send();
-        } catch (Throwable $e) {
-            report($e);
+        } catch (Throwable $exception) {
+            report($exception);
 
             if (Schema::hasColumn('attendees', 'badge_status')) {
                 $attendee->forceFill([
@@ -133,7 +221,11 @@ class BadgePrintStation extends Page
 
             Notification::make()
                 ->title('Badge generation failed')
-                ->body($e->getMessage())
+                ->body(
+                    app()->isLocal()
+                        ? $exception->getMessage()
+                        : 'The badge could not be generated.'
+                )
                 ->danger()
                 ->send();
         }
@@ -141,11 +233,81 @@ class BadgePrintStation extends Page
 
     public function markPrinted(int $attendeeId): void
     {
-        $attendee = Attendee::query()->find($attendeeId);
+        $attendee = $this->authorizedAttendeeQuery()
+            ->whereKey($attendeeId)
+            ->first();
 
         if (! $attendee) {
+            Notification::make()
+                ->title('Attendee not found')
+                ->danger()
+                ->send();
+
             return;
         }
+
+        $previousPrintCount = BadgePrintLog::query()
+            ->where('attendee_id', $attendee->getKey())
+            ->count();
+
+        $printType = $previousPrintCount > 0
+            ? 'reprint'
+            : 'first_print';
+
+        $validated = $this->validate([
+            "printCopies.{$attendeeId}" => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:100',
+            ],
+            "printerNames.{$attendeeId}" => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            "reprintReasons.{$attendeeId}" => [
+                $printType === 'reprint'
+                    ? 'required'
+                    : 'nullable',
+                'string',
+                'max:1000',
+            ],
+        ], [
+            "reprintReasons.{$attendeeId}.required" =>
+                'Enter a reason before recording a reprint.',
+        ]);
+
+        $copies = (int) (
+            $validated['printCopies'][$attendeeId]
+            ?? 1
+        );
+
+        $printerName = filled(
+            $validated['printerNames'][$attendeeId]
+            ?? null
+        )
+            ? trim(
+                $validated['printerNames'][$attendeeId]
+            )
+            : null;
+
+        $reprintReason = $printType === 'reprint'
+            ? trim(
+                $validated['reprintReasons'][$attendeeId]
+            )
+            : null;
+
+        BadgePrintLog::query()->create([
+            'event_id' => $attendee->event_id,
+            'attendee_id' => $attendee->getKey(),
+            'printed_by' => auth()->id(),
+            'copies' => $copies,
+            'printer_name' => $printerName,
+            'print_type' => $printType,
+            'reprint_reason' => $reprintReason,
+            'printed_at' => now(),
+        ]);
 
         $data = [];
 
@@ -161,11 +323,29 @@ class BadgePrintStation extends Page
             $attendee->forceFill($data)->save();
         }
 
+        $this->printCopies[$attendeeId] = 1;
+        $this->reprintReasons[$attendeeId] = '';
+
         Notification::make()
-            ->title('Badge marked as printed')
-            ->body($attendee->full_name . ' badge has been marked as printed.')
+            ->title(
+                $printType === 'reprint'
+                    ? 'Badge reprint recorded'
+                    : 'Badge print recorded'
+            )
+            ->body(
+                $attendee->full_name
+                . ' badge print was recorded successfully.'
+            )
             ->success()
             ->send();
+    }
+
+    public function clearSelectedAttendee(): void
+    {
+        $this->attendeeId = null;
+        $this->search = '';
+        $this->badgeStatus = 'generated';
+        $this->resetPageState();
     }
 
     public function badgeExists(Attendee $attendee): bool
@@ -180,7 +360,9 @@ class BadgePrintStation extends Page
             return null;
         }
 
-        return asset('storage/' . ltrim((string) $attendee->badge_path, '/'));
+        return asset(
+            'storage/' . ltrim((string) $attendee->badge_path, '/')
+        );
     }
 
     public function badgeStatusLabel(?string $status): string
@@ -203,5 +385,26 @@ class BadgePrintStation extends Page
             'failed' => 'bg-red-50 text-red-700 ring-red-600/20',
             default => 'bg-gray-50 text-gray-700 ring-gray-600/20',
         };
+    }
+
+    private function authorizedAttendeeQuery(): Builder
+    {
+        $user = auth()->user();
+
+        $query = Attendee::query();
+
+        if (! $user instanceof User) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $query->whereHas(
+            'event',
+            fn (Builder $eventQuery): Builder =>
+                $eventQuery->accessibleBy($user)
+        );
     }
 }

@@ -7,6 +7,7 @@ use App\Models\AttendeeMerchandise;
 use App\Models\AttendeeRegistrationAnswer;
 use App\Models\BadgeType;
 use App\Models\Event;
+use App\Models\EventSession;
 use App\Models\MerchandiseVariant;
 use App\Services\BadgeGenerationService;
 use App\Services\QrTokenService;
@@ -37,6 +38,10 @@ class PublicRegistrationController extends Controller
             ->get();
 
         $eventDays = $this->registrationDays($event);
+        $eventSessions = $this->registrationSessions(
+            $event,
+            $eventDays
+        );
 
         return view('public.events.register', [
             'event' => $event,
@@ -57,7 +62,22 @@ class PublicRegistrationController extends Controller
 
             'fields' => $fields,
             'eventDays' => $eventDays,
-            'merchandiseItems' => $this->registrationMerchandise($event),
+            'eventSessions' => $eventSessions,
+
+            'allowDaySelection' =>
+                $event->allowsDaySelection(),
+
+            'allowAllDaysSelection' =>
+                $event->allowsAllDaysSelection(),
+
+            'allowSessionRegistration' =>
+                $event->allowsSessionRegistration(),
+
+            'registrationSectionLabels' =>
+                $event->registrationSectionLabels(),
+
+            'merchandiseItems' =>
+                $this->registrationMerchandise($event),
         ]);
     }
 
@@ -90,6 +110,10 @@ class PublicRegistrationController extends Controller
             ->get();
 
         $eventDays = $this->registrationDays($event);
+        $eventSessions = $this->registrationSessions(
+            $event,
+            $eventDays
+        );
         $merchandiseItems = $this->registrationMerchandise($event);
 
         $validated = $request->validate(
@@ -97,10 +121,13 @@ class PublicRegistrationController extends Controller
                 $event,
                 $fields,
                 $eventDays,
+                $eventSessions,
                 $merchandiseItems
             ),
             $this->validationMessages(
+                $event,
                 $eventDays,
+                $eventSessions,
                 $merchandiseItems
             )
         );
@@ -145,6 +172,7 @@ class PublicRegistrationController extends Controller
                     $validated,
                     $fields,
                     $eventDays,
+                    $eventSessions,
                     $merchandiseItems,
                     $fullName,
                     $phone,
@@ -194,9 +222,17 @@ class PublicRegistrationController extends Controller
                     );
 
                     $this->saveEventDaySelections(
+                        $event,
                         $attendee,
                         $eventDays,
                         $validated['event_days'] ?? []
+                    );
+
+                    $this->saveEventSessionSelections(
+                        $event,
+                        $attendee,
+                        $eventSessions,
+                        $validated['event_sessions'] ?? []
                     );
 
                     $this->saveMerchandiseOrders(
@@ -254,6 +290,7 @@ class PublicRegistrationController extends Controller
 
         $attendee->load([
             'eventDays',
+            'eventSessions.eventDay',
             'merchandiseSelections.merchandise',
             'merchandiseSelections.variant',
         ]);
@@ -270,6 +307,7 @@ class PublicRegistrationController extends Controller
         Event $event,
         Collection $fields,
         Collection $eventDays,
+        Collection $eventSessions,
         Collection $merchandiseItems
     ): array {
         $rules = [
@@ -350,21 +388,176 @@ class PublicRegistrationController extends Controller
             ],
 
             'event_days' => [
-                $eventDays->isNotEmpty() ? 'required' : 'nullable',
+                $event->allowsDaySelection()
+                    && $eventDays->isNotEmpty()
+                        ? 'required'
+                        : 'nullable',
                 'array',
-                $eventDays->isNotEmpty() ? 'min:1' : 'min:0',
+                $event->allowsDaySelection()
+                    && $eventDays->isNotEmpty()
+                        ? 'min:1'
+                        : 'min:0',
             ],
 
             'event_days.*' => [
-                'integer',
+                function (
+                    string $attribute,
+                    mixed $value,
+                    \Closure $fail
+                ) use (
+                    $event,
+                    $eventDays
+                ): void {
+                    if (! $event->allowsDaySelection()) {
+                        $fail(
+                            'Event-day selection is not enabled for this event.'
+                        );
 
-                Rule::exists('event_days', 'id')
-                    ->where(
-                        fn ($query) => $query
-                            ->where('event_id', $event->id)
-                            ->where('status', 'active')
-                            ->where('is_registration_open', true)
-                    ),
+                        return;
+                    }
+
+                    if ($value === 'all') {
+                        if (! $event->allowsAllDaysSelection()) {
+                            $fail(
+                                'The All Event Days option is not available for this event.'
+                            );
+                        }
+
+                        return;
+                    }
+
+                    if (! is_numeric($value)) {
+                        $fail(
+                            'One of the selected event days is invalid.'
+                        );
+
+                        return;
+                    }
+
+                    $allowed = $eventDays->contains(
+                        fn ($day): bool =>
+                            (int) $day->id === (int) $value
+                    );
+
+                    if (! $allowed) {
+                        $fail(
+                            'One of the selected event days is unavailable.'
+                        );
+                    }
+                },
+            ],
+
+            'event_sessions' => [
+                $event->allowsSessionRegistration()
+                    ? 'nullable'
+                    : 'prohibited',
+                'array',
+                'max:100',
+            ],
+
+            'event_sessions.*' => [
+                'integer',
+                function (
+                    string $attribute,
+                    mixed $value,
+                    \Closure $fail
+                ) use (
+                    $event,
+                    $eventDays,
+                    $eventSessions
+                ): void {
+                    if (! $event->allowsSessionRegistration()) {
+                        $fail(
+                            'Session registration is not enabled for this event.'
+                        );
+
+                        return;
+                    }
+
+                    if (! is_numeric($value)) {
+                        $fail(
+                            'One of the selected sessions is invalid.'
+                        );
+
+                        return;
+                    }
+
+                    $session = $eventSessions->firstWhere(
+                        'id',
+                        (int) $value
+                    );
+
+                    if (! $session) {
+                        $fail(
+                            'One of the selected sessions is unavailable.'
+                        );
+
+                        return;
+                    }
+
+                    if ($event->allowsDaySelection()) {
+                        $submittedDays = collect(
+                            request()->input(
+                                'event_days',
+                                []
+                            )
+                        );
+
+                        $selectAllDays = $submittedDays
+                            ->contains(
+                                fn ($dayId): bool =>
+                                    (string) $dayId === 'all'
+                            );
+
+                        if ($selectAllDays) {
+                            if (! $event->allowsAllDaysSelection()) {
+                                $fail(
+                                    'The All Event Days option is not available for this event.'
+                                );
+
+                                return;
+                            }
+
+                            $selectedDayIds = $eventDays
+                                ->pluck('id')
+                                ->map(
+                                    fn ($id): int => (int) $id
+                                );
+                        } else {
+                            $selectedDayIds = $submittedDays
+                                ->filter(
+                                    fn ($dayId): bool =>
+                                        is_numeric($dayId)
+                                )
+                                ->map(
+                                    fn ($dayId): int =>
+                                        (int) $dayId
+                                );
+                        }
+                    } else {
+                        /*
+                         * When public day selection is disabled,
+                         * all active/open event days are assigned
+                         * automatically to the attendee.
+                         */
+                        $selectedDayIds = $eventDays
+                            ->pluck('id')
+                            ->map(
+                                fn ($id): int => (int) $id
+                            );
+                    }
+
+                    if (
+                        ! $selectedDayIds->contains(
+                            (int) $session->event_day_id
+                        )
+                    ) {
+                        $fail(
+                            $session->name
+                            . ' belongs to an event day you are not registered to attend.'
+                        );
+                    }
+                },
             ],
 
             'merchandise' => [
@@ -463,7 +656,9 @@ class PublicRegistrationController extends Controller
     }
 
     protected function validationMessages(
+        Event $event,
         Collection $eventDays,
+        Collection $eventSessions,
         Collection $merchandiseItems
     ): array {
         $messages = [
@@ -495,15 +690,26 @@ class PublicRegistrationController extends Controller
                 'The selected badge type is unavailable.',
         ];
 
-        if ($eventDays->isNotEmpty()) {
+        if (
+            $event->allowsDaySelection()
+            && $eventDays->isNotEmpty()
+        ) {
             $messages['event_days.required'] =
-                'Please select at least one day or session.';
+                'Please select at least one event day.';
 
             $messages['event_days.min'] =
-                'Please select at least one day or session.';
+                'Please select at least one event day.';
+        }
 
-            $messages['event_days.*.exists'] =
-                'One of the selected days or sessions is unavailable.';
+        if ($eventSessions->isNotEmpty()) {
+            $messages['event_sessions.prohibited'] =
+                'Session registration is not enabled for this event.';
+
+            $messages['event_sessions.array'] =
+                'The selected sessions are invalid.';
+
+            $messages['event_sessions.*.integer'] =
+                'One of the selected sessions is invalid.';
         }
 
         foreach ($merchandiseItems as $item) {
@@ -561,6 +767,7 @@ class PublicRegistrationController extends Controller
     }
 
     protected function saveEventDaySelections(
+        Event $event,
         Attendee $attendee,
         Collection $eventDays,
         array $selectedDayIds
@@ -571,21 +778,66 @@ class PublicRegistrationController extends Controller
 
         $allowedDayIds = $eventDays
             ->pluck('id')
-            ->map(fn ($id): int => (int) $id);
-
-        $selectedDayIds = collect($selectedDayIds)
             ->map(fn ($id): int => (int) $id)
-            ->filter(
-                fn (int $id): bool =>
-                    $allowedDayIds->contains($id)
-            )
-            ->unique()
             ->values();
+
+        /*
+         * If day selection is disabled, automatically assign
+         * every active/open event day.
+         */
+        if (! $event->allowsDaySelection()) {
+            $pivotData = [];
+
+            foreach ($allowedDayIds as $dayId) {
+                $pivotData[$dayId] = [
+                    'selection_source' =>
+                        'public_registration_auto_days',
+                    'selected_at' => now(),
+                ];
+            }
+
+            $attendee->eventDays()->sync($pivotData);
+
+            return;
+        }
+
+        $selectAllDays = collect($selectedDayIds)
+            ->contains(
+                fn ($value): bool =>
+                    (string) $value === 'all'
+            );
+
+        if (
+            $selectAllDays
+            && ! $event->allowsAllDaysSelection()
+        ) {
+            throw ValidationException::withMessages([
+                'event_days' =>
+                    'The All Event Days option is not available for this event.',
+            ]);
+        }
+
+        if ($selectAllDays) {
+            $selectedDayIds = $allowedDayIds;
+        } else {
+            $selectedDayIds = collect($selectedDayIds)
+                ->filter(
+                    fn ($id): bool =>
+                        is_numeric($id)
+                )
+                ->map(fn ($id): int => (int) $id)
+                ->filter(
+                    fn (int $id): bool =>
+                        $allowedDayIds->contains($id)
+                )
+                ->unique()
+                ->values();
+        }
 
         if ($selectedDayIds->isEmpty()) {
             throw ValidationException::withMessages([
                 'event_days' =>
-                    'Please select at least one day or session.',
+                    'Please select at least one event day.',
             ]);
         }
 
@@ -594,12 +846,136 @@ class PublicRegistrationController extends Controller
         foreach ($selectedDayIds as $dayId) {
             $pivotData[$dayId] = [
                 'selection_source' =>
-                    'public_registration',
+                    $selectAllDays
+                        ? 'public_registration_all_days'
+                        : 'public_registration',
                 'selected_at' => now(),
             ];
         }
 
         $attendee->eventDays()->sync($pivotData);
+    }
+
+    protected function saveEventSessionSelections(
+        Event $event,
+        Attendee $attendee,
+        Collection $eventSessions,
+        array $selectedSessionIds
+    ): void {
+        if (! $event->allowsSessionRegistration()) {
+            return;
+        }
+
+        if (
+            $eventSessions->isEmpty()
+            || $selectedSessionIds === []
+        ) {
+            return;
+        }
+
+        $selectedSessionIds = collect($selectedSessionIds)
+            ->filter(
+                fn ($id): bool =>
+                    is_numeric($id)
+            )
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($selectedSessionIds->isEmpty()) {
+            return;
+        }
+
+        $selectedDayIds = $attendee->eventDays()
+            ->pluck('event_days.id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+
+        $allowedSessionIds = $eventSessions
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+
+        $pivotData = [];
+
+        foreach ($selectedSessionIds as $sessionId) {
+            if (! $allowedSessionIds->contains($sessionId)) {
+                throw ValidationException::withMessages([
+                    'event_sessions' =>
+                        'One of the selected sessions is unavailable.',
+                ]);
+            }
+
+            $session = EventSession::query()
+                ->whereKey($sessionId)
+                ->where('event_id', $attendee->event_id)
+                ->where('status', EventSession::STATUS_ACTIVE)
+                ->where('requires_registration', true)
+                ->where('registration_is_open', true)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $session) {
+                throw ValidationException::withMessages([
+                    'event_sessions' =>
+                        'One of the selected sessions is no longer available.',
+                ]);
+            }
+
+            if (
+                ! $selectedDayIds->contains(
+                    (int) $session->event_day_id
+                )
+            ) {
+                throw ValidationException::withMessages([
+                    'event_sessions' =>
+                        $session->name
+                        . ' belongs to an event day you did not select.',
+                ]);
+            }
+
+            if (
+                $session->capacity !== null
+                && (int) $session->capacity > 0
+            ) {
+                $registeredCount = DB::table(
+                    'attendee_event_session'
+                )
+                    ->where(
+                        'event_session_id',
+                        $session->id
+                    )
+                    ->where(
+                        'status',
+                        'registered'
+                    )
+                    ->count();
+
+                if (
+                    $registeredCount
+                    >= (int) $session->capacity
+                ) {
+                    throw ValidationException::withMessages([
+                        'event_sessions' =>
+                            $session->name
+                            . ' has reached its capacity. Please select another session.',
+                    ]);
+                }
+            }
+
+            $pivotData[$session->id] = [
+                'status' => 'registered',
+                'selection_source' =>
+                    'public_registration',
+                'selected_at' => now(),
+            ];
+        }
+
+        if ($pivotData !== []) {
+            $attendee->eventSessions()->sync(
+                $pivotData
+            );
+        }
     }
 
     protected function saveMerchandiseOrders(
@@ -716,6 +1092,39 @@ class PublicRegistrationController extends Controller
             ->where('is_registration_open', true)
             ->orderBy('display_order')
             ->orderBy('event_date')
+            ->orderBy('id')
+            ->get();
+    }
+
+    protected function registrationSessions(
+        Event $event,
+        Collection $eventDays
+    ): Collection {
+        if (
+            ! $event->allowsSessionRegistration()
+            || $eventDays->isEmpty()
+        ) {
+            return new Collection();
+        }
+
+        $eventDayIds = $eventDays
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+
+        return EventSession::query()
+            ->where('event_id', $event->id)
+            ->whereIn('event_day_id', $eventDayIds)
+            ->where('status', EventSession::STATUS_ACTIVE)
+            ->where('requires_registration', true)
+            ->where('registration_is_open', true)
+            ->with('eventDay')
+            ->withCount([
+                'registeredAttendees as registered_attendees_count',
+            ])
+            ->orderBy('event_day_id')
+            ->orderBy('display_order')
+            ->orderBy('starts_at')
             ->orderBy('id')
             ->get();
     }

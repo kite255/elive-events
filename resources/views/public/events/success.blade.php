@@ -54,6 +54,39 @@
             ? $attendee->publicUrl()
             : null;
 
+        $selectedEventDays =
+            $attendee->eventDays ?? collect();
+
+        $selectedAllDays = $selectedEventDays->contains(
+            fn ($day) =>
+                data_get(
+                    $day,
+                    'pivot.selection_source'
+                ) === 'public_registration_all_days'
+        );
+
+        $autoAssignedDays = $selectedEventDays->contains(
+            fn ($day) =>
+                data_get(
+                    $day,
+                    'pivot.selection_source'
+                ) === 'public_registration_auto_days'
+        );
+
+        $allowDaySelection = $event->allowsDaySelection();
+        $allowAllDaysSelection = $event->allowsAllDaysSelection();
+        $allowSessionRegistration = $event->allowsSessionRegistration();
+
+        $attendanceSectionTitle = $allowDaySelection
+            ? 'Selected Attendance'
+            : 'Attendance Schedule';
+
+        $selectedEventSessions =
+            $attendee->eventSessions ?? collect();
+
+        $selectedSessionsByDay =
+            $selectedEventSessions->groupBy('event_day_id');
+
         $merchandiseSelections =
             $attendee->merchandiseSelections ?? collect();
 
@@ -416,6 +449,83 @@
             line-height: 1.5;
         }
 
+        .session-day-group {
+            display: grid;
+            gap: 10px;
+        }
+
+        .session-day-group + .session-day-group {
+            margin-top: 16px;
+        }
+
+        .session-day-heading {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            padding: 11px 13px;
+            border: 1px solid color-mix(
+                in srgb,
+                var(--elive-primary) 20%,
+                var(--elive-border)
+            );
+            border-radius: 13px;
+            background: color-mix(
+                in srgb,
+                var(--elive-primary) 5%,
+                #ffffff
+            );
+        }
+
+        .session-day-name {
+            color: var(--elive-primary);
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .session-day-date {
+            margin-top: 3px;
+            color: var(--elive-muted);
+            font-size: 12px;
+        }
+
+        .session-card {
+            padding: 14px;
+            border: 1px solid var(--elive-border);
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .session-card + .session-card {
+            margin-top: 10px;
+        }
+
+        .session-name {
+            color: var(--elive-text);
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .session-type {
+            display: inline-flex;
+            margin-top: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .session-meta {
+            margin-top: 7px;
+            color: var(--elive-muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
         .order-row {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -746,11 +856,21 @@
                             @if ($event->starts_at)
                                 <div class="summary-card">
                                     <div class="summary-label">
-                                        Event Date
+                                        {{ $event->isMultiDay() ? 'Event Period' : 'Event Date' }}
                                     </div>
 
                                     <div class="summary-value">
-                                        {{ $event->starts_at->format('d M Y, H:i') }}
+                                        @if (
+                                            $event->isMultiDay()
+                                            && $event->ends_at
+                                        )
+                                            {{ $event->starts_at->format('d M Y, H:i') }}
+                                            <br>
+                                            to
+                                            {{ $event->ends_at->format('d M Y, H:i') }}
+                                        @else
+                                            {{ $event->starts_at->format('d M Y, H:i') }}
+                                        @endif
                                     </div>
                                 </div>
                             @endif
@@ -784,21 +904,54 @@
                         </div>
                     </section>
 
-                    @if (($attendee->eventDays ?? collect())->isNotEmpty())
+                    @if ($selectedEventDays->isNotEmpty())
                         <section class="section">
-                            <h2 class="section-title">
-                                Selected Attendance
-                            </h2>
+                            <div style="
+                                display:flex;
+                                justify-content:space-between;
+                                align-items:flex-start;
+                                gap:14px;
+                                flex-wrap:wrap;
+                                margin-bottom:18px;
+                            ">
+                                <div>
+                                    <h2 class="section-title" style="margin-bottom:0;">
+                                        {{ $attendanceSectionTitle }}
+                                    </h2>
+
+                                    <div class="list-item-meta" style="margin-top:8px;">
+                                        {{ $selectedEventDays->count() }}
+                                        {{ \Illuminate\Support\Str::plural('event day', $selectedEventDays->count()) }}
+                                        {{ $allowDaySelection ? 'selected' : 'included in your registration' }}
+                                    </div>
+                                </div>
+
+                                @if (
+                                    $allowAllDaysSelection
+                                    && $selectedAllDays
+                                )
+                                    <span class="status-pill success" style="margin-top:0;">
+                                        ALL EVENT DAYS
+                                    </span>
+                                @elseif (
+                                    ! $allowDaySelection
+                                    && $autoAssignedDays
+                                )
+                                    <span class="status-pill info" style="margin-top:0;">
+                                        AUTOMATICALLY ASSIGNED
+                                    </span>
+                                @endif
+                            </div>
 
                             <div class="list">
-                                @foreach ($attendee->eventDays as $day)
+                                @foreach ($selectedEventDays as $day)
                                     <div class="list-item">
                                         <div class="list-item-title">
                                             {{ $day->name }}
                                         </div>
 
                                         <div class="list-item-meta">
-                                            {{ $day->event_date?->format('d M Y') }}
+                                            {{ $day->event_date?->format('d M Y') ?: 'Date to be announced' }}
 
                                             @if ($day->starts_at)
                                                 — {{ $day->starts_at?->format('H:i') }}
@@ -808,14 +961,130 @@
                                                 to {{ $day->ends_at?->format('H:i') }}
                                             @endif
 
-                                            @if ($day->venue_name)
+                                            @if (filled($day->venue_name))
                                                 <br>
-                                                {{ $day->venue_name }}
+                                                Venue: {{ $day->venue_name }}
                                             @endif
                                         </div>
                                     </div>
                                 @endforeach
                             </div>
+                        </section>
+                    @endif
+
+                    @if (
+                        $allowSessionRegistration
+                        && $selectedEventSessions->isNotEmpty()
+                    )
+                        <section class="section">
+                            <div style="
+                                display:flex;
+                                justify-content:space-between;
+                                align-items:flex-start;
+                                gap:14px;
+                                flex-wrap:wrap;
+                                margin-bottom:18px;
+                            ">
+                                <div>
+                                    <h2 class="section-title" style="margin-bottom:0;">
+                                        Selected Sessions / Activities
+                                    </h2>
+
+                                    <div class="list-item-meta" style="margin-top:8px;">
+                                        {{ $selectedEventSessions->count() }}
+                                        {{ \Illuminate\Support\Str::plural(
+                                            'session',
+                                            $selectedEventSessions->count()
+                                        ) }}
+                                        selected during registration
+                                    </div>
+                                </div>
+                            </div>
+
+                            @foreach ($selectedEventDays as $day)
+                                @php
+                                    $daySessions = $selectedSessionsByDay
+                                        ->get($day->id, collect());
+                                @endphp
+
+                                @if ($daySessions->isNotEmpty())
+                                    <div class="session-day-group">
+                                        <div class="session-day-heading">
+                                            <div>
+                                                <div class="session-day-name">
+                                                    {{ $day->name }}
+                                                </div>
+
+                                                <div class="session-day-date">
+                                                    {{ $day->event_date?->format('d M Y')
+                                                        ?: 'Date to be announced' }}
+                                                </div>
+                                            </div>
+
+                                            <strong style="
+                                                color:#475569;
+                                                font-size:11px;
+                                            ">
+                                                {{ $daySessions->count() }}
+                                                {{ \Illuminate\Support\Str::plural(
+                                                    'session',
+                                                    $daySessions->count()
+                                                ) }}
+                                            </strong>
+                                        </div>
+
+                                        <div>
+                                            @foreach ($daySessions as $session)
+                                                <div class="session-card">
+                                                    <div class="session-name">
+                                                        {{ $session->name }}
+                                                    </div>
+
+                                                    <span class="session-type">
+                                                        {{ ucwords(
+                                                            str_replace(
+                                                                '_',
+                                                                ' ',
+                                                                $session->session_type
+                                                                    ?: 'session'
+                                                            )
+                                                        ) }}
+                                                    </span>
+
+                                                    <div class="session-meta">
+                                                        @if ($session->starts_at)
+                                                            {{ $session->starts_at->format('H:i') }}
+                                                        @endif
+
+                                                        @if ($session->ends_at)
+                                                            @if ($session->starts_at)
+                                                                –
+                                                            @endif
+                                                            {{ $session->ends_at->format('H:i') }}
+                                                        @endif
+
+                                                        @if (filled($session->venue_name))
+                                                            @if ($session->starts_at || $session->ends_at)
+                                                                <br>
+                                                            @endif
+
+                                                            Venue: {{ $session->venue_name }}
+                                                        @endif
+
+                                                        @if (filled($session->description))
+                                                            <br>
+                                                            {{ \Illuminate\Support\Str::limit(
+                                                                $session->description,
+                                                                150
+                                                            ) }}
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+                            @endforeach
                         </section>
                     @endif
 

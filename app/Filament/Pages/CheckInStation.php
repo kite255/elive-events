@@ -1,0 +1,1643 @@
+<?php
+
+namespace App\Filament\Pages;
+
+use App\Filament\Pages\BadgePrintStation;
+use App\Models\Attendee;
+use App\Models\AttendeeQrToken;
+use App\Models\AttendeeCategory;
+use App\Models\BadgeType;
+use App\Models\CheckIn;
+use App\Models\CheckInPoint;
+use App\Models\Event;
+use App\Models\EventDay;
+use App\Models\EventSession;
+use App\Models\User;
+use App\Services\BadgeGenerationService;
+use App\Services\CheckInService;
+use BackedEnum;
+use Filament\Notifications\Notification;
+use Filament\Pages\Page;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Throwable;
+use UnitEnum;
+
+class CheckInStation extends Page
+{
+    protected static string|BackedEnum|null $navigationIcon =
+        Heroicon::OutlinedQrCode;
+
+    protected static string|UnitEnum|null $navigationGroup =
+        'Attendance';
+
+    protected static ?string $navigationLabel =
+        'Check-in Station';
+
+    protected static ?string $title =
+        'Check-in Station';
+
+    protected static ?int $navigationSort = 1;
+
+    protected string $view =
+        'filament.pages.check-in-station';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Station state
+    |--------------------------------------------------------------------------
+    */
+
+    public ?int $eventId = null;
+
+    public ?int $eventDayId = null;
+
+    public ?int $eventSessionId = null;
+
+    public ?int $checkInPointId = null;
+
+    public string $scanValue = '';
+
+    public string $search = '';
+
+    public ?int $selectedAttendeeId = null;
+
+    public ?array $lastResult = null;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Onsite registration state
+    |--------------------------------------------------------------------------
+    */
+
+    public bool $showOnsiteRegistration = false;
+
+    public string $onsiteFullName = '';
+
+    public string $onsitePhone = '';
+
+    public string $onsiteEmail = '';
+
+    public string $onsiteOrganizationName = '';
+
+    public string $onsitePosition = '';
+
+    public ?int $onsiteCategoryId = null;
+
+    public ?int $onsiteBadgeTypeId = null;
+
+    public bool $onsiteGenerateBadge = true;
+
+    public bool $onsiteCheckInImmediately = true;
+
+    public ?int $lastOnsiteAttendeeId = null;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mount
+    |--------------------------------------------------------------------------
+    */
+
+    public function mount(): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $events = $this->getAvailableEvents();
+
+        if ($events->count() === 1) {
+            $this->eventId = (int) $events->first()->getKey();
+
+            $this->selectDefaultEventDay();
+            $this->selectDefaultCheckInPoint();
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return Event::query()
+            ->accessibleBy($user)
+            ->get()
+            ->contains(
+                fn (Event $event): bool =>
+                    $event->canBeCheckedInBy($user)
+            );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Event and station selection
+    |--------------------------------------------------------------------------
+    */
+
+    public function updatedEventId(): void
+    {
+        $this->eventDayId = null;
+        $this->eventSessionId = null;
+        $this->checkInPointId = null;
+        $this->selectedAttendeeId = null;
+        $this->scanValue = '';
+        $this->search = '';
+        $this->lastResult = null;
+        $this->showOnsiteRegistration = false;
+
+        $this->resetOnsiteRegistrationForm();
+        $this->selectDefaultEventDay();
+        $this->selectDefaultCheckInPoint();
+    }
+
+    public function updatedEventDayId(): void
+    {
+        $this->eventSessionId = null;
+        $this->scanValue = '';
+        $this->selectedAttendeeId = null;
+        $this->search = '';
+        $this->lastResult = null;
+    }
+
+    public function updatedEventSessionId(): void
+    {
+        $this->scanValue = '';
+        $this->selectedAttendeeId = null;
+        $this->search = '';
+        $this->lastResult = null;
+    }
+
+    public function updatedCheckInPointId(): void
+    {
+        $this->scanValue = '';
+        $this->selectedAttendeeId = null;
+        $this->lastResult = null;
+    }
+
+    private function selectDefaultEventDay(): void
+    {
+        if (! $this->eventId) {
+            return;
+        }
+
+        $days = $this->getAvailableEventDays();
+
+        if ($days->isEmpty()) {
+            $this->eventDayId = null;
+
+            return;
+        }
+
+        $todayDay = $days->first(
+            fn (EventDay $day): bool =>
+                $day->event_date?->isToday() ?? false
+        );
+
+        $day = $todayDay ?? $days->first();
+
+        $this->eventDayId = $day
+            ? (int) $day->getKey()
+            : null;
+    }
+
+    private function selectDefaultCheckInPoint(): void
+    {
+        if (! $this->eventId) {
+            return;
+        }
+
+        $point = $this->getAvailableCheckInPoints()->first();
+
+        $this->checkInPointId = $point
+            ? (int) $point->getKey()
+            : null;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Onsite registration
+    |--------------------------------------------------------------------------
+    */
+
+    public function openOnsiteRegistration(): void
+    {
+        $event = $this->getSelectedEvent();
+
+        if (! $event) {
+            Notification::make()
+                ->title('Select an event first')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->resetOnsiteRegistrationForm();
+
+        $defaultCategory = $this->getAvailableCategories()
+            ->first();
+
+        $defaultBadgeType = $this->getAvailableBadgeTypes()
+            ->firstWhere('is_default', true)
+            ?? $this->getAvailableBadgeTypes()->first();
+
+        $this->onsiteCategoryId = $defaultCategory
+            ? (int) $defaultCategory->getKey()
+            : null;
+
+        $this->onsiteBadgeTypeId = $defaultBadgeType
+            ? (int) $defaultBadgeType->getKey()
+            : null;
+
+        $this->showOnsiteRegistration = true;
+    }
+
+    public function closeOnsiteRegistration(): void
+    {
+        $this->showOnsiteRegistration = false;
+
+        $this->resetValidation();
+    }
+
+    public function registerOnsiteAttendee(
+        BadgeGenerationService $badgeGenerationService,
+        CheckInService $checkInService
+    ): void {
+        $this->resetValidation();
+
+        $event = $this->getSelectedEvent();
+
+        if (! $event) {
+            Notification::make()
+                ->title('Select a valid event')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $validated = $this->validate([
+            'onsiteFullName' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            'onsitePhone' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
+
+            'onsiteEmail' => [
+                'nullable',
+                'email',
+                'max:255',
+            ],
+
+            'onsiteOrganizationName' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'onsitePosition' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'onsiteCategoryId' => [
+                'nullable',
+                'integer',
+                Rule::exists('attendee_categories', 'id')
+                    ->where(
+                        fn ($query) => $query->where(
+                            'event_id',
+                            $event->getKey()
+                        )
+                    ),
+            ],
+
+            'onsiteBadgeTypeId' => [
+                'nullable',
+                'integer',
+                Rule::exists('badge_types', 'id')
+                    ->where(
+                        fn ($query) => $query
+                            ->where(
+                                'event_id',
+                                $event->getKey()
+                            )
+                            ->where('is_active', true)
+                    ),
+            ],
+
+            'onsiteGenerateBadge' => [
+                'boolean',
+            ],
+
+            'onsiteCheckInImmediately' => [
+                'boolean',
+            ],
+        ]);
+
+        if (
+            $this->getAvailableEventDays()->isNotEmpty()
+            && ! $this->getSelectedEventDay()
+        ) {
+            Notification::make()
+                ->title('Select an event day')
+                ->body(
+                    'This event uses multi-day attendance. Select the day before registering an onsite attendee.'
+                )
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (
+            $this->onsiteCheckInImmediately
+            && ! $this->getSelectedCheckInPoint()
+        ) {
+            Notification::make()
+                ->title('Select a check-in point')
+                ->body(
+                    'A check-in point is required when immediate check-in is enabled.'
+                )
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $attendee = DB::transaction(
+                function () use ($event, $validated): Attendee {
+                    return Attendee::query()->create([
+                        'event_id' => $event->getKey(),
+
+                        'category_id' =>
+                            $validated['onsiteCategoryId']
+                            ?? null,
+
+                        'badge_type_id' =>
+                            $validated['onsiteBadgeTypeId']
+                            ?? null,
+
+                        'full_name' =>
+                            trim($validated['onsiteFullName']),
+
+                        'phone' =>
+                            filled($validated['onsitePhone'] ?? null)
+                                ? trim($validated['onsitePhone'])
+                                : null,
+
+                        'email' =>
+                            filled($validated['onsiteEmail'] ?? null)
+                                ? strtolower(
+                                    trim($validated['onsiteEmail'])
+                                )
+                                : null,
+
+                        'organization_name' =>
+                            filled(
+                                $validated[
+                                    'onsiteOrganizationName'
+                                ] ?? null
+                            )
+                                ? trim(
+                                    $validated[
+                                        'onsiteOrganizationName'
+                                    ]
+                                )
+                                : null,
+
+                        'position' =>
+                            filled($validated['onsitePosition'] ?? null)
+                                ? trim($validated['onsitePosition'])
+                                : null,
+
+                        'status' => 'registered',
+                        'registration_source' => 'onsite',
+                        'registered_at' => now(),
+                    ]);
+                }
+            );
+
+            $eventDay = $this->getSelectedEventDay();
+
+            if ($eventDay) {
+                $attendee->eventDays()->syncWithoutDetaching([
+                    $eventDay->getKey() => [
+                        'selection_source' => 'onsite_registration',
+                        'selected_at' => now(),
+                    ],
+                ]);
+            }
+
+            $eventSession = $this->getSelectedEventSession();
+
+            if (
+                $eventSession
+                && $eventSession->requires_registration
+            ) {
+                $attendee->eventSessions()->syncWithoutDetaching([
+                    $eventSession->getKey() => [
+                        'status' => 'registered',
+                        'selection_source' =>
+                            'onsite_registration',
+                        'selected_at' => now(),
+                    ],
+                ]);
+            }
+
+            /*
+             * The Attendee model created hook automatically generates
+             * the badge number and secure QR token.
+             */
+            $attendee->refresh();
+
+            if ($this->onsiteGenerateBadge) {
+                try {
+                    $badgeGenerationService
+                        ->generateForAttendee($attendee);
+
+                    $attendee->refresh();
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    Notification::make()
+                        ->title('Attendee registered')
+                        ->body(
+                            'Registration succeeded, but badge generation failed. Generate it later from the Badge Print Station.'
+                        )
+                        ->warning()
+                        ->send();
+                }
+            }
+
+            $checkInResult = null;
+
+            if ($this->onsiteCheckInImmediately) {
+                $checkInPoint = $this->getSelectedCheckInPoint();
+
+                $eventSessionId = $this->sessionCheckInEnabled()
+                    ? $this->eventSessionId
+                    : null;
+
+                if (! $this->sessionCheckInEnabled()) {
+                    $this->eventSessionId = null;
+                }
+
+                $checkInResult = $checkInService->checkIn(
+                    attendee: $attendee,
+                    checkInPointId: $checkInPoint?->getKey(),
+                    method: CheckInService::METHOD_ONSITE,
+                    note: 'Onsite registration and immediate check-in',
+                    eventDayId: $this->eventDayId,
+                    eventSessionId: $eventSessionId
+                );
+            }
+
+            $attendee->refresh();
+
+            $this->lastOnsiteAttendeeId =
+                (int) $attendee->getKey();
+
+            $status = $checkInResult['status']
+                ?? 'onsite_registered';
+
+            $success = $checkInResult === null
+                || (bool) ($checkInResult['success'] ?? false);
+
+            $this->lastResult = [
+                'success' => $success,
+                'status' => $status,
+
+                'title' => $this->onsiteCheckInImmediately
+                    ? $this->resultTitle($status)
+                    : 'Onsite registration successful',
+
+                'message' => $checkInResult['message']
+                    ?? (
+                        $attendee->full_name
+                        . ' was registered onsite successfully.'
+                    ),
+
+                'attendee' => [
+                    'id' => $attendee->getKey(),
+                    'name' => $attendee->full_name,
+                    'email' => $attendee->email,
+                    'phone' => $attendee->phone,
+                    'badge_number' => $attendee->badge_number,
+                    'organization' =>
+                        $attendee->organization_name,
+                    'position' => $attendee->position,
+                    'status' => $attendee->status,
+                    'badge_path' => $attendee->badge_path,
+                ],
+
+                'event_day' =>
+                    $checkInResult['event_day']?->name
+                    ?? $eventDay?->name,
+
+                'event_session' =>
+                    $checkInResult['event_session']?->name
+                    ?? $eventSession?->name,
+
+                'check_in_point' =>
+                    $checkInResult['check_in_point']?->name
+                    ?? $this->getSelectedCheckInPoint()?->name,
+
+                'checked_in_at' =>
+                    $checkInResult['checked_in_at']
+                    ?? $attendee->checked_in_at,
+
+                'method' => $this->onsiteCheckInImmediately
+                    ? CheckInService::METHOD_ONSITE
+                    : 'onsite_registration',
+            ];
+
+            Notification::make()
+                ->title(
+                    $this->onsiteCheckInImmediately
+                        ? 'Registered and checked in'
+                        : 'Attendee registered'
+                )
+                ->body(
+                    'Badge number: '
+                    . ($attendee->badge_number ?? 'Pending')
+                )
+                ->success()
+                ->send();
+
+            $this->showOnsiteRegistration = false;
+
+            $this->resetOnsiteRegistrationForm(
+                preserveLastAttendeeId: true
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Onsite registration failed')
+                ->body(
+                    app()->isLocal()
+                        ? $exception->getMessage()
+                        : 'The attendee could not be registered. Please try again.'
+                )
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function getAvailableCategories(): Collection
+    {
+        if (! $this->eventId) {
+            return collect();
+        }
+
+        return AttendeeCategory::query()
+            ->where('event_id', $this->eventId)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function getAvailableBadgeTypes(): Collection
+    {
+        if (! $this->eventId) {
+            return collect();
+        }
+
+        return BadgeType::query()
+            ->where('event_id', $this->eventId)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function resetOnsiteRegistrationForm(
+        bool $preserveLastAttendeeId = false
+    ): void {
+        $lastAttendeeId = $this->lastOnsiteAttendeeId;
+
+        $this->onsiteFullName = '';
+        $this->onsitePhone = '';
+        $this->onsiteEmail = '';
+        $this->onsiteOrganizationName = '';
+        $this->onsitePosition = '';
+        $this->onsiteCategoryId = null;
+        $this->onsiteBadgeTypeId = null;
+        $this->onsiteGenerateBadge = true;
+        $this->onsiteCheckInImmediately = true;
+        $this->lastOnsiteAttendeeId = $preserveLastAttendeeId
+            ? $lastAttendeeId
+            : null;
+
+        $this->resetValidation();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | QR and badge scanning
+    |--------------------------------------------------------------------------
+    */
+
+    public function processScan(
+        CheckInService $checkInService
+    ): void {
+        $this->resetValidation();
+
+        $validated = $this->validate([
+            'eventId' => [
+                'required',
+                'integer',
+            ],
+
+            'eventDayId' => [
+                'nullable',
+                'integer',
+            ],
+
+            'eventSessionId' => [
+                'nullable',
+                'integer',
+            ],
+
+            'checkInPointId' => [
+                'required',
+                'integer',
+            ],
+
+            'scanValue' => [
+                'required',
+                'string',
+                'max:1000',
+            ],
+        ]);
+
+        $event = $this->getSelectedEvent();
+
+        if (! $event) {
+            throw ValidationException::withMessages([
+                'eventId' =>
+                    'Select a valid event assigned to you.',
+            ]);
+        }
+
+        if (
+            $this->getAvailableEventDays()->isNotEmpty()
+            && ! $this->getSelectedEventDay()
+        ) {
+            throw ValidationException::withMessages([
+                'eventDayId' =>
+                    'Select a valid event day before scanning.',
+            ]);
+        }
+
+        $checkInPoint = $this->getSelectedCheckInPoint();
+
+        if (! $checkInPoint) {
+            throw ValidationException::withMessages([
+                'checkInPointId' =>
+                    'Select an active check-in point.',
+            ]);
+        }
+
+        $scanValue = $this->normalizeScanValue(
+            $validated['scanValue']
+        );
+
+        $attendee = $this->findAttendeeFromScanValue(
+            value: $scanValue,
+            event: $event
+        );
+
+        if (! $attendee) {
+            $this->lastResult = [
+                'success' => false,
+                'status' => 'invalid_code',
+                'title' => 'Invalid QR or badge',
+                'message' =>
+                    'No attendee was found for this event using that QR code or badge number.',
+            ];
+
+            Notification::make()
+                ->title('Attendee not found')
+                ->body(
+                    'The QR code or badge number is invalid for the selected event.'
+                )
+                ->danger()
+                ->send();
+
+            $this->scanValue = '';
+
+            return;
+        }
+
+        $method = $this->determineScanMethod(
+            $scanValue,
+            $attendee
+        );
+
+        $this->performCheckIn(
+            attendee: $attendee,
+            checkInService: $checkInService,
+            method: $method
+        );
+
+        $this->scanValue = '';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Manual attendee check-in
+    |--------------------------------------------------------------------------
+    */
+
+    public function selectAttendee(int $attendeeId): void
+    {
+        $attendee = Attendee::query()
+            ->whereKey($attendeeId)
+            ->where('event_id', $this->eventId)
+            ->first();
+
+        if (! $attendee) {
+            Notification::make()
+                ->title('Attendee not found')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->selectedAttendeeId =
+            (int) $attendee->getKey();
+    }
+
+    public function clearSelectedAttendee(): void
+    {
+        $this->selectedAttendeeId = null;
+    }
+
+    public function checkInSelectedAttendee(
+        CheckInService $checkInService
+    ): void {
+        $this->resetValidation();
+
+        $this->validate([
+            'eventId' => [
+                'required',
+                'integer',
+            ],
+
+            'eventDayId' => [
+                'nullable',
+                'integer',
+            ],
+
+            'eventSessionId' => [
+                'nullable',
+                'integer',
+            ],
+
+            'checkInPointId' => [
+                'required',
+                'integer',
+            ],
+
+            'selectedAttendeeId' => [
+                'required',
+                'integer',
+            ],
+        ]);
+
+        $event = $this->getSelectedEvent();
+
+        if (! $event) {
+            Notification::make()
+                ->title('Invalid event')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $attendee = Attendee::query()
+            ->whereKey($this->selectedAttendeeId)
+            ->where('event_id', $event->getKey())
+            ->first();
+
+        if (! $attendee) {
+            Notification::make()
+                ->title('Attendee not found')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (
+            $this->getAvailableEventDays()->isNotEmpty()
+            && ! $this->getSelectedEventDay()
+        ) {
+            Notification::make()
+                ->title('Select an event day')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->performCheckIn(
+            attendee: $attendee,
+            checkInService: $checkInService,
+            method: CheckInService::METHOD_MANUAL
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Check-in execution
+    |--------------------------------------------------------------------------
+    */
+
+    private function performCheckIn(
+        Attendee $attendee,
+        CheckInService $checkInService,
+        string $method
+    ): void {
+        $checkInPoint = $this->getSelectedCheckInPoint();
+
+        if (! $checkInPoint) {
+            Notification::make()
+                ->title('Select a check-in point')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $eventSessionId = $this->sessionCheckInEnabled()
+            ? $this->eventSessionId
+            : null;
+
+        if (! $this->sessionCheckInEnabled()) {
+            $this->eventSessionId = null;
+        }
+
+        $result = $checkInService->checkIn(
+            attendee: $attendee,
+            checkInPointId: $checkInPoint->getKey(),
+            method: $method,
+            note: 'Checked in from Check-in Station',
+            eventDayId: $this->eventDayId,
+            eventSessionId: $eventSessionId
+        );
+
+        $resultAttendee = $result['attendee']
+            ?? $attendee->fresh();
+
+        $checkIn = $result['check_in'] ?? null;
+
+        $status = $result['status']
+            ?? 'check_in_failed';
+
+        $this->lastResult = [
+            'success' => (bool) (
+                $result['success'] ?? false
+            ),
+
+            'status' => $status,
+
+            'title' => $this->resultTitle($status),
+
+            'message' => $result['message']
+                ?? 'The check-in could not be completed.',
+
+            'attendee' => [
+                'id' => $resultAttendee?->getKey(),
+
+                'name' => $resultAttendee?->full_name
+                    ?? $attendee->full_name,
+
+                'email' => $resultAttendee?->email,
+
+                'phone' => $resultAttendee?->phone,
+
+                'badge_number' =>
+                    $resultAttendee?->badge_number,
+
+                'organization' =>
+                    $resultAttendee?->organization_name,
+
+                'position' =>
+                    $resultAttendee?->position,
+
+                'status' =>
+                    $resultAttendee?->status,
+            ],
+
+            'event_day' =>
+                $result['event_day']?->name
+                ?? $checkIn?->eventDay?->name
+                ?? $this->getSelectedEventDay()?->name,
+
+            'event_session' =>
+                $result['event_session']?->name
+                ?? $checkIn?->eventSession?->name
+                ?? $this->getSelectedEventSession()?->name,
+
+            'check_in_point' =>
+                $result['check_in_point']?->name
+                ?? $checkIn?->checkInPoint?->name
+                ?? $checkInPoint->name,
+
+            'checked_in_at' =>
+                $result['checked_in_at']
+                ?? $checkIn?->checked_in_at
+                ?? $resultAttendee?->checked_in_at,
+
+            'method' => $checkIn?->method
+                ?? $method,
+        ];
+
+        if (($result['success'] ?? false) === true) {
+            Notification::make()
+                ->title('Check-in successful')
+                ->body(
+                    $result['message']
+                    ?? 'The attendee has been checked in.'
+                )
+                ->success()
+                ->send();
+
+            $this->selectedAttendeeId = null;
+            $this->search = '';
+
+            return;
+        }
+
+        if ($status === 'already_checked_in') {
+            Notification::make()
+                ->title('Already checked in')
+                ->body($result['message'] ?? null)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title($this->resultTitle($status))
+            ->body($result['message'] ?? null)
+            ->danger()
+            ->send();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Available events and stations
+    |--------------------------------------------------------------------------
+    */
+
+    public function getAvailableEvents(): Collection
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return collect();
+        }
+
+        return Event::query()
+            ->accessibleBy($user)
+            ->whereIn('status', [
+                Event::STATUS_ACTIVE,
+                Event::STATUS_DRAFT,
+            ])
+            ->orderBy('starts_at')
+            ->get()
+            ->filter(
+                fn (Event $event): bool =>
+                    $event->canBeCheckedInBy($user)
+            )
+            ->values();
+    }
+
+    public function getAvailableEventDays(): Collection
+    {
+        if (! $this->eventId) {
+            return collect();
+        }
+
+        return EventDay::query()
+            ->where('event_id', $this->eventId)
+            ->where('status', 'active')
+            ->orderBy('display_order')
+            ->orderBy('event_date')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function getAvailableEventSessions(): Collection
+    {
+        if (
+            ! $this->eventId
+            || ! $this->eventDayId
+        ) {
+            return collect();
+        }
+
+        $event = $this->getSelectedEvent();
+
+        if (
+            ! $event
+            || ! $event->allowsSessionCheckIn()
+        ) {
+            return collect();
+        }
+
+        return EventSession::query()
+            ->where('event_id', $event->getKey())
+            ->where('event_day_id', $this->eventDayId)
+            ->where('status', EventSession::STATUS_ACTIVE)
+            ->where('requires_check_in', true)
+            ->orderBy('display_order')
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function sessionCheckInEnabled(): bool
+    {
+        $event = $this->getSelectedEvent();
+
+        return $event
+            ? $event->allowsSessionCheckIn()
+            : false;
+    }
+
+    public function getAvailableCheckInPoints(): Collection
+    {
+        if (! $this->eventId) {
+            return collect();
+        }
+
+        return CheckInPoint::query()
+            ->forEvent($this->eventId)
+            ->active()
+            ->orderBy('name')
+            ->get();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Manual search
+    |--------------------------------------------------------------------------
+    */
+
+    public function getSearchResults(): Collection
+    {
+        if (
+            ! $this->eventId
+            || mb_strlen(trim($this->search)) < 2
+        ) {
+            return collect();
+        }
+
+        $event = $this->getSelectedEvent();
+
+        if (! $event) {
+            return collect();
+        }
+
+        $search = trim($this->search);
+
+        $selectedSession = $this->getSelectedEventSession();
+
+        return Attendee::query()
+            ->where('event_id', $event->getKey())
+            ->when(
+                $this->eventDayId,
+                fn (Builder $query): Builder =>
+                    $query->whereHas(
+                        'eventDays',
+                        fn (Builder $dayQuery): Builder =>
+                            $dayQuery->where(
+                                'event_days.id',
+                                $this->eventDayId
+                            )
+                    )
+            )
+            ->when(
+                $selectedSession
+                    && $selectedSession->requires_registration,
+                fn (Builder $query): Builder =>
+                    $query->whereHas(
+                        'eventSessions',
+                        fn (Builder $sessionQuery): Builder =>
+                            $sessionQuery->where(
+                                'event_sessions.id',
+                                $selectedSession->getKey()
+                            )
+                    )
+            )
+            ->where(
+                function (Builder $query) use ($search): void {
+                    $query
+                        ->where(
+                            'full_name',
+                            'ilike',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'phone',
+                            'ilike',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'email',
+                            'ilike',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'badge_number',
+                            'ilike',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'organization_name',
+                            'ilike',
+                            "%{$search}%"
+                        );
+                }
+            )
+            ->orderBy('full_name')
+            ->limit(15)
+            ->get();
+    }
+
+    public function getSelectedAttendee(): ?Attendee
+    {
+        if (
+            ! $this->eventId
+            || ! $this->selectedAttendeeId
+        ) {
+            return null;
+        }
+
+        return Attendee::query()
+            ->whereKey($this->selectedAttendeeId)
+            ->where('event_id', $this->eventId)
+            ->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recent activity and statistics
+    |--------------------------------------------------------------------------
+    */
+
+    public function getRecentCheckIns(): Collection
+    {
+        if (! $this->eventId) {
+            return collect();
+        }
+
+        return CheckIn::query()
+            ->with([
+                'attendee',
+                'eventDay',
+                'eventSession',
+                'checkInPoint',
+                'checkedInBy',
+            ])
+            ->where('event_id', $this->eventId)
+            ->when(
+                $this->eventDayId,
+                fn (Builder $query): Builder =>
+                    $query->where(
+                        'event_day_id',
+                        $this->eventDayId
+                    )
+            )
+            ->when(
+                $this->eventSessionId,
+                fn (Builder $query): Builder =>
+                    $query->where(
+                        'event_session_id',
+                        $this->eventSessionId
+                    ),
+                fn (Builder $query): Builder =>
+                    $query->whereNull('event_session_id')
+            )
+            ->latest('checked_in_at')
+            ->limit(10)
+            ->get();
+    }
+
+    public function getCounters(): array
+    {
+        if (! $this->eventId) {
+            return [
+                'registered' => 0,
+                'checked_in' => 0,
+                'remaining' => 0,
+                'today' => 0,
+            ];
+        }
+
+        $registeredQuery = Attendee::query()
+            ->where('event_id', $this->eventId);
+
+        if ($this->eventDayId) {
+            $registeredQuery->whereHas(
+                'eventDays',
+                fn (Builder $query): Builder =>
+                    $query->where(
+                        'event_days.id',
+                        $this->eventDayId
+                    )
+            );
+        }
+
+        $selectedSession = $this->getSelectedEventSession();
+
+        if (
+            $selectedSession
+            && $selectedSession->requires_registration
+        ) {
+            $registeredQuery->whereHas(
+                'eventSessions',
+                fn (Builder $query): Builder =>
+                    $query->where(
+                        'event_sessions.id',
+                        $selectedSession->getKey()
+                    )
+            );
+        }
+
+        $registered = $registeredQuery->count();
+
+        $checkedInQuery = CheckIn::query()
+            ->where('event_id', $this->eventId)
+            ->when(
+                $this->eventDayId,
+                fn (Builder $query): Builder =>
+                    $query->where(
+                        'event_day_id',
+                        $this->eventDayId
+                    )
+            )
+            ->when(
+                $this->eventSessionId,
+                fn (Builder $query): Builder =>
+                    $query->where(
+                        'event_session_id',
+                        $this->eventSessionId
+                    ),
+                fn (Builder $query): Builder =>
+                    $query->whereNull('event_session_id')
+            );
+
+        $checkedIn = (clone $checkedInQuery)
+            ->distinct('attendee_id')
+            ->count('attendee_id');
+
+        $today = (clone $checkedInQuery)
+            ->whereDate('checked_in_at', today())
+            ->distinct('attendee_id')
+            ->count('attendee_id');
+
+        return [
+            'registered' => $registered,
+            'checked_in' => $checkedIn,
+            'remaining' => max(
+                $registered - $checkedIn,
+                0
+            ),
+            'today' => $today,
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Selected records
+    |--------------------------------------------------------------------------
+    */
+
+    private function getSelectedEvent(): ?Event
+    {
+        if (! $this->eventId) {
+            return null;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $event = Event::query()
+            ->accessibleBy($user)
+            ->whereKey($this->eventId)
+            ->first();
+
+        if (! $event) {
+            return null;
+        }
+
+        return $event->canBeCheckedInBy($user)
+            ? $event
+            : null;
+    }
+
+    public function getSelectedEventDay(): ?EventDay
+    {
+        if (
+            ! $this->eventId
+            || ! $this->eventDayId
+        ) {
+            return null;
+        }
+
+        return EventDay::query()
+            ->whereKey($this->eventDayId)
+            ->where('event_id', $this->eventId)
+            ->where('status', 'active')
+            ->first();
+    }
+
+    public function getSelectedEventSession(): ?EventSession
+    {
+        if (
+            ! $this->eventId
+            || ! $this->eventDayId
+            || ! $this->eventSessionId
+        ) {
+            return null;
+        }
+
+        $event = $this->getSelectedEvent();
+
+        if (
+            ! $event
+            || ! $event->allowsSessionCheckIn()
+        ) {
+            return null;
+        }
+
+        return EventSession::query()
+            ->whereKey($this->eventSessionId)
+            ->where('event_id', $event->getKey())
+            ->where('event_day_id', $this->eventDayId)
+            ->where('status', EventSession::STATUS_ACTIVE)
+            ->where('requires_check_in', true)
+            ->first();
+    }
+
+    private function getSelectedCheckInPoint(): ?CheckInPoint
+    {
+        if (
+            ! $this->eventId
+            || ! $this->checkInPointId
+        ) {
+            return null;
+        }
+
+        return CheckInPoint::query()
+            ->whereKey($this->checkInPointId)
+            ->forEvent($this->eventId)
+            ->active()
+            ->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scan resolution
+    |--------------------------------------------------------------------------
+    */
+
+    private function findAttendeeFromScanValue(
+        string $value,
+        Event $event
+    ): ?Attendee {
+        $attendee = Attendee::query()
+            ->where('event_id', $event->getKey())
+            ->where(
+                function (Builder $query) use ($value): void {
+                    $query
+                        ->where('badge_number', $value)
+                        ->orWhere('public_token', $value);
+                }
+            )
+            ->first();
+
+        if ($attendee) {
+            return $attendee;
+        }
+
+        return $this->findAttendeeBySecureQrToken(
+            value: $value,
+            event: $event
+        );
+    }
+
+    private function findAttendeeBySecureQrToken(
+        string $value,
+        Event $event
+    ): ?Attendee {
+        $lastFour = substr($value, -4);
+
+        $tokens = AttendeeQrToken::query()
+            ->with('attendee')
+            ->where('token_last4', $lastFour)
+            ->whereHas(
+                'attendee',
+                fn (Builder $query): Builder =>
+                    $query->where(
+                        'event_id',
+                        $event->getKey()
+                    )
+            )
+            ->where(
+                function (Builder $query): void {
+                    $query
+                        ->whereNull('expires_at')
+                        ->orWhere(
+                            'expires_at',
+                            '>',
+                            now()
+                        );
+                }
+            )
+            ->get();
+
+        foreach ($tokens as $token) {
+            if (
+                Hash::check(
+                    $value,
+                    $token->token_hash
+                )
+            ) {
+                return $token->attendee;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeScanValue(
+        string $value
+    ): string {
+        $value = trim($value);
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            $path = parse_url($value, PHP_URL_PATH);
+
+            if (is_string($path)) {
+                $segments = array_values(
+                    array_filter(
+                        explode('/', trim($path, '/'))
+                    )
+                );
+
+                if ($segments !== []) {
+                    return urldecode(
+                        (string) end($segments)
+                    );
+                }
+            }
+        }
+
+        return $value;
+    }
+
+    private function determineScanMethod(
+        string $scanValue,
+        Attendee $attendee
+    ): string {
+        if (
+            filled($attendee->badge_number)
+            && hash_equals(
+                (string) $attendee->badge_number,
+                $scanValue
+            )
+        ) {
+            return CheckInService::METHOD_BADGE_NUMBER;
+        }
+
+        return CheckInService::METHOD_QR;
+    }
+
+    public function getLastOnsiteBadgePrintUrl(): ?string
+    {
+        $attendeeId = $this->lastResult['attendee']['id']
+            ?? $this->lastOnsiteAttendeeId;
+
+        if (! $attendeeId) {
+            return null;
+        }
+
+        $attendee = Attendee::query()
+            ->whereKey($attendeeId)
+            ->where('event_id', $this->eventId)
+            ->first();
+
+        if (! $attendee || ! filled($attendee->badge_path)) {
+            return null;
+        }
+
+        return BadgePrintStation::getUrl([
+            'attendee' => (int) $attendee->getKey(),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Presentation helpers
+    |--------------------------------------------------------------------------
+    */
+
+    private function resultTitle(
+        string $status
+    ): string {
+        return match ($status) {
+            'checked_in' =>
+                'Check-in successful',
+
+            'already_checked_in' =>
+                'Already checked in',
+
+            'attendee_not_found' =>
+                'Attendee not found',
+
+            'attendee_not_eligible' =>
+                'Attendee not eligible',
+
+            'access_denied' =>
+                'Access denied',
+
+            'check_in_point_not_found' =>
+                'Invalid check-in point',
+
+            'check_in_point_inactive' =>
+                'Check-in point inactive',
+
+            'wrong_event' =>
+                'Wrong event',
+
+            'event_day_required' =>
+                'Select event day',
+
+            'invalid_event_day' =>
+                'Invalid event day',
+
+            'event_day_not_selected' =>
+                'Not registered for this day',
+
+            'invalid_event_session' =>
+                'Invalid session',
+
+            'session_check_in_disabled' =>
+                'Session check-in disabled',
+
+            'event_session_not_selected' =>
+                'Not registered for this session',
+
+            'onsite_registered' =>
+                'Onsite registration successful',
+
+            default =>
+                'Check-in failed',
+        };
+    }
+}

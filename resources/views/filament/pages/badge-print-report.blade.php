@@ -1,17 +1,13 @@
 <x-filament-panels::page>
     @php
         $events = $this->events;
-        $categories = $this->categories;
-        $checkInPoints = $this->checkInPoints;
-        $methods = $this->methods;
         $officers = $this->officers;
-        $attendees = $this->attendees;
-        $latestCheckIns = $this->latestCheckIns;
+        $logs = $this->printLogs;
         $summary = $this->summary;
     @endphp
 
     <style>
-        .elive-attendance-report {
+        .elive-print-report {
             display: grid;
             gap: 1.25rem;
         }
@@ -225,7 +221,7 @@
             color: rgb(229 231 235);
         }
 
-        .elive-status {
+        .elive-type {
             display: inline-flex;
             padding: 0.25rem 0.55rem;
             border-radius: 999px;
@@ -233,14 +229,14 @@
             font-weight: 800;
         }
 
-        .elive-status-in {
+        .elive-type-first {
             background: rgb(220 252 231);
             color: rgb(22 101 52);
         }
 
-        .elive-status-out {
-            background: rgb(254 226 226);
-            color: rgb(153 27 27);
+        .elive-type-reprint {
+            background: rgb(254 243 199);
+            color: rgb(146 64 14);
         }
 
         .elive-empty {
@@ -277,33 +273,33 @@
         }
     </style>
 
-    <div class="elive-attendance-report">
+    <div class="elive-print-report">
         <section class="elive-panel">
             <div class="elive-panel-header">
                 <div>
                     <h2 class="elive-title">
-                        Attendance Filters
+                        Badge Print Filters
                     </h2>
 
                     <p class="elive-subtitle">
-                        Filter attendance records and export the result to CSV.
+                        Review first prints, reprints, copies, printers, officers, and reprint reasons.
                     </p>
                 </div>
 
                 <div wire:loading>
-                    Updating...
+                    Updating report...
                 </div>
             </div>
 
             <div class="elive-panel-body">
                 <div class="elive-filter-grid">
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-event">
+                        <label class="elive-label" for="print-report-event">
                             Event
                         </label>
 
                         <select
-                            id="attendance-event"
+                            id="print-report-event"
                             class="elive-select"
                             wire:model.live="eventId"
                         >
@@ -318,92 +314,30 @@
                     </div>
 
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-category">
-                            Category
+                        <label class="elive-label" for="print-report-type">
+                            Print Type
                         </label>
 
                         <select
-                            id="attendance-category"
+                            id="print-report-type"
                             class="elive-select"
-                            wire:model.live="categoryId"
-                            @disabled(! $eventId)
+                            wire:model.live="printType"
                         >
-                            <option value="">All categories</option>
-
-                            @foreach ($categories as $category)
-                                <option value="{{ $category->id }}">
-                                    {{ $category->name }}
-                                </option>
-                            @endforeach
+                            <option value="all">All print types</option>
+                            <option value="first_print">First print</option>
+                            <option value="reprint">Reprint</option>
                         </select>
                     </div>
 
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-status">
-                            Attendance Status
+                        <label class="elive-label" for="print-report-officer">
+                            Printed By
                         </label>
 
                         <select
-                            id="attendance-status"
+                            id="print-report-officer"
                             class="elive-select"
-                            wire:model.live="attendanceStatus"
-                        >
-                            <option value="all">All attendees</option>
-                            <option value="checked_in">Checked in</option>
-                            <option value="not_checked_in">Not checked in</option>
-                        </select>
-                    </div>
-
-                    <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-point">
-                            Check-in Point
-                        </label>
-
-                        <select
-                            id="attendance-point"
-                            class="elive-select"
-                            wire:model.live="checkInPointId"
-                            @disabled(! $eventId)
-                        >
-                            <option value="">All points</option>
-
-                            @foreach ($checkInPoints as $point)
-                                <option value="{{ $point->id }}">
-                                    {{ $point->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-method">
-                            Method
-                        </label>
-
-                        <select
-                            id="attendance-method"
-                            class="elive-select"
-                            wire:model.live="method"
-                        >
-                            <option value="all">All methods</option>
-
-                            @foreach ($methods as $methodOption)
-                                <option value="{{ $methodOption }}">
-                                    {{ ucwords(str_replace('_', ' ', $methodOption)) }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-officer">
-                            Officer
-                        </label>
-
-                        <select
-                            id="attendance-officer"
-                            class="elive-select"
-                            wire:model.live="officerId"
+                            wire:model.live="printedBy"
                         >
                             <option value="">All officers</option>
 
@@ -416,12 +350,12 @@
                     </div>
 
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-from">
+                        <label class="elive-label" for="print-report-from">
                             Date From
                         </label>
 
                         <input
-                            id="attendance-from"
+                            id="print-report-from"
                             type="date"
                             class="elive-input"
                             wire:model.live="dateFrom"
@@ -429,12 +363,12 @@
                     </div>
 
                     <div class="elive-form-group">
-                        <label class="elive-label" for="attendance-to">
+                        <label class="elive-label" for="print-report-to">
                             Date To
                         </label>
 
                         <input
-                            id="attendance-to"
+                            id="print-report-to"
                             type="date"
                             class="elive-input"
                             wire:model.live="dateTo"
@@ -442,16 +376,16 @@
                     </div>
 
                     <div class="elive-form-group elive-filter-search">
-                        <label class="elive-label" for="attendance-search">
+                        <label class="elive-label" for="print-report-search">
                             Search
                         </label>
 
                         <input
-                            id="attendance-search"
+                            id="print-report-search"
                             type="search"
                             class="elive-input"
                             wire:model.live.debounce.400ms="search"
-                            placeholder="Name, phone, email, badge number, organization..."
+                            placeholder="Attendee, badge number, organization, printer, reason..."
                         >
                     </div>
 
@@ -486,30 +420,30 @@
 
         <section class="elive-stat-grid">
             <div class="elive-stat">
-                <div class="elive-stat-label">Registered</div>
+                <div class="elive-stat-label">Print Actions</div>
                 <div class="elive-stat-value">
-                    {{ number_format($summary['total']) }}
+                    {{ number_format($summary['actions']) }}
                 </div>
             </div>
 
             <div class="elive-stat">
-                <div class="elive-stat-label">Checked In</div>
+                <div class="elive-stat-label">First Prints</div>
                 <div class="elive-stat-value">
-                    {{ number_format($summary['checked_in']) }}
+                    {{ number_format($summary['first_prints']) }}
                 </div>
             </div>
 
             <div class="elive-stat">
-                <div class="elive-stat-label">Not Checked In</div>
+                <div class="elive-stat-label">Reprints</div>
                 <div class="elive-stat-value">
-                    {{ number_format($summary['not_checked_in']) }}
+                    {{ number_format($summary['reprints']) }}
                 </div>
             </div>
 
             <div class="elive-stat">
-                <div class="elive-stat-label">Attendance Rate</div>
+                <div class="elive-stat-label">Total Copies</div>
                 <div class="elive-stat-value">
-                    {{ number_format($summary['attendance_rate'], 1) }}%
+                    {{ number_format($summary['copies']) }}
                 </div>
             </div>
         </section>
@@ -518,21 +452,21 @@
             <div class="elive-panel-header">
                 <div>
                     <h2 class="elive-title">
-                        Attendance Records
+                        Badge Print Records
                     </h2>
 
                     <p class="elive-subtitle">
-                        Showing {{ number_format($attendees->total()) }} matching attendees.
+                        Showing {{ number_format($logs->total()) }} matching print records.
                     </p>
                 </div>
 
                 <div class="elive-form-group" style="min-width: 8rem;">
-                    <label class="elive-label" for="attendance-per-page">
+                    <label class="elive-label" for="print-report-per-page">
                         Per Page
                     </label>
 
                     <select
-                        id="attendance-per-page"
+                        id="print-report-per-page"
                         class="elive-select"
                         wire:model.live="perPage"
                     >
@@ -544,77 +478,65 @@
                 </div>
             </div>
 
-            @if ($attendees->isNotEmpty())
+            @if ($logs->isNotEmpty())
                 <div class="elive-table-wrap">
                     <table class="elive-table">
                         <thead>
                             <tr>
                                 <th>Attendee</th>
                                 <th>Badge</th>
-                                <th>Category</th>
-                                <th>Organization</th>
-                                <th>Status</th>
-                                <th>Check-in Point</th>
-                                <th>Method</th>
-                                <th>Officer</th>
-                                <th>Checked-in Time</th>
+                                <th>Type</th>
+                                <th>Copies</th>
+                                <th>Printer</th>
+                                <th>Reprint Reason</th>
+                                <th>Printed By</th>
+                                <th>Printed At</th>
                             </tr>
                         </thead>
 
                         <tbody>
-                            @foreach ($attendees as $attendee)
-                                @php
-                                    $checkIn = $latestCheckIns->get(
-                                        $attendee->id
-                                    );
-                                @endphp
-
-                                <tr wire:key="attendance-report-{{ $attendee->id }}">
+                            @foreach ($logs as $log)
+                                <tr wire:key="badge-print-log-{{ $log->id }}">
                                     <td>
-                                        <strong>{{ $attendee->full_name }}</strong>
+                                        <strong>
+                                            {{ $log->attendee?->full_name ?? 'Deleted attendee' }}
+                                        </strong>
 
-                                        @if ($attendee->event)
+                                        @if ($log->event)
                                             <div style="margin-top: 0.2rem; color: rgb(100 116 139);">
-                                                {{ $attendee->event->name }}
+                                                {{ $log->event->name }}
                                             </div>
                                         @endif
                                     </td>
 
                                     <td>
-                                        {{ $attendee->badge_number ?? '—' }}
+                                        {{ $log->attendee?->badge_number ?? '—' }}
                                     </td>
 
                                     <td>
-                                        {{ $attendee->category?->name ?? '—' }}
-                                    </td>
-
-                                    <td>
-                                        {{ $attendee->organization_name ?? '—' }}
-                                    </td>
-
-                                    <td>
-                                        <span class="elive-status {{ $checkIn ? 'elive-status-in' : 'elive-status-out' }}">
-                                            {{ $checkIn ? 'Checked In' : 'Not Checked In' }}
+                                        <span class="elive-type {{ $log->print_type === 'reprint' ? 'elive-type-reprint' : 'elive-type-first' }}">
+                                            {{ $log->print_type === 'reprint' ? 'Reprint' : 'First Print' }}
                                         </span>
                                     </td>
 
                                     <td>
-                                        {{ $checkIn?->checkInPoint?->name ?? '—' }}
+                                        {{ number_format($log->copies ?? 1) }}
                                     </td>
 
                                     <td>
-                                        {{ $checkIn
-                                            ? ucwords(str_replace('_', ' ', $checkIn->method ?? ''))
-                                            : '—' }}
+                                        {{ $log->printer_name ?? '—' }}
                                     </td>
 
                                     <td>
-                                        {{ $checkIn?->checkedInBy?->name
-                                            ?? ($checkIn ? 'System' : '—') }}
+                                        {{ $log->reprint_reason ?? '—' }}
                                     </td>
 
                                     <td>
-                                        {{ $checkIn?->checked_in_at?->format('d/m/Y H:i:s') ?? '—' }}
+                                        {{ $log->printedBy?->name ?? 'System' }}
+                                    </td>
+
+                                    <td>
+                                        {{ $log->printed_at?->format('d/m/Y H:i:s') ?? '—' }}
                                     </td>
                                 </tr>
                             @endforeach
@@ -623,11 +545,11 @@
                 </div>
 
                 <div class="elive-pagination">
-                    {{ $attendees->links() }}
+                    {{ $logs->links() }}
                 </div>
             @else
                 <div class="elive-empty">
-                    No attendance records matched the selected filters.
+                    No badge print records matched the selected filters.
                 </div>
             @endif
         </section>
