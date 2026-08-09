@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Events;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
+use App\Filament\Resources\Events\RelationManagers\AttendeeCategoriesRelationManager;
 use App\Filament\Resources\Events\RelationManagers\AttendeesRelationManager;
 use App\Filament\Resources\Events\RelationManagers\BadgeTemplatesRelationManager;
 use App\Filament\Resources\Events\RelationManagers\BadgeTypesRelationManager;
@@ -277,15 +278,16 @@ class EventResource extends Resource
     |
     | 0  - Event Staff
     | 1  - Attendees
-    | 2  - Event Days
-    | 3  - Sessions / Activities
-    | 4  - Event Merchandise
-    | 5  - Attendee Merchandise Orders
-    | 6  - Registration Fields
-    | 7  - Badge Templates
-    | 8  - Badge Types
-    | 9  - Check-in Points
-    | 10 - Check-ins
+    | 2  - Participant Types
+    | 3  - Event Days
+    | 4  - Sessions / Activities
+    | 5  - Event Merchandise
+    | 6  - Attendee Merchandise Orders
+    | 7  - Registration Fields
+    | 8  - Badge Templates
+    | 9  - Badge Types
+    | 10 - Check-in Points
+    | 11 - Check-ins
     |
     */
 
@@ -294,6 +296,7 @@ class EventResource extends Resource
         return [
             EventStaffRelationManager::class,
             AttendeesRelationManager::class,
+            AttendeeCategoriesRelationManager::class,
             DaysRelationManager::class,
             SessionsRelationManager::class,
             MerchandiseRelationManager::class,
