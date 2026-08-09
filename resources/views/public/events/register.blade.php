@@ -735,6 +735,27 @@
 
                                 $sectionLabels = $registrationSectionLabels
                                     ?? $event->registrationSectionLabels();
+
+                                $availableCategories = collect($categories ?? []);
+                                $availableBadgeTypes = collect($badgeTypes ?? []);
+
+                                $isChurchLikeEvent = in_array(
+                                    $event->event_type,
+                                    ['church_event', 'community_event', 'charity_event'],
+                                    true
+                                );
+
+                                $organizationFieldLabel = $isChurchLikeEvent
+                                    ? 'Church / Congregation'
+                                    : 'Organization / Company';
+
+                                $positionFieldLabel = $isChurchLikeEvent
+                                    ? 'Church Position / Responsibility'
+                                    : 'Position / Title';
+
+                                $categoryFieldLabel = $isChurchLikeEvent
+                                    ? 'Participant Type'
+                                    : 'Attendee Category';
                             @endphp
 
                             @if ($isFull && $waitlistEnabled)
@@ -830,14 +851,8 @@
                                 $showOptionalStandardDetails =
                                     $standardFields['organization']['show']
                                     || $standardFields['position']['show']
-                                    || (
-                                        $standardFields['category']['show']
-                                        && ($categories ?? collect())->isNotEmpty()
-                                    )
-                                    || (
-                                        $standardFields['badge_type']['show']
-                                        && ($badgeTypes ?? collect())->isNotEmpty()
-                                    );
+                                    || $standardFields['category']['show']
+                                    || $standardFields['badge_type']['show'];
                             @endphp
 
                             @if ($showOptionalStandardDetails)
@@ -862,7 +877,7 @@
                                         @if ($standardFields['organization']['show'])
                                             <div id="field-organization-name" class="@error('organization_name') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
-                                                    Organization / Company
+                                                    {{ $organizationFieldLabel }}
                                                     @if ($standardFields['organization']['required'])
                                                         <span style="color:#dc2626;">*</span>
                                                     @endif
@@ -884,7 +899,7 @@
                                         @if ($standardFields['position']['show'])
                                             <div id="field-position" class="@error('position') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
-                                                    Position / Title
+                                                    {{ $positionFieldLabel }}
                                                     @if ($standardFields['position']['required'])
                                                         <span style="color:#dc2626;">*</span>
                                                     @endif
@@ -903,26 +918,45 @@
                                             </div>
                                         @endif
 
-                                        @if ($standardFields['category']['show'] && ($categories ?? collect())->isNotEmpty())
+                                        @if ($standardFields['category']['show'])
                                             <div id="field-category-id" class="@error('category_id') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
-                                                    Category
+                                                    {{ $categoryFieldLabel }}
                                                     @if ($standardFields['category']['required'])
                                                         <span style="color:#dc2626;">*</span>
                                                     @endif
                                                 </label>
-                                                <select
-                                                    name="category_id"
-                                                    @required($standardFields['category']['required'])
-                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
-                                                >
-                                                    <option value="">Select category</option>
-                                                    @foreach ($categories as $category)
-                                                        <option value="{{ $category->id }}" @selected(old('category_id') == $category->id)>
-                                                            {{ $category->name }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
+
+                                                @if ($availableCategories->isNotEmpty())
+                                                    <select
+                                                        name="category_id"
+                                                        @required($standardFields['category']['required'])
+                                                        style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                                    >
+                                                        <option value="">Select {{ strtolower($categoryFieldLabel) }}</option>
+
+                                                        @foreach ($availableCategories as $category)
+                                                            <option
+                                                                value="{{ $category->id }}"
+                                                                @selected((string) old('category_id') === (string) $category->id)
+                                                            >
+                                                                {{ $category->name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                @else
+                                                    <select
+                                                        disabled
+                                                        style="width:100%;box-sizing:border-box;border:1px solid #f59e0b;border-radius:14px;padding:12px;font-size:15px;background:#fffbeb;color:#92400e;"
+                                                    >
+                                                        <option>No participant types have been configured for this event</option>
+                                                    </select>
+
+                                                    <div style="font-size:12px;color:#92400e;margin-top:7px;font-weight:700;line-height:1.5;">
+                                                        The organizer must add at least one attendee category before registration can continue.
+                                                    </div>
+                                                @endif
+
                                                 @error('category_id')
                                                     <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
                                                         {{ $message }}
@@ -931,7 +965,7 @@
                                             </div>
                                         @endif
 
-                                        @if ($standardFields['badge_type']['show'] && ($badgeTypes ?? collect())->isNotEmpty())
+                                        @if ($standardFields['badge_type']['show'] && $availableBadgeTypes->isNotEmpty())
                                             <div id="field-badge-type-id" class="@error('badge_type_id') elive-field-invalid @enderror">
                                                 <label style="display:block;font-weight:800;margin-bottom:7px;">
                                                     Badge Type
@@ -945,7 +979,7 @@
                                                     style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
                                                 >
                                                     <option value="">Select badge type</option>
-                                                    @foreach ($badgeTypes as $badgeType)
+                                                    @foreach ($availableBadgeTypes as $badgeType)
                                                         <option value="{{ $badgeType->id }}" @selected(old('badge_type_id') == $badgeType->id)>
                                                             {{ $badgeType->name }}
                                                         </option>
