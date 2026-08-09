@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendee;
+use App\Models\AttendeeCategory;
 use App\Models\AttendeeMerchandise;
 use App\Models\AttendeeRegistrationAnswer;
 use App\Models\BadgeType;
@@ -10,7 +11,6 @@ use App\Models\Event;
 use App\Models\EventSession;
 use App\Models\MerchandiseVariant;
 use App\Services\BadgeGenerationService;
-use App\Services\QrTokenService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,9 +51,7 @@ class PublicRegistrationController extends Controller
             'waitlistEnabled' => (bool) $event->registration_waitlist_enabled,
             'registrationStats' => $this->registrationStats($event),
 
-            'categories' => $event->attendeeCategories()
-                ->orderBy('name')
-                ->get(),
+            'categories' => $this->registrationCategories($event),
 
             'badgeTypes' => $event->badgeTypes()
                 ->where('is_active', true)
@@ -153,14 +151,41 @@ class PublicRegistrationController extends Controller
             default => 'registered',
         };
 
-        $badgeTypeId = $event->registration_show_badge_type
-            ? ($validated['badge_type_id'] ?? null)
+        /*
+        |--------------------------------------------------------------------------
+        | Participant type and badge resolution
+        |--------------------------------------------------------------------------
+        */
+
+        $categoryId = $event->registration_show_category
+            ? ($validated['category_id'] ?? null)
             : null;
+
+        $selectedCategory = null;
+
+        if ($categoryId) {
+            $selectedCategory = AttendeeCategory::query()
+                ->whereKey($categoryId)
+                ->where('event_id', $event->id)
+                ->where('is_active', true)
+                ->where('is_public', true)
+                ->first();
+        }
+
+        $badgeTypeId = $selectedCategory?->badge_type_id;
+
+        if (
+            ! $badgeTypeId
+            && $event->registration_show_badge_type
+        ) {
+            $badgeTypeId = $validated['badge_type_id'] ?? null;
+        }
 
         if (! $badgeTypeId) {
             $badgeTypeId = BadgeType::query()
                 ->where('event_id', $event->id)
                 ->where('is_active', true)
+                ->orderByDesc('is_default')
                 ->orderBy('id')
                 ->value('id');
         }
@@ -178,15 +203,12 @@ class PublicRegistrationController extends Controller
                     $phone,
                     $email,
                     $status,
+                    $categoryId,
                     $badgeTypeId
                 ): Attendee {
                     $attendee = Attendee::create([
                         'event_id' => $event->id,
-                        'category_id' =>
-                            $event->registration_show_category
-                                ? ($validated['category_id'] ?? null)
-                                : null,
-
+                        'category_id' => $categoryId,
                         'badge_type_id' => $badgeTypeId,
                         'full_name' => $fullName,
                         'phone' => $phone,
@@ -260,7 +282,13 @@ class PublicRegistrationController extends Controller
                 );
         }
 
-        app(QrTokenService::class)->generateForAttendee($attendee);
+        /*
+        |--------------------------------------------------------------------------
+        | Refresh generated attendee values before badge generation
+        |--------------------------------------------------------------------------
+        */
+
+        $attendee->refresh();
 
         if (
             $event->registration_auto_generate_badge
@@ -268,6 +296,8 @@ class PublicRegistrationController extends Controller
         ) {
             app(BadgeGenerationService::class)
                 ->generateForAttendee($attendee);
+
+            $attendee->refresh();
         }
 
         return redirect()->route(
@@ -364,6 +394,8 @@ class PublicRegistrationController extends Controller
                     ->where(
                         fn ($query) => $query
                             ->where('event_id', $event->id)
+                            ->where('is_active', true)
+                            ->where('is_public', true)
                     ),
             ],
 
@@ -678,10 +710,10 @@ class PublicRegistrationController extends Controller
                 'Please enter your position or title.',
 
             'category_id.required' =>
-                'Please select an attendee category.',
+                'Please select a participant type.',
 
             'category_id.exists' =>
-                'The selected attendee category is unavailable.',
+                'The selected participant type is unavailable.',
 
             'badge_type_id.required' =>
                 'Please select a badge type.',
@@ -1082,6 +1114,19 @@ class PublicRegistrationController extends Controller
                 'selected_at' => now(),
             ]);
         }
+    }
+
+    protected function registrationCategories(
+        Event $event
+    ): Collection {
+        return $event->attendeeCategories()
+            ->where('is_active', true)
+            ->where('is_public', true)
+            ->orderBy('group_name')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
     }
 
     protected function registrationDays(
