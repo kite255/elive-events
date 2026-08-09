@@ -68,6 +68,7 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
+        'is_super_admin',
     ];
 
     /**
@@ -90,6 +91,7 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_super_admin' => 'boolean',
         ];
     }
 
@@ -604,12 +606,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function isSuperAdmin(): bool
     {
-        if (method_exists($this, 'hasRole')) {
-            return $this->hasRole('super_admin');
-        }
-
-        return isset($this->role)
-            && $this->role === 'super_admin';
+        return (bool) $this->is_super_admin;
     }
 
     /*
