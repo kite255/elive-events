@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\Schemas;
 
+use App\Models\CommunicationTemplate;
+use App\Services\EventPresetService;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
@@ -13,7 +15,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use App\Services\EventPresetService;
 use Illuminate\Support\Str;
 
 class EventForm
@@ -22,6 +23,12 @@ class EventForm
     {
         return $schema
             ->components([
+                /*
+                |--------------------------------------------------------------------------
+                | Event Information
+                |--------------------------------------------------------------------------
+                */
+
                 Section::make('Event Information')
                     ->description(
                         'Basic event details and organization ownership.'
@@ -35,7 +42,23 @@ class EventForm
                             )
                             ->searchable()
                             ->preload()
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(
+                                function (
+                                    $state,
+                                    Set $set
+                                ): void {
+                                    /*
+                                     * A template from a previous organization
+                                     * must never remain selected.
+                                     */
+                                    $set(
+                                        'registration_sms_template_id',
+                                        null
+                                    );
+                                }
+                            ),
 
                         TextInput::make('name')
                             ->label('Event Name')
@@ -119,7 +142,10 @@ class EventForm
                                             $state
                                         ) as $field => $value
                                     ) {
-                                        $set($field, $value);
+                                        $set(
+                                            $field,
+                                            $value
+                                        );
                                     }
 
                                     if ($state !== 'other') {
@@ -167,6 +193,12 @@ class EventForm
                     ])
                     ->columns(2),
 
+                /*
+                |--------------------------------------------------------------------------
+                | Schedule and Capacity
+                |--------------------------------------------------------------------------
+                */
+
                 Section::make('Schedule and Capacity')
                     ->description(
                         'Set the overall event period, capacity, and publishing status.'
@@ -192,10 +224,17 @@ class EventForm
                         Select::make('status')
                             ->label('Status')
                             ->options([
-                                'draft' => 'Draft',
-                                'active' => 'Active',
-                                'completed' => 'Completed',
-                                'cancelled' => 'Cancelled',
+                                'draft' =>
+                                    'Draft',
+
+                                'active' =>
+                                    'Active',
+
+                                'completed' =>
+                                    'Completed',
+
+                                'cancelled' =>
+                                    'Cancelled',
                             ])
                             ->helperText(
                                 'Use Active when the event is ready for attendee registration and operations.'
@@ -205,6 +244,12 @@ class EventForm
                             ->native(false),
                     ])
                     ->columns(2),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Event Structure
+                |--------------------------------------------------------------------------
+                */
 
                 Section::make('Event Structure')
                     ->description(
@@ -216,6 +261,7 @@ class EventForm
                             ->options([
                                 'single_day' =>
                                     'Single-day Event',
+
                                 'multi_day' =>
                                     'Multi-day Event',
                             ])
@@ -321,6 +367,12 @@ class EventForm
                     ])
                     ->columns(2),
 
+                /*
+                |--------------------------------------------------------------------------
+                | Public Registration
+                |--------------------------------------------------------------------------
+                */
+
                 Section::make('Public Registration')
                     ->description(
                         'Control whether attendees can register publicly for this event.'
@@ -347,7 +399,9 @@ class EventForm
                         Toggle::make(
                             'registration_auto_generate_badge'
                         )
-                            ->label('Auto-generate Badge')
+                            ->label(
+                                'Auto-generate Badge'
+                            )
                             ->helperText(
                                 'Automatically generate a badge after public registration when the attendee is registered.'
                             )
@@ -356,7 +410,9 @@ class EventForm
                         Toggle::make(
                             'registration_waitlist_enabled'
                         )
-                            ->label('Enable Waitlist')
+                            ->label(
+                                'Enable Waitlist'
+                            )
                             ->helperText(
                                 'Allow attendees to join the waitlist when the event reaches capacity.'
                             )
@@ -365,7 +421,9 @@ class EventForm
                         TextInput::make(
                             'registration_welcome_title'
                         )
-                            ->label('Welcome Title')
+                            ->label(
+                                'Welcome Title'
+                            )
                             ->maxLength(255)
                             ->placeholder(
                                 'Register for this event'
@@ -374,7 +432,9 @@ class EventForm
                         Textarea::make(
                             'registration_welcome_message'
                         )
-                            ->label('Welcome Message')
+                            ->label(
+                                'Welcome Message'
+                            )
                             ->rows(3)
                             ->placeholder(
                                 'Complete the form below to register for this event.'
@@ -384,7 +444,9 @@ class EventForm
                         Textarea::make(
                             'registration_success_message'
                         )
-                            ->label('Success Message')
+                            ->label(
+                                'Success Message'
+                            )
                             ->rows(3)
                             ->placeholder(
                                 'Thank you. Your registration has been received.'
@@ -394,7 +456,9 @@ class EventForm
                         Textarea::make(
                             'registration_waitlist_message'
                         )
-                            ->label('Waitlist Message')
+                            ->label(
+                                'Waitlist Message'
+                            )
                             ->rows(3)
                             ->placeholder(
                                 'This event is currently full. You have been added to the waitlist.'
@@ -404,7 +468,175 @@ class EventForm
                     ->columns(3)
                     ->collapsible(),
 
-                Section::make('Public Registration Fields')
+                /*
+                |--------------------------------------------------------------------------
+                | Automatic Registration Communication
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make(
+                    'Automatic Registration Communication'
+                )
+                    ->description(
+                        'Automatically send an SMS when an attendee successfully completes registration.'
+                    )
+                    ->schema([
+                        Toggle::make(
+                            'registration_sms_enabled'
+                        )
+                            ->label(
+                                'Send SMS After Registration'
+                            )
+                            ->helperText(
+                                'When enabled, registered attendees automatically receive the selected SMS template.'
+                            )
+                            ->default(false)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (
+                                    bool $state,
+                                    Set $set
+                                ): void {
+                                    if ($state) {
+                                        /*
+                                         * SMS cannot work without a
+                                         * phone number.
+                                         */
+                                        $set(
+                                            'registration_show_phone',
+                                            true
+                                        );
+
+                                        $set(
+                                            'registration_require_phone',
+                                            true
+                                        );
+
+                                        return;
+                                    }
+
+                                    $set(
+                                        'registration_sms_template_id',
+                                        null
+                                    );
+                                }
+                            ),
+
+                        Select::make(
+                            'registration_sms_template_id'
+                        )
+                            ->label(
+                                'Registration SMS Template'
+                            )
+                            ->placeholder(
+                                'Select SMS template'
+                            )
+                            ->options(
+                                function (
+                                    Get $get
+                                ): array {
+                                    $organizationId =
+                                        $get(
+                                            'organization_id'
+                                        );
+
+                                    if (
+                                        blank(
+                                            $organizationId
+                                        )
+                                    ) {
+                                        return [];
+                                    }
+
+                                    return CommunicationTemplate::query()
+                                        ->where(
+                                            'organization_id',
+                                            $organizationId
+                                        )
+                                        ->where(
+                                            'channel',
+                                            CommunicationTemplate::CHANNEL_SMS
+                                        )
+                                        ->where(
+                                            'is_active',
+                                            true
+                                        )
+                                        ->orderBy(
+                                            'name'
+                                        )
+                                        ->pluck(
+                                            'name',
+                                            'id'
+                                        )
+                                        ->all();
+                                }
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->live()
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'registration_sms_enabled'
+                                    )
+                            )
+                            ->required(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'registration_sms_enabled'
+                                    )
+                            )
+                            ->helperText(
+                                'Only active SMS templates belonging to this event organization are available.'
+                            ),
+
+                        \Filament\Forms\Components\Placeholder::make(
+                            'registration_sms_information'
+                        )
+                            ->label(
+                                'How it works'
+                            )
+                            ->content(
+                                'After a successful public registration, eLive Events creates the attendee and badge first, then queues the selected SMS through the communications queue.'
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'registration_sms_enabled'
+                                    )
+                            )
+                            ->columnSpanFull(),
+
+                        \Filament\Forms\Components\Placeholder::make(
+                            'registration_sms_status_information'
+                        )
+                            ->label(
+                                'Registration Status'
+                            )
+                            ->content(
+                                'For now, this confirmation SMS is sent only when the attendee status is Registered. Pending approval and waitlisted attendees will use separate automatic templates later.'
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'registration_sms_enabled'
+                                    )
+                            )
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Public Registration Fields
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make(
+                    'Public Registration Fields'
+                )
                     ->description(
                         'Choose which standard attendee fields appear on the public form and whether they are optional or required.'
                     )
@@ -412,7 +644,9 @@ class EventForm
                         Toggle::make(
                             'registration_show_phone'
                         )
-                            ->label('Show Phone Number')
+                            ->label(
+                                'Show Phone Number'
+                            )
                             ->helperText(
                                 'Display the phone number field in Personal Details.'
                             )
@@ -428,6 +662,21 @@ class EventForm
                                             'registration_require_phone',
                                             false
                                         );
+
+                                        /*
+                                         * Automatic SMS cannot remain
+                                         * enabled if the registration form
+                                         * no longer collects a phone number.
+                                         */
+                                        $set(
+                                            'registration_sms_enabled',
+                                            false
+                                        );
+
+                                        $set(
+                                            'registration_sms_template_id',
+                                            null
+                                        );
                                     }
                                 }
                             ),
@@ -435,7 +684,9 @@ class EventForm
                         Toggle::make(
                             'registration_require_phone'
                         )
-                            ->label('Require Phone Number')
+                            ->label(
+                                'Require Phone Number'
+                            )
                             ->helperText(
                                 'Attendees must provide a phone number.'
                             )
@@ -450,7 +701,9 @@ class EventForm
                         Toggle::make(
                             'registration_show_email'
                         )
-                            ->label('Show Email Address')
+                            ->label(
+                                'Show Email Address'
+                            )
                             ->helperText(
                                 'Display the email address field in Personal Details.'
                             )
@@ -473,7 +726,9 @@ class EventForm
                         Toggle::make(
                             'registration_require_email'
                         )
-                            ->label('Require Email Address')
+                            ->label(
+                                'Require Email Address'
+                            )
                             ->helperText(
                                 'Attendees must provide a valid email address.'
                             )
@@ -530,7 +785,9 @@ class EventForm
                         Toggle::make(
                             'registration_show_position'
                         )
-                            ->label('Show Position / Title')
+                            ->label(
+                                'Show Position / Title'
+                            )
                             ->helperText(
                                 'Display Position / Title in the event-specific registration details section.'
                             )
@@ -612,7 +869,9 @@ class EventForm
                         Toggle::make(
                             'registration_show_badge_type'
                         )
-                            ->label('Show Badge Type')
+                            ->label(
+                                'Show Badge Type'
+                            )
                             ->helperText(
                                 'Allow attendees to select an active badge type.'
                             )
@@ -635,7 +894,9 @@ class EventForm
                         Toggle::make(
                             'registration_require_badge_type'
                         )
-                            ->label('Require Badge Type')
+                            ->label(
+                                'Require Badge Type'
+                            )
                             ->helperText(
                                 'Attendees must select a badge type.'
                             )
@@ -650,7 +911,15 @@ class EventForm
                     ->columns(2)
                     ->collapsible(),
 
-                Section::make('Registration Branding')
+                /*
+                |--------------------------------------------------------------------------
+                | Registration Branding
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make(
+                    'Registration Branding'
+                )
                     ->description(
                         'Optional event-level branding for the public registration page. If left empty, organization branding or eLive defaults will be used.'
                     )
@@ -658,14 +927,18 @@ class EventForm
                         FileUpload::make(
                             'registration_logo_path'
                         )
-                            ->label('Registration Logo')
+                            ->label(
+                                'Registration Logo'
+                            )
                             ->disk('public')
                             ->directory(
                                 'event-registration/logos'
                             )
                             ->image()
                             ->imageEditor()
-                            ->imagePreviewHeight('120')
+                            ->imagePreviewHeight(
+                                '120'
+                            )
                             ->downloadable()
                             ->openable()
                             ->maxSize(2048)
@@ -676,14 +949,18 @@ class EventForm
                         FileUpload::make(
                             'registration_banner_image_path'
                         )
-                            ->label('Banner Image')
+                            ->label(
+                                'Banner Image'
+                            )
                             ->disk('public')
                             ->directory(
                                 'event-registration/banners'
                             )
                             ->image()
                             ->imageEditor()
-                            ->imagePreviewHeight('180')
+                            ->imagePreviewHeight(
+                                '180'
+                            )
                             ->downloadable()
                             ->openable()
                             ->maxSize(4096)
@@ -694,20 +971,32 @@ class EventForm
                         ColorPicker::make(
                             'registration_primary_color'
                         )
-                            ->label('Primary Color')
-                            ->default('#233F7E'),
+                            ->label(
+                                'Primary Color'
+                            )
+                            ->default(
+                                '#233F7E'
+                            ),
 
                         ColorPicker::make(
                             'registration_background_color'
                         )
-                            ->label('Background Color')
-                            ->default('#F8FAFC'),
+                            ->label(
+                                'Background Color'
+                            )
+                            ->default(
+                                '#F8FAFC'
+                            ),
 
                         ColorPicker::make(
                             'registration_button_color'
                         )
-                            ->label('Button Color')
-                            ->default('#233F7E'),
+                            ->label(
+                                'Button Color'
+                            )
+                            ->default(
+                                '#233F7E'
+                            ),
                     ])
                     ->columns(2)
                     ->collapsible()

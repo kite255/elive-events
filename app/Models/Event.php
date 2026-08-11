@@ -15,17 +15,12 @@ use Illuminate\Support\Str;
 class Event extends Model
 {
     public const STATUS_DRAFT = 'draft';
-
     public const STATUS_ACTIVE = 'active';
-
     public const STATUS_COMPLETED = 'completed';
-
     public const STATUS_CANCELLED = 'cancelled';
 
     public const STAFF_STATUS_ACTIVE = 'active';
-
     public const STAFF_STATUS_INACTIVE = 'inactive';
-
     public const STAFF_STATUS_SUSPENDED = 'suspended';
 
     protected $fillable = [
@@ -82,6 +77,9 @@ class Event extends Model
         'registration_show_badge_type',
         'registration_require_badge_type',
 
+        'registration_sms_enabled',
+        'registration_sms_template_id',
+
         'show_merchandise_images',
     ];
 
@@ -122,6 +120,9 @@ class Event extends Model
 
             'registration_show_badge_type' => 'boolean',
             'registration_require_badge_type' => 'boolean',
+
+            'registration_sms_enabled' => 'boolean',
+            'registration_sms_template_id' => 'integer',
 
             'show_merchandise_images' => 'boolean',
         ];
@@ -406,15 +407,27 @@ class Event extends Model
     public function activeSessions(): HasMany
     {
         return $this->sessions()
-            ->where('status', EventSession::STATUS_ACTIVE);
+            ->where(
+                'status',
+                EventSession::STATUS_ACTIVE
+            );
     }
 
     public function registrationOpenSessions(): HasMany
     {
         return $this->sessions()
-            ->where('status', EventSession::STATUS_ACTIVE)
-            ->where('requires_registration', true)
-            ->where('registration_is_open', true);
+            ->where(
+                'status',
+                EventSession::STATUS_ACTIVE
+            )
+            ->where(
+                'requires_registration',
+                true
+            )
+            ->where(
+                'registration_is_open',
+                true
+            );
     }
 
     /*
@@ -472,23 +485,38 @@ class Event extends Model
     public function pendingApprovalAttendees(): HasMany
     {
         return $this->attendees()
-            ->where('status', 'pending_approval');
+            ->where(
+                'status',
+                'pending_approval'
+            );
     }
 
     public function waitlistedAttendees(): HasMany
     {
         return $this->attendees()
-            ->where('status', 'waitlisted');
+            ->where(
+                'status',
+                'waitlisted'
+            );
     }
 
     public function checkedInAttendees(): HasMany
     {
         return $this->attendees()
-            ->where(function (Builder $query): void {
-                $query
-                    ->where('status', 'checked_in')
-                    ->orWhereNotNull('checked_in_at');
-            });
+            ->where(
+                function (
+                    Builder $query
+                ): void {
+                    $query
+                        ->where(
+                            'status',
+                            'checked_in'
+                        )
+                        ->orWhereNotNull(
+                            'checked_in_at'
+                        );
+                }
+            );
     }
 
     /*
@@ -515,12 +543,32 @@ class Event extends Model
 
     public function communicationCampaigns(): HasMany
     {
-        return $this->hasMany(CommunicationCampaign::class);
+        return $this->hasMany(
+            CommunicationCampaign::class
+        );
     }
 
     public function communicationLogs(): HasMany
     {
-        return $this->hasMany(CommunicationLog::class);
+        return $this->hasMany(
+            CommunicationLog::class
+        );
+    }
+
+    public function registrationSmsTemplate(): BelongsTo
+    {
+        return $this->belongsTo(
+            CommunicationTemplate::class,
+            'registration_sms_template_id'
+        );
+    }
+
+    public function shouldSendRegistrationSms(): bool
+    {
+        return (bool) $this->registration_sms_enabled
+            && filled(
+                $this->registration_sms_template_id
+            );
     }
 
     /*
@@ -533,9 +581,10 @@ class Event extends Model
         Builder $query,
         Organization|int $organization
     ): Builder {
-        $organizationId = $organization instanceof Organization
-            ? $organization->getKey()
-            : $organization;
+        $organizationId =
+            $organization instanceof Organization
+                ? $organization->getKey()
+                : $organization;
 
         return $query->where(
             'organization_id',
@@ -548,25 +597,33 @@ class Event extends Model
         User|int $user,
         ?string $role = null
     ): Builder {
-        $userId = $user instanceof User
-            ? $user->getKey()
-            : $user;
+        $userId =
+            $user instanceof User
+                ? $user->getKey()
+                : $user;
 
         return $query->whereHas(
             'users',
-            function (Builder $staffQuery) use (
+            function (
+                Builder $staffQuery
+            ) use (
                 $userId,
                 $role
             ): void {
                 $staffQuery
-                    ->where('users.id', $userId)
+                    ->where(
+                        'users.id',
+                        $userId
+                    )
                     ->where(
                         'event_user.status',
                         self::STAFF_STATUS_ACTIVE
                     )
                     ->when(
                         filled($role),
-                        fn (Builder $query): Builder =>
+                        fn (
+                            Builder $query
+                        ): Builder =>
                             $query->where(
                                 'event_user.role',
                                 $role
@@ -581,38 +638,55 @@ class Event extends Model
         ?User $user
     ): Builder {
         if (! $user) {
-            return $query->whereRaw('1 = 0');
+            return $query->whereRaw(
+                '1 = 0'
+            );
         }
 
         if ($user->isSuperAdmin()) {
             return $query;
         }
 
-        $managedOrganizationIds = $user
-            ->activeOrganizations()
-            ->wherePivotIn('role', [
-                User::ORGANIZATION_ROLE_OWNER,
-                User::ORGANIZATION_ROLE_ADMIN,
-            ])
-            ->pluck('organizations.id');
+        $managedOrganizationIds =
+            $user
+                ->activeOrganizations()
+                ->wherePivotIn(
+                    'role',
+                    [
+                        User::ORGANIZATION_ROLE_OWNER,
+                        User::ORGANIZATION_ROLE_ADMIN,
+                    ]
+                )
+                ->pluck(
+                    'organizations.id'
+                );
 
         return $query->where(
-            function (Builder $query) use (
+            function (
+                Builder $query
+            ) use (
                 $user,
                 $managedOrganizationIds
             ): void {
-                if ($managedOrganizationIds->isNotEmpty()) {
+                if (
+                    $managedOrganizationIds
+                        ->isNotEmpty()
+                ) {
                     $query->whereIn(
                         'organization_id',
                         $managedOrganizationIds
                     );
                 } else {
-                    $query->whereRaw('1 = 0');
+                    $query->whereRaw(
+                        '1 = 0'
+                    );
                 }
 
                 $query->orWhereHas(
                     'users',
-                    function (Builder $staffQuery) use (
+                    function (
+                        Builder $staffQuery
+                    ) use (
                         $user
                     ): void {
                         $staffQuery
@@ -630,32 +704,36 @@ class Event extends Model
         );
     }
 
-    public function scopeActive(Builder $query): Builder
-    {
+    public function scopeActive(
+        Builder $query
+    ): Builder {
         return $query->where(
             'status',
             self::STATUS_ACTIVE
         );
     }
 
-    public function scopeDraft(Builder $query): Builder
-    {
+    public function scopeDraft(
+        Builder $query
+    ): Builder {
         return $query->where(
             'status',
             self::STATUS_DRAFT
         );
     }
 
-    public function scopeCompleted(Builder $query): Builder
-    {
+    public function scopeCompleted(
+        Builder $query
+    ): Builder {
         return $query->where(
             'status',
             self::STATUS_COMPLETED
         );
     }
 
-    public function scopeCancelled(Builder $query): Builder
-    {
+    public function scopeCancelled(
+        Builder $query
+    ): Builder {
         return $query->where(
             'status',
             self::STATUS_CANCELLED
@@ -666,12 +744,19 @@ class Event extends Model
         Builder $query
     ): Builder {
         return $query
-            ->where('registration_is_open', true)
-            ->where('status', self::STATUS_ACTIVE);
+            ->where(
+                'registration_is_open',
+                true
+            )
+            ->where(
+                'status',
+                self::STATUS_ACTIVE
+            );
     }
 
-    public function scopeUpcoming(Builder $query): Builder
-    {
+    public function scopeUpcoming(
+        Builder $query
+    ): Builder {
         return $query->where(
             'starts_at',
             '>=',
@@ -679,27 +764,53 @@ class Event extends Model
         );
     }
 
-    public function scopeOngoing(Builder $query): Builder
-    {
+    public function scopeOngoing(
+        Builder $query
+    ): Builder {
         return $query
-            ->where('starts_at', '<=', now())
-            ->where(function (Builder $query): void {
-                $query
-                    ->whereNull('ends_at')
-                    ->orWhere('ends_at', '>=', now());
-            });
+            ->where(
+                'starts_at',
+                '<=',
+                now()
+            )
+            ->where(
+                function (
+                    Builder $query
+                ): void {
+                    $query
+                        ->whereNull(
+                            'ends_at'
+                        )
+                        ->orWhere(
+                            'ends_at',
+                            '>=',
+                            now()
+                        );
+                }
+            );
     }
 
-    public function scopePast(Builder $query): Builder
-    {
+    public function scopePast(
+        Builder $query
+    ): Builder {
         return $query->where(
-            function (Builder $query): void {
+            function (
+                Builder $query
+            ): void {
                 $query
-                    ->where('ends_at', '<', now())
+                    ->where(
+                        'ends_at',
+                        '<',
+                        now()
+                    )
                     ->orWhere(
-                        function (Builder $query): void {
+                        function (
+                            Builder $query
+                        ): void {
                             $query
-                                ->whereNull('ends_at')
+                                ->whereNull(
+                                    'ends_at'
+                                )
                                 ->where(
                                     'starts_at',
                                     '<',
@@ -717,13 +828,18 @@ class Event extends Model
     ): Builder {
         return $query->when(
             filled($search),
-            function (Builder $query) use (
+            function (
+                Builder $query
+            ) use (
                 $search
             ): Builder {
-                $search = trim($search);
+                $search =
+                    trim($search);
 
                 return $query->where(
-                    function (Builder $query) use (
+                    function (
+                        Builder $query
+                    ) use (
                         $search
                     ): void {
                         $query
@@ -767,12 +883,16 @@ class Event extends Model
     public function isUserAssigned(
         User|int $user
     ): bool {
-        $userId = $user instanceof User
-            ? $user->getKey()
-            : $user;
+        $userId =
+            $user instanceof User
+                ? $user->getKey()
+                : $user;
 
-        return $this->users()
-            ->whereKey($userId)
+        return $this
+            ->users()
+            ->whereKey(
+                $userId
+            )
             ->wherePivot(
                 'status',
                 self::STAFF_STATUS_ACTIVE
@@ -783,26 +903,36 @@ class Event extends Model
     public function assignedUserRole(
         User|int $user
     ): ?string {
-        $userId = $user instanceof User
-            ? $user->getKey()
-            : $user;
+        $userId =
+            $user instanceof User
+                ? $user->getKey()
+                : $user;
 
-        $assignedUser = $this->users()
-            ->whereKey($userId)
-            ->wherePivot(
-                'status',
-                self::STAFF_STATUS_ACTIVE
-            )
-            ->first();
+        $assignedUser =
+            $this
+                ->users()
+                ->whereKey(
+                    $userId
+                )
+                ->wherePivot(
+                    'status',
+                    self::STAFF_STATUS_ACTIVE
+                )
+                ->first();
 
-        return $assignedUser?->pivot?->role;
+        return $assignedUser
+            ?->pivot
+            ?->role;
     }
 
     public function assignedUserHasRole(
         User|int $user,
         string|array $roles
     ): bool {
-        $assignedRole = $this->assignedUserRole($user);
+        $assignedRole =
+            $this->assignedUserRole(
+                $user
+            );
 
         if ($assignedRole === null) {
             return false;
@@ -819,28 +949,37 @@ class Event extends Model
         User|int $user,
         string $role
     ): void {
-        $userId = $user instanceof User
-            ? $user->getKey()
-            : $user;
+        $userId =
+            $user instanceof User
+                ? $user->getKey()
+                : $user;
 
-        $this->users()->syncWithoutDetaching([
-            $userId => [
-                'role' => $role,
-                'status' => self::STAFF_STATUS_ACTIVE,
-                'assigned_at' => now(),
-            ],
-        ]);
+        $this->users()
+            ->syncWithoutDetaching([
+                $userId => [
+                    'role' =>
+                        $role,
+
+                    'status' =>
+                        self::STAFF_STATUS_ACTIVE,
+
+                    'assigned_at' =>
+                        now(),
+                ],
+            ]);
     }
 
     public function updateUserAssignment(
         User|int $user,
         array $attributes
     ): int {
-        $userId = $user instanceof User
-            ? $user->getKey()
-            : $user;
+        $userId =
+            $user instanceof User
+                ? $user->getKey()
+                : $user;
 
-        return $this->users()
+        return $this
+            ->users()
             ->updateExistingPivot(
                 $userId,
                 $attributes
@@ -853,7 +992,8 @@ class Event extends Model
         return $this->updateUserAssignment(
             $user,
             [
-                'status' => self::STAFF_STATUS_ACTIVE,
+                'status' =>
+                    self::STAFF_STATUS_ACTIVE,
             ]
         );
     }
@@ -864,7 +1004,8 @@ class Event extends Model
         return $this->updateUserAssignment(
             $user,
             [
-                'status' => self::STAFF_STATUS_SUSPENDED,
+                'status' =>
+                    self::STAFF_STATUS_SUSPENDED,
             ]
         );
     }
@@ -872,11 +1013,16 @@ class Event extends Model
     public function removeAssignedUser(
         User|int $user
     ): int {
-        $userId = $user instanceof User
-            ? $user->getKey()
-            : $user;
+        $userId =
+            $user instanceof User
+                ? $user->getKey()
+                : $user;
 
-        return $this->users()->detach($userId);
+        return $this
+            ->users()
+            ->detach(
+                $userId
+            );
     }
 
     /*
@@ -888,16 +1034,18 @@ class Event extends Model
     public function belongsToOrganization(
         Organization|int $organization
     ): bool {
-        $organizationId = $organization instanceof Organization
-            ? $organization->getKey()
-            : $organization;
+        $organizationId =
+            $organization instanceof Organization
+                ? $organization->getKey()
+                : $organization;
 
         return (int) $this->organization_id
             === (int) $organizationId;
     }
 
-    public function isAccessibleBy(?User $user): bool
-    {
+    public function isAccessibleBy(
+        ?User $user
+    ): bool {
         if (! $user) {
             return false;
         }
@@ -910,23 +1058,30 @@ class Event extends Model
             return false;
         }
 
-        if (! $user->hasActiveOrganizationAccess(
-            $this->organization_id
-        )) {
+        if (
+            ! $user->hasActiveOrganizationAccess(
+                $this->organization_id
+            )
+        ) {
             return false;
         }
 
-        if ($user->canManageOrganization(
-            $this->organization_id
-        )) {
+        if (
+            $user->canManageOrganization(
+                $this->organization_id
+            )
+        ) {
             return true;
         }
 
-        return $this->isUserAssigned($user);
+        return $this->isUserAssigned(
+            $user
+        );
     }
 
-    public function canBeManagedBy(?User $user): bool
-    {
+    public function canBeManagedBy(
+        ?User $user
+    ): bool {
         if (! $user) {
             return false;
         }
@@ -939,9 +1094,11 @@ class Event extends Model
             return false;
         }
 
-        if ($user->canManageOrganization(
-            $this->organization_id
-        )) {
+        if (
+            $user->canManageOrganization(
+                $this->organization_id
+            )
+        ) {
             return true;
         }
 
@@ -951,8 +1108,9 @@ class Event extends Model
         );
     }
 
-    public function canBeCheckedInBy(?User $user): bool
-    {
+    public function canBeCheckedInBy(
+        ?User $user
+    ): bool {
         if (! $user) {
             return false;
         }
@@ -965,15 +1123,19 @@ class Event extends Model
             return false;
         }
 
-        if (! $user->hasActiveOrganizationAccess(
-            $this->organization_id
-        )) {
+        if (
+            ! $user->hasActiveOrganizationAccess(
+                $this->organization_id
+            )
+        ) {
             return false;
         }
 
-        if ($user->canManageOrganization(
-            $this->organization_id
-        )) {
+        if (
+            $user->canManageOrganization(
+                $this->organization_id
+            )
+        ) {
             return true;
         }
 
@@ -1001,15 +1163,19 @@ class Event extends Model
             return false;
         }
 
-        if (! $user->hasActiveOrganizationAccess(
-            $this->organization_id
-        )) {
+        if (
+            ! $user->hasActiveOrganizationAccess(
+                $this->organization_id
+            )
+        ) {
             return false;
         }
 
-        if ($user->canManageOrganization(
-            $this->organization_id
-        )) {
+        if (
+            $user->canManageOrganization(
+                $this->organization_id
+            )
+        ) {
             return true;
         }
 
@@ -1037,15 +1203,19 @@ class Event extends Model
             return false;
         }
 
-        if (! $user->hasActiveOrganizationAccess(
-            $this->organization_id
-        )) {
+        if (
+            ! $user->hasActiveOrganizationAccess(
+                $this->organization_id
+            )
+        ) {
             return false;
         }
 
-        if ($user->canManageOrganization(
-            $this->organization_id
-        )) {
+        if (
+            $user->canManageOrganization(
+                $this->organization_id
+            )
+        ) {
             return true;
         }
 
@@ -1073,15 +1243,19 @@ class Event extends Model
             return false;
         }
 
-        if (! $user->hasActiveOrganizationAccess(
-            $this->organization_id
-        )) {
+        if (
+            ! $user->hasActiveOrganizationAccess(
+                $this->organization_id
+            )
+        ) {
             return false;
         }
 
-        if ($user->canManageOrganization(
-            $this->organization_id
-        )) {
+        if (
+            $user->canManageOrganization(
+                $this->organization_id
+            )
+        ) {
             return true;
         }
 
@@ -1109,15 +1283,19 @@ class Event extends Model
             return false;
         }
 
-        if (! $user->hasActiveOrganizationAccess(
-            $this->organization_id
-        )) {
+        if (
+            ! $user->hasActiveOrganizationAccess(
+                $this->organization_id
+            )
+        ) {
             return false;
         }
 
-        if ($user->canManageOrganization(
-            $this->organization_id
-        )) {
+        if (
+            $user->canManageOrganization(
+                $this->organization_id
+            )
+        ) {
             return true;
         }
 
@@ -1138,22 +1316,26 @@ class Event extends Model
 
     public function isDraft(): bool
     {
-        return $this->status === self::STATUS_DRAFT;
+        return $this->status ===
+            self::STATUS_DRAFT;
     }
 
     public function isActive(): bool
     {
-        return $this->status === self::STATUS_ACTIVE;
+        return $this->status ===
+            self::STATUS_ACTIVE;
     }
 
     public function isCompleted(): bool
     {
-        return $this->status === self::STATUS_COMPLETED;
+        return $this->status ===
+            self::STATUS_COMPLETED;
     }
 
     public function isCancelled(): bool
     {
-        return $this->status === self::STATUS_CANCELLED;
+        return $this->status ===
+            self::STATUS_CANCELLED;
     }
 
     public function hasStarted(): bool
@@ -1198,23 +1380,29 @@ class Event extends Model
     public function acceptedAttendeesCount(): int
     {
         return $this->attendees()
-            ->whereIn('status', [
-                'pending_approval',
-                'registered',
-                'confirmed',
-                'checked_in',
-            ])
+            ->whereIn(
+                'status',
+                [
+                    'pending_approval',
+                    'registered',
+                    'confirmed',
+                    'checked_in',
+                ]
+            )
             ->count();
     }
 
     public function confirmedAttendeesCount(): int
     {
         return $this->attendees()
-            ->whereIn('status', [
-                'registered',
-                'confirmed',
-                'checked_in',
-            ])
+            ->whereIn(
+                'status',
+                [
+                    'registered',
+                    'confirmed',
+                    'checked_in',
+                ]
+            )
             ->count();
     }
 
@@ -1251,7 +1439,7 @@ class Event extends Model
         return max(
             0,
             (int) $this->capacity
-                - $this->acceptedAttendeesCount()
+            - $this->acceptedAttendeesCount()
         );
     }
 
@@ -1289,9 +1477,10 @@ class Event extends Model
     public function nextRegistrationStatus(): string
     {
         if ($this->isRegistrationFull()) {
-            return $this->registration_waitlist_enabled
-                ? 'waitlisted'
-                : 'closed';
+            return $this
+                ->registration_waitlist_enabled
+                    ? 'waitlisted'
+                    : 'closed';
         }
 
         if ($this->registration_requires_approval) {
@@ -1318,7 +1507,8 @@ class Event extends Model
 
     public function isMultiDay(): bool
     {
-        return $this->schedule_mode === 'multi_day';
+        return $this->schedule_mode ===
+            'multi_day';
     }
 
     public function isSingleDay(): bool
@@ -1329,59 +1519,75 @@ class Event extends Model
     public function allowsDaySelection(): bool
     {
         return $this->isMultiDay()
-            && (bool) $this->registration_allow_day_selection;
+            && (bool)
+                $this->registration_allow_day_selection;
     }
 
     public function allowsAllDaysSelection(): bool
     {
         return $this->allowsDaySelection()
-            && (bool) $this->registration_allow_all_days;
+            && (bool)
+                $this->registration_allow_all_days;
     }
 
     public function sessionsAreEnabled(): bool
     {
-        return (bool) $this->sessions_enabled;
+        return (bool)
+            $this->sessions_enabled;
     }
 
     public function allowsSessionRegistration(): bool
     {
         return $this->sessionsAreEnabled()
-            && (bool) $this->session_registration_enabled;
+            && (bool)
+                $this->session_registration_enabled;
     }
 
     public function allowsSessionCheckIn(): bool
     {
         return $this->sessionsAreEnabled()
-            && (bool) $this->session_check_in_enabled;
+            && (bool)
+                $this->session_check_in_enabled;
     }
 
     public function hasMultipleDays(): bool
     {
-        return $this->days()->count() > 1;
+        return $this
+            ->days()
+            ->count() > 1;
     }
 
     public function hasEventDays(): bool
     {
-        return $this->days()->exists();
+        return $this
+            ->days()
+            ->exists();
     }
 
     public function hasSessions(): bool
     {
-        return $this->sessions()->exists();
+        return $this
+            ->sessions()
+            ->exists();
     }
 
     public function activeSessionsCount(): int
     {
-        return $this->activeSessions()->count();
+        return $this
+            ->activeSessions()
+            ->count();
     }
 
     public function hasMerchandise(): bool
     {
-        return $this->activeMerchandise()->exists();
+        return $this
+            ->activeMerchandise()
+            ->exists();
     }
 
     public function shouldShowMerchandiseImages(): bool
     {
-        return (bool) $this->show_merchandise_images;
+        return (bool)
+            $this->show_merchandise_images;
     }
 }

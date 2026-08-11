@@ -10,7 +10,9 @@ use App\Models\BadgeType;
 use App\Models\Event;
 use App\Models\EventSession;
 use App\Models\MerchandiseVariant;
+use App\Services\AutomaticCommunicationService;
 use App\Services\BadgeGenerationService;
+use App\Services\PhoneNumberService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -132,17 +134,24 @@ class PublicRegistrationController extends Controller
 
         $fullName = trim($validated['full_name']);
         $phone = $event->registration_show_phone
-            ? $this->normalizePhone($validated['phone'] ?? null)
+            ? app(PhoneNumberService::class)
+                ->normalize($validated['phone'] ?? null)
             : null;
 
         $email = $event->registration_show_email
             ? strtolower(trim($validated['email'] ?? ''))
             : '';
 
-        if ($this->alreadyRegistered($event, $fullName, $phone, $email)) {
+        $duplicateReason = $this->duplicateRegistrationReason(
+            $event,
+            $fullName,
+            $email
+        );
+
+        if ($duplicateReason) {
             return back()
                 ->withInput()
-                ->with('error', 'This attendee already exists for this event.');
+                ->with('error', $duplicateReason);
         }
 
         $status = match (true) {
@@ -300,6 +309,24 @@ class PublicRegistrationController extends Controller
             $attendee->refresh();
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Automatic registration communication
+        |--------------------------------------------------------------------------
+        |
+        | Communication runs only after attendee creation, badge number/QR
+        | generation, and optional badge generation. Communication failures
+        | must never roll back or block a successful registration.
+        |
+        */
+
+        try {
+            app(AutomaticCommunicationService::class)
+                ->handleRegistration($attendee->fresh());
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
         return redirect()->route(
             'public.registration.success',
             [
@@ -353,7 +380,29 @@ class PublicRegistrationController extends Controller
                     (bool) $event->registration_require_phone
                 ),
                 'string',
-                'max:255',
+                'max:20',
+                function (
+                    string $attribute,
+                    mixed $value,
+                    \Closure $fail
+                ) use ($event): void {
+                    if (! $event->registration_show_phone) {
+                        return;
+                    }
+
+                    if (blank($value)) {
+                        return;
+                    }
+
+                    if (
+                        ! app(PhoneNumberService::class)
+                            ->isValid((string) $value)
+                    ) {
+                        $fail(
+                            'Please enter a valid Tanzanian mobile number, for example 0650537539.'
+                        );
+                    }
+                },
             ],
 
             'email' => [
@@ -696,6 +745,12 @@ class PublicRegistrationController extends Controller
         $messages = [
             'phone.required' =>
                 'Please enter your phone number.',
+
+            'phone.string' =>
+                'Please enter a valid phone number.',
+
+            'phone.max' =>
+                'The phone number is too long.',
 
             'email.required' =>
                 'Please enter your email address.',
@@ -1212,47 +1267,54 @@ class PublicRegistrationController extends Controller
             ->get();
     }
 
-    protected function alreadyRegistered(
+    protected function duplicateRegistrationReason(
         Event $event,
         string $fullName,
-        ?string $phone,
         ?string $email
-    ): bool {
-        return Attendee::query()
+    ): ?string {
+        $normalizedName = strtolower(
+            trim($fullName)
+        );
+
+        $nameExists = Attendee::query()
             ->where('event_id', $event->id)
-            ->where(function ($query) use (
-                $fullName,
-                $phone,
-                $email
-            ) {
-                $query->where(
-                    function ($query) use (
-                        $fullName,
-                        $phone
-                    ) {
-                        $query->whereRaw(
-                            'LOWER(full_name) = ?',
-                            [strtolower($fullName)]
-                        );
-
-                        if (filled($phone)) {
-                            $query->where('phone', $phone);
-                        }
-                    }
-                );
-
-                if (filled($email)) {
-                    $query->orWhere(
-                        'email',
-                        strtolower($email)
-                    );
-                }
-            })
             ->whereNotIn('status', [
                 'rejected',
                 'cancelled',
             ])
+            ->whereRaw(
+                'LOWER(TRIM(full_name)) = ?',
+                [$normalizedName]
+            )
             ->exists();
+
+        if ($nameExists) {
+            return 'This attendee name is already registered for this event. Please verify the name or contact the event organizer.';
+        }
+
+        if (filled($email)) {
+            $normalizedEmail = strtolower(
+                trim($email)
+            );
+
+            $emailExists = Attendee::query()
+                ->where('event_id', $event->id)
+                ->whereNotIn('status', [
+                    'rejected',
+                    'cancelled',
+                ])
+                ->whereRaw(
+                    'LOWER(TRIM(email)) = ?',
+                    [$normalizedEmail]
+                )
+                ->exists();
+
+            if ($emailExists) {
+                return 'This email address is already registered for this event. Please use a different email address or contact the event organizer.';
+            }
+        }
+
+        return null;
     }
 
     protected function registrationStats(Event $event): array
@@ -1317,39 +1379,5 @@ class PublicRegistrationController extends Controller
             'support_phone' => $organization?->support_phone
                 ?: $organization?->phone,
         ];
-    }
-
-    protected function normalizePhone(?string $phone): ?string
-    {
-        $phone = trim((string) $phone);
-
-        if ($phone === '') {
-            return null;
-        }
-
-        $phone = preg_replace('/[^0-9+]/', '', $phone);
-
-        if (str_starts_with($phone, '+')) {
-            $phone = substr($phone, 1);
-        }
-
-        if (
-            str_starts_with($phone, '0')
-            && strlen($phone) === 10
-        ) {
-            return '255' . substr($phone, 1);
-        }
-
-        if (
-            (
-                str_starts_with($phone, '7')
-                || str_starts_with($phone, '6')
-            )
-            && strlen($phone) === 9
-        ) {
-            return '255' . $phone;
-        }
-
-        return $phone;
     }
 }
