@@ -5,9 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class CommunicationLog extends Model
+class CommunicationCampaignRecipient extends Model
 {
     /*
     |--------------------------------------------------------------------------
@@ -19,7 +18,7 @@ class CommunicationLog extends Model
 
     public const STATUS_QUEUED = 'queued';
 
-    public const STATUS_SENDING = 'sending';
+    public const STATUS_PROCESSING = 'processing';
 
     public const STATUS_SENT = 'sent';
 
@@ -27,17 +26,7 @@ class CommunicationLog extends Model
 
     public const STATUS_FAILED = 'failed';
 
-    /*
-    |--------------------------------------------------------------------------
-    | Channels
-    |--------------------------------------------------------------------------
-    */
-
-    public const CHANNEL_SMS = 'sms';
-
-    public const CHANNEL_EMAIL = 'email';
-
-    public const CHANNEL_WHATSAPP = 'whatsapp';
+    public const STATUS_SKIPPED = 'skipped';
 
     /*
     |--------------------------------------------------------------------------
@@ -46,25 +35,25 @@ class CommunicationLog extends Model
     */
 
     protected $fillable = [
-        'event_id',
-        'attendee_id',
         'communication_campaign_id',
-
-        'channel',
-        'recipient',
-
-        'subject',
-        'message',
+        'attendee_id',
+        'communication_log_id',
 
         'status',
+        'recipient',
 
-        'provider_message_id',
-        'error',
+        'rendered_subject',
+        'rendered_message',
+
+        'attempts',
 
         'queued_at',
         'sent_at',
         'delivered_at',
         'failed_at',
+
+        'error_message',
+        'metadata',
     ];
 
     /*
@@ -76,10 +65,14 @@ class CommunicationLog extends Model
     protected function casts(): array
     {
         return [
+            'attempts' => 'integer',
+
             'queued_at' => 'datetime',
             'sent_at' => 'datetime',
             'delivered_at' => 'datetime',
             'failed_at' => 'datetime',
+
+            'metadata' => 'array',
         ];
     }
 
@@ -89,10 +82,11 @@ class CommunicationLog extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function event(): BelongsTo
+    public function campaign(): BelongsTo
     {
         return $this->belongsTo(
-            Event::class
+            CommunicationCampaign::class,
+            'communication_campaign_id'
         );
     }
 
@@ -103,18 +97,10 @@ class CommunicationLog extends Model
         );
     }
 
-    public function campaign(): BelongsTo
+    public function communicationLog(): BelongsTo
     {
         return $this->belongsTo(
-            CommunicationCampaign::class,
-            'communication_campaign_id'
-        );
-    }
-
-    public function campaignRecipient(): HasOne
-    {
-        return $this->hasOne(
-            CommunicationCampaignRecipient::class,
+            CommunicationLog::class,
             'communication_log_id'
         );
     }
@@ -124,26 +110,6 @@ class CommunicationLog extends Model
     | Scopes
     |--------------------------------------------------------------------------
     */
-
-    public function scopeForEvent(
-        Builder $query,
-        int $eventId
-    ): Builder {
-        return $query->where(
-            'event_id',
-            $eventId
-        );
-    }
-
-    public function scopeForAttendee(
-        Builder $query,
-        int $attendeeId
-    ): Builder {
-        return $query->where(
-            'attendee_id',
-            $attendeeId
-        );
-    }
 
     public function scopeForCampaign(
         Builder $query,
@@ -155,40 +121,13 @@ class CommunicationLog extends Model
         );
     }
 
-    public function scopeForChannel(
+    public function scopeForAttendee(
         Builder $query,
-        string $channel
+        int $attendeeId
     ): Builder {
         return $query->where(
-            'channel',
-            $channel
-        );
-    }
-
-    public function scopeSms(
-        Builder $query
-    ): Builder {
-        return $query->where(
-            'channel',
-            self::CHANNEL_SMS
-        );
-    }
-
-    public function scopeEmail(
-        Builder $query
-    ): Builder {
-        return $query->where(
-            'channel',
-            self::CHANNEL_EMAIL
-        );
-    }
-
-    public function scopeWhatsapp(
-        Builder $query
-    ): Builder {
-        return $query->where(
-            'channel',
-            self::CHANNEL_WHATSAPP
+            'attendee_id',
+            $attendeeId
         );
     }
 
@@ -210,12 +149,12 @@ class CommunicationLog extends Model
         );
     }
 
-    public function scopeSending(
+    public function scopeProcessing(
         Builder $query
     ): Builder {
         return $query->where(
             'status',
-            self::STATUS_SENDING
+            self::STATUS_PROCESSING
         );
     }
 
@@ -246,6 +185,15 @@ class CommunicationLog extends Model
         );
     }
 
+    public function scopeSkipped(
+        Builder $query
+    ): Builder {
+        return $query->where(
+            'status',
+            self::STATUS_SKIPPED
+        );
+    }
+
     public function scopeSuccessful(
         Builder $query
     ): Builder {
@@ -266,7 +214,7 @@ class CommunicationLog extends Model
             [
                 self::STATUS_PENDING,
                 self::STATUS_QUEUED,
-                self::STATUS_SENDING,
+                self::STATUS_PROCESSING,
             ]
         );
     }
@@ -283,7 +231,7 @@ class CommunicationLog extends Model
                 'recipient'
             )
             ->whereNotNull(
-                'message'
+                'rendered_message'
             );
     }
 
@@ -305,13 +253,25 @@ class CommunicationLog extends Model
             self::STATUS_QUEUED;
     }
 
-    public function isSending(): bool
+    public function isProcessing(): bool
     {
         return $this->status ===
-            self::STATUS_SENDING;
+            self::STATUS_PROCESSING;
     }
 
     public function isSent(): bool
+    {
+        return $this->status ===
+            self::STATUS_SENT;
+    }
+
+    public function isDelivered(): bool
+    {
+        return $this->status ===
+            self::STATUS_DELIVERED;
+    }
+
+    public function isSuccessful(): bool
     {
         return in_array(
             $this->status,
@@ -323,16 +283,16 @@ class CommunicationLog extends Model
         );
     }
 
-    public function isDelivered(): bool
-    {
-        return $this->status ===
-            self::STATUS_DELIVERED;
-    }
-
     public function isFailed(): bool
     {
         return $this->status ===
             self::STATUS_FAILED;
+    }
+
+    public function isSkipped(): bool
+    {
+        return $this->status ===
+            self::STATUS_SKIPPED;
     }
 
     public function isIncomplete(): bool
@@ -342,7 +302,7 @@ class CommunicationLog extends Model
             [
                 self::STATUS_PENDING,
                 self::STATUS_QUEUED,
-                self::STATUS_SENDING,
+                self::STATUS_PROCESSING,
             ],
             true
         );
@@ -352,31 +312,7 @@ class CommunicationLog extends Model
     {
         return $this->isFailed()
             && filled($this->recipient)
-            && filled($this->message);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Channel helpers
-    |--------------------------------------------------------------------------
-    */
-
-    public function isSms(): bool
-    {
-        return $this->channel ===
-            self::CHANNEL_SMS;
-    }
-
-    public function isWhatsApp(): bool
-    {
-        return $this->channel ===
-            self::CHANNEL_WHATSAPP;
-    }
-
-    public function isEmail(): bool
-    {
-        return $this->channel ===
-            self::CHANNEL_EMAIL;
+            && filled($this->rendered_message);
     }
 
     /*
@@ -398,25 +334,12 @@ class CommunicationLog extends Model
             ->toString();
     }
 
-    public function channelLabel(): string
+    public function attendeeName(): string
     {
-        return match ($this->channel) {
-            self::CHANNEL_SMS =>
-                'SMS',
-
-            self::CHANNEL_WHATSAPP =>
-                'WhatsApp',
-
-            self::CHANNEL_EMAIL =>
-                'Email',
-
-            default =>
-                str(
-                    $this->channel
-                )
-                    ->headline()
-                    ->toString(),
-        };
+        return (string) (
+            $this->attendee?->full_name
+            ?: 'Unknown attendee'
+        );
     }
 
     public function recipientLabel(): string
@@ -427,25 +350,37 @@ class CommunicationLog extends Model
         );
     }
 
-    public function attendeeName(): string
-    {
-        return (string) (
-            $this->attendee?->full_name
-            ?: 'Unknown attendee'
-        );
-    }
-
     public function errorLabel(): string
     {
         return (string) (
-            $this->error
+            $this->error_message
             ?: '—'
         );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Lifecycle helpers
+    | Attempts
+    |--------------------------------------------------------------------------
+    */
+
+    public function attemptsCount(): int
+    {
+        return (int) $this->attempts;
+    }
+
+    public function incrementAttempts(): void
+    {
+        $this->increment(
+            'attempts'
+        );
+
+        $this->refresh();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lifecycle
     |--------------------------------------------------------------------------
     */
 
@@ -455,12 +390,6 @@ class CommunicationLog extends Model
             'status' =>
                 self::STATUS_PENDING,
 
-            'provider_message_id' =>
-                null,
-
-            'error' =>
-                null,
-
             'queued_at' =>
                 null,
 
@@ -472,9 +401,10 @@ class CommunicationLog extends Model
 
             'failed_at' =>
                 null,
-        ])->save();
 
-        $this->syncCampaignRecipient();
+            'error_message' =>
+                null,
+        ])->save();
     }
 
     public function markQueued(): void
@@ -483,12 +413,6 @@ class CommunicationLog extends Model
             'status' =>
                 self::STATUS_QUEUED,
 
-            'provider_message_id' =>
-                null,
-
-            'error' =>
-                null,
-
             'queued_at' =>
                 now(),
 
@@ -500,48 +424,41 @@ class CommunicationLog extends Model
 
             'failed_at' =>
                 null,
-        ])->save();
 
-        $this->syncCampaignRecipient();
+            'error_message' =>
+                null,
+        ])->save();
     }
 
-    public function markSending(): void
+    public function markProcessing(): void
     {
         $this->forceFill([
             'status' =>
-                self::STATUS_SENDING,
-
-            'error' =>
-                null,
+                self::STATUS_PROCESSING,
 
             'failed_at' =>
                 null,
-        ])->save();
 
-        $this->syncCampaignRecipient();
+            'error_message' =>
+                null,
+        ])->save();
     }
 
-    public function markSent(
-        ?string $providerMessageId = null
-    ): void {
+    public function markSent(): void
+    {
         $this->forceFill([
             'status' =>
                 self::STATUS_SENT,
 
-            'provider_message_id' =>
-                $providerMessageId,
-
             'sent_at' =>
                 now(),
 
-            'error' =>
-                null,
-
             'failed_at' =>
                 null,
-        ])->save();
 
-        $this->syncCampaignRecipient();
+            'error_message' =>
+                null,
+        ])->save();
     }
 
     public function markDelivered(): void
@@ -553,14 +470,12 @@ class CommunicationLog extends Model
             'delivered_at' =>
                 now(),
 
-            'error' =>
-                null,
-
             'failed_at' =>
                 null,
-        ])->save();
 
-        $this->syncCampaignRecipient();
+            'error_message' =>
+                null,
+        ])->save();
     }
 
     public function markFailed(
@@ -573,11 +488,24 @@ class CommunicationLog extends Model
             'failed_at' =>
                 now(),
 
-            'error' =>
+            'error_message' =>
                 $error,
         ])->save();
+    }
 
-        $this->syncCampaignRecipient();
+    public function markSkipped(
+        ?string $reason = null
+    ): void {
+        $this->forceFill([
+            'status' =>
+                self::STATUS_SKIPPED,
+
+            'error_message' =>
+                $reason,
+
+            'failed_at' =>
+                null,
+        ])->save();
     }
 
     /*
@@ -593,72 +521,77 @@ class CommunicationLog extends Model
         }
 
         $this->markQueued();
+
+        if ($this->communicationLog) {
+            $this->communicationLog
+                ->markQueued();
+        }
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Campaign recipient synchronization
+    | Communication log synchronization
     |--------------------------------------------------------------------------
     */
 
-    public function syncCampaignRecipient(): void
+    public function syncFromCommunicationLog(): void
     {
-        $recipient =
-            $this->campaignRecipient;
+        $log =
+            $this->communicationLog;
 
-        if (! $recipient) {
+        if (! $log) {
             return;
         }
 
-        $recipientStatus = match (
-            $this->status
+        $status = match (
+            $log->status
         ) {
-            self::STATUS_PENDING =>
-                CommunicationCampaignRecipient::STATUS_PENDING,
+            CommunicationLog::STATUS_PENDING =>
+                self::STATUS_PENDING,
 
-            self::STATUS_QUEUED =>
-                CommunicationCampaignRecipient::STATUS_QUEUED,
+            CommunicationLog::STATUS_QUEUED =>
+                self::STATUS_QUEUED,
 
-            self::STATUS_SENDING =>
-                CommunicationCampaignRecipient::STATUS_PROCESSING,
+            CommunicationLog::STATUS_SENDING =>
+                self::STATUS_PROCESSING,
 
-            self::STATUS_SENT =>
-                CommunicationCampaignRecipient::STATUS_SENT,
+            CommunicationLog::STATUS_SENT =>
+                self::STATUS_SENT,
 
-            self::STATUS_DELIVERED =>
-                CommunicationCampaignRecipient::STATUS_DELIVERED,
+            CommunicationLog::STATUS_DELIVERED =>
+                self::STATUS_DELIVERED,
 
-            self::STATUS_FAILED =>
-                CommunicationCampaignRecipient::STATUS_FAILED,
+            CommunicationLog::STATUS_FAILED =>
+                self::STATUS_FAILED,
 
             default =>
-                $recipient->status,
+                $this->status,
         };
 
-        $recipient->forceFill([
+        $this->forceFill([
             'status' =>
-                $recipientStatus,
+                $status,
 
             'queued_at' =>
-                $this->queued_at,
+                $log->queued_at,
 
             'sent_at' =>
-                $this->sent_at,
+                $log->sent_at,
 
             'delivered_at' =>
-                $this->delivered_at,
+                $log->delivered_at,
 
             'failed_at' =>
-                $this->failed_at,
+                $log->failed_at,
 
             'error_message' =>
-                $this->error,
+                $log->error,
         ])->save();
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Campaign counters
+    | Campaign counter refresh
     |--------------------------------------------------------------------------
     */
 
@@ -670,5 +603,56 @@ class CommunicationLog extends Model
 
         $this->campaign
             ->refreshCounters();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Metadata
+    |--------------------------------------------------------------------------
+    */
+
+    public function metadataValue(
+        string $key,
+        mixed $default = null
+    ): mixed {
+        return data_get(
+            $this->metadata ?? [],
+            $key,
+            $default
+        );
+    }
+
+    public function setMetadataValue(
+        string $key,
+        mixed $value
+    ): void {
+        $metadata =
+            $this->metadata ?? [];
+
+        data_set(
+            $metadata,
+            $key,
+            $value
+        );
+
+        $this->forceFill([
+            'metadata' =>
+                $metadata,
+        ])->save();
+    }
+
+    public function mergeMetadata(
+        array $values
+    ): void {
+        $metadata =
+            array_merge(
+                $this->metadata ?? [],
+                $values
+            );
+
+        $this->forceFill([
+            'metadata' =>
+                $metadata,
+        ])->save();
     }
 }

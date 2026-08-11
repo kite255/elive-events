@@ -7,20 +7,36 @@ return [
     | Third Party Services
     |--------------------------------------------------------------------------
     |
-    | This file is for storing the credentials for third party services such
-    | as Mailgun, Postmark, AWS and more. This file provides the de facto
-    | location for this type of information, allowing packages to have
-    | a conventional file to locate the various service credentials.
+    | This file stores credentials and configuration for third-party services.
+    | Keep secrets in .env and never hard-code API credentials here.
     |
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Postmark
+    |--------------------------------------------------------------------------
     */
 
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Resend
+    |--------------------------------------------------------------------------
+    */
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Amazon SES
+    |--------------------------------------------------------------------------
+    */
 
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
@@ -28,11 +44,128 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Slack
+    |--------------------------------------------------------------------------
+    */
+
     'slack' => [
         'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+            'bot_user_oauth_token' => env(
+                'SLACK_BOT_USER_OAUTH_TOKEN'
+            ),
+
+            'channel' => env(
+                'SLACK_BOT_USER_DEFAULT_CHANNEL'
+            ),
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SMS
+    |--------------------------------------------------------------------------
+    |
+    | Generic SMS configuration used by eLive Events.
+    |
+    */
+
+    'sms' => [
+        'driver' => env(
+            'SMS_DRIVER',
+            'http'
+        ),
+
+        'provider' => env(
+            'SMS_PROVIDER',
+            'elive_sms'
+        ),
+
+        'api_url' => env(
+            'SMS_API_URL'
+        ),
+
+        'api_key' => env(
+            'SMS_API_KEY'
+        ),
+
+        'api_secret' => env(
+            'SMS_API_SECRET'
+        ),
+
+        'sender_id' => env(
+            'SMS_SENDER_ID',
+            'eLive'
+        ),
+
+        'timeout' => (int) env(
+            'SMS_TIMEOUT',
+            30
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | eLive SMS Provider
+    |--------------------------------------------------------------------------
+    */
+
+    'elive_sms' => [
+        'base_url' => env(
+            'ELIVE_SMS_BASE_URL'
+        ),
+
+        'api_key' => env(
+            'ELIVE_SMS_API_KEY'
+        ),
+
+        'api_secret' => env(
+            'ELIVE_SMS_API_SECRET'
+        ),
+
+        'delivery_report_path' => env(
+            'ELIVE_SMS_DELIVERY_REPORT_PATH'
+        ),
+
+        'balance_path' => env(
+            'ELIVE_SMS_BALANCE_PATH'
+        ),
+
+        'timeout' => (int) env(
+            'ELIVE_SMS_TIMEOUT',
+            30
+        ),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SMS Balance API
+    |--------------------------------------------------------------------------
+    */
+
+    'sms_balance' => [
+        'url' => env(
+            'SMS_BALANCE_URL'
+        ),
+
+        'method' => env(
+            'SMS_BALANCE_METHOD',
+            'get'
+        ),
+
+        'api_key' => env(
+            'SMS_BALANCE_API_KEY'
+        ),
+
+        'api_secret' => env(
+            'SMS_BALANCE_API_SECRET'
+        ),
+
+        'timeout' => (int) env(
+            'SMS_BALANCE_TIMEOUT',
+            30
+        ),
     ],
 
 ];
