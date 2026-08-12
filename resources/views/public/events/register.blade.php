@@ -407,6 +407,136 @@
             box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Merchandise Image Preview Modal
+        |--------------------------------------------------------------------------
+        */
+
+        .elive-merch-image-button {
+            display: block;
+            padding: 0;
+            border: 0;
+            border-radius: 16px;
+            background: transparent;
+            cursor: zoom-in;
+            line-height: 0;
+        }
+
+        .elive-merch-image-button:focus-visible {
+            outline: 3px solid color-mix(
+                in srgb,
+                var(--elive-primary) 35%,
+                transparent
+            );
+            outline-offset: 3px;
+        }
+
+        .elive-merch-image-button img {
+            display: block;
+        }
+
+        .elive-merch-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(5px);
+        }
+
+        .elive-merch-modal.is-open {
+            display: flex;
+        }
+
+        .elive-merch-modal-dialog {
+            position: relative;
+            width: min(100%, 760px);
+            max-height: calc(100vh - 48px);
+            padding: 18px;
+            border-radius: 22px;
+            background: #ffffff;
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+        }
+
+        .elive-merch-modal-image-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-height: calc(100vh - 150px);
+            overflow: hidden;
+            border-radius: 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .elive-merch-modal-image {
+            display: block;
+            max-width: 100%;
+            max-height: calc(100vh - 150px);
+            object-fit: contain;
+        }
+
+        .elive-merch-modal-title {
+            margin: 14px 44px 0 2px;
+            color: #0f172a;
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 1.4;
+        }
+
+        .elive-merch-modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.88);
+            color: #ffffff;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .elive-merch-modal-close:hover {
+            background: #0f172a;
+        }
+
+        body.elive-modal-open {
+            overflow: hidden;
+        }
+
+        @media (max-width: 600px) {
+            .elive-merch-modal {
+                padding: 12px;
+            }
+
+            .elive-merch-modal-dialog {
+                max-height: calc(100vh - 24px);
+                padding: 12px;
+                border-radius: 18px;
+            }
+
+            .elive-merch-modal-image-wrap {
+                max-height: calc(100vh - 120px);
+            }
+
+            .elive-merch-modal-image {
+                max-height: calc(100vh - 120px);
+            }
+        }
+
         [data-payment-section] {
             background:
                 linear-gradient(
@@ -1790,11 +1920,27 @@
                                             >
                                                 <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
                                                     @if ($showItemImage)
-                                                        <img
-                                                            src="{{ asset('storage/' . $item->image_path) }}"
-                                                            alt="{{ $item->name }}"
-                                                            style="width:110px;height:110px;object-fit:cover;border-radius:16px;border:1px solid #e2e8f0;background:white;"
+                                                        @php
+                                                            $merchandiseImageUrl = asset(
+                                                                'storage/' . $item->image_path
+                                                            );
+                                                        @endphp
+
+                                                        <button
+                                                            type="button"
+                                                            class="elive-merch-image-button"
+                                                            data-merchandise-image-trigger
+                                                            data-image-src="{{ $merchandiseImageUrl }}"
+                                                            data-image-alt="{{ $item->name }}"
+                                                            aria-label="View larger image of {{ $item->name }}"
+                                                            title="Click to view larger image"
                                                         >
+                                                            <img
+                                                                src="{{ $merchandiseImageUrl }}"
+                                                                alt="{{ $item->name }}"
+                                                                style="width:110px;height:110px;object-fit:cover;border-radius:16px;border:1px solid #e2e8f0;background:white;"
+                                                            >
+                                                        </button>
                                                     @endif
 
                                                     <div style="flex:1;min-width:240px;">
@@ -2046,8 +2192,161 @@
         </div>
     </div>
 
+
+    <div
+        class="elive-merch-modal"
+        data-merchandise-image-modal
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="elive-merch-modal-title"
+    >
+        <div
+            class="elive-merch-modal-dialog"
+            data-merchandise-modal-dialog
+        >
+            <button
+                type="button"
+                class="elive-merch-modal-close"
+                data-merchandise-modal-close
+                aria-label="Close image preview"
+                title="Close"
+            >
+                ×
+            </button>
+
+            <div class="elive-merch-modal-image-wrap">
+                <img
+                    class="elive-merch-modal-image"
+                    data-merchandise-modal-image
+                    src=""
+                    alt=""
+                >
+            </div>
+
+            <div
+                id="elive-merch-modal-title"
+                class="elive-merch-modal-title"
+                data-merchandise-modal-title
+            ></div>
+        </div>
+    </div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        /*
+        |--------------------------------------------------------------------------
+        | Merchandise image popup
+        |--------------------------------------------------------------------------
+        */
+
+        const merchandiseModal = document.querySelector(
+            '[data-merchandise-image-modal]'
+        );
+
+        const merchandiseModalDialog = document.querySelector(
+            '[data-merchandise-modal-dialog]'
+        );
+
+        const merchandiseModalImage = document.querySelector(
+            '[data-merchandise-modal-image]'
+        );
+
+        const merchandiseModalTitle = document.querySelector(
+            '[data-merchandise-modal-title]'
+        );
+
+        const merchandiseModalClose = document.querySelector(
+            '[data-merchandise-modal-close]'
+        );
+
+        let merchandiseLastTrigger = null;
+
+        const closeMerchandiseModal = () => {
+            if (!merchandiseModal) {
+                return;
+            }
+
+            merchandiseModal.classList.remove('is-open');
+            merchandiseModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('elive-modal-open');
+
+            if (merchandiseModalImage) {
+                merchandiseModalImage.src = '';
+                merchandiseModalImage.alt = '';
+            }
+
+            merchandiseLastTrigger?.focus();
+            merchandiseLastTrigger = null;
+        };
+
+        const openMerchandiseModal = (trigger) => {
+            if (
+                !merchandiseModal
+                || !merchandiseModalImage
+            ) {
+                return;
+            }
+
+            const imageSrc = trigger.dataset.imageSrc || '';
+            const imageAlt = trigger.dataset.imageAlt || 'Merchandise image';
+
+            if (!imageSrc) {
+                return;
+            }
+
+            merchandiseLastTrigger = trigger;
+
+            merchandiseModalImage.src = imageSrc;
+            merchandiseModalImage.alt = imageAlt;
+
+            if (merchandiseModalTitle) {
+                merchandiseModalTitle.textContent = imageAlt;
+            }
+
+            merchandiseModal.classList.add('is-open');
+            merchandiseModal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('elive-modal-open');
+
+            window.setTimeout(() => {
+                merchandiseModalClose?.focus();
+            }, 10);
+        };
+
+        document.querySelectorAll(
+            '[data-merchandise-image-trigger]'
+        ).forEach((trigger) => {
+            trigger.addEventListener('click', () => {
+                openMerchandiseModal(trigger);
+            });
+        });
+
+        merchandiseModalClose?.addEventListener(
+            'click',
+            closeMerchandiseModal
+        );
+
+        merchandiseModal?.addEventListener('click', (event) => {
+            if (
+                event.target === merchandiseModal
+            ) {
+                closeMerchandiseModal();
+            }
+        });
+
+        merchandiseModalDialog?.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (
+                event.key === 'Escape'
+                && merchandiseModal?.classList.contains('is-open')
+            ) {
+                closeMerchandiseModal();
+            }
+        });
+
         const firstInvalidField = document.querySelector('.elive-field-invalid');
 
         if (firstInvalidField) {
