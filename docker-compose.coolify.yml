@@ -19,7 +19,7 @@ services:
     working_dir: /var/www/html
     command: >
       php artisan queue:work redis
-      --queue=communications
+      --queue=communications,default
       --sleep=3
       --tries=3
       --timeout=120

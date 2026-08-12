@@ -20,6 +20,14 @@ class User extends Authenticatable implements FilamentUser
 
     /*
     |--------------------------------------------------------------------------
+    | System administrator
+    |--------------------------------------------------------------------------
+    */
+
+    public const SYSTEM_ADMIN_EMAIL = 'admin@elive.co.tz';
+
+    /*
+    |--------------------------------------------------------------------------
     | Organization roles
     |--------------------------------------------------------------------------
     */
@@ -236,6 +244,10 @@ class User extends Authenticatable implements FilamentUser
     public function belongsToOrganization(
         Organization|int $organization
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         $organizationId = $this->resolveOrganizationId(
             $organization
         );
@@ -248,6 +260,10 @@ class User extends Authenticatable implements FilamentUser
     public function hasActiveOrganizationAccess(
         Organization|int $organization
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         $organizationId = $this->resolveOrganizationId(
             $organization
         );
@@ -264,6 +280,10 @@ class User extends Authenticatable implements FilamentUser
     public function organizationRole(
         Organization|int $organization
     ): ?string {
+        if ($this->isSuperAdmin()) {
+            return 'super_admin';
+        }
+
         $organizationId = $this->resolveOrganizationId(
             $organization
         );
@@ -279,6 +299,10 @@ class User extends Authenticatable implements FilamentUser
         Organization|int $organization,
         string|array $roles
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         if (! $this->hasActiveOrganizationAccess($organization)) {
             return false;
         }
@@ -299,6 +323,10 @@ class User extends Authenticatable implements FilamentUser
     public function isOrganizationOwner(
         Organization|int $organization
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         $organizationId = $this->resolveOrganizationId(
             $organization
         );
@@ -450,6 +478,10 @@ class User extends Authenticatable implements FilamentUser
     public function isAssignedToEvent(
         Event|int $event
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         $eventId = $this->resolveEventId($event);
 
         return $this->assignedEvents()
@@ -464,6 +496,10 @@ class User extends Authenticatable implements FilamentUser
     public function eventAssignmentRole(
         Event|int $event
     ): ?string {
+        if ($this->isSuperAdmin()) {
+            return 'super_admin';
+        }
+
         $eventId = $this->resolveEventId($event);
 
         $assignedEvent = $this->assignedEvents()
@@ -481,6 +517,10 @@ class User extends Authenticatable implements FilamentUser
         Event|int $event,
         string|array $roles
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         $role = $this->eventAssignmentRole($event);
 
         if ($role === null) {
@@ -496,40 +536,68 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessEvent(Event $event): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $event->isAccessibleBy($this);
     }
 
     public function canManageEvent(Event $event): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $event->canBeManagedBy($this);
     }
 
     public function canCheckInEvent(Event $event): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $event->canBeCheckedInBy($this);
     }
 
     public function canManageEventRegistration(
         Event $event
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $event->canManageRegistrationBy($this);
     }
 
     public function canManageEventBadges(
         Event $event
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $event->canManageBadgesBy($this);
     }
 
     public function canManageEventCommunication(
         Event $event
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $event->canManageCommunicationBy($this);
     }
 
     public function canViewEventReports(
         Event $event
     ): bool {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $event->canViewReportsBy($this);
     }
 
@@ -606,7 +674,54 @@ class User extends Authenticatable implements FilamentUser
 
     public function isSuperAdmin(): bool
     {
-        return (bool) $this->is_super_admin;
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Database-backed platform administrator
+        |--------------------------------------------------------------------------
+        */
+
+        if ((bool) $this->is_super_admin) {
+            return true;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Main production System Admin fallback
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            filled($this->email)
+            && strtolower(trim($this->email))
+                === strtolower(self::SYSTEM_ADMIN_EMAIL)
+        ) {
+            return true;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Future package-based role support
+        |--------------------------------------------------------------------------
+        */
+
+        if (method_exists($this, 'hasRole')) {
+            return $this->hasRole('super_admin');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Legacy role-column support
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            array_key_exists('role', $this->getAttributes())
+            && $this->getAttribute('role') === 'super_admin'
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     /*
