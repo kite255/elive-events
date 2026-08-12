@@ -385,12 +385,18 @@
             text-align: center;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Merchandise cards
+        |--------------------------------------------------------------------------
+        */
+
         [data-merchandise-card] {
-            background:
-                linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
-            border: 1px solid var(--elive-border) !important;
-            border-radius: 18px !important;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+            background: #ffffff !important;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 20px !important;
+            padding: 20px !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
             transition:
                 border-color 150ms ease,
                 transform 150ms ease,
@@ -399,18 +405,119 @@
 
         [data-merchandise-card]:hover {
             transform: translateY(-1px);
-            border-color: color-mix(in srgb, var(--elive-primary) 30%, var(--elive-border)) !important;
-            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+            border-color: color-mix(in srgb, var(--elive-primary) 34%, #dbe3ef) !important;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.09);
         }
 
-        [data-merchandise-card] img {
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+        .elive-merch-layout {
+            display: grid !important;
+            grid-template-columns: 150px minmax(0, 1fr);
+            gap: 20px !important;
+            align-items: start !important;
+        }
+
+        .elive-merch-image {
+            width: 150px !important;
+            height: 150px !important;
+            object-fit: contain !important;
+            object-position: center !important;
+            padding: 10px !important;
+            border-radius: 18px !important;
+            border: 1px solid #cbd5e1 !important;
+            background:
+                linear-gradient(
+                    145deg,
+                    #e5e7eb 0%,
+                    #f8fafc 100%
+                ) !important;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10) !important;
+        }
+
+        .elive-merch-content {
+            min-width: 0 !important;
+        }
+
+        .elive-merch-header {
+            display: flex !important;
+            align-items: flex-start !important;
+            justify-content: space-between !important;
+            gap: 14px !important;
+            flex-wrap: wrap !important;
+        }
+
+        .elive-merch-heading {
+            flex: 1 1 320px;
+            min-width: 0;
+        }
+
+        .elive-merch-title {
+            margin: 0 !important;
+            color: #0f172a !important;
+            font-size: 21px !important;
+            line-height: 1.25 !important;
+            font-weight: 900 !important;
+            letter-spacing: -0.015em;
+        }
+
+        .elive-merch-description {
+            margin: 7px 0 0 !important;
+            max-width: 680px;
+            color: #475569 !important;
+            font-size: 14px !important;
+            line-height: 1.6 !important;
+            font-weight: 500 !important;
+        }
+
+        .elive-merch-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex: 0 0 auto;
+            padding: 7px 11px !important;
+            border-radius: 999px !important;
+            font-size: 11px !important;
+            line-height: 1 !important;
+            font-weight: 900 !important;
+            white-space: nowrap;
+        }
+
+        .elive-merch-select {
+            display: flex !important;
+            align-items: center !important;
+            gap: 11px !important;
+            width: fit-content;
+            max-width: 100%;
+            margin-top: 16px !important;
+            padding: 11px 14px !important;
+            border: 1px solid #dbe3ef;
+            border-radius: 13px;
+            background: #f8fafc;
+            color: #0f172a !important;
+            font-size: 14px !important;
+            font-weight: 850 !important;
+            cursor: pointer;
+        }
+
+        .elive-merch-select:hover {
+            border-color: color-mix(in srgb, var(--elive-primary) 35%, #dbe3ef);
+            background: color-mix(in srgb, var(--elive-primary) 4%, #ffffff);
+        }
+
+        .elive-merch-select input[type="checkbox"] {
+            width: 21px !important;
+            height: 21px !important;
+            margin: 0 !important;
+            flex: 0 0 auto;
+        }
+
+        [data-merchandise-fields] {
+            padding-top: 2px;
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | Merchandise Image Preview Modal
+        | Merchandise Image Popup
         |--------------------------------------------------------------------------
         */
 
@@ -418,10 +525,9 @@
             display: block;
             padding: 0;
             border: 0;
-            border-radius: 16px;
+            border-radius: 18px;
             background: transparent;
             cursor: zoom-in;
-            line-height: 0;
         }
 
         .elive-merch-image-button:focus-visible {
@@ -433,11 +539,7 @@
             outline-offset: 3px;
         }
 
-        .elive-merch-image-button img {
-            display: block;
-        }
-
-        .elive-merch-modal {
+        .elive-merch-image-modal {
             position: fixed;
             inset: 0;
             z-index: 9999;
@@ -449,11 +551,11 @@
             backdrop-filter: blur(5px);
         }
 
-        .elive-merch-modal.is-open {
+        .elive-merch-image-modal.is-open {
             display: flex;
         }
 
-        .elive-merch-modal-dialog {
+        .elive-merch-image-dialog {
             position: relative;
             width: min(100%, 760px);
             max-height: calc(100vh - 48px);
@@ -463,26 +565,26 @@
             box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
         }
 
-        .elive-merch-modal-image-wrap {
+        .elive-merch-image-preview-wrap {
             display: flex;
             align-items: center;
             justify-content: center;
             width: 100%;
             max-height: calc(100vh - 150px);
             overflow: hidden;
+            border: 1px solid #e2e8f0;
             border-radius: 16px;
             background: #f8fafc;
-            border: 1px solid #e2e8f0;
         }
 
-        .elive-merch-modal-image {
+        .elive-merch-image-preview {
             display: block;
             max-width: 100%;
             max-height: calc(100vh - 150px);
             object-fit: contain;
         }
 
-        .elive-merch-modal-title {
+        .elive-merch-image-title {
             margin: 14px 44px 0 2px;
             color: #0f172a;
             font-size: 16px;
@@ -490,10 +592,11 @@
             line-height: 1.4;
         }
 
-        .elive-merch-modal-close {
+        .elive-merch-image-close {
             position: absolute;
             top: 12px;
             right: 12px;
+            z-index: 2;
             width: 38px;
             height: 38px;
             display: inline-flex;
@@ -501,38 +604,34 @@
             justify-content: center;
             border: 0;
             border-radius: 999px;
-            background: rgba(15, 23, 42, 0.88);
+            background: rgba(15, 23, 42, 0.9);
             color: #ffffff;
             font-size: 24px;
             line-height: 1;
             cursor: pointer;
-            z-index: 2;
         }
 
-        .elive-merch-modal-close:hover {
+        .elive-merch-image-close:hover {
             background: #0f172a;
         }
 
-        body.elive-modal-open {
+        body.elive-image-modal-open {
             overflow: hidden;
         }
 
         @media (max-width: 600px) {
-            .elive-merch-modal {
+            .elive-merch-image-modal {
                 padding: 12px;
             }
 
-            .elive-merch-modal-dialog {
+            .elive-merch-image-dialog {
                 max-height: calc(100vh - 24px);
                 padding: 12px;
                 border-radius: 18px;
             }
 
-            .elive-merch-modal-image-wrap {
-                max-height: calc(100vh - 120px);
-            }
-
-            .elive-merch-modal-image {
+            .elive-merch-image-preview-wrap,
+            .elive-merch-image-preview {
                 max-height: calc(100vh - 120px);
             }
         }
@@ -649,12 +748,60 @@
             }
 
             [data-merchandise-card] {
-                padding: 14px !important;
+                padding: 16px !important;
             }
 
-            [data-merchandise-card] img {
-                width: 86px !important;
-                height: 86px !important;
+            .elive-merch-layout {
+                grid-template-columns: 108px minmax(0, 1fr);
+                gap: 14px !important;
+            }
+
+            .elive-merch-image {
+                width: 108px !important;
+                height: 108px !important;
+                padding: 7px !important;
+                border-radius: 15px !important;
+            }
+
+            .elive-merch-title {
+                font-size: 17px !important;
+            }
+
+            .elive-merch-description {
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+            }
+
+            .elive-merch-badge {
+                padding: 6px 9px !important;
+                font-size: 10px !important;
+            }
+
+            .elive-merch-select {
+                width: 100%;
+                margin-top: 13px !important;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .elive-merch-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-merch-image {
+                width: 100% !important;
+                height: 210px !important;
+                max-width: none !important;
+            }
+
+            .elive-merch-header {
+                display: grid !important;
+                grid-template-columns: 1fr auto;
+                align-items: start !important;
+            }
+
+            .elive-merch-heading {
+                flex: none;
             }
         }
 
@@ -1918,7 +2065,7 @@
                                                 data-required="{{ $item->selection_type === 'required' ? '1' : '0' }}"
                                                 style="border:1px solid #e2e8f0;border-radius:18px;padding:18px;background:#f8fafc;"
                                             >
-                                                <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+                                                <div class="elive-merch-layout">
                                                     @if ($showItemImage)
                                                         @php
                                                             $merchandiseImageUrl = asset(
@@ -1933,40 +2080,37 @@
                                                             data-image-src="{{ $merchandiseImageUrl }}"
                                                             data-image-alt="{{ $item->name }}"
                                                             aria-label="View larger image of {{ $item->name }}"
-                                                            title="Click to view larger image"
+                                                            title="Click to enlarge"
                                                         >
                                                             <img
                                                                 src="{{ $merchandiseImageUrl }}"
                                                                 alt="{{ $item->name }}"
-                                                                style="width:110px;height:110px;object-fit:cover;border-radius:16px;border:1px solid #e2e8f0;background:white;"
+                                                                class="elive-merch-image"
                                                             >
                                                         </button>
                                                     @endif
 
-                                                    <div style="flex:1;min-width:240px;">
-                                                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-                                                            <div>
-                                                                <h3 style="margin:0;font-size:18px;font-weight:900;color:#0f172a;">
+                                                    <div class="elive-merch-content">
+                                                        <div class="elive-merch-header">
+                                                            <div class="elive-merch-heading">
+                                                                <h3 class="elive-merch-title">
                                                                     {{ $item->name }}
                                                                 </h3>
 
                                                                 @if (filled($item->description))
-                                                                    <p style="margin:6px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                                                    <p class="elive-merch-description">
                                                                         {{ $item->description }}
                                                                     </p>
                                                                 @endif
                                                             </div>
 
-                                                            <span style="
-                                                                display:inline-flex;
-                                                                align-items:center;
-                                                                border-radius:999px;
-                                                                padding:6px 10px;
-                                                                font-size:11px;
-                                                                font-weight:900;
-                                                                background:{{ $item->selection_type === 'required' ? '#fee2e2' : '#e2e8f0' }};
-                                                                color:{{ $item->selection_type === 'required' ? '#991b1b' : '#334155' }};
-                                                            ">
+                                                            <span
+                                                                class="elive-merch-badge"
+                                                                style="
+                                                                    background:{{ $item->selection_type === 'required' ? '#fee2e2' : '#e2e8f0' }};
+                                                                    color:{{ $item->selection_type === 'required' ? '#991b1b' : '#334155' }};
+                                                                "
+                                                            >
                                                                 {{ $item->selection_type === 'required' ? 'Required' : 'Optional' }}
                                                             </span>
                                                         </div>
@@ -1978,14 +2122,13 @@
                                                                 value="1"
                                                             >
                                                         @else
-                                                            <label style="display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:800;cursor:pointer;">
+                                                            <label class="elive-merch-select">
                                                                 <input
                                                                     type="checkbox"
                                                                     name="merchandise[{{ $item->id }}][selected]"
                                                                     value="1"
                                                                     data-merchandise-toggle
                                                                     @checked($oldSelected)
-                                                                    style="width:18px;height:18px;"
                                                                 >
                                                                 <span>Add this item to my order</span>
                                                             </label>
@@ -2109,48 +2252,212 @@
                             @endif
 
                             @if (($merchandiseItems ?? collect())->isNotEmpty())
-                            <div
-                                data-payment-section
-                                style="
-                                    margin-top:22px;
-                                    background:#ffffff;
-                                    border:1px solid #e2e8f0;
-                                    border-radius:20px;
-                                    padding:22px;
-                                    box-shadow:0 8px 22px rgba(15,23,42,0.06);
-                                "
-                            >
-                                <h2 style="
-                                    margin:0;
-                                    color:{{ $branding['primary_color'] }};
-                                    font-size:22px;
-                                    font-weight:900;
-                                ">
-                                    Payment
-                                </h2>
+                                <div
+                                    data-payment-section
+                                    style="
+                                        margin-top:22px;
+                                        background:#ffffff;
+                                        border:1px solid #e2e8f0;
+                                        border-radius:20px;
+                                        padding:22px;
+                                        box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                    "
+                                >
+                                    <h2 style="
+                                        margin:0;
+                                        color:{{ $branding['primary_color'] }};
+                                        font-size:22px;
+                                        font-weight:900;
+                                    ">
+                                        Payment
+                                    </h2>
 
-                                <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
-                                    Payment is only required when a paid item or paid registration option is selected.
-                                </p>
+                                    <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                        Payment is only required when a paid item is selected.
+                                    </p>
 
-                                <div style="
-                                    margin-top:16px;
-                                    background:#f8fafc;
-                                    border:1px solid #e2e8f0;
-                                    border-radius:14px;
-                                    padding:14px;
-                                ">
-                                    <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;color:#475569;">
-                                        <span>Amount payable</span>
-                                        <strong data-payment-total>No payment required</strong>
+                                    <div style="
+                                        margin-top:16px;
+                                        background:#f8fafc;
+                                        border:1px solid #e2e8f0;
+                                        border-radius:14px;
+                                        padding:14px;
+                                    ">
+                                        <div style="
+                                            display:flex;
+                                            justify-content:space-between;
+                                            gap:12px;
+                                            align-items:center;
+                                            font-size:14px;
+                                            color:#475569;
+                                        ">
+                                            <span>Amount payable</span>
+                                            <strong
+                                                data-payment-total
+                                                style="
+                                                    color:#0f172a;
+                                                    font-size:16px;
+                                                "
+                                            >
+                                                No payment required
+                                            </strong>
+                                        </div>
                                     </div>
 
-                                    <div style="margin-top:8px;font-size:12px;color:#64748b;">
-                                        Final payment instructions will be shown after registration.
+                                    <div
+                                        data-payment-details
+                                        hidden
+                                        style="
+                                            margin-top:16px;
+                                            padding:18px;
+                                            border:1px solid color-mix(
+                                                in srgb,
+                                                {{ $branding['primary_color'] }} 25%,
+                                                #e2e8f0
+                                            );
+                                            border-radius:16px;
+                                            background:color-mix(
+                                                in srgb,
+                                                {{ $branding['primary_color'] }} 5%,
+                                                #ffffff
+                                            );
+                                        "
+                                    >
+                                        <div style="
+                                            display:flex;
+                                            align-items:center;
+                                            gap:10px;
+                                            margin-bottom:14px;
+                                        ">
+                                            <div style="
+                                                width:36px;
+                                                height:36px;
+                                                display:flex;
+                                                align-items:center;
+                                                justify-content:center;
+                                                border-radius:999px;
+                                                background:{{ $branding['primary_color'] }};
+                                                color:white;
+                                                font-weight:900;
+                                            ">
+                                                $
+                                            </div>
+
+                                            <div>
+                                                <div style="
+                                                    color:#0f172a;
+                                                    font-size:15px;
+                                                    font-weight:900;
+                                                ">
+                                                    Payment Instructions
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:2px;
+                                                    color:#64748b;
+                                                    font-size:12px;
+                                                ">
+                                                    Use the details below to complete payment.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        @if (filled($event->payment_method))
+                                            <div style="
+                                                padding:11px 0;
+                                                border-bottom:1px solid #e2e8f0;
+                                            ">
+                                                <div style="
+                                                    color:#64748b;
+                                                    font-size:11px;
+                                                    font-weight:800;
+                                                    text-transform:uppercase;
+                                                    letter-spacing:.05em;
+                                                ">
+                                                    Payment Method
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:4px;
+                                                    color:#0f172a;
+                                                    font-size:15px;
+                                                    font-weight:900;
+                                                ">
+                                                    {{ $event->payment_method }}
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if (filled($event->payment_account_name))
+                                            <div style="
+                                                padding:11px 0;
+                                                border-bottom:1px solid #e2e8f0;
+                                            ">
+                                                <div style="
+                                                    color:#64748b;
+                                                    font-size:11px;
+                                                    font-weight:800;
+                                                    text-transform:uppercase;
+                                                    letter-spacing:.05em;
+                                                ">
+                                                    Account Name
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:4px;
+                                                    color:#0f172a;
+                                                    font-size:15px;
+                                                    font-weight:900;
+                                                ">
+                                                    {{ $event->payment_account_name }}
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if (filled($event->payment_account_number))
+                                            <div style="
+                                                padding:11px 0;
+                                                border-bottom:1px solid #e2e8f0;
+                                            ">
+                                                <div style="
+                                                    color:#64748b;
+                                                    font-size:11px;
+                                                    font-weight:800;
+                                                    text-transform:uppercase;
+                                                    letter-spacing:.05em;
+                                                ">
+                                                    Account Number
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:4px;
+                                                    color:#0f172a;
+                                                    font-size:18px;
+                                                    font-weight:900;
+                                                    letter-spacing:.03em;
+                                                    word-break:break-word;
+                                                ">
+                                                    {{ $event->payment_account_number }}
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if (filled($event->payment_instructions))
+                                            <div style="
+                                                margin-top:14px;
+                                                padding:13px 14px;
+                                                border-radius:12px;
+                                                background:#ffffff;
+                                                border:1px solid #e2e8f0;
+                                                color:#475569;
+                                                font-size:13px;
+                                                line-height:1.6;
+                                            ">
+                                                {{ $event->payment_instructions }}
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
-                            </div>
-
                             @endif
 
                             <button
@@ -2194,40 +2501,40 @@
 
 
     <div
-        class="elive-merch-modal"
+        class="elive-merch-image-modal"
         data-merchandise-image-modal
         aria-hidden="true"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="elive-merch-modal-title"
+        aria-labelledby="elive-merch-image-title"
     >
         <div
-            class="elive-merch-modal-dialog"
-            data-merchandise-modal-dialog
+            class="elive-merch-image-dialog"
+            data-merchandise-image-dialog
         >
             <button
                 type="button"
-                class="elive-merch-modal-close"
-                data-merchandise-modal-close
+                class="elive-merch-image-close"
+                data-merchandise-image-close
                 aria-label="Close image preview"
                 title="Close"
             >
                 ×
             </button>
 
-            <div class="elive-merch-modal-image-wrap">
+            <div class="elive-merch-image-preview-wrap">
                 <img
-                    class="elive-merch-modal-image"
-                    data-merchandise-modal-image
+                    class="elive-merch-image-preview"
+                    data-merchandise-image-preview
                     src=""
                     alt=""
                 >
             </div>
 
             <div
-                id="elive-merch-modal-title"
-                class="elive-merch-modal-title"
-                data-merchandise-modal-title
+                id="elive-merch-image-title"
+                class="elive-merch-image-title"
+                data-merchandise-image-title
             ></div>
         </div>
     </div>
@@ -2240,50 +2547,50 @@
         |--------------------------------------------------------------------------
         */
 
-        const merchandiseModal = document.querySelector(
+        const merchandiseImageModal = document.querySelector(
             '[data-merchandise-image-modal]'
         );
 
-        const merchandiseModalDialog = document.querySelector(
-            '[data-merchandise-modal-dialog]'
+        const merchandiseImageDialog = document.querySelector(
+            '[data-merchandise-image-dialog]'
         );
 
-        const merchandiseModalImage = document.querySelector(
-            '[data-merchandise-modal-image]'
+        const merchandiseImagePreview = document.querySelector(
+            '[data-merchandise-image-preview]'
         );
 
-        const merchandiseModalTitle = document.querySelector(
-            '[data-merchandise-modal-title]'
+        const merchandiseImageTitle = document.querySelector(
+            '[data-merchandise-image-title]'
         );
 
-        const merchandiseModalClose = document.querySelector(
-            '[data-merchandise-modal-close]'
+        const merchandiseImageClose = document.querySelector(
+            '[data-merchandise-image-close]'
         );
 
-        let merchandiseLastTrigger = null;
+        let lastMerchandiseImageTrigger = null;
 
-        const closeMerchandiseModal = () => {
-            if (!merchandiseModal) {
+        const closeMerchandiseImageModal = () => {
+            if (!merchandiseImageModal) {
                 return;
             }
 
-            merchandiseModal.classList.remove('is-open');
-            merchandiseModal.setAttribute('aria-hidden', 'true');
-            document.body.classList.remove('elive-modal-open');
+            merchandiseImageModal.classList.remove('is-open');
+            merchandiseImageModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('elive-image-modal-open');
 
-            if (merchandiseModalImage) {
-                merchandiseModalImage.src = '';
-                merchandiseModalImage.alt = '';
+            if (merchandiseImagePreview) {
+                merchandiseImagePreview.src = '';
+                merchandiseImagePreview.alt = '';
             }
 
-            merchandiseLastTrigger?.focus();
-            merchandiseLastTrigger = null;
+            lastMerchandiseImageTrigger?.focus();
+            lastMerchandiseImageTrigger = null;
         };
 
-        const openMerchandiseModal = (trigger) => {
+        const openMerchandiseImageModal = (trigger) => {
             if (
-                !merchandiseModal
-                || !merchandiseModalImage
+                !merchandiseImageModal
+                || !merchandiseImagePreview
             ) {
                 return;
             }
@@ -2295,21 +2602,21 @@
                 return;
             }
 
-            merchandiseLastTrigger = trigger;
+            lastMerchandiseImageTrigger = trigger;
 
-            merchandiseModalImage.src = imageSrc;
-            merchandiseModalImage.alt = imageAlt;
+            merchandiseImagePreview.src = imageSrc;
+            merchandiseImagePreview.alt = imageAlt;
 
-            if (merchandiseModalTitle) {
-                merchandiseModalTitle.textContent = imageAlt;
+            if (merchandiseImageTitle) {
+                merchandiseImageTitle.textContent = imageAlt;
             }
 
-            merchandiseModal.classList.add('is-open');
-            merchandiseModal.setAttribute('aria-hidden', 'false');
-            document.body.classList.add('elive-modal-open');
+            merchandiseImageModal.classList.add('is-open');
+            merchandiseImageModal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('elive-image-modal-open');
 
             window.setTimeout(() => {
-                merchandiseModalClose?.focus();
+                merchandiseImageClose?.focus();
             }, 10);
         };
 
@@ -2317,33 +2624,31 @@
             '[data-merchandise-image-trigger]'
         ).forEach((trigger) => {
             trigger.addEventListener('click', () => {
-                openMerchandiseModal(trigger);
+                openMerchandiseImageModal(trigger);
             });
         });
 
-        merchandiseModalClose?.addEventListener(
+        merchandiseImageClose?.addEventListener(
             'click',
-            closeMerchandiseModal
+            closeMerchandiseImageModal
         );
 
-        merchandiseModal?.addEventListener('click', (event) => {
-            if (
-                event.target === merchandiseModal
-            ) {
-                closeMerchandiseModal();
+        merchandiseImageModal?.addEventListener('click', (event) => {
+            if (event.target === merchandiseImageModal) {
+                closeMerchandiseImageModal();
             }
         });
 
-        merchandiseModalDialog?.addEventListener('click', (event) => {
+        merchandiseImageDialog?.addEventListener('click', (event) => {
             event.stopPropagation();
         });
 
         document.addEventListener('keydown', (event) => {
             if (
                 event.key === 'Escape'
-                && merchandiseModal?.classList.contains('is-open')
+                && merchandiseImageModal?.classList.contains('is-open')
             ) {
-                closeMerchandiseModal();
+                closeMerchandiseImageModal();
             }
         });
 
@@ -2384,6 +2689,7 @@
         const registrationForm = document.querySelector('[data-registration-form]');
         const submitButton = document.querySelector('[data-submit-button]');
         const paymentTotal = document.querySelector('[data-payment-total]');
+        const paymentDetails = document.querySelector('[data-payment-details]');
         const allDaysCheckbox = document.querySelector('[data-all-days-checkbox]');
         const eventDayCheckboxes = Array.from(
             document.querySelectorAll('[data-event-day-checkbox]')
@@ -2584,6 +2890,10 @@
             paymentTotal.textContent = total > 0
                 ? formatMoney(total, currency)
                 : 'No payment required';
+
+            if (paymentDetails) {
+                paymentDetails.hidden = total <= 0;
+            }
         };
 
         registrationForm?.addEventListener('submit', (event) => {

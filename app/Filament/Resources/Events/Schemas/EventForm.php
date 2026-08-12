@@ -913,6 +913,73 @@ class EventForm
 
                 /*
                 |--------------------------------------------------------------------------
+                | Payment Settings
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make(
+                    'Payment Settings'
+                )
+                    ->description(
+                        'Configure event-level payment details used for paid merchandise and other payable registration items.'
+                    )
+                    ->schema([
+                        TextInput::make(
+                            'payment_method'
+                        )
+                            ->label(
+                                'Payment Method'
+                            )
+                            ->placeholder(
+                                'Example: Vodacom M-Pesa'
+                            )
+                            ->maxLength(255)
+                            ->helperText(
+                                'Example: Vodacom M-Pesa, Airtel Money, Mixx by Yas, Bank Transfer.'
+                            ),
+
+                        TextInput::make(
+                            'payment_account_name'
+                        )
+                            ->label(
+                                'Payment Account Name'
+                            )
+                            ->placeholder(
+                                'Example: Sadaka Dar Es Salaam Central SDA Church'
+                            )
+                            ->maxLength(255),
+
+                        TextInput::make(
+                            'payment_account_number'
+                        )
+                            ->label(
+                                'Payment Account Number'
+                            )
+                            ->placeholder(
+                                'Example: 58192223'
+                            )
+                            ->maxLength(255),
+
+                        Textarea::make(
+                            'payment_instructions'
+                        )
+                            ->label(
+                                'Payment Instructions'
+                            )
+                            ->rows(4)
+                            ->placeholder(
+                                'Example: Please complete payment after registration and keep your payment confirmation for verification.'
+                            )
+                            ->helperText(
+                                'Shown to attendees when a paid item is selected.'
+                            )
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
                 | Registration Branding
                 |--------------------------------------------------------------------------
                 */

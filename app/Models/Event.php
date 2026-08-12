@@ -81,6 +81,11 @@ class Event extends Model
         'registration_sms_template_id',
 
         'show_merchandise_images',
+
+        'payment_method',
+        'payment_account_name',
+        'payment_account_number',
+        'payment_instructions',
     ];
 
     protected function casts(): array

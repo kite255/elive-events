@@ -48,6 +48,54 @@
         $canViewBadge =
             $registrationUrl
             && $isSuccessful;
+
+        /*
+         * Merchandise / payment summary.
+         */
+        $merchandiseSelections =
+            $attendee->merchandiseSelections ?? collect();
+
+        $paidSelections = $merchandiseSelections
+            ->filter(
+                fn ($selection) =>
+                    (float) ($selection->total_price ?? 0) > 0
+            );
+
+        $paymentTotal = (float) $paidSelections->sum(
+            fn ($selection) =>
+                (float) ($selection->total_price ?? 0)
+        );
+
+        $paymentCurrency =
+            $paidSelections
+                ->pluck('currency')
+                ->filter()
+                ->first()
+            ?? 'TZS';
+
+        $paymentRequired = $paymentTotal > 0;
+
+        $paymentStatus = $paymentRequired
+            ? strtoupper(
+                str_replace(
+                    '_',
+                    ' ',
+                    (string) (
+                        $paidSelections
+                            ->pluck('payment_status')
+                            ->filter()
+                            ->first()
+                        ?? 'pending'
+                    )
+                )
+            )
+            : null;
+
+        $hasPaymentDetails =
+            filled($event->payment_method)
+            || filled($event->payment_account_name)
+            || filled($event->payment_account_number)
+            || filled($event->payment_instructions);
     @endphp
 
     <title>
@@ -73,6 +121,7 @@
             --text: #0f172a;
             --muted: #64748b;
             --border: #e2e8f0;
+            --soft: #f8fafc;
 
             --success: #16a34a;
             --warning: #d97706;
@@ -88,10 +137,10 @@
             min-height: 100vh;
 
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
 
-            padding: 20px;
+            padding: 36px 20px;
 
             background:
                 linear-gradient(
@@ -113,29 +162,19 @@
         }
 
         .success-card {
-            width: min(
-                100%,
-                560px
-            );
+            width: min(100%, 620px);
 
             padding: 42px 32px;
 
             background: #ffffff;
 
-            border:
-                1px solid
-                var(--border);
+            border: 1px solid var(--border);
 
             border-radius: 24px;
 
             box-shadow:
                 0 20px 50px
-                rgba(
-                    15,
-                    23,
-                    42,
-                    0.10
-                );
+                rgba(15, 23, 42, 0.10);
 
             text-align: center;
         }
@@ -146,9 +185,7 @@
             max-width: 90px;
             max-height: 90px;
 
-            margin:
-                0 auto
-                22px;
+            margin: 0 auto 22px;
 
             object-fit: contain;
         }
@@ -157,9 +194,7 @@
             width: 76px;
             height: 76px;
 
-            margin:
-                0 auto
-                22px;
+            margin: 0 auto 22px;
 
             display: flex;
             align-items: center;
@@ -191,12 +226,7 @@
 
             color: var(--primary);
 
-            font-size:
-                clamp(
-                    28px,
-                    5vw,
-                    38px
-                );
+            font-size: clamp(28px, 5vw, 38px);
 
             line-height: 1.2;
 
@@ -213,11 +243,9 @@
         }
 
         .message {
-            max-width: 460px;
+            max-width: 500px;
 
-            margin:
-                10px auto
-                0;
+            margin: 10px auto 0;
 
             color: #475569;
 
@@ -228,6 +256,174 @@
         .event-name {
             color: var(--primary);
             font-weight: 800;
+        }
+
+        .payment-card {
+            margin-top: 28px;
+
+            padding: 20px;
+
+            border:
+                1px solid
+                color-mix(
+                    in srgb,
+                    var(--primary) 24%,
+                    var(--border)
+                );
+
+            border-radius: 18px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    color-mix(
+                        in srgb,
+                        var(--primary) 5%,
+                        #ffffff
+                    ),
+                    #ffffff
+                );
+
+            text-align: left;
+        }
+
+        .payment-title {
+            margin: 0;
+
+            color: var(--primary);
+
+            font-size: 19px;
+            font-weight: 900;
+        }
+
+        .payment-subtitle {
+            margin: 6px 0 0;
+
+            color: var(--muted);
+
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .amount-box {
+            margin-top: 16px;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+
+            padding: 14px 15px;
+
+            border: 1px solid var(--border);
+            border-radius: 14px;
+
+            background: var(--soft);
+        }
+
+        .amount-label {
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .amount-value {
+            color: var(--text);
+            font-size: 19px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .payment-status {
+            margin-top: 10px;
+
+            display: inline-flex;
+            align-items: center;
+
+            padding: 6px 10px;
+
+            border-radius: 999px;
+
+            background: #fff7ed;
+            color: #9a3412;
+
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .payment-details {
+            margin-top: 16px;
+
+            overflow: hidden;
+
+            border: 1px solid var(--border);
+            border-radius: 14px;
+
+            background: #ffffff;
+        }
+
+        .payment-row {
+            padding: 13px 14px;
+
+            border-bottom:
+                1px solid
+                var(--border);
+        }
+
+        .payment-row:last-child {
+            border-bottom: 0;
+        }
+
+        .payment-label {
+            color: var(--muted);
+
+            font-size: 10px;
+            font-weight: 900;
+
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .payment-value {
+            margin-top: 5px;
+
+            color: var(--text);
+
+            font-size: 15px;
+            font-weight: 800;
+
+            line-height: 1.45;
+
+            word-break: break-word;
+        }
+
+        .account-number {
+            font-size: 19px;
+            letter-spacing: 0.03em;
+        }
+
+        .instructions {
+            margin-top: 16px;
+
+            padding: 14px;
+
+            border-radius: 13px;
+
+            background: #f8fafc;
+
+            color: #475569;
+
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .payment-note {
+            margin-top: 14px;
+
+            color: #475569;
+
+            font-size: 12px;
+            line-height: 1.6;
         }
 
         .actions {
@@ -241,8 +437,7 @@
 
             min-height: 48px;
 
-            padding:
-                13px 22px;
+            padding: 13px 22px;
 
             border-radius: 14px;
 
@@ -255,12 +450,7 @@
 
             box-shadow:
                 0 12px 24px
-                rgba(
-                    30,
-                    64,
-                    175,
-                    0.20
-                );
+                rgba(30, 64, 175, 0.20);
         }
 
         .footer {
@@ -271,22 +461,26 @@
             font-size: 12px;
         }
 
-        @media (
-            max-width: 600px
-        ) {
+        @media (max-width: 600px) {
             body {
-                align-items: flex-start;
                 padding: 16px;
             }
 
             .success-card {
-                margin-top: 30px;
+                margin-top: 14px;
 
-                padding:
-                    34px
-                    20px;
+                padding: 34px 20px;
 
                 border-radius: 20px;
+            }
+
+            .amount-box {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .amount-value {
+                white-space: normal;
             }
 
             .button {
@@ -361,6 +555,93 @@
                 {{ $event->name }}
             </span>
         </p>
+
+        @if ($paymentRequired)
+            <section class="payment-card">
+                <h2 class="payment-title">
+                    Payment Required
+                </h2>
+
+                <p class="payment-subtitle">
+                    Your merchandise order has been received.
+                    Complete the payment using the details below.
+                </p>
+
+                <div class="amount-box">
+                    <span class="amount-label">
+                        Amount to Pay
+                    </span>
+
+                    <span class="amount-value">
+                        {{ $paymentCurrency }}
+                        {{ number_format($paymentTotal, 2) }}
+                    </span>
+                </div>
+
+                @if ($paymentStatus)
+                    <span class="payment-status">
+                        {{ $paymentStatus }}
+                    </span>
+                @endif
+
+                @if ($hasPaymentDetails)
+                    <div class="payment-details">
+
+                        @if (filled($event->payment_method))
+                            <div class="payment-row">
+                                <div class="payment-label">
+                                    Payment Method
+                                </div>
+
+                                <div class="payment-value">
+                                    {{ $event->payment_method }}
+                                </div>
+                            </div>
+                        @endif
+
+                        @if (filled($event->payment_account_name))
+                            <div class="payment-row">
+                                <div class="payment-label">
+                                    Account Name
+                                </div>
+
+                                <div class="payment-value">
+                                    {{ $event->payment_account_name }}
+                                </div>
+                            </div>
+                        @endif
+
+                        @if (filled($event->payment_account_number))
+                            <div class="payment-row">
+                                <div class="payment-label">
+                                    Account Number
+                                </div>
+
+                                <div class="payment-value account-number">
+                                    {{ $event->payment_account_number }}
+                                </div>
+                            </div>
+                        @endif
+
+                    </div>
+
+                    @if (filled($event->payment_instructions))
+                        <div class="instructions">
+                            {{ $event->payment_instructions }}
+                        </div>
+                    @endif
+                @else
+                    <div class="instructions">
+                        Payment instructions will be provided by the event organizer.
+                    </div>
+                @endif
+
+                <div class="payment-note">
+                    Please keep your payment confirmation or transaction reference
+                    for verification.
+                </div>
+            </section>
+        @endif
 
         @if ($registrationUrl)
             <div class="actions">
