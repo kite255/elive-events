@@ -4,6 +4,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /var/www/html
 
+# ---------------------------------------------------------
+# System Dependencies + PHP Extensions
+# ---------------------------------------------------------
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -17,6 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libonig-dev \
     libxml2-dev \
     libicu-dev \
+    imagemagick \
+    libmagickwand-dev \
+    librsvg2-bin \
+    pkg-config \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j2 \
         pdo_pgsql \
@@ -31,13 +39,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pecl install redis \
-    && docker-php-ext-enable redis
+# ---------------------------------------------------------
+# PECL Extensions
+# Redis   = queue/cache/session
+# Imagick = SVG -> PNG badge conversion
+# ---------------------------------------------------------
+
+RUN pecl install redis imagick \
+    && docker-php-ext-enable redis imagick
+
+# ---------------------------------------------------------
+# Composer
+# ---------------------------------------------------------
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# ---------------------------------------------------------
+# PHP Configuration
+# ---------------------------------------------------------
+
 COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
+
+# ---------------------------------------------------------
+# Composer Dependencies
+# ---------------------------------------------------------
 
 COPY composer.json composer.lock ./
 
@@ -48,7 +74,15 @@ RUN composer install \
     --optimize-autoloader \
     --no-scripts
 
+# ---------------------------------------------------------
+# Application
+# ---------------------------------------------------------
+
 COPY . .
+
+# ---------------------------------------------------------
+# Laravel Runtime Preparation
+# ---------------------------------------------------------
 
 RUN composer dump-autoload --optimize \
     && mkdir -p \
