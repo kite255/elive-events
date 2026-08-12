@@ -2,8 +2,74 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ $event->registration_welcome_title ?: 'Register for ' . $event->name }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    @php
+        /*
+         * Social sharing / link preview metadata.
+         *
+         * Priority:
+         * 1. Event registration banner
+         * 2. Event / organization logo
+         * 3. Generic eLive fallback image
+         */
+        $shareTitle =
+            $event->registration_welcome_title
+            ?: $event->name;
+
+        $shareDescription =
+            $event->registration_welcome_message
+            ?: (
+                filled($event->description)
+                    ? \Illuminate\Support\Str::limit(
+                        strip_tags((string) $event->description),
+                        180
+                    )
+                    : 'Register for ' . $event->name . ' with eLive Events.'
+            );
+
+        $shareImage = filled($branding['banner'] ?? null)
+            ? asset('storage/' . $branding['banner'])
+            : (
+                filled($branding['logo'] ?? null)
+                    ? asset('storage/' . $branding['logo'])
+                    : asset('images/elive-events-share.png')
+            );
+
+        $shareUrl = url()->current();
+    @endphp
+
+    <title>
+        {{ $shareTitle }}
+    </title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="{{ $shareDescription }}"
+    >
+
+    <link
+        rel="canonical"
+        href="{{ $shareUrl }}"
+    >
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="eLive Events">
+    <meta property="og:title" content="{{ $shareTitle }}">
+    <meta property="og:description" content="{{ $shareDescription }}">
+    <meta property="og:url" content="{{ $shareUrl }}">
+    <meta property="og:image" content="{{ $shareImage }}">
+    <meta property="og:image:secure_url" content="{{ $shareImage }}">
+    <meta property="og:image:alt" content="{{ $event->name }}">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $shareTitle }}">
+    <meta name="twitter:description" content="{{ $shareDescription }}">
+    <meta name="twitter:image" content="{{ $shareImage }}">
 
     <style>
         :root {
