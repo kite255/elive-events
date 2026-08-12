@@ -19,7 +19,8 @@ class AutomaticCommunicationService
 
     public function __construct(
         protected MessagePlaceholderService $placeholderService,
-        protected PhoneNumberService $phoneNumberService
+        protected PhoneNumberService $phoneNumberService,
+        protected WhatsAppService $whatsAppService,
     ) {
     }
 
@@ -28,16 +29,21 @@ class AutomaticCommunicationService
     | Registration Communication
     |--------------------------------------------------------------------------
     |
-    | This method is called after public registration has completed.
+    | Called after public registration completes.
     |
-    | For the current MVP:
+    | Current automatic channels:
     |
-    | - Only approved / registered attendees receive the automatic SMS.
-    | - The event must have registration_sms_enabled = true.
-    | - The event must have registration_sms_template_id selected.
-    | - The selected template must be active.
-    | - The selected template must be an SMS template.
-    | - The attendee must have a valid phone number.
+    | 1. SMS
+    |    - Event must have registration SMS enabled.
+    |    - Event must have a registration SMS template selected.
+    |
+    | 2. WhatsApp
+    |    - Attendee must be approved.
+    |    - WhatsApp must be configured.
+    |    - Attendee must have a valid phone number.
+    |    - Badge must already exist.
+    |    - Uses Meta template:
+    |      event_registration_confirmation
     |
     |--------------------------------------------------------------------------
     */
@@ -60,12 +66,136 @@ class AutomaticCommunicationService
 
         /*
         |--------------------------------------------------------------------------
-        | Only confirmed registration for now
+        | Only approved / confirmed attendees
         |--------------------------------------------------------------------------
         */
 
         if (! $attendee->isApproved()) {
             return collect();
+        }
+
+        $logs = collect();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Automatic SMS
+        |--------------------------------------------------------------------------
+        */
+
+        $smsLog =
+            $this->prepareRegistrationSms(
+                $attendee
+            );
+
+        if ($smsLog) {
+            $logs->push(
+                $this->dispatchLog(
+                    $smsLog
+                )
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Automatic WhatsApp
+        |--------------------------------------------------------------------------
+        |
+        | Do not send the WhatsApp confirmation before the badge exists,
+        | because the approved Meta template uses the badge as its image
+        | header.
+        |
+        */
+
+        $whatsAppLog =
+            $this->prepareRegistrationWhatsApp(
+                $attendee
+            );
+
+        if ($whatsAppLog) {
+            $logs->push(
+                $this->dispatchLog(
+                    $whatsAppLog
+                )
+            );
+        }
+
+        return $logs
+            ->filter()
+            ->values();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Badge Ready Communication
+    |--------------------------------------------------------------------------
+    |
+    | Call this after a badge has successfully been generated.
+    |
+    | This is important when badge generation happens asynchronously.
+    |
+    | Registration may happen first:
+    |
+    | Registration
+    |     ↓
+    | Badge job
+    |     ↓
+    | handleBadgeReady()
+    |     ↓
+    | WhatsApp registration confirmation
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    public function handleBadgeReady(
+        Attendee $attendee
+    ): Collection {
+        $attendee->loadMissing([
+            'event.organization',
+            'category',
+            'badgeType',
+        ]);
+
+        if (! $attendee->event) {
+            return collect();
+        }
+
+        if (! $attendee->isApproved()) {
+            return collect();
+        }
+
+        if (blank($attendee->badge_path)) {
+            return collect();
+        }
+
+        $log =
+            $this->prepareRegistrationWhatsApp(
+                $attendee
+            );
+
+        if (! $log) {
+            return collect();
+        }
+
+        return collect([
+            $this->dispatchLog(
+                $log
+            ),
+        ])->filter()->values();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prepare Registration SMS
+    |--------------------------------------------------------------------------
+    */
+
+    protected function prepareRegistrationSms(
+        Attendee $attendee
+    ): ?CommunicationLog {
+        $event = $attendee->event;
+
+        if (! $event) {
+            return null;
         }
 
         /*
@@ -75,12 +205,12 @@ class AutomaticCommunicationService
         */
 
         if (! $event->shouldSendRegistrationSms()) {
-            return collect();
+            return null;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Selected registration SMS template
+        | Selected SMS template
         |--------------------------------------------------------------------------
         */
 
@@ -88,12 +218,12 @@ class AutomaticCommunicationService
             $event->registrationSmsTemplate;
 
         if (! $template) {
-            return collect();
+            return null;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Validate template
+        | Validate SMS template
         |--------------------------------------------------------------------------
         */
 
@@ -101,54 +231,245 @@ class AutomaticCommunicationService
             $attendee,
             $template
         )) {
-            return collect();
+            return null;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Prepare communication
-        |--------------------------------------------------------------------------
-        */
-
-        $log = $this->prepareCommunication(
+        return $this->prepareCommunication(
             $attendee,
             $template
         );
+    }
 
-        if (! $log) {
-            return collect();
+    /*
+    |--------------------------------------------------------------------------
+    | Prepare Registration WhatsApp
+    |--------------------------------------------------------------------------
+    |
+    | This does not depend on a CommunicationTemplate database record.
+    |
+    | The approved Meta template is configured through:
+    |
+    | WHATSAPP_TEMPLATE_REGISTRATION_CONFIRMATION
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    protected function prepareRegistrationWhatsApp(
+        Attendee $attendee
+    ): ?CommunicationLog {
+        $event = $attendee->event;
+
+        if (! $event) {
+            return null;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Dispatch queued job
+        | WhatsApp must be configured
         |--------------------------------------------------------------------------
         */
 
+        if (! $this->whatsAppService->isConfigured()) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Badge must exist
+        |--------------------------------------------------------------------------
+        */
+
+        if (blank($attendee->badge_path)) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Valid phone number required
+        |--------------------------------------------------------------------------
+        */
+
+        $recipient =
+            $this->phoneRecipient(
+                $attendee
+            );
+
+        if (blank($recipient)) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Approved Meta template
+        |--------------------------------------------------------------------------
+        */
+
+        $templateName =
+            config(
+                'services.whatsapp.templates.registration_confirmation'
+            );
+
+        if (blank($templateName)) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Human-readable log message
+        |--------------------------------------------------------------------------
+        |
+        | The actual WhatsApp payload will be built by WhatsAppService.
+        |
+        | Meta variables:
+        |
+        | {{1}} Full name
+        | {{2}} Event name
+        | {{3}} Category
+        | {{4}} Venue
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        $category =
+            $attendee->category?->name
+            ?? 'Attendee';
+
+        $venue =
+            $event->venue
+            ?? '-';
+
+        $message = implode(
+            PHP_EOL,
+            [
+                "Hello {$attendee->full_name},",
+                '',
+                "Your registration for {$event->name} has been completed successfully.",
+                "Category: {$category}",
+                "Venue: {$venue}",
+                '',
+                'Your digital badge is attached. Please keep it available for check-in during the event.',
+                '',
+                'Thank you.',
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate Protection
+        |--------------------------------------------------------------------------
+        */
+
+        $existingLog =
+            CommunicationLog::query()
+                ->where(
+                    'event_id',
+                    $attendee->event_id
+                )
+                ->where(
+                    'attendee_id',
+                    $attendee->id
+                )
+                ->whereNull(
+                    'communication_campaign_id'
+                )
+                ->where(
+                    'channel',
+                    CommunicationTemplate::CHANNEL_WHATSAPP
+                )
+                ->where(
+                    'recipient',
+                    $recipient
+                )
+                ->where(
+                    'subject',
+                    $templateName
+                )
+                ->whereIn(
+                    'status',
+                    [
+                        CommunicationLog::STATUS_PENDING,
+                        CommunicationLog::STATUS_QUEUED,
+                        CommunicationLog::STATUS_SENDING,
+                        CommunicationLog::STATUS_SENT,
+                        CommunicationLog::STATUS_DELIVERED,
+                    ]
+                )
+                ->first();
+
+        if ($existingLog) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create WhatsApp communication log
+        |--------------------------------------------------------------------------
+        |
+        | subject stores the Meta template name.
+        |
+        | SendAutomaticCommunicationJob will use this when channel=whatsapp.
+        |
+        |--------------------------------------------------------------------------
+        */
+
+        return CommunicationLog::create([
+            'event_id' =>
+                $attendee->event_id,
+
+            'attendee_id' =>
+                $attendee->id,
+
+            'communication_campaign_id' =>
+                null,
+
+            'channel' =>
+                CommunicationTemplate::CHANNEL_WHATSAPP,
+
+            'recipient' =>
+                $recipient,
+
+            'subject' =>
+                $templateName,
+
+            'message' =>
+                trim($message),
+
+            'status' =>
+                CommunicationLog::STATUS_QUEUED,
+
+            'queued_at' =>
+                now(),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue Communication
+    |--------------------------------------------------------------------------
+    */
+
+    protected function dispatchLog(
+        CommunicationLog $log
+    ): CommunicationLog {
         try {
             SendAutomaticCommunicationJob::dispatch(
                 $log->id
             )->onQueue(
                 'communications'
             );
+
+            return $log;
         } catch (Throwable $exception) {
-            /*
-             * If dispatch itself fails, mark the log failed.
-             */
-            report($exception);
+            report(
+                $exception
+            );
 
             $log->markFailed(
                 $exception->getMessage()
             );
 
-            return collect([
-                $log->fresh(),
-            ]);
+            return $log->fresh();
         }
-
-        return collect([
-            $log,
-        ]);
     }
 
     /*
@@ -156,17 +477,15 @@ class AutomaticCommunicationService
     | Generic Trigger Dispatcher
     |--------------------------------------------------------------------------
     |
-    | Keep this method for future automatic communication such as:
+    | Reserved for future automatic communication:
     |
     | registration_received
+    | registration_confirmed
     | registration_approved
     | waitlist
     | reminder
     | badge_ready
     | certificate_ready
-    |
-    | The registration confirmation flow above does NOT depend on template
-    | naming. It uses the template selected directly on the event.
     |
     |--------------------------------------------------------------------------
     */
@@ -217,30 +536,16 @@ class AutomaticCommunicationService
                 continue;
             }
 
-            try {
-                SendAutomaticCommunicationJob::dispatch(
-                    $log->id
-                )->onQueue(
-                    'communications'
-                );
-
-                $logs->push(
+            $logs->push(
+                $this->dispatchLog(
                     $log
-                );
-            } catch (Throwable $exception) {
-                report($exception);
-
-                $log->markFailed(
-                    $exception->getMessage()
-                );
-
-                $logs->push(
-                    $log->fresh()
-                );
-            }
+                )
+            );
         }
 
-        return $logs;
+        return $logs
+            ->filter()
+            ->values();
     }
 
     /*
@@ -260,8 +565,9 @@ class AutomaticCommunicationService
         }
 
         /*
-         * Template must belong to the same organization as the event.
+         * Template must belong to same organization.
          */
+
         if (
             (int) $template->organization_id
             !== (int) $event->organization_id
@@ -272,13 +578,15 @@ class AutomaticCommunicationService
         /*
          * Template must be active.
          */
+
         if (! $template->is_active) {
             return false;
         }
 
         /*
-         * Registration automatic communication currently uses SMS.
+         * Registration SMS must be SMS channel.
          */
+
         if (
             $template->channel
             !== CommunicationTemplate::CHANNEL_SMS
@@ -287,8 +595,9 @@ class AutomaticCommunicationService
         }
 
         /*
-         * Template must contain a message body.
+         * Template must have message body.
          */
+
         if (blank($template->body)) {
             return false;
         }
@@ -349,7 +658,7 @@ class AutomaticCommunicationService
     ): ?CommunicationLog {
         /*
         |--------------------------------------------------------------------------
-        | Resolve recipient
+        | Resolve Recipient
         |--------------------------------------------------------------------------
         */
 
@@ -365,7 +674,7 @@ class AutomaticCommunicationService
 
         /*
         |--------------------------------------------------------------------------
-        | Render template
+        | Render Template
         |--------------------------------------------------------------------------
         */
 
@@ -395,14 +704,6 @@ class AutomaticCommunicationService
         /*
         |--------------------------------------------------------------------------
         | Duplicate Protection
-        |--------------------------------------------------------------------------
-        |
-        | Public registration should trigger this once.
-        |
-        | This also prevents accidental duplicate dispatch if the automatic
-        | communication method is called again for the same attendee with
-        | exactly the same automatic message.
-        |
         |--------------------------------------------------------------------------
         */
 
@@ -449,7 +750,7 @@ class AutomaticCommunicationService
 
         /*
         |--------------------------------------------------------------------------
-        | Create communication log
+        | Create Communication Log
         |--------------------------------------------------------------------------
         */
 

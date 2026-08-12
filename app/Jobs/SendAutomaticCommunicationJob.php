@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\CommunicationLog;
 use App\Services\SmsService;
+use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -18,24 +19,49 @@ class SendAutomaticCommunicationJob implements ShouldQueue
 
     public int $timeout = 120;
 
+    public array $backoff = [
+        60,
+        300,
+        900,
+    ];
+
     public function __construct(
         public int $communicationLogId
     ) {
-        $this->onQueue('communications');
+        $this->onQueue(
+            'communications'
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Handle Job
+    |--------------------------------------------------------------------------
+    */
 
     public function handle(): void
     {
-        $communicationLog = CommunicationLog::query()
-            ->with([
-                'event',
-                'attendee',
-            ])
-            ->find($this->communicationLogId);
+        $communicationLog =
+            CommunicationLog::query()
+                ->with([
+                    'event',
+                    'attendee.event',
+                    'attendee.category',
+                    'attendee.badgeType',
+                ])
+                ->find(
+                    $this->communicationLogId
+                );
 
         if (! $communicationLog) {
             return;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate Send Protection
+        |--------------------------------------------------------------------------
+        */
 
         if (
             in_array(
@@ -51,10 +77,25 @@ class SendAutomaticCommunicationJob implements ShouldQueue
         }
 
         try {
+            /*
+            |--------------------------------------------------------------------------
+            | Mark Sending
+            |--------------------------------------------------------------------------
+            */
+
             $communicationLog->update([
-                'status' => CommunicationLog::STATUS_SENDING,
-                'error' => null,
+                'status' =>
+                    CommunicationLog::STATUS_SENDING,
+
+                'error' =>
+                    null,
             ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Send Based On Channel
+            |--------------------------------------------------------------------------
+            */
 
             $providerMessageId = match (
                 $communicationLog->channel
@@ -81,6 +122,12 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     ),
             };
 
+            /*
+            |--------------------------------------------------------------------------
+            | Mark Sent
+            |--------------------------------------------------------------------------
+            */
+
             $communicationLog->markSent(
                 $providerMessageId
             );
@@ -91,15 +138,32 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     'communication_log_id' =>
                         $communicationLog->id,
 
+                    'event_id' =>
+                        $communicationLog->event_id,
+
+                    'attendee_id' =>
+                        $communicationLog->attendee_id,
+
                     'channel' =>
                         $communicationLog->channel,
+
+                    'recipient' =>
+                        $communicationLog->recipient,
 
                     'provider_message_id' =>
                         $providerMessageId,
                 ]
             );
         } catch (Throwable $exception) {
-            report($exception);
+            report(
+                $exception
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Mark Failed
+            |--------------------------------------------------------------------------
+            */
 
             $communicationLog->markFailed(
                 $exception->getMessage()
@@ -111,31 +175,66 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     'communication_log_id' =>
                         $communicationLog->id,
 
+                    'event_id' =>
+                        $communicationLog->event_id,
+
+                    'attendee_id' =>
+                        $communicationLog->attendee_id,
+
                     'channel' =>
                         $communicationLog->channel,
 
                     'recipient' =>
                         $communicationLog->recipient,
 
+                    'attempt' =>
+                        $this->attempts(),
+
                     'error' =>
                         $exception->getMessage(),
                 ]
             );
 
+            /*
+            |--------------------------------------------------------------------------
+            | Throw Again
+            |--------------------------------------------------------------------------
+            |
+            | Laravel will retry according to:
+            |
+            | tries   = 3
+            | backoff = 60, 300, 900 seconds
+            |
+            */
+
             throw $exception;
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Send SMS
+    |--------------------------------------------------------------------------
+    */
+
     protected function sendSms(
         CommunicationLog $communicationLog
     ): ?string {
-        if (blank($communicationLog->recipient)) {
+        if (
+            blank(
+                $communicationLog->recipient
+            )
+        ) {
             throw new RuntimeException(
                 'SMS recipient is missing.'
             );
         }
 
-        if (blank($communicationLog->message)) {
+        if (
+            blank(
+                $communicationLog->message
+            )
+        ) {
             throw new RuntimeException(
                 'SMS message is missing.'
             );
@@ -177,7 +276,11 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             $result['provider_message_id']
             ?? null;
 
-        if (blank($providerMessageId)) {
+        if (
+            blank(
+                $providerMessageId
+            )
+        ) {
             Log::warning(
                 'SMS was submitted but provider message ID was missing.',
                 [
@@ -193,18 +296,40 @@ class SendAutomaticCommunicationJob implements ShouldQueue
         return $providerMessageId;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Send Email
+    |--------------------------------------------------------------------------
+    |
+    | Email is intentionally still in local/test mode.
+    |
+    | We will connect SMTP / Laravel Mail after WhatsApp registration
+    | confirmation is working correctly.
+    |
+    */
+
     protected function sendEmail(
         CommunicationLog $communicationLog
     ): ?string {
-        /*
-        |--------------------------------------------------------------------------
-        | Email provider integration
-        |--------------------------------------------------------------------------
-        |
-        | Email is still running in local/test mode.
-        | SMTP / Laravel Mail will be connected next.
-        |
-        */
+        if (
+            blank(
+                $communicationLog->recipient
+            )
+        ) {
+            throw new RuntimeException(
+                'Email recipient is missing.'
+            );
+        }
+
+        if (
+            blank(
+                $communicationLog->message
+            )
+        ) {
+            throw new RuntimeException(
+                'Email message is missing.'
+            );
+        }
 
         Log::info(
             'Automatic email communication prepared.',
@@ -233,21 +358,114 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             . $communicationLog->id;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Send WhatsApp
+    |--------------------------------------------------------------------------
+    |
+    | Uses the approved Meta template:
+    |
+    | event_registration_confirmation
+    |
+    | Header:
+    | Digital attendee badge
+    |
+    | Body:
+    |
+    | {{1}} Attendee full name
+    | {{2}} Event name
+    | {{3}} Attendee category
+    | {{4}} Event venue
+    |
+    |--------------------------------------------------------------------------
+    */
+
     protected function sendWhatsApp(
         CommunicationLog $communicationLog
     ): ?string {
+        if (
+            blank(
+                $communicationLog->recipient
+            )
+        ) {
+            throw new RuntimeException(
+                'WhatsApp recipient is missing.'
+            );
+        }
+
         /*
         |--------------------------------------------------------------------------
-        | WhatsApp integration
+        | Attendee Required
+        |--------------------------------------------------------------------------
+        */
+
+        $attendee =
+            $communicationLog->attendee;
+
+        if (! $attendee) {
+            throw new RuntimeException(
+                'WhatsApp communication attendee could not be found.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Event Required
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $attendee->event) {
+            throw new RuntimeException(
+                'WhatsApp communication event could not be found.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Badge Required
         |--------------------------------------------------------------------------
         |
-        | WhatsApp is still running in local/test mode.
-        | WhatsApp Cloud API will be connected later.
+        | Registration confirmation uses the digital badge as the Meta
+        | template image header.
         |
         */
 
+        if (
+            blank(
+                $attendee->badge_path
+            )
+        ) {
+            throw new RuntimeException(
+                'Attendee badge has not been generated yet.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Verify WhatsApp Configuration
+        |--------------------------------------------------------------------------
+        */
+
+        $whatsAppService = app(
+            WhatsAppService::class
+        );
+
+        if (
+            ! $whatsAppService->isConfigured()
+        ) {
+            throw new RuntimeException(
+                'WhatsApp Cloud API is not configured.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send Meta Template
+        |--------------------------------------------------------------------------
+        */
+
         Log::info(
-            'Automatic WhatsApp communication prepared.',
+            'Sending automatic WhatsApp registration confirmation.',
             [
                 'communication_log_id' =>
                     $communicationLog->id,
@@ -261,35 +479,133 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 'recipient' =>
                     $communicationLog->recipient,
 
-                'message' =>
-                    $communicationLog->message,
+                'template' =>
+                    config(
+                        'services.whatsapp.templates.registration_confirmation'
+                    ),
+
+                'badge_path' =>
+                    $attendee->badge_path,
             ]
         );
 
-        return 'local-whatsapp-'
-            . $communicationLog->id;
+        $result =
+            $whatsAppService
+                ->sendRegistrationConfirmation(
+                    $attendee
+                );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Provider Response
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            ! ($result['success'] ?? false)
+        ) {
+            throw new RuntimeException(
+                'WhatsApp provider did not confirm message submission.'
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Provider Message ID
+        |--------------------------------------------------------------------------
+        |
+        | Meta should return a WAMID such as:
+        |
+        | wamid.HBgM...
+        |
+        | We save this in CommunicationLog so the webhook can later update:
+        |
+        | sent
+        | delivered
+        | read
+        | failed
+        |
+        */
+
+        $providerMessageId =
+            $result['provider_message_id']
+            ?? null;
+
+        if (
+            blank(
+                $providerMessageId
+            )
+        ) {
+            Log::warning(
+                'WhatsApp message was submitted but Meta returned no message ID.',
+                [
+                    'communication_log_id' =>
+                        $communicationLog->id,
+
+                    'attendee_id' =>
+                        $communicationLog->attendee_id,
+
+                    'recipient' =>
+                        $communicationLog->recipient,
+
+                    'response' =>
+                        $result['response']
+                        ?? null,
+                ]
+            );
+        }
+
+        return $providerMessageId;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Permanently Failed Job
+    |--------------------------------------------------------------------------
+    |
+    | Laravel calls this after all retry attempts have been exhausted.
+    |
+    */
 
     public function failed(
         ?Throwable $exception
     ): void {
-        $communicationLog = CommunicationLog::query()
-            ->find($this->communicationLogId);
+        $communicationLog =
+            CommunicationLog::query()
+                ->find(
+                    $this->communicationLogId
+                );
 
         if (! $communicationLog) {
-            return;
-        }
-
-        if (
-            $communicationLog->status
-            === CommunicationLog::STATUS_FAILED
-        ) {
             return;
         }
 
         $communicationLog->markFailed(
             $exception?->getMessage()
                 ?: 'Automatic communication job failed.'
+        );
+
+        Log::error(
+            'Automatic communication job permanently failed.',
+            [
+                'communication_log_id' =>
+                    $communicationLog->id,
+
+                'event_id' =>
+                    $communicationLog->event_id,
+
+                'attendee_id' =>
+                    $communicationLog->attendee_id,
+
+                'channel' =>
+                    $communicationLog->channel,
+
+                'recipient' =>
+                    $communicationLog->recipient,
+
+                'error' =>
+                    $exception?->getMessage(),
+            ]
         );
     }
 }

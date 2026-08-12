@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Attendee;
 use App\Models\BadgeTemplate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -64,8 +65,9 @@ class BadgeGenerationService
     |--------------------------------------------------------------------------
     */
 
-    public function generateForAttendee(Attendee $attendee): string
-    {
+    public function generateForAttendee(
+        Attendee $attendee
+    ): string {
         $attendee->loadMissing([
             'event',
             'category',
@@ -73,12 +75,31 @@ class BadgeGenerationService
             'qrToken',
         ]);
 
-        $this->updateBadgeState($attendee, [
-            'badge_status' => 'generating',
-        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | Mark Generating
+        |--------------------------------------------------------------------------
+        */
+
+        $this->updateBadgeState(
+            $attendee,
+            [
+                'badge_status' =>
+                    'generating',
+            ]
+        );
 
         try {
-            $template = $this->resolveTemplate($attendee);
+            /*
+            |--------------------------------------------------------------------------
+            | Resolve Badge Template
+            |--------------------------------------------------------------------------
+            */
+
+            $template =
+                $this->resolveTemplate(
+                    $attendee
+                );
 
             if (! $template) {
                 throw new \RuntimeException(
@@ -86,7 +107,16 @@ class BadgeGenerationService
                 );
             }
 
-            $layout = $this->resolveLayout($template);
+            /*
+            |--------------------------------------------------------------------------
+            | Resolve Layout
+            |--------------------------------------------------------------------------
+            */
+
+            $layout =
+                $this->resolveLayout(
+                    $template
+                );
 
             $width = (int) data_get(
                 $layout,
@@ -101,13 +131,22 @@ class BadgeGenerationService
             );
 
             $backgroundColor =
-                $template->background_color ?: '#FFFFFF';
+                $template->background_color
+                ?: '#FFFFFF';
 
             $backgroundImagePath =
-                $template->backgroundImagePath();
+                $template
+                    ->backgroundImagePath();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Badge Output Path
+            |--------------------------------------------------------------------------
+            */
 
             $safeName = Str::slug(
-                $attendee->full_name ?: 'attendee'
+                $attendee->full_name
+                    ?: 'attendee'
             );
 
             $path = sprintf(
@@ -123,15 +162,16 @@ class BadgeGenerationService
             |--------------------------------------------------------------------------
             */
 
-            $elementsSvg = $this->renderDesignedElements(
-                attendee: $attendee,
-                layout: $layout,
-                width: $width,
-            );
+            $elementsSvg =
+                $this->renderDesignedElements(
+                    attendee: $attendee,
+                    layout: $layout,
+                    width: $width,
+                );
 
             /*
             |--------------------------------------------------------------------------
-            | QR
+            | QR Code
             |--------------------------------------------------------------------------
             */
 
@@ -150,25 +190,28 @@ class BadgeGenerationService
                     true
                 )
             ) {
-                $qrSvg = $this->renderQrCode(
-                    attendee: $attendee,
+                $qrSvg =
+                    $this->renderQrCode(
+                        attendee: $attendee,
 
-                    centerX: (int) data_get(
-                        $qrConfig,
-                        'x',
-                        self::QR_DEFAULT_X
-                    ),
+                        centerX: (int) data_get(
+                            $qrConfig,
+                            'x',
+                            self::QR_DEFAULT_X
+                        ),
 
-                    y: (int) data_get(
-                        $qrConfig,
-                        'y',
-                        self::QR_MIN_Y
-                    ),
+                        y: (int) data_get(
+                            $qrConfig,
+                            'y',
+                            self::QR_MIN_Y
+                        ),
 
-                    size: self::QR_DEFAULT_SIZE,
+                        size:
+                            self::QR_DEFAULT_SIZE,
 
-                    padding: self::QR_DEFAULT_PADDING,
-                );
+                        padding:
+                            self::QR_DEFAULT_PADDING,
+                    );
             }
 
             /*
@@ -177,12 +220,20 @@ class BadgeGenerationService
             |--------------------------------------------------------------------------
             */
 
-            $backgroundSvg = $this->renderBackground(
-                backgroundImagePath: $backgroundImagePath,
-                backgroundColor: $backgroundColor,
-                width: $width,
-                height: $height,
-            );
+            $backgroundSvg =
+                $this->renderBackground(
+                    backgroundImagePath:
+                        $backgroundImagePath,
+
+                    backgroundColor:
+                        $backgroundColor,
+
+                    width:
+                        $width,
+
+                    height:
+                        $height,
+                );
 
             /*
             |--------------------------------------------------------------------------
@@ -205,24 +256,178 @@ class BadgeGenerationService
 </svg>
 SVG;
 
+            /*
+            |--------------------------------------------------------------------------
+            | Save Badge
+            |--------------------------------------------------------------------------
+            */
+
             Storage::disk('public')->put(
                 $path,
                 $svg
             );
 
-            $this->updateBadgeState($attendee, [
-                'badge_path' => $path,
-                'badge_status' => 'generated',
-                'badge_generated_at' => now(),
+            /*
+            |--------------------------------------------------------------------------
+            | Mark Badge Generated
+            |--------------------------------------------------------------------------
+            */
+
+            $this->updateBadgeState(
+                $attendee,
+                [
+                    'badge_path' =>
+                        $path,
+
+                    'badge_status' =>
+                        'generated',
+
+                    'badge_generated_at' =>
+                        now(),
+                ]
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Refresh Attendee
+            |--------------------------------------------------------------------------
+            |
+            | Make sure the communication service receives the newly saved
+            | badge_path and badge state.
+            |
+            */
+
+            $attendee->refresh();
+
+            $attendee->loadMissing([
+                'event.organization',
+                'category',
+                'badgeType',
+                'qrToken',
             ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Trigger Badge Ready Communication
+            |--------------------------------------------------------------------------
+            |
+            | Registration WhatsApp confirmation requires the generated badge
+            | as the image header.
+            |
+            | IMPORTANT:
+            |
+            | Communication failure must NEVER make badge generation fail.
+            |
+            | The badge has already been generated successfully at this point.
+            | Therefore communication is dispatched in a separate protected
+            | method.
+            |
+            */
+
+            $this->triggerBadgeReadyCommunication(
+                $attendee
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return Badge Path
+            |--------------------------------------------------------------------------
+            */
 
             return $path;
-        } catch (Throwable $e) {
-            $this->updateBadgeState($attendee, [
-                'badge_status' => 'failed',
-            ]);
+        } catch (Throwable $exception) {
+            /*
+            |--------------------------------------------------------------------------
+            | Badge Generation Failed
+            |--------------------------------------------------------------------------
+            */
 
-            throw $e;
+            $this->updateBadgeState(
+                $attendee,
+                [
+                    'badge_status' =>
+                        'failed',
+                ]
+            );
+
+            throw $exception;
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trigger Badge Ready Communication
+    |--------------------------------------------------------------------------
+    |
+    | This connects:
+    |
+    | Badge generated
+    |      ↓
+    | AutomaticCommunicationService
+    |      ↓
+    | WhatsApp CommunicationLog
+    |      ↓
+    | SendAutomaticCommunicationJob
+    |      ↓
+    | WhatsAppService
+    |      ↓
+    | Meta Cloud API
+    |
+    | Communication errors are deliberately isolated from badge generation.
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    protected function triggerBadgeReadyCommunication(
+        Attendee $attendee
+    ): void {
+        try {
+            app(
+                AutomaticCommunicationService::class
+            )->handleBadgeReady(
+                $attendee
+            );
+
+            Log::info(
+                'Badge-ready communication processed.',
+                [
+                    'event_id' =>
+                        $attendee->event_id,
+
+                    'attendee_id' =>
+                        $attendee->id,
+
+                    'badge_path' =>
+                        $attendee->badge_path,
+                ]
+            );
+        } catch (Throwable $exception) {
+            /*
+            |--------------------------------------------------------------------------
+            | Do Not Fail Badge Generation
+            |--------------------------------------------------------------------------
+            */
+
+            report(
+                $exception
+            );
+
+            Log::error(
+                'Badge was generated but badge-ready communication could not be queued.',
+                [
+                    'event_id' =>
+                        $attendee->event_id,
+
+                    'attendee_id' =>
+                        $attendee->id,
+
+                    'badge_path' =>
+                        $attendee->badge_path,
+
+                    'error' =>
+                        $exception->getMessage(),
+                ]
+            );
         }
     }
 
@@ -239,23 +444,33 @@ SVG;
         int $height
     ): string {
         if (
-            filled($backgroundImagePath)
-            && Storage::disk('public')->exists(
+            filled(
                 $backgroundImagePath
             )
+            && Storage::disk('public')
+                ->exists(
+                    $backgroundImagePath
+                )
         ) {
-            $imageContent = Storage::disk('public')
-                ->get($backgroundImagePath);
+            $imageContent =
+                Storage::disk('public')
+                    ->get(
+                        $backgroundImagePath
+                    );
 
-            $mimeType = Storage::disk('public')
-                ->mimeType($backgroundImagePath)
+            $mimeType =
+                Storage::disk('public')
+                    ->mimeType(
+                        $backgroundImagePath
+                    )
                 ?: $this->guessImageMimeType(
                     $backgroundImagePath
                 );
 
-            $encodedImage = base64_encode(
-                $imageContent
-            );
+            $encodedImage =
+                base64_encode(
+                    $imageContent
+                );
 
             return <<<SVG
     <image
@@ -280,6 +495,12 @@ SVG;
 SVG;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Guess Background Image MIME Type
+    |--------------------------------------------------------------------------
+    */
+
     protected function guessImageMimeType(
         string $path
     ): string {
@@ -291,11 +512,21 @@ SVG;
                 )
             )
         ) {
-            'jpg', 'jpeg' => 'image/jpeg',
-            'webp' => 'image/webp',
-            'gif' => 'image/gif',
-            'svg' => 'image/svg+xml',
-            default => 'image/png',
+            'jpg',
+            'jpeg' =>
+                'image/jpeg',
+
+            'webp' =>
+                'image/webp',
+
+            'gif' =>
+                'image/gif',
+
+            'svg' =>
+                'image/svg+xml',
+
+            default =>
+                'image/png',
         };
     }
 
@@ -345,15 +576,16 @@ SVG;
                 ?? $attendee->badgeType?->name
                 ?? 'Guest';
 
-            $categoryConfig = data_get(
-                $layout,
-                'category',
-                []
-            );
+            $categoryConfig =
+                data_get(
+                    $layout,
+                    'category',
+                    []
+                );
 
             /*
             |--------------------------------------------------------------------------
-            | Permanent category design
+            | Permanent Category Design
             |--------------------------------------------------------------------------
             */
 
@@ -381,34 +613,38 @@ SVG;
             $categoryConfig['uppercase'] =
                 true;
 
-            $svg .= $this->renderTextElement(
-                value: $category,
-                config: $categoryConfig,
+            $svg .=
+                $this->renderTextElement(
+                    value:
+                        $category,
 
-                defaultX:
-                    self::CATEGORY_DEFAULT_X,
+                    config:
+                        $categoryConfig,
 
-                defaultY:
-                    self::CATEGORY_MIN_Y,
+                    defaultX:
+                        self::CATEGORY_DEFAULT_X,
 
-                defaultFontSize:
-                    self::CATEGORY_DEFAULT_FONT_SIZE,
+                    defaultY:
+                        self::CATEGORY_MIN_Y,
 
-                defaultMinFontSize:
-                    self::CATEGORY_MIN_FONT_SIZE,
+                    defaultFontSize:
+                        self::CATEGORY_DEFAULT_FONT_SIZE,
 
-                defaultWidth:
-                    self::CATEGORY_MAX_WIDTH,
+                    defaultMinFontSize:
+                        self::CATEGORY_MIN_FONT_SIZE,
 
-                defaultWeight:
-                    self::CATEGORY_FONT_WEIGHT,
+                    defaultWidth:
+                        self::CATEGORY_MAX_WIDTH,
 
-                defaultColor:
-                    '#FFFFFF',
+                    defaultWeight:
+                        self::CATEGORY_FONT_WEIGHT,
 
-                defaultFontFamily:
-                    'Bebas Neue',
-            );
+                    defaultColor:
+                        '#FFFFFF',
+
+                    defaultFontFamily:
+                        'Bebas Neue',
+                );
         }
 
         /*
@@ -431,17 +667,18 @@ SVG;
         ) {
             $name =
                 $attendee->full_name
-                ?: 'Guest';
+                    ?: 'Guest';
 
-            $nameConfig = data_get(
-                $layout,
-                'name',
-                []
-            );
+            $nameConfig =
+                data_get(
+                    $layout,
+                    'name',
+                    []
+                );
 
             /*
             |--------------------------------------------------------------------------
-            | Permanent attendee name design
+            | Permanent Attendee Name Design
             |--------------------------------------------------------------------------
             */
 
@@ -469,34 +706,38 @@ SVG;
             $nameConfig['uppercase'] =
                 true;
 
-            $svg .= $this->renderTextElement(
-                value: $name,
-                config: $nameConfig,
+            $svg .=
+                $this->renderTextElement(
+                    value:
+                        $name,
 
-                defaultX:
-                    self::NAME_DEFAULT_X,
+                    config:
+                        $nameConfig,
 
-                defaultY:
-                    self::NAME_MIN_Y,
+                    defaultX:
+                        self::NAME_DEFAULT_X,
 
-                defaultFontSize:
-                    self::NAME_DEFAULT_FONT_SIZE,
+                    defaultY:
+                        self::NAME_MIN_Y,
 
-                defaultMinFontSize:
-                    self::NAME_MIN_FONT_SIZE,
+                    defaultFontSize:
+                        self::NAME_DEFAULT_FONT_SIZE,
 
-                defaultWidth:
-                    self::NAME_MAX_WIDTH,
+                    defaultMinFontSize:
+                        self::NAME_MIN_FONT_SIZE,
 
-                defaultWeight:
-                    self::NAME_FONT_WEIGHT,
+                    defaultWidth:
+                        self::NAME_MAX_WIDTH,
 
-                defaultColor:
-                    '#FFFFFF',
+                    defaultWeight:
+                        self::NAME_FONT_WEIGHT,
 
-                defaultFontFamily:
-                    'Bebas Neue',
-            );
+                    defaultColor:
+                        '#FFFFFF',
+
+                    defaultFontFamily:
+                        'Bebas Neue',
+                );
         }
 
         return $svg;
@@ -520,18 +761,23 @@ SVG;
         string $defaultColor,
         string $defaultFontFamily = 'Bebas Neue',
     ): string {
-        $uppercase = (bool) data_get(
-            $config,
-            'uppercase',
-            true
-        );
+        $uppercase =
+            (bool) data_get(
+                $config,
+                'uppercase',
+                true
+            );
 
-        $value = trim($value);
-
-        if ($uppercase) {
-            $value = Str::upper(
+        $value =
+            trim(
                 $value
             );
+
+        if ($uppercase) {
+            $value =
+                Str::upper(
+                    $value
+                );
         }
 
         if ($value === '') {
@@ -577,8 +823,12 @@ SVG;
             )
         );
 
-        if ($minFontSize > $fontSize) {
-            $minFontSize = $fontSize;
+        if (
+            $minFontSize
+            > $fontSize
+        ) {
+            $minFontSize =
+                $fontSize;
         }
 
         $fontFamily = trim(
@@ -589,23 +839,36 @@ SVG;
             )
         );
 
-        if ($fontFamily === '') {
-            $fontFamily = $defaultFontFamily;
+        if (
+            $fontFamily === ''
+        ) {
+            $fontFamily =
+                $defaultFontFamily;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Automatic font fitting
+        | Automatic Font Fitting
         |--------------------------------------------------------------------------
         */
 
-        $fontSize = $this->fitFontSize(
-            text: $value,
-            desiredFontSize: $fontSize,
-            minimumFontSize: $minFontSize,
-            maxWidth: $maxWidth,
-            fontFamily: $fontFamily,
-        );
+        $fontSize =
+            $this->fitFontSize(
+                text:
+                    $value,
+
+                desiredFontSize:
+                    $fontSize,
+
+                minimumFontSize:
+                    $minFontSize,
+
+                maxWidth:
+                    $maxWidth,
+
+                fontFamily:
+                    $fontFamily,
+            );
 
         $fontWeight = e(
             (string) data_get(
@@ -623,29 +886,42 @@ SVG;
             )
         );
 
-        $align = data_get(
-            $config,
-            'align',
-            'center'
-        );
+        $align =
+            data_get(
+                $config,
+                'align',
+                'center'
+            );
 
-        $textAnchor = match ($align) {
-            'left' => 'start',
-            'right' => 'end',
-            default => 'middle',
+        $textAnchor = match (
+            $align
+        ) {
+            'left' =>
+                'start',
+
+            'right' =>
+                'end',
+
+            default =>
+                'middle',
         };
 
-        $safeText = e($value);
+        $safeText =
+            e(
+                $value
+            );
 
-        $safeFontFamily = e(
-            $fontFamily
-        );
+        $safeFontFamily =
+            e(
+                $fontFamily
+            );
 
         $svgFontStack =
             "'{$safeFontFamily}', 'Arial Narrow', "
             . "'Liberation Sans Narrow', Arial, sans-serif";
 
-        $shadowY = $y + 2;
+        $shadowY =
+            $y + 2;
 
         return <<<SVG
 
@@ -692,42 +968,62 @@ SVG;
 
         $widthFactor = match (
             strtolower(
-                trim($fontFamily)
+                trim(
+                    $fontFamily
+                )
             )
         ) {
-            'bebas neue' => 0.50,
-            'arial narrow' => 0.52,
-            default => 0.60,
+            'bebas neue' =>
+                0.50,
+
+            'arial narrow' =>
+                0.52,
+
+            'creato display' =>
+                0.58,
+
+            default =>
+                0.60,
         };
 
-        $characters = preg_split(
-            '//u',
-            $text,
-            -1,
-            PREG_SPLIT_NO_EMPTY
-        ) ?: [];
+        $characters =
+            preg_split(
+                '//u',
+                $text,
+                -1,
+                PREG_SPLIT_NO_EMPTY
+            ) ?: [];
 
         while (
-            $fontSize > $minimumFontSize
+            $fontSize
+            > $minimumFontSize
         ) {
-            $estimatedWidth = 0.0;
+            $estimatedWidth =
+                0.0;
 
             foreach (
                 $characters as $character
             ) {
-                $characterFactor = match (true) {
-                    in_array(
-                        Str::upper($character),
-                        ['M', 'W'],
-                        true
-                    ) => $widthFactor * 1.25,
+                $characterFactor =
+                    match (true) {
+                        in_array(
+                            Str::upper(
+                                $character
+                            ),
+                            [
+                                'M',
+                                'W',
+                            ],
+                            true
+                        ) =>
+                            $widthFactor * 1.25,
 
-                    $character === ' ' =>
-                        $widthFactor * 0.55,
+                        $character === ' ' =>
+                            $widthFactor * 0.55,
 
-                    default =>
-                        $widthFactor,
-                };
+                        default =>
+                            $widthFactor,
+                    };
 
                 $estimatedWidth +=
                     $fontSize
@@ -735,7 +1031,8 @@ SVG;
             }
 
             if (
-                $estimatedWidth <= $maxWidth
+                $estimatedWidth
+                <= $maxWidth
             ) {
                 break;
             }
@@ -768,9 +1065,11 @@ SVG;
             $attendee
         );
 
-        $checkInUrl = url(
-            '/check-in/' . $token
-        );
+        $checkInUrl =
+            url(
+                '/check-in/'
+                . $token
+            );
 
         /*
         |--------------------------------------------------------------------------
@@ -784,12 +1083,13 @@ SVG;
             $attendee->id
         );
 
-        $qrSvgContent = QrCode::format('svg')
-            ->size(500)
-            ->margin(0)
-            ->generate(
-                $checkInUrl
-            );
+        $qrSvgContent =
+            QrCode::format('svg')
+                ->size(500)
+                ->margin(0)
+                ->generate(
+                    $checkInUrl
+                );
 
         Storage::disk('public')->put(
             $qrPath,
@@ -798,39 +1098,47 @@ SVG;
 
         /*
         |--------------------------------------------------------------------------
-        | Permanent QR position
+        | Permanent QR Position
         |--------------------------------------------------------------------------
         */
 
-        $centerX = self::QR_DEFAULT_X;
-        $y = self::QR_MIN_Y;
-        $size = self::QR_DEFAULT_SIZE;
-        $padding = self::QR_DEFAULT_PADDING;
+        $centerX =
+            self::QR_DEFAULT_X;
+
+        $y =
+            self::QR_MIN_Y;
+
+        $size =
+            self::QR_DEFAULT_SIZE;
+
+        $padding =
+            self::QR_DEFAULT_PADDING;
 
         $x = (int) round(
             $centerX
             - ($size / 2)
         );
 
-        $encodedQr = base64_encode(
-            $qrSvgContent
-        );
+        $encodedQr =
+            base64_encode(
+                $qrSvgContent
+            );
 
         $padding = max(
             0,
             min(
                 $padding,
-                (int) ($size / 4)
+                (int) (
+                    $size / 4
+                )
             )
         );
 
         $innerX =
-            $x
-            + $padding;
+            $x + $padding;
 
         $innerY =
-            $y
-            + $padding;
+            $y + $padding;
 
         $innerSize = max(
             20,
@@ -869,8 +1177,9 @@ SVG;
     protected function resolveLayout(
         BadgeTemplate $template
     ): array {
-        $layout = $template
-            ->getDesignConfigWithDefaults();
+        $layout =
+            $template
+                ->getDesignConfigWithDefaults();
 
         /*
         |--------------------------------------------------------------------------
@@ -887,7 +1196,8 @@ SVG;
             data_set(
                 $layout,
                 'canvas.width',
-                $template->width ?: 1638
+                $template->width
+                    ?: 1638
             );
         }
 
@@ -900,7 +1210,8 @@ SVG;
             data_set(
                 $layout,
                 'canvas.height',
-                $template->height ?: 2048
+                $template->height
+                    ?: 2048
             );
         }
 
@@ -1087,9 +1398,10 @@ SVG;
             );
         }
 
-        return $this->normalizeFlexibleElements(
-            $layout
-        );
+        return $this
+            ->normalizeFlexibleElements(
+                $layout
+            );
     }
 
     /*
@@ -1101,23 +1413,31 @@ SVG;
     protected function normalizeFlexibleElements(
         array $layout
     ): array {
-        $elements = data_get(
-            $layout,
-            'elements',
-            []
-        );
+        $elements =
+            data_get(
+                $layout,
+                'elements',
+                []
+            );
 
-        if (! is_array($elements)) {
+        if (
+            ! is_array(
+                $elements
+            )
+        ) {
             $elements = [];
         }
 
         $normalized = [];
 
-        foreach ($elements as $element) {
-            $type = data_get(
-                $element,
-                'type'
-            );
+        foreach (
+            $elements as $element
+        ) {
+            $type =
+                data_get(
+                    $element,
+                    'type'
+                );
 
             /*
             |--------------------------------------------------------------------------
@@ -1125,7 +1445,9 @@ SVG;
             |--------------------------------------------------------------------------
             */
 
-            if ($type === 'category') {
+            if (
+                $type === 'category'
+            ) {
                 $element['x'] =
                     self::CATEGORY_DEFAULT_X;
 
@@ -1198,7 +1520,9 @@ SVG;
             |--------------------------------------------------------------------------
             */
 
-            if ($type === 'qr_code') {
+            if (
+                $type === 'qr_code'
+            ) {
                 $element['x'] =
                     self::QR_DEFAULT_X;
 
@@ -1212,7 +1536,8 @@ SVG;
                     self::QR_DEFAULT_PADDING;
             }
 
-            $normalized[] = $element;
+            $normalized[] =
+                $element;
         }
 
         data_set(
@@ -1233,7 +1558,9 @@ SVG;
     protected function resolveQrFromFlexibleElements(
         array $elements
     ): array {
-        foreach ($elements as $element) {
+        foreach (
+            $elements as $element
+        ) {
             if (
                 data_get(
                     $element,
@@ -1256,11 +1583,12 @@ SVG;
                 'padding' =>
                     self::QR_DEFAULT_PADDING,
 
-                'visible' => (bool) data_get(
-                    $element,
-                    'visible',
-                    true
-                ),
+                'visible' =>
+                    (bool) data_get(
+                        $element,
+                        'visible',
+                        true
+                    ),
             ];
         }
 
@@ -1291,12 +1619,13 @@ SVG;
     protected function resolveTemplate(
         Attendee $attendee
     ): ?BadgeTemplate {
-        $baseQuery = fn () =>
-            BadgeTemplate::query()
-                ->where(
-                    'is_active',
-                    true
-                );
+        $baseQuery =
+            fn () =>
+                BadgeTemplate::query()
+                    ->where(
+                        'is_active',
+                        true
+                    );
 
         /*
         |--------------------------------------------------------------------------
@@ -1304,18 +1633,21 @@ SVG;
         |--------------------------------------------------------------------------
         */
 
-        if ($attendee->badge_type_id) {
-            $template = $baseQuery()
-                ->where(
-                    'event_id',
-                    $attendee->event_id
-                )
-                ->where(
-                    'badge_type_id',
-                    $attendee->badge_type_id
-                )
-                ->latest()
-                ->first();
+        if (
+            $attendee->badge_type_id
+        ) {
+            $template =
+                $baseQuery()
+                    ->where(
+                        'event_id',
+                        $attendee->event_id
+                    )
+                    ->where(
+                        'badge_type_id',
+                        $attendee->badge_type_id
+                    )
+                    ->latest()
+                    ->first();
 
             if ($template) {
                 return $template;
@@ -1328,18 +1660,21 @@ SVG;
         |--------------------------------------------------------------------------
         */
 
-        if ($attendee->category_id) {
-            $template = $baseQuery()
-                ->where(
-                    'event_id',
-                    $attendee->event_id
-                )
-                ->where(
-                    'category_id',
-                    $attendee->category_id
-                )
-                ->latest()
-                ->first();
+        if (
+            $attendee->category_id
+        ) {
+            $template =
+                $baseQuery()
+                    ->where(
+                        'event_id',
+                        $attendee->event_id
+                    )
+                    ->where(
+                        'category_id',
+                        $attendee->category_id
+                    )
+                    ->latest()
+                    ->first();
 
             if ($template) {
                 return $template;
@@ -1352,23 +1687,24 @@ SVG;
         |--------------------------------------------------------------------------
         */
 
-        $template = $baseQuery()
-            ->where(
-                'event_id',
-                $attendee->event_id
-            )
-            ->where(
-                'is_default',
-                true
-            )
-            ->whereNull(
-                'category_id'
-            )
-            ->whereNull(
-                'badge_type_id'
-            )
-            ->latest()
-            ->first();
+        $template =
+            $baseQuery()
+                ->where(
+                    'event_id',
+                    $attendee->event_id
+                )
+                ->where(
+                    'is_default',
+                    true
+                )
+                ->whereNull(
+                    'category_id'
+                )
+                ->whereNull(
+                    'badge_type_id'
+                )
+                ->latest()
+                ->first();
 
         if ($template) {
             return $template;
@@ -1380,13 +1716,14 @@ SVG;
         |--------------------------------------------------------------------------
         */
 
-        $template = $baseQuery()
-            ->where(
-                'event_id',
-                $attendee->event_id
-            )
-            ->latest()
-            ->first();
+        $template =
+            $baseQuery()
+                ->where(
+                    'event_id',
+                    $attendee->event_id
+                )
+                ->latest()
+                ->first();
 
         if ($template) {
             return $template;
@@ -1398,16 +1735,17 @@ SVG;
         |--------------------------------------------------------------------------
         */
 
-        $template = $baseQuery()
-            ->whereNull(
-                'event_id'
-            )
-            ->where(
-                'is_default',
-                true
-            )
-            ->latest()
-            ->first();
+        $template =
+            $baseQuery()
+                ->whereNull(
+                    'event_id'
+                )
+                ->where(
+                    'is_default',
+                    true
+                )
+                ->latest()
+                ->first();
 
         if ($template) {
             return $template;
@@ -1442,7 +1780,9 @@ SVG;
             }
         }
 
-        if ($allowed !== []) {
+        if (
+            $allowed !== []
+        ) {
             $attendee
                 ->forceFill(
                     $allowed

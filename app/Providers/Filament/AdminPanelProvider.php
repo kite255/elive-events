@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -28,10 +29,40 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+
+            /*
+            |--------------------------------------------------------------------------
+            | Branding
+            |--------------------------------------------------------------------------
+            */
+
             ->brandName('eLive Events')
             ->brandLogo(asset('eLive-Logo.png'))
             ->brandLogoHeight('2.5rem')
             ->favicon(asset('favicon.ico'))
+
+            /*
+            |--------------------------------------------------------------------------
+            | Font
+            |--------------------------------------------------------------------------
+            |
+            | Creato Display is loaded from:
+            | public/css/creato-font.css
+            |
+            */
+
+            ->font(
+                'Creato Display',
+                url: asset('css/creato-font.css'),
+                provider: LocalFontProvider::class,
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | Colors
+            |--------------------------------------------------------------------------
+            */
+
             ->colors([
                 'primary' => Color::hex('#233F7E'),
                 'gray' => Color::Slate,
@@ -39,16 +70,55 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
                 'danger' => Color::Red,
             ])
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
+
+            /*
+            |--------------------------------------------------------------------------
+            | Resources
+            |--------------------------------------------------------------------------
+            */
+
+            ->discoverResources(
+                in: app_path('Filament/Resources'),
+                for: 'App\Filament\Resources'
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pages
+            |--------------------------------------------------------------------------
+            */
+
+            ->discoverPages(
+                in: app_path('Filament/Pages'),
+                for: 'App\Filament\Pages'
+            )
+
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
+
+            /*
+            |--------------------------------------------------------------------------
+            | Widgets
+            |--------------------------------------------------------------------------
+            */
+
+            ->discoverWidgets(
+                in: app_path('Filament/Widgets'),
+                for: 'App\Filament\Widgets'
+            )
+
             ->widgets([
                 AccountWidget::class,
                 FilamentInfoWidget::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | Middleware
+            |--------------------------------------------------------------------------
+            */
+
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -60,6 +130,13 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | Authentication Middleware
+            |--------------------------------------------------------------------------
+            */
+
             ->authMiddleware([
                 Authenticate::class,
             ]);

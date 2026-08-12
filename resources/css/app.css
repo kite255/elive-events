@@ -5,7 +5,75 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+/*
+|--------------------------------------------------------------------------
+| Creato Display
+|--------------------------------------------------------------------------
+*/
+
+@font-face {
+    font-family: 'Creato Display';
+    src: url('/fonts/creato-display/CreatoDisplay-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Creato Display';
+    src: url('/fonts/creato-display/CreatoDisplay-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Creato Display';
+    src: url('/fonts/creato-display/CreatoDisplay-SemiBold.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Creato Display';
+    src: url('/fonts/creato-display/CreatoDisplay-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Creato Display';
+    src: url('/fonts/creato-display/CreatoDisplay-ExtraBold.woff2') format('woff2');
+    font-weight: 800;
+    font-style: normal;
+    font-display: swap;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Tailwind Theme
+|--------------------------------------------------------------------------
+*/
+
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Creato Display', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji',
+        'Segoe UI Emoji',
+        'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --font-creato: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Global Typography
+|--------------------------------------------------------------------------
+*/
+
+html,
+body {
+    font-family: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
 }
