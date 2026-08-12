@@ -14,6 +14,52 @@ class BadgeGenerationService
 {
     /*
     |--------------------------------------------------------------------------
+    | Permanent Badge Layout
+    |--------------------------------------------------------------------------
+    |
+    | Optimized for the DCC SDA Camp Meeting badge artwork.
+    |
+    | Category:
+    |   Y      = 1085
+    |   Size   = 105
+    |   Weight = 600
+    |
+    | Name:
+    |   Y      = 1245
+    |   Size   = 58
+    |
+    | QR:
+    |   Y      = 1375
+    |   Size   = 360
+    |
+    */
+
+    protected const CATEGORY_MIN_Y = 1085;
+    protected const NAME_MIN_Y = 1245;
+    protected const QR_MIN_Y = 1375;
+
+    protected const CATEGORY_DEFAULT_X = 819;
+    protected const NAME_DEFAULT_X = 819;
+    protected const QR_DEFAULT_X = 819;
+
+    protected const CATEGORY_DEFAULT_FONT_SIZE = 105;
+    protected const CATEGORY_MIN_FONT_SIZE = 58;
+    protected const CATEGORY_MAX_WIDTH = 1250;
+    protected const CATEGORY_FONT_WEIGHT = '600';
+
+    protected const NAME_DEFAULT_FONT_SIZE = 58;
+    protected const NAME_MIN_FONT_SIZE = 38;
+    protected const NAME_MAX_WIDTH = 1150;
+    protected const NAME_FONT_WEIGHT = '400';
+
+    protected const QR_DEFAULT_SIZE = 360;
+    protected const QR_DEFAULT_PADDING = 16;
+
+    protected const CATEGORY_NAME_GAP = 160;
+    protected const NAME_QR_GAP = 110;
+
+    /*
+    |--------------------------------------------------------------------------
     | Generate Badge
     |--------------------------------------------------------------------------
     */
@@ -42,12 +88,6 @@ class BadgeGenerationService
 
             $layout = $this->resolveLayout($template);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Canvas
-            |--------------------------------------------------------------------------
-            */
-
             $width = (int) data_get(
                 $layout,
                 'canvas.width',
@@ -60,19 +100,15 @@ class BadgeGenerationService
                 $template->height ?: 2048
             );
 
-            $backgroundColor = $template->background_color ?: '#FFFFFF';
+            $backgroundColor =
+                $template->background_color ?: '#FFFFFF';
 
-            $backgroundImagePath = $template->backgroundImagePath();
+            $backgroundImagePath =
+                $template->backgroundImagePath();
 
             $safeName = Str::slug(
                 $attendee->full_name ?: 'attendee'
             );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Generated Badge Path
-            |--------------------------------------------------------------------------
-            */
 
             $path = sprintf(
                 'events/%s/badges/attendee-%s-%s.svg',
@@ -83,7 +119,7 @@ class BadgeGenerationService
 
             /*
             |--------------------------------------------------------------------------
-            | Dynamic Elements
+            | Dynamic Text
             |--------------------------------------------------------------------------
             */
 
@@ -107,37 +143,31 @@ class BadgeGenerationService
 
             $qrSvg = '';
 
-            if ((bool) data_get(
-                $qrConfig,
-                'visible',
-                true
-            )) {
+            if (
+                (bool) data_get(
+                    $qrConfig,
+                    'visible',
+                    true
+                )
+            ) {
                 $qrSvg = $this->renderQrCode(
                     attendee: $attendee,
 
                     centerX: (int) data_get(
                         $qrConfig,
                         'x',
-                        (int) ($width / 2)
+                        self::QR_DEFAULT_X
                     ),
 
                     y: (int) data_get(
                         $qrConfig,
                         'y',
-                        1365
+                        self::QR_MIN_Y
                     ),
 
-                    size: (int) data_get(
-                        $qrConfig,
-                        'size',
-                        470
-                    ),
+                    size: self::QR_DEFAULT_SIZE,
 
-                    padding: (int) data_get(
-                        $qrConfig,
-                        'padding',
-                        20
-                    ),
+                    padding: self::QR_DEFAULT_PADDING,
                 );
             }
 
@@ -210,7 +240,9 @@ SVG;
     ): string {
         if (
             filled($backgroundImagePath)
-            && Storage::disk('public')->exists($backgroundImagePath)
+            && Storage::disk('public')->exists(
+                $backgroundImagePath
+            )
         ) {
             $imageContent = Storage::disk('public')
                 ->get($backgroundImagePath);
@@ -225,16 +257,6 @@ SVG;
                 $imageContent
             );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Full Artwork Background
-            |--------------------------------------------------------------------------
-            |
-            | The uploaded Camp Meeting artwork is already the finished
-            | background, therefore we do not draw headers, logos or footers.
-            |
-            */
-
             return <<<SVG
     <image
         href="data:{$mimeType};base64,{$encodedImage}"
@@ -247,12 +269,6 @@ SVG;
 SVG;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Fallback
-        |--------------------------------------------------------------------------
-        */
-
         return <<<SVG
     <rect
         x="0"
@@ -264,8 +280,9 @@ SVG;
 SVG;
     }
 
-    protected function guessImageMimeType(string $path): string
-    {
+    protected function guessImageMimeType(
+        string $path
+    ): string {
         return match (
             strtolower(
                 pathinfo(
@@ -307,13 +324,8 @@ SVG;
 
         /*
         |--------------------------------------------------------------------------
-        | Category
+        | Participant Category
         |--------------------------------------------------------------------------
-        |
-        | Example:
-        |
-        | MEDIA CREW
-        |
         */
 
         if (
@@ -328,39 +340,80 @@ SVG;
                 true
             )
         ) {
-            $category = $attendee->category?->name
+            $category =
+                $attendee->category?->name
                 ?? $attendee->badgeType?->name
                 ?? 'Guest';
 
+            $categoryConfig = data_get(
+                $layout,
+                'category',
+                []
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Permanent category design
+            |--------------------------------------------------------------------------
+            */
+
+            $categoryConfig['x'] =
+                self::CATEGORY_DEFAULT_X;
+
+            $categoryConfig['y'] =
+                self::CATEGORY_MIN_Y;
+
+            $categoryConfig['width'] =
+                self::CATEGORY_MAX_WIDTH;
+
+            $categoryConfig['font_size'] =
+                self::CATEGORY_DEFAULT_FONT_SIZE;
+
+            $categoryConfig['min_font_size'] =
+                self::CATEGORY_MIN_FONT_SIZE;
+
+            $categoryConfig['font_weight'] =
+                self::CATEGORY_FONT_WEIGHT;
+
+            $categoryConfig['align'] =
+                'center';
+
+            $categoryConfig['uppercase'] =
+                true;
+
             $svg .= $this->renderTextElement(
                 value: $category,
-                config: data_get(
-                    $layout,
-                    'category',
-                    []
-                ),
+                config: $categoryConfig,
 
-                defaultX: (int) ($width / 2),
+                defaultX:
+                    self::CATEGORY_DEFAULT_X,
 
-                defaultY: 1050,
+                defaultY:
+                    self::CATEGORY_MIN_Y,
 
-                defaultFontSize: 130,
+                defaultFontSize:
+                    self::CATEGORY_DEFAULT_FONT_SIZE,
 
-                defaultMinFontSize: 70,
+                defaultMinFontSize:
+                    self::CATEGORY_MIN_FONT_SIZE,
 
-                defaultWidth: 1350,
+                defaultWidth:
+                    self::CATEGORY_MAX_WIDTH,
 
-                defaultWeight: '400',
+                defaultWeight:
+                    self::CATEGORY_FONT_WEIGHT,
 
-                defaultColor: '#FFFFFF',
+                defaultColor:
+                    '#FFFFFF',
 
-                defaultFontFamily: 'Bebas Neue',
+                defaultFontFamily:
+                    'Bebas Neue',
             );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Attendee Full Name
+        | Attendee Name
         |--------------------------------------------------------------------------
         */
 
@@ -376,32 +429,73 @@ SVG;
                 true
             )
         ) {
-            $name = $attendee->full_name
+            $name =
+                $attendee->full_name
                 ?: 'Guest';
+
+            $nameConfig = data_get(
+                $layout,
+                'name',
+                []
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Permanent attendee name design
+            |--------------------------------------------------------------------------
+            */
+
+            $nameConfig['x'] =
+                self::NAME_DEFAULT_X;
+
+            $nameConfig['y'] =
+                self::NAME_MIN_Y;
+
+            $nameConfig['width'] =
+                self::NAME_MAX_WIDTH;
+
+            $nameConfig['font_size'] =
+                self::NAME_DEFAULT_FONT_SIZE;
+
+            $nameConfig['min_font_size'] =
+                self::NAME_MIN_FONT_SIZE;
+
+            $nameConfig['font_weight'] =
+                self::NAME_FONT_WEIGHT;
+
+            $nameConfig['align'] =
+                'center';
+
+            $nameConfig['uppercase'] =
+                true;
 
             $svg .= $this->renderTextElement(
                 value: $name,
-                config: data_get(
-                    $layout,
-                    'name',
-                    []
-                ),
+                config: $nameConfig,
 
-                defaultX: (int) ($width / 2),
+                defaultX:
+                    self::NAME_DEFAULT_X,
 
-                defaultY: 1235,
+                defaultY:
+                    self::NAME_MIN_Y,
 
-                defaultFontSize: 82,
+                defaultFontSize:
+                    self::NAME_DEFAULT_FONT_SIZE,
 
-                defaultMinFontSize: 45,
+                defaultMinFontSize:
+                    self::NAME_MIN_FONT_SIZE,
 
-                defaultWidth: 1250,
+                defaultWidth:
+                    self::NAME_MAX_WIDTH,
 
-                defaultWeight: '400',
+                defaultWeight:
+                    self::NAME_FONT_WEIGHT,
 
-                defaultColor: '#FFFFFF',
+                defaultColor:
+                    '#FFFFFF',
 
-                defaultFontFamily: 'Bebas Neue',
+                defaultFontFamily:
+                    'Bebas Neue',
             );
         }
 
@@ -426,12 +520,6 @@ SVG;
         string $defaultColor,
         string $defaultFontFamily = 'Bebas Neue',
     ): string {
-        /*
-        |--------------------------------------------------------------------------
-        | Text
-        |--------------------------------------------------------------------------
-        */
-
         $uppercase = (bool) data_get(
             $config,
             'uppercase',
@@ -450,12 +538,6 @@ SVG;
             return '';
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Position
-        |--------------------------------------------------------------------------
-        */
-
         $x = (int) data_get(
             $config,
             'x',
@@ -468,39 +550,36 @@ SVG;
             $defaultY
         );
 
-        $maxWidth = (int) data_get(
-            $config,
-            'width',
-            $defaultWidth
+        $maxWidth = max(
+            100,
+            (int) data_get(
+                $config,
+                'width',
+                $defaultWidth
+            )
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Font Size
-        |--------------------------------------------------------------------------
-        */
-
-        $fontSize = (int) data_get(
-            $config,
-            'font_size',
-            $defaultFontSize
+        $fontSize = max(
+            1,
+            (int) data_get(
+                $config,
+                'font_size',
+                $defaultFontSize
+            )
         );
 
-        $minFontSize = (int) data_get(
-            $config,
-            'min_font_size',
-            $defaultMinFontSize
+        $minFontSize = max(
+            1,
+            (int) data_get(
+                $config,
+                'min_font_size',
+                $defaultMinFontSize
+            )
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Font Family
-        |--------------------------------------------------------------------------
-        |
-        | Bebas Neue closely matches the tall narrow typography used in the
-        | supplied Camp Meeting badge.
-        |
-        */
+        if ($minFontSize > $fontSize) {
+            $minFontSize = $fontSize;
+        }
 
         $fontFamily = trim(
             (string) data_get(
@@ -516,7 +595,7 @@ SVG;
 
         /*
         |--------------------------------------------------------------------------
-        | Auto Fit
+        | Automatic font fitting
         |--------------------------------------------------------------------------
         */
 
@@ -528,12 +607,6 @@ SVG;
             fontFamily: $fontFamily,
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Weight
-        |--------------------------------------------------------------------------
-        */
-
         $fontWeight = e(
             (string) data_get(
                 $config,
@@ -542,12 +615,6 @@ SVG;
             )
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Color
-        |--------------------------------------------------------------------------
-        */
-
         $color = e(
             (string) data_get(
                 $config,
@@ -555,12 +622,6 @@ SVG;
                 $defaultColor
             )
         );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Alignment
-        |--------------------------------------------------------------------------
-        */
 
         $align = data_get(
             $config,
@@ -574,36 +635,15 @@ SVG;
             default => 'middle',
         };
 
-        $safeText = e(
-            $value
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | SVG Font Stack
-        |--------------------------------------------------------------------------
-        |
-        | Bebas Neue is the preferred font.
-        |
-        | Arial Narrow is the first fallback.
-        |
-        */
+        $safeText = e($value);
 
         $safeFontFamily = e(
             $fontFamily
         );
 
         $svgFontStack =
-            "'{$safeFontFamily}', 'Arial Narrow', 'Liberation Sans Narrow', Arial, sans-serif";
-
-        /*
-        |--------------------------------------------------------------------------
-        | Very Light Shadow
-        |--------------------------------------------------------------------------
-        |
-        | The original design is clean, therefore we keep the shadow subtle.
-        |
-        */
+            "'{$safeFontFamily}', 'Arial Narrow', "
+            . "'Liberation Sans Narrow', Arial, sans-serif";
 
         $shadowY = $y + 2;
 
@@ -617,7 +657,7 @@ SVG;
         font-size="{$fontSize}"
         font-weight="{$fontWeight}"
         fill="#000000"
-        opacity="0.12"
+        opacity="0.10"
     >{$safeText}</text>
 
     <text
@@ -650,35 +690,49 @@ SVG;
             $desiredFontSize
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Width Factor
-        |--------------------------------------------------------------------------
-        |
-        | Bebas Neue is a condensed typeface.
-        |
-        | Arial tends to average around 0.60 - 0.65.
-        |
-        | Bebas Neue is considerably narrower, therefore approximately 0.50
-        | works better for our badge text fitting.
-        |
-        */
-
         $widthFactor = match (
-            strtolower($fontFamily)
+            strtolower(
+                trim($fontFamily)
+            )
         ) {
             'bebas neue' => 0.50,
             'arial narrow' => 0.52,
             default => 0.60,
         };
 
+        $characters = preg_split(
+            '//u',
+            $text,
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        ) ?: [];
+
         while (
             $fontSize > $minimumFontSize
         ) {
-            $estimatedWidth =
-                mb_strlen($text)
-                * $fontSize
-                * $widthFactor;
+            $estimatedWidth = 0.0;
+
+            foreach (
+                $characters as $character
+            ) {
+                $characterFactor = match (true) {
+                    in_array(
+                        Str::upper($character),
+                        ['M', 'W'],
+                        true
+                    ) => $widthFactor * 1.25,
+
+                    $character === ' ' =>
+                        $widthFactor * 0.55,
+
+                    default =>
+                        $widthFactor,
+                };
+
+                $estimatedWidth +=
+                    $fontSize
+                    * $characterFactor;
+            }
 
             if (
                 $estimatedWidth <= $maxWidth
@@ -706,14 +760,8 @@ SVG;
         int $centerX,
         int $y,
         int $size,
-        int $padding = 20
+        int $padding = 16
     ): string {
-        /*
-        |--------------------------------------------------------------------------
-        | Secure Token
-        |--------------------------------------------------------------------------
-        */
-
         $token = app(
             QrTokenService::class
         )->generateForAttendee(
@@ -750,9 +798,14 @@ SVG;
 
         /*
         |--------------------------------------------------------------------------
-        | QR Center Position
+        | Permanent QR position
         |--------------------------------------------------------------------------
         */
+
+        $centerX = self::QR_DEFAULT_X;
+        $y = self::QR_MIN_Y;
+        $size = self::QR_DEFAULT_SIZE;
+        $padding = self::QR_DEFAULT_PADDING;
 
         $x = (int) round(
             $centerX
@@ -763,12 +816,6 @@ SVG;
             $qrSvgContent
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | QR Quiet Zone
-        |--------------------------------------------------------------------------
-        */
-
         $padding = max(
             0,
             min(
@@ -777,13 +824,18 @@ SVG;
             )
         );
 
-        $innerX = $x + $padding;
+        $innerX =
+            $x
+            + $padding;
 
-        $innerY = $y + $padding;
+        $innerY =
+            $y
+            + $padding;
 
         $innerSize = max(
             20,
-            $size - ($padding * 2)
+            $size
+            - ($padding * 2)
         );
 
         return <<<SVG
@@ -826,10 +878,12 @@ SVG;
         |--------------------------------------------------------------------------
         */
 
-        if (! data_get(
-            $layout,
-            'canvas.width'
-        )) {
+        if (
+            ! data_get(
+                $layout,
+                'canvas.width'
+            )
+        ) {
             data_set(
                 $layout,
                 'canvas.width',
@@ -837,10 +891,12 @@ SVG;
             );
         }
 
-        if (! data_get(
-            $layout,
-            'canvas.height'
-        )) {
+        if (
+            ! data_get(
+                $layout,
+                'canvas.height'
+            )
+        ) {
             data_set(
                 $layout,
                 'canvas.height',
@@ -848,16 +904,12 @@ SVG;
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Background
-        |--------------------------------------------------------------------------
-        */
-
-        if (! data_get(
-            $layout,
-            'canvas.background_image_path'
-        )) {
+        if (
+            ! data_get(
+                $layout,
+                'canvas.background_image_path'
+            )
+        ) {
             data_set(
                 $layout,
                 'canvas.background_image_path',
@@ -867,78 +919,307 @@ SVG;
 
         /*
         |--------------------------------------------------------------------------
-        | QR Fallback
+        | Permanent Category Configuration
         |--------------------------------------------------------------------------
         */
 
-        $qrFromElements =
-            $this->resolveQrFromFlexibleElements(
-                data_get(
-                    $layout,
-                    'elements',
-                    []
-                )
-            );
-
-        if (! data_get(
+        data_set(
             $layout,
-            'qr_code.x'
-        )) {
+            'category.x',
+            self::CATEGORY_DEFAULT_X
+        );
+
+        data_set(
+            $layout,
+            'category.y',
+            self::CATEGORY_MIN_Y
+        );
+
+        data_set(
+            $layout,
+            'category.width',
+            self::CATEGORY_MAX_WIDTH
+        );
+
+        data_set(
+            $layout,
+            'category.font_size',
+            self::CATEGORY_DEFAULT_FONT_SIZE
+        );
+
+        data_set(
+            $layout,
+            'category.min_font_size',
+            self::CATEGORY_MIN_FONT_SIZE
+        );
+
+        data_set(
+            $layout,
+            'category.font_weight',
+            self::CATEGORY_FONT_WEIGHT
+        );
+
+        data_set(
+            $layout,
+            'category.align',
+            'center'
+        );
+
+        data_set(
+            $layout,
+            'category.uppercase',
+            true
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Permanent Name Configuration
+        |--------------------------------------------------------------------------
+        */
+
+        data_set(
+            $layout,
+            'name.x',
+            self::NAME_DEFAULT_X
+        );
+
+        data_set(
+            $layout,
+            'name.y',
+            self::NAME_MIN_Y
+        );
+
+        data_set(
+            $layout,
+            'name.width',
+            self::NAME_MAX_WIDTH
+        );
+
+        data_set(
+            $layout,
+            'name.font_size',
+            self::NAME_DEFAULT_FONT_SIZE
+        );
+
+        data_set(
+            $layout,
+            'name.min_font_size',
+            self::NAME_MIN_FONT_SIZE
+        );
+
+        data_set(
+            $layout,
+            'name.font_weight',
+            self::NAME_FONT_WEIGHT
+        );
+
+        data_set(
+            $layout,
+            'name.align',
+            'center'
+        );
+
+        data_set(
+            $layout,
+            'name.uppercase',
+            true
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Permanent QR Configuration
+        |--------------------------------------------------------------------------
+        */
+
+        data_set(
+            $layout,
+            'qr_code.x',
+            self::QR_DEFAULT_X
+        );
+
+        data_set(
+            $layout,
+            'qr_code.y',
+            self::QR_MIN_Y
+        );
+
+        data_set(
+            $layout,
+            'qr_code.size',
+            self::QR_DEFAULT_SIZE
+        );
+
+        data_set(
+            $layout,
+            'qr_code.padding',
+            self::QR_DEFAULT_PADDING
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Preserve Visibility
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            data_get(
+                $layout,
+                'qr_code.visible'
+            ) === null
+        ) {
+            $qrFromElements =
+                $this->resolveQrFromFlexibleElements(
+                    data_get(
+                        $layout,
+                        'elements',
+                        []
+                    )
+                );
+
             data_set(
                 $layout,
-                'qr_code.x',
-                data_get(
+                'qr_code.visible',
+                (bool) data_get(
                     $qrFromElements,
-                    'x',
-                    819
+                    'visible',
+                    true
                 )
             );
         }
 
-        if (! data_get(
+        return $this->normalizeFlexibleElements(
+            $layout
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Flexible Elements
+    |--------------------------------------------------------------------------
+    */
+
+    protected function normalizeFlexibleElements(
+        array $layout
+    ): array {
+        $elements = data_get(
             $layout,
-            'qr_code.y'
-        )) {
-            data_set(
-                $layout,
-                'qr_code.y',
-                data_get(
-                    $qrFromElements,
-                    'y',
-                    1365
-                )
-            );
+            'elements',
+            []
+        );
+
+        if (! is_array($elements)) {
+            $elements = [];
         }
 
-        if (! data_get(
-            $layout,
-            'qr_code.size'
-        )) {
-            data_set(
-                $layout,
-                'qr_code.size',
-                data_get(
-                    $qrFromElements,
-                    'size',
-                    470
-                )
+        $normalized = [];
+
+        foreach ($elements as $element) {
+            $type = data_get(
+                $element,
+                'type'
             );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Category
+            |--------------------------------------------------------------------------
+            */
+
+            if ($type === 'category') {
+                $element['x'] =
+                    self::CATEGORY_DEFAULT_X;
+
+                $element['y'] =
+                    self::CATEGORY_MIN_Y;
+
+                $element['width'] =
+                    self::CATEGORY_MAX_WIDTH;
+
+                $element['font_size'] =
+                    self::CATEGORY_DEFAULT_FONT_SIZE;
+
+                $element['min_font_size'] =
+                    self::CATEGORY_MIN_FONT_SIZE;
+
+                $element['font_weight'] =
+                    self::CATEGORY_FONT_WEIGHT;
+
+                $element['align'] =
+                    'center';
+
+                $element['uppercase'] =
+                    true;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Name
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                in_array(
+                    $type,
+                    [
+                        'name',
+                        'attendee_name',
+                    ],
+                    true
+                )
+            ) {
+                $element['x'] =
+                    self::NAME_DEFAULT_X;
+
+                $element['y'] =
+                    self::NAME_MIN_Y;
+
+                $element['width'] =
+                    self::NAME_MAX_WIDTH;
+
+                $element['font_size'] =
+                    self::NAME_DEFAULT_FONT_SIZE;
+
+                $element['min_font_size'] =
+                    self::NAME_MIN_FONT_SIZE;
+
+                $element['font_weight'] =
+                    self::NAME_FONT_WEIGHT;
+
+                $element['align'] =
+                    'center';
+
+                $element['uppercase'] =
+                    true;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | QR
+            |--------------------------------------------------------------------------
+            */
+
+            if ($type === 'qr_code') {
+                $element['x'] =
+                    self::QR_DEFAULT_X;
+
+                $element['y'] =
+                    self::QR_MIN_Y;
+
+                $element['size'] =
+                    self::QR_DEFAULT_SIZE;
+
+                $element['padding'] =
+                    self::QR_DEFAULT_PADDING;
+            }
+
+            $normalized[] = $element;
         }
 
-        if (! data_get(
+        data_set(
             $layout,
-            'qr_code.padding'
-        )) {
-            data_set(
-                $layout,
-                'qr_code.padding',
-                data_get(
-                    $qrFromElements,
-                    'padding',
-                    20
-                )
-            );
-        }
+            'elements',
+            $normalized
+        );
 
         return $layout;
     }
@@ -952,9 +1233,7 @@ SVG;
     protected function resolveQrFromFlexibleElements(
         array $elements
     ): array {
-        foreach (
-            $elements as $element
-        ) {
+        foreach ($elements as $element) {
             if (
                 data_get(
                     $element,
@@ -965,29 +1244,17 @@ SVG;
             }
 
             return [
-                'x' => (int) data_get(
-                    $element,
-                    'x',
-                    819
-                ),
+                'x' =>
+                    self::QR_DEFAULT_X,
 
-                'y' => (int) data_get(
-                    $element,
-                    'y',
-                    1365
-                ),
+                'y' =>
+                    self::QR_MIN_Y,
 
-                'size' => (int) data_get(
-                    $element,
-                    'size',
-                    470
-                ),
+                'size' =>
+                    self::QR_DEFAULT_SIZE,
 
-                'padding' => (int) data_get(
-                    $element,
-                    'padding',
-                    20
-                ),
+                'padding' =>
+                    self::QR_DEFAULT_PADDING,
 
                 'visible' => (bool) data_get(
                     $element,
@@ -998,11 +1265,20 @@ SVG;
         }
 
         return [
-            'x' => 819,
-            'y' => 1365,
-            'size' => 470,
-            'padding' => 20,
-            'visible' => true,
+            'x' =>
+                self::QR_DEFAULT_X,
+
+            'y' =>
+                self::QR_MIN_Y,
+
+            'size' =>
+                self::QR_DEFAULT_SIZE,
+
+            'padding' =>
+                self::QR_DEFAULT_PADDING,
+
+            'visible' =>
+                true,
         ];
     }
 
