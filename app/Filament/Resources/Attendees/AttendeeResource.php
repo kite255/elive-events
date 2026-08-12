@@ -68,22 +68,27 @@ class AttendeeResource extends Resource
     {
         $user = auth()->user();
 
+        $query = parent::getEloquentQuery()
+            ->with([
+                'event.organization',
+                'category',
+                'badgeType',
+                'eventDays',
+            ]);
+
         if (! $user instanceof User) {
-            return parent::getEloquentQuery()
-                ->whereRaw('1 = 0');
+            return $query->whereRaw('1 = 0');
         }
 
         if ($user->isSuperAdmin()) {
-            return parent::getEloquentQuery();
+            return $query;
         }
 
-        return parent::getEloquentQuery()
-            ->whereHas(
-                'event',
-                function (Builder $query) use ($user): Builder {
-                    return $query->accessibleBy($user);
-                }
-            );
+        return $query->whereHas(
+            'event',
+            fn (Builder $eventQuery): Builder =>
+                $eventQuery->accessibleBy($user)
+        );
     }
 
     /*
@@ -275,6 +280,33 @@ class AttendeeResource extends Resource
     |--------------------------------------------------------------------------
     */
 
+    public static function canManageBadge(
+        Attendee $attendee
+    ): bool {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $event = $attendee->event;
+
+        if (! $event || ! $event->organization_id) {
+            return false;
+        }
+
+        if (! $event->isAccessibleBy($user)) {
+            return false;
+        }
+
+        return $event->canManageBadgesBy($user)
+            || $event->canManageRegistrationBy($user);
+    }
+
     public static function canViewQrCode(
         Attendee $attendee
     ): bool {
@@ -303,6 +335,32 @@ class AttendeeResource extends Resource
             || $event->canBeCheckedInBy($user);
     }
 
+    public static function canCheckIn(
+        Attendee $attendee
+    ): bool {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $event = $attendee->event;
+
+        if (! $event || ! $event->organization_id) {
+            return false;
+        }
+
+        if (! $event->isAccessibleBy($user)) {
+            return false;
+        }
+
+        return $event->canBeCheckedInBy($user);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Navigation
@@ -324,6 +382,13 @@ class AttendeeResource extends Resource
 
         return $count > 0
             ? (string) $count
+            : null;
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return static::canViewAny()
+            ? 'Accessible attendees'
             : null;
     }
 

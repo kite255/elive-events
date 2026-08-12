@@ -539,6 +539,8 @@ class CheckInStation extends Page
             $this->lastResult = [
                 'success' => $success,
                 'status' => $status,
+                'tone' => $this->resultTone($status, $success),
+                'icon' => $this->resultIcon($status, $success),
 
                 'title' => $this->onsiteCheckInImmediately
                     ? $this->resultTitle($status)
@@ -561,6 +563,8 @@ class CheckInStation extends Page
                     'position' => $attendee->position,
                     'status' => $attendee->status,
                     'badge_path' => $attendee->badge_path,
+                    'category' => $attendee->category?->name,
+                    'badge_type' => $attendee->badgeType?->name,
                 ],
 
                 'event_day' =>
@@ -745,9 +749,17 @@ class CheckInStation extends Page
             $this->lastResult = [
                 'success' => false,
                 'status' => 'invalid_code',
+                'tone' => 'danger',
+                'icon' => 'heroicon-o-x-circle',
                 'title' => 'Invalid QR or badge',
                 'message' =>
                     'No attendee was found for this event using that QR code or badge number.',
+                'attendee' => null,
+                'event_day' => $this->getSelectedEventDay()?->name,
+                'event_session' => $this->getSelectedEventSession()?->name,
+                'check_in_point' => $this->getSelectedCheckInPoint()?->name,
+                'checked_in_at' => null,
+                'method' => CheckInService::METHOD_QR,
             ];
 
             Notification::make()
@@ -931,12 +943,15 @@ class CheckInStation extends Page
         $status = $result['status']
             ?? 'check_in_failed';
 
-        $this->lastResult = [
-            'success' => (bool) (
-                $result['success'] ?? false
-            ),
+        $success = (bool) (
+            $result['success'] ?? false
+        );
 
+        $this->lastResult = [
+            'success' => $success,
             'status' => $status,
+            'tone' => $this->resultTone($status, $success),
+            'icon' => $this->resultIcon($status, $success),
 
             'title' => $this->resultTitle($status),
 
@@ -964,6 +979,12 @@ class CheckInStation extends Page
 
                 'status' =>
                     $resultAttendee?->status,
+
+                'category' =>
+                    $resultAttendee?->category?->name,
+
+                'badge_type' =>
+                    $resultAttendee?->badgeType?->name,
             ],
 
             'event_day' =>
@@ -1597,6 +1618,7 @@ class CheckInStation extends Page
             'already_checked_in' =>
                 'Already checked in',
 
+            'invalid_code',
             'attendee_not_found' =>
                 'Attendee not found',
 
@@ -1606,6 +1628,7 @@ class CheckInStation extends Page
             'access_denied' =>
                 'Access denied',
 
+            'invalid_check_in_point',
             'check_in_point_not_found' =>
                 'Invalid check-in point',
 
@@ -1639,5 +1662,52 @@ class CheckInStation extends Page
             default =>
                 'Check-in failed',
         };
+    }
+
+    /**
+     * Return a simple visual tone that the Blade view can use for
+     * high-contrast gate feedback.
+     */
+    private function resultTone(
+        string $status,
+        bool $success
+    ): string {
+        if ($success) {
+            return 'success';
+        }
+
+        if ($status === 'already_checked_in') {
+            return 'warning';
+        }
+
+        return 'danger';
+    }
+
+    /**
+     * Return a Heroicon name that matches the check-in result.
+     */
+    private function resultIcon(
+        string $status,
+        bool $success
+    ): string {
+        if ($success) {
+            return 'heroicon-o-check-circle';
+        }
+
+        if ($status === 'already_checked_in') {
+            return 'heroicon-o-exclamation-triangle';
+        }
+
+        return 'heroicon-o-x-circle';
+    }
+
+    /**
+     * Clear the result panel without changing the selected station context.
+     */
+    public function clearLastResult(): void
+    {
+        $this->lastResult = null;
+        $this->scanValue = '';
+        $this->selectedAttendeeId = null;
     }
 }

@@ -7,26 +7,36 @@ use App\Models\Event;
 
 class MessagePlaceholderService
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Render Message
+    |--------------------------------------------------------------------------
+    */
+
     public function render(
         string $content,
         Attendee $attendee
     ): string {
         $attendee->loadMissing([
-            'event',
+            'event.organization',
             'category',
             'badgeType',
         ]);
-
-        $event = $attendee->event;
 
         return strtr(
             $content,
             $this->replacements(
                 $attendee,
-                $event
+                $attendee->event
             )
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render Nullable Message
+    |--------------------------------------------------------------------------
+    */
 
     public function renderNullable(
         ?string $content,
@@ -42,6 +52,12 @@ class MessagePlaceholderService
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Available Placeholders
+    |--------------------------------------------------------------------------
+    */
+
     public function placeholders(): array
     {
         return [
@@ -50,19 +66,29 @@ class MessagePlaceholderService
             '#EMAIL#',
             '#ORGANIZATION#',
             '#POSITION#',
+
             '#CATEGORY#',
             '#PARTICIPANT_TYPE#',
+
             '#BADGE_TYPE#',
             '#BADGE_NUMBER#',
+            '#BADGE_LINK#',
+
             '#EVENT_NAME#',
             '#EVENT_VENUE#',
             '#EVENT_DATE#',
             '#EVENT_TIME#',
+
             '#PUBLIC_LINK#',
-            '#BADGE_LINK#',
             '#REGISTRATION_LINK#',
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Placeholder Replacements
+    |--------------------------------------------------------------------------
+    */
 
     protected function replacements(
         Attendee $attendee,
@@ -70,54 +96,125 @@ class MessagePlaceholderService
     ): array {
         return [
             '#NAME#' =>
-                $attendee->full_name ?? '',
+                trim(
+                    (string) (
+                        $attendee->full_name
+                        ?? ''
+                    )
+                ),
 
             '#PHONE#' =>
-                $attendee->phone ?? '',
+                trim(
+                    (string) (
+                        $attendee->phone
+                        ?? ''
+                    )
+                ),
 
             '#EMAIL#' =>
-                $attendee->email ?? '',
+                trim(
+                    (string) (
+                        $attendee->email
+                        ?? ''
+                    )
+                ),
 
             '#ORGANIZATION#' =>
-                $attendee->organization_name ?? '',
+                trim(
+                    (string) (
+                        $attendee->organization_name
+                        ?? ''
+                    )
+                ),
 
             '#POSITION#' =>
-                $attendee->position ?? '',
+                trim(
+                    (string) (
+                        $attendee->position
+                        ?? ''
+                    )
+                ),
 
             '#CATEGORY#' =>
-                $attendee->category?->name ?? '',
+                trim(
+                    (string) (
+                        $attendee->category?->name
+                        ?? ''
+                    )
+                ),
 
             '#PARTICIPANT_TYPE#' =>
-                $attendee->category?->name ?? '',
+                trim(
+                    (string) (
+                        $attendee->category?->name
+                        ?? ''
+                    )
+                ),
 
             '#BADGE_TYPE#' =>
-                $attendee->badgeType?->name ?? '',
+                trim(
+                    (string) (
+                        $attendee->badgeType?->name
+                        ?? ''
+                    )
+                ),
 
             '#BADGE_NUMBER#' =>
-                $attendee->badge_number ?? '',
-
-            '#EVENT_NAME#' =>
-                $event?->name ?? '',
-
-            '#EVENT_VENUE#' =>
-                $event?->venue ?? '',
-
-            '#EVENT_DATE#' =>
-                $this->eventDate($event),
-
-            '#EVENT_TIME#' =>
-                $this->eventTime($event),
-
-            '#PUBLIC_LINK#' =>
-                $this->publicLink($attendee),
+                trim(
+                    (string) (
+                        $attendee->badge_number
+                        ?? ''
+                    )
+                ),
 
             '#BADGE_LINK#' =>
-                $this->badgeLink($attendee),
+                $this->badgeLink(
+                    $attendee
+                ),
+
+            '#EVENT_NAME#' =>
+                trim(
+                    (string) (
+                        $event?->name
+                        ?? ''
+                    )
+                ),
+
+            '#EVENT_VENUE#' =>
+                trim(
+                    (string) (
+                        $event?->venue
+                        ?? ''
+                    )
+                ),
+
+            '#EVENT_DATE#' =>
+                $this->eventDate(
+                    $event
+                ),
+
+            '#EVENT_TIME#' =>
+                $this->eventTime(
+                    $event
+                ),
+
+            '#PUBLIC_LINK#' =>
+                $this->publicLink(
+                    $attendee
+                ),
 
             '#REGISTRATION_LINK#' =>
-                $this->registrationLink($event),
+                $this->registrationLink(
+                    $event
+                ),
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Event Date
+    |--------------------------------------------------------------------------
+    */
 
     protected function eventDate(
         ?Event $event
@@ -126,10 +223,31 @@ class MessagePlaceholderService
             return '';
         }
 
+        if (
+            $event->ends_at
+            && ! $event->starts_at->isSameDay(
+                $event->ends_at
+            )
+        ) {
+            return $event->starts_at->format(
+                'd M Y'
+            )
+                . ' - '
+                . $event->ends_at->format(
+                    'd M Y'
+                );
+        }
+
         return $event->starts_at->format(
             'd M Y'
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Event Time
+    |--------------------------------------------------------------------------
+    */
 
     protected function eventTime(
         ?Event $event
@@ -138,10 +256,26 @@ class MessagePlaceholderService
             return '';
         }
 
+        if ($event->ends_at) {
+            return $event->starts_at->format(
+                'H:i'
+            )
+                . ' - '
+                . $event->ends_at->format(
+                    'H:i'
+                );
+        }
+
         return $event->starts_at->format(
             'H:i'
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public Attendee Link
+    |--------------------------------------------------------------------------
+    */
 
     protected function publicLink(
         Attendee $attendee
@@ -150,14 +284,54 @@ class MessagePlaceholderService
             return '';
         }
 
-        return $attendee->publicUrl();
+        if (! method_exists(
+            $attendee,
+            'publicUrl'
+        )) {
+            return '';
+        }
+
+        return (string) (
+            $attendee->publicUrl()
+            ?? ''
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Badge Link
+    |--------------------------------------------------------------------------
+    */
 
     protected function badgeLink(
         Attendee $attendee
     ): string {
-        return $attendee->badgeUrl() ?? '';
+        /*
+         * The attendee must have a generated badge before
+         * there is anything useful to send.
+         */
+        if (blank($attendee->badge_path)) {
+            return '';
+        }
+
+        if (! method_exists(
+            $attendee,
+            'badgeUrl'
+        )) {
+            return '';
+        }
+
+        return (string) (
+            $attendee->badgeUrl()
+            ?? ''
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Registration Link
+    |--------------------------------------------------------------------------
+    */
 
     protected function registrationLink(
         ?Event $event

@@ -183,6 +183,50 @@ class BadgePrintStation extends Page
             ->paginate($this->perPage);
     }
 
+    public function getSelectedAttendeeProperty(): ?Attendee
+    {
+        if (! $this->attendeeId) {
+            return null;
+        }
+
+        return $this->authorizedAttendeeQuery()
+            ->with([
+                'event',
+                'category',
+                'badgeType',
+            ])
+            ->whereKey($this->attendeeId)
+            ->first();
+    }
+
+    public function selectAttendee(int $attendeeId): void
+    {
+        $attendee = $this->authorizedAttendeeQuery()
+            ->whereKey($attendeeId)
+            ->first();
+
+        if (! $attendee) {
+            Notification::make()
+                ->title('Attendee not found')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->attendeeId = (int) $attendee->getKey();
+
+        $this->eventId = (int) $attendee->event_id;
+
+        $this->search = filled($attendee->badge_number)
+            ? (string) $attendee->badge_number
+            : (string) $attendee->full_name;
+
+        $this->badgeStatus = 'all';
+
+        $this->resetPageState();
+    }
+
     public function generateBadge(int $attendeeId): void
     {
         $attendee = $this->authorizedAttendeeQuery()
@@ -340,11 +384,107 @@ class BadgePrintStation extends Page
             ->send();
     }
 
+    public function getCountersProperty(): array
+    {
+        $query = $this->authorizedAttendeeQuery()
+            ->when(
+                $this->eventId,
+                fn (Builder $query): Builder =>
+                    $query->where('event_id', $this->eventId)
+            );
+
+        $total = (clone $query)->count();
+
+        $generated = Schema::hasColumn('attendees', 'badge_status')
+            ? (clone $query)
+                ->where('badge_status', 'generated')
+                ->count()
+            : (clone $query)
+                ->whereNotNull('badge_path')
+                ->count();
+
+        $printed = Schema::hasColumn('attendees', 'badge_status')
+            ? (clone $query)
+                ->where('badge_status', 'printed')
+                ->count()
+            : BadgePrintLog::query()
+                ->when(
+                    $this->eventId,
+                    fn (Builder $query): Builder =>
+                        $query->where('event_id', $this->eventId)
+                )
+                ->distinct('attendee_id')
+                ->count('attendee_id');
+
+        $failed = Schema::hasColumn('attendees', 'badge_status')
+            ? (clone $query)
+                ->where('badge_status', 'failed')
+                ->count()
+            : 0;
+
+        $printedToday = BadgePrintLog::query()
+            ->when(
+                $this->eventId,
+                fn (Builder $query): Builder =>
+                    $query->where('event_id', $this->eventId)
+            )
+            ->whereDate('printed_at', today())
+            ->sum('copies');
+
+        return [
+            'total' => $total,
+            'generated' => $generated,
+            'printed' => $printed,
+            'failed' => $failed,
+            'pending' => max(
+                $total - $generated - $printed - $failed,
+                0
+            ),
+            'printed_today' => (int) $printedToday,
+        ];
+    }
+
+    public function getRecentPrintsProperty(): Collection
+    {
+        return BadgePrintLog::query()
+            ->with([
+                'attendee',
+                'event',
+                'printedBy',
+            ])
+            ->when(
+                $this->eventId,
+                fn (Builder $query): Builder =>
+                    $query->where('event_id', $this->eventId)
+            )
+            ->latest('printed_at')
+            ->limit(10)
+            ->get();
+    }
+
+    public function getPrintHistoryCount(int $attendeeId): int
+    {
+        return BadgePrintLog::query()
+            ->where('attendee_id', $attendeeId)
+            ->count();
+    }
+
+    public function isReprint(Attendee $attendee): bool
+    {
+        return $this->getPrintHistoryCount(
+            (int) $attendee->getKey()
+        ) > 0;
+    }
+
     public function clearSelectedAttendee(): void
     {
         $this->attendeeId = null;
         $this->search = '';
         $this->badgeStatus = 'generated';
+        $this->printCopies = [];
+        $this->printerNames = [];
+        $this->reprintReasons = [];
+        $this->resetValidation();
         $this->resetPageState();
     }
 
@@ -385,6 +525,29 @@ class BadgePrintStation extends Page
             'failed' => 'bg-red-50 text-red-700 ring-red-600/20',
             default => 'bg-gray-50 text-gray-700 ring-gray-600/20',
         };
+    }
+
+    public function badgeStatusTone(?string $status): string
+    {
+        return match ($status) {
+            'generated' => 'success',
+            'printed' => 'info',
+            'generating' => 'warning',
+            'failed' => 'danger',
+            default => 'gray',
+        };
+    }
+
+    public function canPrintBadge(Attendee $attendee): bool
+    {
+        return $this->badgeExists($attendee);
+    }
+
+    public function getPrintActionLabel(Attendee $attendee): string
+    {
+        return $this->isReprint($attendee)
+            ? 'Record Reprint'
+            : 'Record Print';
     }
 
     private function authorizedAttendeeQuery(): Builder

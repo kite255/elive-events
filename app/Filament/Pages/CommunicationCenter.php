@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use BackedEnum;
 use App\Models\CommunicationCampaign;
 use App\Models\CommunicationTemplate;
 use App\Models\Event;
+use App\Models\User;
 use App\Services\CommunicationCampaignService;
 use App\Services\SmsService;
 use Filament\Notifications\Notification;
@@ -15,6 +17,9 @@ use UnitEnum;
 
 class CommunicationCenter extends Page
 {
+    protected static string|BackedEnum|null $navigationIcon =
+        'heroicon-o-megaphone';
+
     protected static ?string $navigationLabel = 'Communication Center';
 
     protected static ?string $title = 'Communication Center';
@@ -50,6 +55,50 @@ class CommunicationCenter extends Page
     */
 
     public string $testPhone = '';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Audience options
+    |--------------------------------------------------------------------------
+    */
+
+    public array $audienceOptions = [
+        'all' => 'All Attendees',
+        'registered' => 'Registered',
+        'confirmed' => 'Confirmed',
+        'approved' => 'Approved',
+        'pending_approval' => 'Pending Approval',
+        'waitlisted' => 'Waitlisted',
+        'checked_in' => 'Checked In',
+        'not_checked_in' => 'Not Checked In',
+    ];
+
+    public function getSelectedEventProperty(): ?Event
+    {
+        return $this->selectedEvent();
+    }
+
+    public function getSelectedTemplateProperty(): ?CommunicationTemplate
+    {
+        if (! $this->templateId) {
+            return null;
+        }
+
+        return $this->templates()
+            ->firstWhere(
+                'id',
+                (int) $this->templateId
+            );
+    }
+
+    public function getSmsStatsProperty(): array
+    {
+        return [
+            'characters' => $this->smsCharacterCount(),
+            'segments' => $this->smsSegmentCount(),
+            'estimated_units' => $this->estimatedSmsUnits(),
+        ];
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -100,7 +149,7 @@ class CommunicationCenter extends Page
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             return false;
         }
 
@@ -117,6 +166,11 @@ class CommunicationCenter extends Page
                         $event
                     )
             );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
     }
 
     /*
@@ -174,6 +228,24 @@ class CommunicationCenter extends Page
             $this->campaignName =
                 $template->name;
         }
+    }
+
+    public function resetCampaign(): void
+    {
+        $event = $this->selectedEvent();
+
+        $this->templateId = null;
+        $this->audience = 'all';
+        $this->categoryId = null;
+        $this->message = '';
+        $this->testPhone = '';
+
+        $this->campaignName = $event
+            ? $event->name . ' SMS Campaign'
+            : '';
+
+        $this->resetValidation();
+        $this->refreshPreview();
     }
 
     /*
@@ -489,6 +561,25 @@ class CommunicationCenter extends Page
             return;
         }
 
+        if (
+            $this->categoryId
+            && ! $this->categories()->contains(
+                fn ($category): bool =>
+                    (int) $category->getKey()
+                    === (int) $this->categoryId
+            )
+        ) {
+            Notification::make()
+                ->title('Invalid attendee category')
+                ->body(
+                    'The selected category does not belong to this event.'
+                )
+                ->danger()
+                ->send();
+
+            return;
+        }
+
         $template = null;
 
         if ($this->templateId) {
@@ -565,7 +656,7 @@ class CommunicationCenter extends Page
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             return new Collection();
         }
 
@@ -672,6 +763,59 @@ class CommunicationCenter extends Page
             ->get();
     }
 
+    public function getCampaignStatsProperty(): array
+    {
+        $campaigns = $this->recentCampaigns();
+
+        return [
+            'campaigns' => $campaigns->count(),
+            'queued' => (int) $campaigns->sum(
+                fn (CommunicationCampaign $campaign): int =>
+                    (int) ($campaign->queued_count ?? 0)
+            ),
+            'sent' => (int) $campaigns->sum(
+                fn (CommunicationCampaign $campaign): int =>
+                    (int) ($campaign->sent_count ?? 0)
+            ),
+            'failed' => (int) $campaigns->sum(
+                fn (CommunicationCampaign $campaign): int =>
+                    (int) ($campaign->failed_count ?? 0)
+            ),
+        ];
+    }
+
+    public function campaignStatusLabel(
+        ?string $status
+    ): string {
+        return match ($status) {
+            'draft' => 'Draft',
+            'queued' => 'Queued',
+            'processing' => 'Processing',
+            'completed' => 'Completed',
+            'failed' => 'Failed',
+            'cancelled' => 'Cancelled',
+            default => ucfirst(
+                str_replace(
+                    '_',
+                    ' ',
+                    (string) ($status ?: 'unknown')
+                )
+            ),
+        };
+    }
+
+    public function campaignStatusTone(
+        ?string $status
+    ): string {
+        return match ($status) {
+            'completed' => 'success',
+            'queued', 'processing' => 'warning',
+            'failed' => 'danger',
+            'cancelled' => 'gray',
+            default => 'gray',
+        };
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Selected event
@@ -704,7 +848,7 @@ class CommunicationCenter extends Page
             auth()->user();
 
         abort_unless(
-            $user
+            $user instanceof User
             && $user->canManageEventCommunication(
                 $event
             ),

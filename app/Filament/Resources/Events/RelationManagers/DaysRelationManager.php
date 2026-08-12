@@ -37,39 +37,44 @@ class DaysRelationManager extends RelationManager
     public function form(Schema $schema): Schema
     {
         return $schema
+            ->columns(2)
             ->components([
                 TextInput::make('name')
                     ->label('Day name')
-                    ->placeholder('Day 1 – Opening Ceremony')
+                    ->placeholder('e.g. Day 1, Opening Day')
+                    ->helperText('Use a short name that attendees and check-in staff can recognize easily.')
                     ->required()
                     ->maxLength(255),
 
                 DatePicker::make('event_date')
                     ->label('Event date')
+                    ->helperText('The calendar date for this event day.')
                     ->required()
                     ->native(false),
 
                 TimePicker::make('starts_at')
                     ->label('Start time')
+                    ->helperText('Optional. Leave blank if the day has no fixed start time.')
                     ->seconds(false)
                     ->native(false),
 
                 TimePicker::make('ends_at')
                     ->label('End time')
+                    ->helperText('Optional. Must be after the start time when provided.')
                     ->seconds(false)
                     ->native(false)
                     ->after('starts_at'),
 
                 TextInput::make('venue_name')
                     ->label('Venue')
-                    ->placeholder('Main conference hall')
+                    ->placeholder('e.g. Main Conference Hall')
+                    ->helperText('Optional. Leave blank to use the main event venue.')
                     ->maxLength(255),
 
                 TextInput::make('capacity')
                     ->label('Daily capacity')
-                    ->helperText(
-                        'Leave empty when this day has no separate capacity limit.'
-                    )
+                    ->placeholder('Unlimited')
+                    ->helperText('Optional. Leave blank when this day has no separate capacity limit.')
                     ->numeric()
                     ->minValue(1),
 
@@ -82,21 +87,19 @@ class DaysRelationManager extends RelationManager
                         'cancelled' => 'Cancelled',
                     ])
                     ->default('active')
+                    ->helperText('Only active days should normally be used for registration and check-in.')
                     ->required()
                     ->native(false),
 
                 Toggle::make('is_registration_open')
                     ->label('Allow registration for this day')
-                    ->helperText(
-                        'Attendees can select this day on the public registration form.'
-                    )
-                    ->default(true),
+                    ->helperText('When enabled, attendees can select this day on the public registration form.')
+                    ->default(true)
+                    ->inline(false),
 
                 TextInput::make('display_order')
                     ->label('Display order')
-                    ->helperText(
-                        'Lower numbers appear first on the registration form.'
-                    )
+                    ->helperText('Lower numbers appear first on the public registration form.')
                     ->numeric()
                     ->default(0)
                     ->minValue(0),
@@ -156,10 +159,7 @@ class DaysRelationManager extends RelationManager
                     ->getStateUsing(
                         fn (EventDay $record): int => $record
                             ->attendees()
-                            ->where(
-                                'attendees.status',
-                                'pending_approval'
-                            )
+                            ->where('attendees.status', 'pending_approval')
                             ->count()
                     )
                     ->badge()
@@ -244,6 +244,9 @@ class DaysRelationManager extends RelationManager
                 CreateAction::make()
                     ->label('Add Event Day')
                     ->icon('heroicon-o-plus')
+                    ->modalHeading('Create Event Day')
+                    ->modalDescription('Add the date, schedule, venue, registration availability, and capacity for this event day.')
+                    ->modalSubmitActionLabel('Create Day')
                     ->mutateDataUsing(function (array $data): array {
                         $data['display_order'] ??= 0;
                         $data['status'] ??= 'active';
@@ -253,7 +256,10 @@ class DaysRelationManager extends RelationManager
                     }),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->modalHeading('Edit Event Day')
+                    ->modalDescription('Update the schedule, venue, capacity, or registration availability for this day.')
+                    ->modalSubmitActionLabel('Save Changes'),
 
                 DeleteAction::make()
                     ->requiresConfirmation(),
@@ -266,9 +272,7 @@ class DaysRelationManager extends RelationManager
                         ->color('success')
                         ->requiresConfirmation()
                         ->modalHeading('Activate selected event days?')
-                        ->modalDescription(
-                            'The selected event days will become active.'
-                        )
+                        ->modalDescription('The selected event days will become active.')
                         ->modalSubmitActionLabel('Activate')
                         ->action(function (Collection $records): void {
                             $records->each(

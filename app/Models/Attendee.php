@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\BadgeNumberService;
+use App\Services\PhoneNumberService;
 use App\Services\QrTokenService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -54,6 +55,32 @@ class Attendee extends Model
 
     protected static function booted(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Normalize phone number before every save
+        |--------------------------------------------------------------------------
+        |
+        | This protects:
+        | - Manual attendee creation
+        | - Filament attendee creation/editing
+        | - Public registration
+        | - Excel imports
+        | - Onsite registration
+        |
+        | Examples:
+        | 0650537539     => 255650537539
+        | +255650537539  => 255650537539
+        | 255650537539   => 255650537539
+        |
+        */
+
+        static::saving(function (Attendee $attendee): void {
+            if (filled($attendee->phone)) {
+                $attendee->phone = app(PhoneNumberService::class)
+                    ->normalize($attendee->phone);
+            }
+        });
+
         static::creating(function (Attendee $attendee): void {
             if (blank($attendee->registered_at)) {
                 $attendee->registered_at = now();
@@ -73,9 +100,11 @@ class Attendee extends Model
         });
 
         static::created(function (Attendee $attendee): void {
-            app(BadgeNumberService::class)->assignBadgeNumber($attendee);
+            app(BadgeNumberService::class)
+                ->assignBadgeNumber($attendee);
 
-            app(QrTokenService::class)->generateForAttendee($attendee);
+            app(QrTokenService::class)
+                ->generateForAttendee($attendee);
         });
     }
 
@@ -181,7 +210,10 @@ class Attendee extends Model
     public function activeEventSessions(): BelongsToMany
     {
         return $this->eventSessions()
-            ->where('event_sessions.status', EventSession::STATUS_ACTIVE);
+            ->where(
+                'event_sessions.status',
+                EventSession::STATUS_ACTIVE
+            );
     }
 
     public function registeredEventSessions(): BelongsToMany
@@ -248,6 +280,14 @@ class Attendee extends Model
         return $this->hasMany(CommunicationLog::class);
     }
 
+    public function communicationCampaignRecipients(): HasMany
+    {
+        return $this->hasMany(
+            CommunicationCampaignRecipient::class,
+            'attendee_id'
+        );
+    }
+
     public function registrationAnswers(): HasMany
     {
         return $this->hasMany(
@@ -268,45 +308,61 @@ class Attendee extends Model
         return $query->where('event_id', $eventId);
     }
 
-    public function scopeCheckedIn(Builder $query): Builder
-    {
+    public function scopeCheckedIn(
+        Builder $query
+    ): Builder {
         return $query->whereNotNull('checked_in_at');
     }
 
-    public function scopeNotCheckedIn(Builder $query): Builder
-    {
+    public function scopeNotCheckedIn(
+        Builder $query
+    ): Builder {
         return $query->whereNull('checked_in_at');
     }
 
     public function scopePublicRegistrations(
         Builder $query
     ): Builder {
-        return $query->whereIn('registration_source', [
-            'public',
-            'public_form',
-            'public_registration',
-        ]);
+        return $query->whereIn(
+            'registration_source',
+            [
+                'public',
+                'public_form',
+                'public_registration',
+            ]
+        );
     }
 
     public function scopePendingApproval(
         Builder $query
     ): Builder {
-        return $query->where('status', 'pending_approval');
+        return $query->where(
+            'status',
+            'pending_approval'
+        );
     }
 
-    public function scopeWaitlisted(Builder $query): Builder
-    {
-        return $query->where('status', 'waitlisted');
+    public function scopeWaitlisted(
+        Builder $query
+    ): Builder {
+        return $query->where(
+            'status',
+            'waitlisted'
+        );
     }
 
-    public function scopeApproved(Builder $query): Builder
-    {
-        return $query->whereIn('status', [
-            'registered',
-            'confirmed',
-            'approved',
-            'checked_in',
-        ]);
+    public function scopeApproved(
+        Builder $query
+    ): Builder {
+        return $query->whereIn(
+            'status',
+            [
+                'registered',
+                'confirmed',
+                'approved',
+                'checked_in',
+            ]
+        );
     }
 
     public function scopeExpectedForDay(
@@ -316,15 +372,21 @@ class Attendee extends Model
         return $query
             ->whereHas(
                 'eventDays',
-                fn (Builder $dayQuery) => $dayQuery
-                    ->where('event_days.id', $eventDayId)
+                fn (Builder $dayQuery) =>
+                    $dayQuery->where(
+                        'event_days.id',
+                        $eventDayId
+                    )
             )
-            ->whereIn('status', [
-                'registered',
-                'confirmed',
-                'approved',
-                'checked_in',
-            ]);
+            ->whereIn(
+                'status',
+                [
+                    'registered',
+                    'confirmed',
+                    'approved',
+                    'checked_in',
+                ]
+            );
     }
 
     public function scopeExpectedForSession(
@@ -334,22 +396,26 @@ class Attendee extends Model
         return $query
             ->whereHas(
                 'eventSessions',
-                fn (Builder $sessionQuery) => $sessionQuery
-                    ->where(
-                        'event_sessions.id',
-                        $eventSessionId
-                    )
-                    ->where(
-                        'attendee_event_session.status',
-                        'registered'
-                    )
+                fn (Builder $sessionQuery) =>
+                    $sessionQuery
+                        ->where(
+                            'event_sessions.id',
+                            $eventSessionId
+                        )
+                        ->where(
+                            'attendee_event_session.status',
+                            'registered'
+                        )
             )
-            ->whereIn('status', [
-                'registered',
-                'confirmed',
-                'approved',
-                'checked_in',
-            ]);
+            ->whereIn(
+                'status',
+                [
+                    'registered',
+                    'confirmed',
+                    'approved',
+                    'checked_in',
+                ]
+            );
     }
 
     public function scopeWithReservedMerchandise(
@@ -357,8 +423,11 @@ class Attendee extends Model
     ): Builder {
         return $query->whereHas(
             'merchandiseSelections',
-            fn (Builder $selectionQuery) => $selectionQuery
-                ->where('status', 'reserved')
+            fn (Builder $selectionQuery) =>
+                $selectionQuery->where(
+                    'status',
+                    'reserved'
+                )
         );
     }
 
@@ -367,12 +436,15 @@ class Attendee extends Model
     ): Builder {
         return $query->whereDoesntHave(
             'merchandiseSelections',
-            fn (Builder $selectionQuery) => $selectionQuery
-                ->whereIn('status', [
-                    'selected',
-                    'reserved',
-                    'distributed',
-                ])
+            fn (Builder $selectionQuery) =>
+                $selectionQuery->whereIn(
+                    'status',
+                    [
+                        'selected',
+                        'reserved',
+                        'distributed',
+                    ]
+                )
         );
     }
 
@@ -442,7 +514,10 @@ class Attendee extends Model
             : $eventDay;
 
         return $this->eventDays()
-            ->where('event_days.id', $eventDayId)
+            ->where(
+                'event_days.id',
+                $eventDayId
+            )
             ->exists();
     }
 
@@ -455,7 +530,9 @@ class Attendee extends Model
     {
         $days = $this->eventDays()
             ->get()
-            ->map(fn (EventDay $day) => $day->name)
+            ->map(
+                fn (EventDay $day) => $day->name
+            )
             ->filter()
             ->values();
 
@@ -472,17 +549,21 @@ class Attendee extends Model
 
     public function hasSelectedEventSessions(): bool
     {
-        return $this->registeredEventSessions()->exists();
+        return $this
+            ->registeredEventSessions()
+            ->exists();
     }
 
     public function hasSelectedEventSession(
         int|EventSession $eventSession
     ): bool {
-        $eventSessionId = $eventSession instanceof EventSession
-            ? $eventSession->id
-            : $eventSession;
+        $eventSessionId =
+            $eventSession instanceof EventSession
+                ? $eventSession->id
+                : $eventSession;
 
-        return $this->registeredEventSessions()
+        return $this
+            ->registeredEventSessions()
             ->where(
                 'event_sessions.id',
                 $eventSessionId
@@ -492,12 +573,15 @@ class Attendee extends Model
 
     public function selectedEventSessionsCount(): int
     {
-        return $this->registeredEventSessions()->count();
+        return $this
+            ->registeredEventSessions()
+            ->count();
     }
 
     public function selectedEventSessionsLabel(): string
     {
-        $sessions = $this->registeredEventSessions()
+        $sessions = $this
+            ->registeredEventSessions()
             ->get()
             ->map(
                 fn (EventSession $session) =>
@@ -519,27 +603,35 @@ class Attendee extends Model
 
     public function hasMerchandiseSelections(): bool
     {
-        return $this->activeMerchandiseSelections()->exists();
+        return $this
+            ->activeMerchandiseSelections()
+            ->exists();
     }
 
     public function hasReservedMerchandise(): bool
     {
-        return $this->reservedMerchandiseSelections()->exists();
+        return $this
+            ->reservedMerchandiseSelections()
+            ->exists();
     }
 
     public function hasDistributedMerchandise(): bool
     {
-        return $this->distributedMerchandiseSelections()->exists();
+        return $this
+            ->distributedMerchandiseSelections()
+            ->exists();
     }
 
     public function hasSelectedMerchandise(
         int|EventMerchandise $merchandise
     ): bool {
-        $merchandiseId = $merchandise instanceof EventMerchandise
-            ? $merchandise->id
-            : $merchandise;
+        $merchandiseId =
+            $merchandise instanceof EventMerchandise
+                ? $merchandise->id
+                : $merchandise;
 
-        return $this->activeMerchandiseSelections()
+        return $this
+            ->activeMerchandiseSelections()
             ->where(
                 'event_merchandise_id',
                 $merchandiseId
@@ -550,11 +642,13 @@ class Attendee extends Model
     public function merchandiseSelectionFor(
         int|EventMerchandise $merchandise
     ): ?AttendeeMerchandise {
-        $merchandiseId = $merchandise instanceof EventMerchandise
-            ? $merchandise->id
-            : $merchandise;
+        $merchandiseId =
+            $merchandise instanceof EventMerchandise
+                ? $merchandise->id
+                : $merchandise;
 
-        return $this->merchandiseSelections()
+        return $this
+            ->merchandiseSelections()
             ->where(
                 'event_merchandise_id',
                 $merchandiseId
@@ -565,7 +659,8 @@ class Attendee extends Model
 
     public function activeMerchandiseQuantity(): int
     {
-        return (int) $this->activeMerchandiseSelections()
+        return (int) $this
+            ->activeMerchandiseSelections()
             ->sum('quantity');
     }
 
@@ -582,9 +677,12 @@ class Attendee extends Model
 
     public function publicUrl(): string
     {
-        return route('public.attendees.show', [
-            'token' => $this->public_token,
-        ]);
+        return route(
+            'public.attendees.show',
+            [
+                'token' => $this->public_token,
+            ]
+        );
     }
 
     public function badgeUrl(): ?string
@@ -593,9 +691,12 @@ class Attendee extends Model
             return null;
         }
 
-        return asset('storage/' . ltrim(
-            $this->badge_path,
-            '/'
-        ));
+        return asset(
+            'storage/' .
+            ltrim(
+                $this->badge_path,
+                '/'
+            )
+        );
     }
 }

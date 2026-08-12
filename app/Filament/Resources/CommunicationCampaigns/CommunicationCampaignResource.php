@@ -8,12 +8,16 @@ use App\Filament\Resources\CommunicationCampaigns\RelationManagers\LogsRelationM
 use App\Models\CommunicationCampaign;
 use App\Models\Event;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -415,6 +419,11 @@ class CommunicationCampaignResource extends Resource
                 'id',
                 'desc'
             )
+            ->paginated([
+                25,
+                50,
+                100,
+            ])
             ->columns([
 
                 TextColumn::make(
@@ -424,7 +433,8 @@ class CommunicationCampaignResource extends Resource
                         'Campaign'
                     )
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->limit(32),
 
                 TextColumn::make(
                     'event.name'
@@ -433,7 +443,8 @@ class CommunicationCampaignResource extends Resource
                         'Event'
                     )
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->limit(28),
 
                 TextColumn::make(
                     'channel'
@@ -446,14 +457,47 @@ class CommunicationCampaignResource extends Resource
                         fn (
                             string $state
                         ): string =>
-                            strtoupper(
-                                $state
-                            )
+                            match ($state) {
+                                CommunicationCampaign::CHANNEL_SMS =>
+                                    'SMS',
+
+                                CommunicationCampaign::CHANNEL_WHATSAPP =>
+                                    'WhatsApp',
+
+                                CommunicationCampaign::CHANNEL_EMAIL =>
+                                    'Email',
+
+                                default =>
+                                    str($state)
+                                        ->headline()
+                                        ->toString(),
+                            }
+                    )
+                    ->color(
+                        fn (
+                            string $state
+                        ): string =>
+                            match ($state) {
+                                CommunicationCampaign::CHANNEL_SMS =>
+                                    'info',
+
+                                CommunicationCampaign::CHANNEL_WHATSAPP =>
+                                    'success',
+
+                                CommunicationCampaign::CHANNEL_EMAIL =>
+                                    'primary',
+
+                                default =>
+                                    'gray',
+                            }
                     ),
 
                 TextColumn::make(
                     'status'
                 )
+                    ->label(
+                        'Status'
+                    )
                     ->badge()
                     ->formatStateUsing(
                         fn (
@@ -482,10 +526,28 @@ class CommunicationCampaignResource extends Resource
                     ->sortable(),
 
                 TextColumn::make(
+                    'queued_count'
+                )
+                    ->label(
+                        'Queued'
+                    )
+                    ->numeric()
+                    ->sortable(),
+
+                TextColumn::make(
                     'sent_count'
                 )
                     ->label(
                         'Sent'
+                    )
+                    ->numeric()
+                    ->sortable(),
+
+                TextColumn::make(
+                    'delivered_count'
+                )
+                    ->label(
+                        'Delivered'
                     )
                     ->numeric()
                     ->sortable(),
@@ -497,7 +559,55 @@ class CommunicationCampaignResource extends Resource
                         'Failed'
                     )
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->color(
+                        fn (
+                            CommunicationCampaign $record
+                        ): string =>
+                            (int) $record->failed_count > 0
+                                ? 'danger'
+                                : 'gray'
+                    ),
+
+                TextColumn::make(
+                    'remaining'
+                )
+                    ->label(
+                        'Remaining'
+                    )
+                    ->state(
+                        fn (
+                            CommunicationCampaign $record
+                        ): string =>
+                            number_format(
+                                $record->remainingCount()
+                            )
+                    )
+                    ->color(
+                        fn (
+                            CommunicationCampaign $record
+                        ): string =>
+                            $record->remainingCount() > 0
+                                ? 'warning'
+                                : 'success'
+                    ),
+
+                TextColumn::make(
+                    'progress'
+                )
+                    ->label(
+                        'Progress'
+                    )
+                    ->state(
+                        fn (
+                            CommunicationCampaign $record
+                        ): string =>
+                            number_format(
+                                $record->completionPercentage(),
+                                1
+                            )
+                            . '%'
+                    ),
 
                 TextColumn::make(
                     'created_at'
@@ -505,10 +615,41 @@ class CommunicationCampaignResource extends Resource
                     ->label(
                         'Created'
                     )
-                    ->dateTime()
+                    ->dateTime(
+                        'd M Y, H:i'
+                    )
                     ->sortable(),
+
+                TextColumn::make(
+                    'completed_at'
+                )
+                    ->label(
+                        'Completed'
+                    )
+                    ->dateTime(
+                        'd M Y, H:i'
+                    )
+                    ->placeholder(
+                        '—'
+                    )
+                    ->toggleable(
+                        isToggledHiddenByDefault: true
+                    ),
             ])
             ->filters([
+
+                SelectFilter::make(
+                    'event_id'
+                )
+                    ->label(
+                        'Event'
+                    )
+                    ->relationship(
+                        'event',
+                        'name'
+                    )
+                    ->searchable()
+                    ->preload(),
 
                 SelectFilter::make(
                     'channel'
@@ -549,6 +690,121 @@ class CommunicationCampaignResource extends Resource
                         CommunicationCampaign::STATUS_CANCELLED =>
                             'Cancelled',
                     ]),
+
+                Filter::make(
+                    'has_failures'
+                )
+                    ->label(
+                        'Has failures'
+                    )
+                    ->query(
+                        fn (
+                            Builder $query
+                        ): Builder =>
+                            $query->where(
+                                'failed_count',
+                                '>',
+                                0
+                            )
+                    ),
+
+                Filter::make(
+                    'incomplete'
+                )
+                    ->label(
+                        'Incomplete campaigns'
+                    )
+                    ->query(
+                        fn (
+                            Builder $query
+                        ): Builder =>
+                            $query->whereIn(
+                                'status',
+                                [
+                                    CommunicationCampaign::STATUS_QUEUED,
+                                    CommunicationCampaign::STATUS_PROCESSING,
+                                ]
+                            )
+                    ),
+
+                Filter::make(
+                    'stuck'
+                )
+                    ->label(
+                        'Possibly stuck'
+                    )
+                    ->query(
+                        fn (
+                            Builder $query
+                        ): Builder =>
+                            $query
+                                ->whereIn(
+                                    'status',
+                                    [
+                                        CommunicationCampaign::STATUS_QUEUED,
+                                        CommunicationCampaign::STATUS_PROCESSING,
+                                    ]
+                                )
+                                ->where(
+                                    'updated_at',
+                                    '<=',
+                                    now()->subMinutes(10)
+                                )
+                    ),
+
+                Filter::make(
+                    'today'
+                )
+                    ->label(
+                        'Created today'
+                    )
+                    ->query(
+                        fn (
+                            Builder $query
+                        ): Builder =>
+                            $query->whereDate(
+                                'created_at',
+                                today()
+                            )
+                    ),
+            ])
+            ->recordActions([
+
+                ViewAction::make()
+                    ->label(
+                        'Open Campaign'
+                    ),
+
+                Action::make(
+                    'refresh_counters'
+                )
+                    ->label(
+                        'Refresh Counters'
+                    )
+                    ->icon(
+                        'heroicon-o-arrow-path'
+                    )
+                    ->color(
+                        'gray'
+                    )
+                    ->action(
+                        function (
+                            CommunicationCampaign $record
+                        ): void {
+                            $record
+                                ->refreshCounters();
+
+                            Notification::make()
+                                ->title(
+                                    'Campaign counters refreshed'
+                                )
+                                ->body(
+                                    'Campaign totals have been recalculated.'
+                                )
+                                ->success()
+                                ->send();
+                        }
+                    ),
             ])
             ->recordUrl(
                 fn (
@@ -561,6 +817,15 @@ class CommunicationCampaignResource extends Resource
                                 $record,
                         ]
                     )
+            )
+            ->emptyStateHeading(
+                'No communication campaigns'
+            )
+            ->emptyStateDescription(
+                'Campaigns created from Communication Center will appear here.'
+            )
+            ->emptyStateIcon(
+                'heroicon-o-megaphone'
             );
     }
 

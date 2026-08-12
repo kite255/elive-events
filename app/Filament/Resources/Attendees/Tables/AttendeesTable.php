@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Attendees\Tables;
 
 use App\Exports\AttendeesExport;
+use App\Filament\Pages\BadgePrintStation;
 use App\Filament\Resources\Attendees\AttendeeResource;
 use App\Services\BadgeGenerationService;
 use Filament\Actions\Action;
@@ -95,6 +96,37 @@ class AttendeesTable
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('registered_days')
+                    ->label('Registered Days')
+                    ->getStateUsing(function ($record): string {
+                        if (! $record->relationLoaded('eventDays')) {
+                            $record->load('eventDays');
+                        }
+
+                        if ($record->eventDays->isEmpty()) {
+                            return 'General event';
+                        }
+
+                        return $record->eventDays
+                            ->sortBy([
+                                ['event_date', 'asc'],
+                                ['display_order', 'asc'],
+                                ['id', 'asc'],
+                            ])
+                            ->map(function ($day): string {
+                                if ($day->event_date) {
+                                    return $day->name
+                                        . ' · '
+                                        . $day->event_date->format('d M');
+                                }
+
+                                return $day->name;
+                            })
+                            ->implode(', ');
+                    })
+                    ->wrap()
+                    ->toggleable(),
+
                 TextColumn::make('badgeType.name')
                     ->label('Badge Type')
                     ->badge()
@@ -154,10 +186,27 @@ class AttendeesTable
                     ->getStateUsing(fn ($record): bool => filled($record->public_token))
                     ->visible(fn (): bool => Schema::hasColumn('attendees', 'public_token')),
 
-                IconColumn::make('checked_in_at')
-                    ->label('Checked In')
-                    ->boolean()
-                    ->getStateUsing(fn ($record): bool => filled($record->checked_in_at)),
+                TextColumn::make('attendance_status')
+                    ->label('Attendance')
+                    ->badge()
+                    ->getStateUsing(
+                        fn ($record): string =>
+                            filled($record->checked_in_at)
+                                ? 'attended'
+                                : 'not_checked_in'
+                    )
+                    ->formatStateUsing(
+                        fn (string $state): string => match ($state) {
+                            'attended' => 'Attended',
+                            default => 'Not Checked In',
+                        }
+                    )
+                    ->color(
+                        fn (string $state): string => match ($state) {
+                            'attended' => 'success',
+                            default => 'gray',
+                        }
+                    ),
 
                 TextColumn::make('email')
                     ->label('Email')
@@ -168,7 +217,8 @@ class AttendeesTable
                 TextColumn::make('organization_name')
                     ->label('Organization')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->placeholder('—')
+                    ->toggleable(),
 
                 TextColumn::make('position')
                     ->label('Position')
@@ -218,6 +268,34 @@ class AttendeesTable
                     ->searchable()
                     ->preload(),
 
+                SelectFilter::make('event_day')
+                    ->label('Registered Day')
+                    ->relationship('eventDays', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('attendance')
+                    ->label('Attendance')
+                    ->options([
+                        'checked_in' => 'Attended',
+                        'not_checked_in' => 'Not Checked In',
+                    ])
+                    ->query(function ($query, array $data) {
+                        return match ($data['value'] ?? null) {
+                            'checked_in' =>
+                                $query->whereNotNull(
+                                    'attendees.checked_in_at'
+                                ),
+
+                            'not_checked_in' =>
+                                $query->whereNull(
+                                    'attendees.checked_in_at'
+                                ),
+
+                            default => $query,
+                        };
+                    }),
+
                 SelectFilter::make('badge_type')
                     ->relationship('badgeType', 'name')
                     ->searchable()
@@ -257,6 +335,36 @@ class AttendeesTable
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('view_attendee')
+                        ->label('View Attendee')
+                        ->icon('heroicon-o-user')
+                        ->color('gray')
+                        ->url(
+                            fn ($record): string =>
+                                AttendeeResource::getUrl(
+                                    'view',
+                                    ['record' => $record]
+                                )
+                        ),
+
+                    Action::make('badge_print_station')
+                        ->label('Badge Print Station')
+                        ->icon('heroicon-o-printer')
+                        ->color('primary')
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canManageBadge(
+                                    $record
+                                )
+                        )
+                        ->url(
+                            fn ($record): string =>
+                                BadgePrintStation::getUrl([
+                                    'attendee' =>
+                                        (int) $record->getKey(),
+                                ])
+                        ),
+
                     Action::make('open_public_page')
                         ->label('Open Public Page')
                         ->icon('heroicon-o-arrow-top-right-on-square')
@@ -459,11 +567,25 @@ class AttendeesTable
                         ->label('View QR')
                         ->icon('heroicon-o-qr-code')
                         ->color('primary')
-                        ->url(fn ($record): string => AttendeeResource::getUrl('qr-code', [
-                            'record' => $record,
-                        ])),
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canViewQrCode(
+                                    $record
+                                )
+                        )
+                        ->url(
+                            fn ($record): string =>
+                                AttendeeResource::getUrl(
+                                    'qr-code',
+                                    ['record' => $record]
+                                )
+                        ),
 
-                    EditAction::make(),
+                    EditAction::make()
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canEdit($record)
+                        ),
                 ])
                     ->label('Actions')
                     ->icon('heroicon-m-ellipsis-vertical')
@@ -681,7 +803,11 @@ class AttendeesTable
                                 ->send();
                         }),
 
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(
+                            fn (): bool =>
+                                AttendeeResource::canDeleteAny()
+                        ),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

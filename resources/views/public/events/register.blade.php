@@ -68,8 +68,18 @@
 
         .elive-banner {
             position: relative;
-            height: 280px !important;
-            background-position: center !important;
+            width: 100%;
+            height: 220px;
+            overflow: hidden;
+            background: var(--elive-primary);
+        }
+
+        .elive-banner img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: 45% center;
         }
 
         .elive-banner::after {
@@ -78,9 +88,8 @@
             inset: 0;
             background: linear-gradient(
                 180deg,
-                rgba(15, 23, 42, 0.02) 10%,
-                rgba(15, 23, 42, 0.08) 55%,
-                rgba(15, 23, 42, 0.26) 100%
+                rgba(15, 23, 42, 0.00) 68%,
+                rgba(15, 23, 42, 0.08) 100%
             );
             pointer-events: none;
         }
@@ -126,8 +135,8 @@
         .event-summary > div {
             position: relative;
             overflow: hidden;
-            min-height: 102px;
-            padding: 18px !important;
+            min-height: 88px;
+            padding: 16px !important;
             background:
                 linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
             border: 1px solid var(--elive-border) !important;
@@ -451,7 +460,14 @@
             }
 
             .elive-banner {
-                height: 190px !important;
+                height: 150px;
+            }
+
+            .elive-banner img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                object-position: 45% center;
             }
 
             .elive-content {
@@ -473,6 +489,24 @@
 
             .event-summary {
                 grid-template-columns: 1fr !important;
+                gap: 10px !important;
+                margin-top: 20px !important;
+            }
+
+            .event-summary > div {
+                min-height: 0 !important;
+                padding: 13px 14px !important;
+                border-radius: 15px !important;
+            }
+
+            .event-summary > div > div:first-child {
+                font-size: 9px !important;
+            }
+
+            .event-summary > div > div:last-child {
+                margin-top: 5px !important;
+                font-size: 14px !important;
+                line-height: 1.35;
             }
 
             form > div {
@@ -522,14 +556,22 @@
                 border: 1px solid #e5e7eb;
             ">
                 @if ($branding['banner'])
-                    <div class="elive-banner" style="
-                        height: 230px;
-                        background-image: url('{{ asset('storage/' . $branding['banner']) }}');
-                        background-size: cover;
-                        background-position: center;
-                    "></div>
+                    <div class="elive-banner">
+                        <img
+                            src="{{ asset('storage/' . $branding['banner']) }}"
+                            alt="{{ $event->name }} banner"
+                            loading="eager"
+                            decoding="async"
+                        >
+                    </div>
                 @else
-                    <div class="elive-banner" style="height: 16px; background: {{ $branding['primary_color'] }};"></div>
+                    <div
+                        class="elive-banner"
+                        style="
+                            height: 16px;
+                            background: {{ $branding['primary_color'] }};
+                        "
+                    ></div>
                 @endif
 
                 <div class="elive-content" style="padding: 28px;">

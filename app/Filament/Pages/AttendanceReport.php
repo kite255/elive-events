@@ -314,6 +314,48 @@ class AttendanceReport extends Page
         );
     }
 
+    public function registeredDaysLabel(Attendee $attendee): string
+    {
+        if (! $attendee->relationLoaded('eventDays')) {
+            $attendee->load([
+                'eventDays:id,event_id,name,event_date',
+            ]);
+        }
+
+        if ($attendee->eventDays->isEmpty()) {
+            return 'General event';
+        }
+
+        return $attendee->eventDays
+            ->sortBy([
+                ['event_date', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->map(function (EventDay $day): string {
+                if ($day->event_date) {
+                    return $day->name
+                        . ' — '
+                        . $day->event_date->format('d M Y');
+                }
+
+                return $day->name;
+            })
+            ->implode(', ');
+    }
+
+    public function checkedInDayLabel(?CheckIn $checkIn): string
+    {
+        if (! $checkIn) {
+            return '—';
+        }
+
+        if ($checkIn->eventDay) {
+            return $checkIn->eventDay->name;
+        }
+
+        return 'General event';
+    }
+
     public function getSummaryProperty(): array
     {
         $base = $this->summaryBaseQuery();
@@ -388,7 +430,8 @@ class AttendanceReport extends Page
 
                 fputcsv($handle, [
                     'Event',
-                    'Event Day',
+                    'Registered Days',
+                    'Checked-in Day',
                     'Attendee',
                     'Badge Number',
                     'Category',
@@ -405,6 +448,7 @@ class AttendanceReport extends Page
                     ->with([
                         'event:id,name',
                         'category:id,name',
+                        'eventDays:id,event_id,name,event_date',
                     ])
                     ->orderBy('id')
                     ->chunkById(
@@ -424,11 +468,12 @@ class AttendanceReport extends Page
 
                                 fputcsv($handle, [
                                     $attendee->event?->name,
-                                    $checkIn?->eventDay?->name
-                                        ?? (
-                                            $this->selectedEventDay?->name
-                                            ?? 'General'
-                                        ),
+                                    $this->registeredDaysLabel(
+                                        $attendee
+                                    ),
+                                    $this->checkedInDayLabel(
+                                        $checkIn
+                                    ),
                                     $attendee->full_name,
                                     $attendee->badge_number,
                                     $attendee->category?->name,

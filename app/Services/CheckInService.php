@@ -449,17 +449,24 @@ class CheckInService
 
     /**
      * Resolve and validate the selected event day.
+     *
+     * Behavior:
+     * - Events without active EventDay records use legacy event-level check-in.
+     * - If a day is explicitly supplied, validate and use it.
+     * - If no day is supplied, automatically use today's active event day
+     *   when exactly one matching day exists.
+     * - If no current day or multiple current days exist, require the officer
+     *   to choose the correct day manually.
      */
     private function resolveEventDay(
         Attendee $attendee,
         ?int $eventDayId
     ): array {
-        $activeDaysExist = EventDay::query()
+        $activeDaysQuery = EventDay::query()
             ->where('event_id', $attendee->event_id)
-            ->where('status', 'active')
-            ->exists();
+            ->where('status', 'active');
 
-        if (! $activeDaysExist) {
+        if (! (clone $activeDaysQuery)->exists()) {
             return [
                 'success' => true,
                 'status' => 'no_event_day_required',
@@ -467,28 +474,75 @@ class CheckInService
             ];
         }
 
-        if (! $eventDayId) {
+        /*
+         * An explicitly selected day always takes priority.
+         */
+        if ($eventDayId) {
+            $eventDay = (clone $activeDaysQuery)
+                ->whereKey($eventDayId)
+                ->first();
+
+            if (! $eventDay) {
+                return $this->failure(
+                    status: 'invalid_event_day',
+                    message: 'The selected event day is not available for this event.',
+                    attendee: $attendee
+                );
+            }
+
+            return $this->validateAttendeeEventDay(
+                attendee: $attendee,
+                eventDay: $eventDay,
+                status: 'valid_event_day'
+            );
+        }
+
+        /*
+         * No day was selected. Attempt to resolve today's active event day
+         * using the application's configured timezone.
+         */
+        $today = now()->toDateString();
+
+        $todayDays = (clone $activeDaysQuery)
+            ->whereDate('event_date', $today)
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->get();
+
+        if ($todayDays->count() === 1) {
+            /** @var EventDay $eventDay */
+            $eventDay = $todayDays->first();
+
+            return $this->validateAttendeeEventDay(
+                attendee: $attendee,
+                eventDay: $eventDay,
+                status: 'auto_selected_event_day'
+            );
+        }
+
+        if ($todayDays->count() > 1) {
             return $this->failure(
                 status: 'event_day_required',
-                message: 'Select the event day before checking in this attendee.',
+                message: 'Multiple event days are active today. Select the correct event day before checking in this attendee.',
                 attendee: $attendee
             );
         }
 
-        $eventDay = EventDay::query()
-            ->whereKey($eventDayId)
-            ->where('event_id', $attendee->event_id)
-            ->where('status', 'active')
-            ->first();
+        return $this->failure(
+            status: 'event_day_required',
+            message: 'No active event day matches today. Select the correct event day before checking in this attendee.',
+            attendee: $attendee
+        );
+    }
 
-        if (! $eventDay) {
-            return $this->failure(
-                status: 'invalid_event_day',
-                message: 'The selected event day is not available for this event.',
-                attendee: $attendee
-            );
-        }
-
+    /**
+     * Validate that the attendee is registered for the resolved event day.
+     */
+    private function validateAttendeeEventDay(
+        Attendee $attendee,
+        EventDay $eventDay,
+        string $status
+    ): array {
         if (! $attendee->hasSelectedEventDay($eventDay)) {
             return $this->failure(
                 status: 'event_day_not_selected',
@@ -503,7 +557,7 @@ class CheckInService
 
         return [
             'success' => true,
-            'status' => 'valid_event_day',
+            'status' => $status,
             'event_day' => $eventDay,
         ];
     }

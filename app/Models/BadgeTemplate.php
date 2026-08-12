@@ -137,179 +137,269 @@ class BadgeTemplate extends Model
     public static function defaultDesignConfig(): array
     {
         return [
+            /*
+            |--------------------------------------------------------------------------
+            | Canvas
+            |--------------------------------------------------------------------------
+            |
+            | This matches the current Camp Meeting badge background.
+            |
+            */
+
             'canvas' => [
-                'width' => 420,
-                'height' => 620,
+                'width' => 1638,
+                'height' => 2048,
                 'background_image_path' => null,
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Enabled Elements
+            |--------------------------------------------------------------------------
+            |
+            | For the coming event we only need:
+            | - Attendee category
+            | - Attendee full name
+            | - Secure QR code
+            |
+            */
+
             'enabled_elements' => [
-                'name',
                 'category',
-                'organization',
-                'position',
-                'badge_number',
+                'name',
                 'qr_code',
             ],
 
-            'name' => [
-                'x' => 210,
-                'y' => 250,
-                'font_size' => 30,
-                'font_weight' => 'bold',
-                'color' => '#FFFFFF',
-                'align' => 'center',
-                'visible' => true,
-            ],
+            /*
+            |--------------------------------------------------------------------------
+            | Category
+            |--------------------------------------------------------------------------
+            |
+            | Example:
+            | MEDIA CREW
+            |
+            */
 
             'category' => [
-                'x' => 210,
-                'y' => 315,
-                'font_size' => 18,
-                'font_weight' => 'bold',
-                'color' => '#FFFFFF',
-                'background' => '#F99A12',
-                'align' => 'center',
-                'visible' => true,
-            ],
-
-            'organization' => [
-                'x' => 210,
-                'y' => 360,
-                'font_size' => 14,
-                'font_weight' => '600',
-                'color' => '#DBEAFE',
-                'align' => 'center',
-                'visible' => true,
-            ],
-
-            'position' => [
-                'x' => 210,
-                'y' => 385,
-                'font_size' => 13,
-                'font_weight' => '400',
-                'color' => '#E0F2FE',
-                'align' => 'center',
-                'visible' => true,
-            ],
-
-            'badge_number' => [
-                'x' => 210,
-                'y' => 420,
-                'font_size' => 13,
-                'font_weight' => 'bold',
+                'x' => 819,
+                'y' => 820,
+                'width' => 1350,
+                'font_size' => 110,
+                'min_font_size' => 65,
+                'font_weight' => '800',
                 'color' => '#FFFFFF',
                 'align' => 'center',
+                'uppercase' => true,
                 'visible' => true,
             ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Attendee Name
+            |--------------------------------------------------------------------------
+            |
+            | Example:
+            | JOEL MWASIPOSA
+            |
+            */
+
+            'name' => [
+                'x' => 819,
+                'y' => 1080,
+                'width' => 1250,
+                'font_size' => 70,
+                'min_font_size' => 42,
+                'font_weight' => '500',
+                'color' => '#FFFFFF',
+                'align' => 'center',
+                'uppercase' => true,
+                'visible' => true,
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | QR Code
+            |--------------------------------------------------------------------------
+            |
+            | X represents the center position.
+            | The renderer can calculate the top-left position using:
+            |
+            | $left = $x - ($size / 2);
+            |
+            */
 
             'qr_code' => [
-                'x' => 150,
-                'y' => 465,
-                'size' => 120,
+                'x' => 819,
+                'y' => 1430,
+                'size' => 470,
+                'padding' => 20,
+                'align' => 'center',
                 'visible' => true,
             ],
 
+            /*
+            |--------------------------------------------------------------------------
+            | Elements
+            |--------------------------------------------------------------------------
+            |
+            | Keep this array because the existing badge designer / preview
+            | may already depend on design_config.elements.
+            |
+            */
+
             'elements' => [
-                [
-                    'id' => 'name_001',
-                    'type' => 'attendee_name',
-                    'key' => 'name',
-                    'label' => 'Attendee Name',
-                    'x' => 210,
-                    'y' => 250,
-                    'width' => 360,
-                    'font_size' => 30,
-                    'font_weight' => '800',
-                    'color' => '#FFFFFF',
-                    'align' => 'center',
-                    'visible' => true,
-                    'z_index' => 10,
-                ],
                 [
                     'id' => 'category_001',
                     'type' => 'category',
                     'key' => 'category',
                     'label' => 'Category',
-                    'x' => 210,
-                    'y' => 315,
-                    'width' => 230,
-                    'height' => 38,
-                    'font_size' => 18,
+
+                    'x' => 819,
+                    'y' => 820,
+                    'width' => 1350,
+
+                    'font_size' => 110,
+                    'min_font_size' => 65,
                     'font_weight' => '800',
+
                     'color' => '#FFFFFF',
-                    'background' => '#F99A12',
                     'align' => 'center',
+                    'uppercase' => true,
+
+                    'visible' => true,
+                    'z_index' => 10,
+                ],
+
+                [
+                    'id' => 'name_001',
+                    'type' => 'attendee_name',
+                    'key' => 'name',
+                    'label' => 'Attendee Name',
+
+                    'x' => 819,
+                    'y' => 1080,
+                    'width' => 1250,
+
+                    'font_size' => 70,
+                    'min_font_size' => 42,
+                    'font_weight' => '500',
+
+                    'color' => '#FFFFFF',
+                    'align' => 'center',
+                    'uppercase' => true,
+
                     'visible' => true,
                     'z_index' => 20,
                 ],
-                [
-                    'id' => 'organization_001',
-                    'type' => 'organization',
-                    'key' => 'organization',
-                    'label' => 'Organization',
-                    'x' => 210,
-                    'y' => 360,
-                    'width' => 360,
-                    'font_size' => 14,
-                    'font_weight' => '600',
-                    'color' => '#DBEAFE',
-                    'align' => 'center',
-                    'visible' => true,
-                    'z_index' => 30,
-                ],
-                [
-                    'id' => 'position_001',
-                    'type' => 'position',
-                    'key' => 'position',
-                    'label' => 'Position / Title',
-                    'x' => 210,
-                    'y' => 385,
-                    'width' => 360,
-                    'font_size' => 13,
-                    'font_weight' => '500',
-                    'color' => '#E0F2FE',
-                    'align' => 'center',
-                    'visible' => true,
-                    'z_index' => 40,
-                ],
-                [
-                    'id' => 'badge_number_001',
-                    'type' => 'badge_number',
-                    'key' => 'badge_number',
-                    'label' => 'Badge Number',
-                    'x' => 210,
-                    'y' => 420,
-                    'width' => 360,
-                    'font_size' => 13,
-                    'font_weight' => '800',
-                    'color' => '#FFFFFF',
-                    'align' => 'center',
-                    'visible' => true,
-                    'z_index' => 50,
-                ],
+
                 [
                     'id' => 'qr_code_001',
                     'type' => 'qr_code',
                     'key' => 'qr_code',
                     'label' => 'QR Code',
-                    'x' => 150,
-                    'y' => 465,
-                    'size' => 120,
+
+                    'x' => 819,
+                    'y' => 1430,
+                    'size' => 470,
+                    'padding' => 20,
+                    'align' => 'center',
+
                     'visible' => true,
-                    'z_index' => 60,
+                    'z_index' => 30,
                 ],
             ],
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Convenience Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    public function canvasWidth(): int
+    {
+        $config = $this->getDesignConfigWithDefaults();
+
+        return (int) (
+            $config['canvas']['width']
+            ?? $this->width
+            ?? 1638
+        );
+    }
+
+    public function canvasHeight(): int
+    {
+        $config = $this->getDesignConfigWithDefaults();
+
+        return (int) (
+            $config['canvas']['height']
+            ?? $this->height
+            ?? 2048
+        );
+    }
+
+    public function enabledElements(): array
+    {
+        $config = $this->getDesignConfigWithDefaults();
+
+        return $config['enabled_elements'] ?? [
+            'category',
+            'name',
+            'qr_code',
+        ];
+    }
+
+    public function hasElement(string $key): bool
+    {
+        return in_array(
+            $key,
+            $this->enabledElements(),
+            true
+        );
+    }
+
+    public function elementConfig(string $key): array
+    {
+        $config = $this->getDesignConfigWithDefaults();
+
+        return $config[$key] ?? [];
+    }
+
+    public function backgroundImagePath(): ?string
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Priority
+        |--------------------------------------------------------------------------
+        |
+        | 1. Main badge_templates.background_image_path
+        | 2. design_config.canvas.background_image_path
+        |
+        */
+
+        if (filled($this->background_image_path)) {
+            return $this->background_image_path;
+        }
+
+        $config = $this->getDesignConfigWithDefaults();
+
+        $path = $config['canvas']['background_image_path'] ?? null;
+
+        return filled($path)
+            ? $path
+            : null;
+    }
+
     public function backgroundImageUrl(): ?string
     {
-        if (blank($this->background_image_path)) {
+        $path = $this->backgroundImagePath();
+
+        if (blank($path)) {
             return null;
         }
 
-        return asset('storage/' . $this->background_image_path);
+        return asset('storage/' . ltrim($path, '/'));
     }
 
     public function logoUrl(): ?string
@@ -318,6 +408,6 @@ class BadgeTemplate extends Model
             return null;
         }
 
-        return asset('storage/' . $this->logo_path);
+        return asset('storage/' . ltrim($this->logo_path, '/'));
     }
 }

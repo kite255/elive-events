@@ -3,6 +3,12 @@
 namespace App\Filament\Resources\Events\Pages;
 
 use App\Exports\AttendeesExport;
+use App\Filament\Pages\AttendanceDashboard;
+use App\Filament\Pages\AttendanceReport;
+use App\Filament\Pages\BadgePrintStation;
+use App\Filament\Pages\CheckInStation;
+use App\Filament\Pages\CommunicationCenter;
+use App\Filament\Resources\Attendees\AttendeeResource;
 use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Events\Widgets\EventOverviewStats;
 use App\Filament\Resources\Events\Widgets\EventSummaryWidget;
@@ -12,6 +18,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Js;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -24,17 +31,23 @@ class EditEvent extends EditRecord
         return [
             ActionGroup::make([
                 Action::make('registration_status')
-                    ->label(fn () => $this->getRecord()->registration_is_open
-                        ? 'Registration Open'
-                        : 'Registration Closed'
+                    ->label(
+                        fn (): string =>
+                            $this->getRecord()->registration_is_open
+                                ? 'Registration Open'
+                                : 'Registration Closed'
                     )
-                    ->icon(fn () => $this->getRecord()->registration_is_open
-                        ? 'heroicon-o-check-circle'
-                        : 'heroicon-o-x-circle'
+                    ->icon(
+                        fn (): string =>
+                            $this->getRecord()->registration_is_open
+                                ? 'heroicon-o-check-circle'
+                                : 'heroicon-o-x-circle'
                     )
-                    ->color(fn () => $this->getRecord()->registration_is_open
-                        ? 'success'
-                        : 'danger'
+                    ->color(
+                        fn (): string =>
+                            $this->getRecord()->registration_is_open
+                                ? 'success'
+                                : 'danger'
                     )
                     ->disabled(),
 
@@ -61,9 +74,8 @@ class EditEvent extends EditRecord
                     ->icon('heroicon-o-eye')
                     ->color('info')
                     ->visible(
-                        fn (): bool => filled(
-                            $this->getRecord()->slug
-                        )
+                        fn (): bool =>
+                            filled($this->getRecord()->slug)
                     )
                     ->url(
                         fn (): string =>
@@ -78,20 +90,21 @@ class EditEvent extends EditRecord
                     ->icon('heroicon-o-clipboard-document')
                     ->color('gray')
                     ->visible(
-                        fn (): bool => filled(
-                            $this->getRecord()->slug
-                        )
+                        fn (): bool =>
+                            filled($this->getRecord()->slug)
                     )
-                    ->extraAttributes(fn (): array => [
-                        'x-on:click' =>
-                            'navigator.clipboard.writeText(' .
-                            Js::from(
-                                EventResource::getPublicRegistrationUrl(
-                                    $this->getRecord()
+                    ->extraAttributes(
+                        fn (): array => [
+                            'x-on:click' =>
+                                'navigator.clipboard.writeText('
+                                . Js::from(
+                                    EventResource::getPublicRegistrationUrl(
+                                        $this->getRecord()
+                                    )
                                 )
-                            ) .
-                            ')',
-                    ])
+                                . ')',
+                        ]
+                    )
                     ->action(function (): void {
                         $url = EventResource::getPublicRegistrationUrl(
                             $this->getRecord()
@@ -109,9 +122,8 @@ class EditEvent extends EditRecord
                     ->icon('heroicon-o-link')
                     ->color('gray')
                     ->visible(
-                        fn (): bool => filled(
-                            $this->getRecord()->slug
-                        )
+                        fn (): bool =>
+                            filled($this->getRecord()->slug)
                     )
                     ->modalHeading('Public Registration Link')
                     ->modalDescription(
@@ -123,17 +135,65 @@ class EditEvent extends EditRecord
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
 
+                Action::make('view_attendees')
+                    ->label('View Attendees')
+                    ->icon('heroicon-o-users')
+                    ->color('primary')
+                    ->url(
+                        fn (): string =>
+                            AttendeeResource::getUrl('index', [
+                                'tableFilters' => [
+                                    'event' => [
+                                        'value' =>
+                                            $this->getRecord()->id,
+                                    ],
+                                ],
+                            ])
+                    ),
+
                 Action::make('add_attendee')
                     ->label('Add Attendee')
                     ->icon('heroicon-o-user-plus')
                     ->color('primary')
-                    ->url(fn () => url('/admin/attendees/create?event_id=' . $this->getRecord()->id)),
+                    ->visible(
+                        fn (): bool =>
+                            AttendeeResource::canCreate()
+                    )
+                    ->url(
+                        fn (): string =>
+                            AttendeeResource::getUrl('create', [
+                                'event_id' =>
+                                    $this->getRecord()->id,
+                            ])
+                    ),
 
                 Action::make('import_attendees')
                     ->label('Import Attendees')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
-                    ->url(fn () => url('/admin/attendees/import?event_id=' . $this->getRecord()->id)),
+                    ->visible(
+                        fn (): bool =>
+                            AttendeeResource::canImport()
+                    )
+                    ->url(
+                        fn (): string =>
+                            AttendeeResource::getUrl('import', [
+                                'event_id' =>
+                                    $this->getRecord()->id,
+                            ])
+                    ),
+
+                Action::make('badge_print_station')
+                    ->label('Badge Print Station')
+                    ->icon('heroicon-o-printer')
+                    ->color('primary')
+                    ->url(
+                        fn (): string =>
+                            BadgePrintStation::getUrl([
+                                'event_id' =>
+                                    $this->getRecord()->id,
+                            ])
+                    ),
 
                 Action::make('generate_all_badges')
                     ->label('Generate All Badges')
@@ -141,28 +201,44 @@ class EditEvent extends EditRecord
                     ->color('success')
                     ->requiresConfirmation()
                     ->modalHeading('Generate all badges?')
-                    ->modalDescription('This will regenerate badges for every attendee in this event using the current badge template design.')
+                    ->modalDescription(
+                        'This will regenerate badges for every eligible attendee in this event using the current badge template design.'
+                    )
                     ->modalSubmitActionLabel('Generate All')
                     ->action(function (): void {
                         $event = $this->getRecord();
 
-                        $attendeesCount = $event->attendees()->count();
+                        $attendeesCount = $event->attendees()
+                            ->whereNotIn('status', [
+                                'rejected',
+                                'cancelled',
+                                'waitlisted',
+                                'pending_approval',
+                            ])
+                            ->count();
 
                         if ($attendeesCount === 0) {
                             Notification::make()
-                                ->title('No attendees found')
-                                ->body('This event does not have attendees yet.')
+                                ->title('No eligible attendees found')
+                                ->body(
+                                    'This event does not currently have attendees eligible for badge generation.'
+                                )
                                 ->warning()
                                 ->send();
 
                             return;
                         }
 
-                        GenerateEventBadgesJob::dispatch($event->id, false);
+                        GenerateEventBadgesJob::dispatch(
+                            $event->id,
+                            false
+                        );
 
                         Notification::make()
                             ->title('Badge generation started')
-                            ->body("Generating badges for {$attendeesCount} attendee(s) in the background.")
+                            ->body(
+                                "Generating badges for {$attendeesCount} attendee(s) in the background."
+                            )
                             ->success()
                             ->send();
                     }),
@@ -173,57 +249,123 @@ class EditEvent extends EditRecord
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalHeading('Generate missing badges only?')
-                    ->modalDescription('This will generate badges only for attendees without badges, failed badges, or pending badge status.')
+                    ->modalDescription(
+                        'This will generate badges for eligible attendees whose badge is missing, pending, generating, or failed.'
+                    )
                     ->modalSubmitActionLabel('Generate Missing')
                     ->action(function (): void {
                         $event = $this->getRecord();
 
-                        $missingBadgesCount = $event->attendees()
-                            ->where(function ($query) {
+                        $query = $event->attendees()
+                            ->whereNotIn('status', [
+                                'rejected',
+                                'cancelled',
+                                'waitlisted',
+                                'pending_approval',
+                            ])
+                            ->where(function ($query): void {
                                 $query
                                     ->whereNull('badge_path')
-                                    ->orWhere('badge_path', '')
-                                    ->orWhereNull('badge_status')
-                                    ->orWhere('badge_status', '!=', 'generated');
-                            })
-                            ->count();
+                                    ->orWhere('badge_path', '');
+
+                                if (
+                                    Schema::hasColumn(
+                                        'attendees',
+                                        'badge_status'
+                                    )
+                                ) {
+                                    $query
+                                        ->orWhereNull('badge_status')
+                                        ->orWhereIn(
+                                            'badge_status',
+                                            [
+                                                'pending',
+                                                'generating',
+                                                'failed',
+                                            ]
+                                        );
+                                }
+                            });
+
+                        $missingBadgesCount = $query->count();
 
                         if ($missingBadgesCount === 0) {
                             Notification::make()
                                 ->title('No missing badges')
-                                ->body('All attendees already have generated badges.')
+                                ->body(
+                                    'All eligible attendees already have badges.'
+                                )
                                 ->success()
                                 ->send();
 
                             return;
                         }
 
-                        GenerateEventBadgesJob::dispatch($event->id, true);
+                        GenerateEventBadgesJob::dispatch(
+                            $event->id,
+                            true
+                        );
 
                         Notification::make()
                             ->title('Missing badge generation started')
-                            ->body("Generating {$missingBadgesCount} missing or failed badge(s) in the background.")
+                            ->body(
+                                "Generating {$missingBadgesCount} missing or failed badge(s) in the background."
+                            )
                             ->success()
                             ->send();
                     }),
 
-                Action::make('open_scanner')
-                    ->label('Open Scanner')
+                Action::make('check_in_station')
+                    ->label('Check-in Station')
                     ->icon('heroicon-o-qr-code')
                     ->color('info')
-                    ->url(fn () => url('/admin/gate-check-in?event_id=' . $this->getRecord()->id)),
-
-                Action::make('manual_check_in')
-                    ->label('Manual Check-in')
-                    ->icon('heroicon-o-pencil-square')
-                    ->color('gray')
-                    ->url(fn () => url('/admin/manual-check-in?event_id=' . $this->getRecord()->id)),
+                    ->url(
+                        fn (): string =>
+                            CheckInStation::getUrl([
+                                'event_id' =>
+                                    $this->getRecord()->id,
+                            ])
+                    ),
 
                 Action::make('attendance_dashboard')
                     ->label('Attendance Dashboard')
                     ->icon('heroicon-o-chart-bar-square')
                     ->color('primary')
-                    ->url(fn () => url('/admin/attendance-dashboard?event_id=' . $this->getRecord()->id)),
+                    ->url(
+                        fn (): string =>
+                            AttendanceDashboard::getUrl([
+                                'event_id' =>
+                                    $this->getRecord()->id,
+                            ])
+                    ),
+
+                Action::make('attendance_report')
+                    ->label('Attendance Report')
+                    ->icon('heroicon-o-clipboard-document-check')
+                    ->color('gray')
+                    ->url(
+                        fn (): string =>
+                            AttendanceReport::getUrl([
+                                'event_id' =>
+                                    $this->getRecord()->id,
+                            ])
+                    ),
+
+                Action::make('communication_center')
+                    ->label('Communication Center')
+                    ->icon('heroicon-o-megaphone')
+                    ->color('warning')
+                    ->visible(
+                        fn (): bool =>
+                            CommunicationCenter::canAccess()
+                    )
+                    ->url(
+                        fn (): string =>
+                            CommunicationCenter::getUrl([
+                                'event_id' =>
+                                    $this->getRecord()->id,
+                            ])
+                    ),
             ])
                 ->label('Quick Actions')
                 ->icon('heroicon-o-bolt')
@@ -236,8 +378,13 @@ class EditEvent extends EditRecord
                     ->icon('heroicon-o-arrow-down-tray')
                     ->action(function () {
                         return Excel::download(
-                            new AttendeesExport(null, $this->getRecord()->id),
-                            $this->reportFileName('all-attendees')
+                            new AttendeesExport(
+                                null,
+                                $this->getRecord()->id
+                            ),
+                            $this->reportFileName(
+                                'all-attendees'
+                            )
                         );
                     }),
 
@@ -247,8 +394,13 @@ class EditEvent extends EditRecord
                     ->color('success')
                     ->action(function () {
                         return Excel::download(
-                            new AttendeesExport('checked_in', $this->getRecord()->id),
-                            $this->reportFileName('checked-in-attendees')
+                            new AttendeesExport(
+                                'checked_in',
+                                $this->getRecord()->id
+                            ),
+                            $this->reportFileName(
+                                'checked-in-attendees'
+                            )
                         );
                     }),
 
@@ -258,8 +410,13 @@ class EditEvent extends EditRecord
                     ->color('warning')
                     ->action(function () {
                         return Excel::download(
-                            new AttendeesExport('not_checked_in', $this->getRecord()->id),
-                            $this->reportFileName('not-checked-in-attendees')
+                            new AttendeesExport(
+                                'not_checked_in',
+                                $this->getRecord()->id
+                            ),
+                            $this->reportFileName(
+                                'not-checked-in-attendees'
+                            )
                         );
                     }),
 
@@ -269,8 +426,13 @@ class EditEvent extends EditRecord
                     ->color('success')
                     ->action(function () {
                         return Excel::download(
-                            new AttendeesExport('badge_generated', $this->getRecord()->id),
-                            $this->reportFileName('badge-generated-attendees')
+                            new AttendeesExport(
+                                'badge_generated',
+                                $this->getRecord()->id
+                            ),
+                            $this->reportFileName(
+                                'badge-generated-attendees'
+                            )
                         );
                     }),
 
@@ -280,8 +442,13 @@ class EditEvent extends EditRecord
                     ->color('warning')
                     ->action(function () {
                         return Excel::download(
-                            new AttendeesExport('badge_pending', $this->getRecord()->id),
-                            $this->reportFileName('badge-pending-attendees')
+                            new AttendeesExport(
+                                'badge_pending',
+                                $this->getRecord()->id
+                            ),
+                            $this->reportFileName(
+                                'badge-pending-attendees'
+                            )
                         );
                     }),
 
@@ -291,8 +458,13 @@ class EditEvent extends EditRecord
                     ->color('info')
                     ->action(function () {
                         return Excel::download(
-                            new AttendeesExport('badge_printed', $this->getRecord()->id),
-                            $this->reportFileName('badge-printed-attendees')
+                            new AttendeesExport(
+                                'badge_printed',
+                                $this->getRecord()->id
+                            ),
+                            $this->reportFileName(
+                                'badge-printed-attendees'
+                            )
                         );
                     }),
             ])
@@ -335,19 +507,20 @@ class EditEvent extends EditRecord
         return 'Event Settings';
     }
 
-    protected function registrationUrl(): string
-    {
-        return EventResource::getPublicRegistrationUrl(
-            $this->getRecord()
-        );
-    }
-
-    protected function reportFileName(string $type): string
-    {
-        $eventName = str($this->getRecord()->name)
+    protected function reportFileName(
+        string $type
+    ): string {
+        $eventName = str(
+            $this->getRecord()->name
+        )
             ->slug()
             ->toString();
 
-        return $eventName . '-' . $type . '-' . now()->format('Y-m-d-His') . '.xlsx';
+        return $eventName
+            . '-'
+            . $type
+            . '-'
+            . now()->format('Y-m-d-His')
+            . '.xlsx';
     }
 }

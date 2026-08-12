@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Attendees\Schemas;
 
+use App\Services\PhoneNumberService;
+use Closure;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -181,7 +183,48 @@ class AttendeeForm
                         TextInput::make('phone')
                             ->label('Phone Number')
                             ->tel()
-                            ->maxLength(255),
+                            ->placeholder('0650537539')
+                            ->helperText(
+                                'Accepted formats: 0650537539, +255650537539, or 255650537539.'
+                            )
+                            ->maxLength(20)
+                            ->rules([
+                                fn (): Closure =>
+                                    function (
+                                        string $attribute,
+                                        mixed $value,
+                                        Closure $fail
+                                    ): void {
+                                        if (blank($value)) {
+                                            return;
+                                        }
+
+                                        $phoneService = app(
+                                            PhoneNumberService::class
+                                        );
+
+                                        if (! $phoneService->isValid(
+                                            (string) $value
+                                        )) {
+                                            $fail(
+                                                'Enter a valid Tanzanian mobile number, for example 0650537539.'
+                                            );
+                                        }
+                                    },
+                            ])
+                            ->dehydrateStateUsing(
+                                function (
+                                    ?string $state
+                                ): ?string {
+                                    if (blank($state)) {
+                                        return null;
+                                    }
+
+                                    return app(
+                                        PhoneNumberService::class
+                                    )->normalize($state);
+                                }
+                            ),
 
                         TextInput::make('email')
                             ->label('Email Address')

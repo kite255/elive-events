@@ -272,6 +272,29 @@
             color: rgb(153 27 27);
         }
 
+        .elive-day-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            min-width: 13rem;
+        }
+
+        .elive-day-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 999px;
+            background: rgb(239 246 255);
+            color: rgb(30 64 175);
+            font-size: 0.72rem;
+            font-weight: 800;
+        }
+
+        .dark .elive-day-chip {
+            background: rgb(30 58 138 / 0.35);
+            color: rgb(191 219 254);
+        }
+
         .elive-empty {
             padding: 3rem 1.5rem;
             text-align: center;
@@ -634,7 +657,8 @@
                         <thead>
                             <tr>
                                 <th>Attendee</th>
-                                <th>Day</th>
+                                <th>Registered Days</th>
+                                <th>Checked-in Day</th>
                                 <th>Badge</th>
                                 <th>Category</th>
                                 <th>Organization</th>
@@ -666,8 +690,33 @@
                                     </td>
 
                                     <td>
-                                        {{ $checkIn?->eventDay?->name
-                                            ?? ($selectedEventDay?->name ?? '—') }}
+                                        @if ($attendee->eventDays->isNotEmpty())
+                                            <div class="elive-day-list">
+                                                @foreach (
+                                                    $attendee->eventDays
+                                                        ->sortBy([
+                                                            ['event_date', 'asc'],
+                                                            ['id', 'asc'],
+                                                        ]) as $registeredDay
+                                                )
+                                                    <span class="elive-day-chip">
+                                                        {{ $registeredDay->name }}
+
+                                                        @if ($registeredDay->event_date)
+                                                            · {{ $registeredDay->event_date->format('d M') }}
+                                                        @endif
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <span class="elive-day-chip">
+                                                General event
+                                            </span>
+                                        @endif
+                                    </td>
+
+                                    <td>
+                                        {{ $this->checkedInDayLabel($checkIn) }}
                                     </td>
 
                                     <td>

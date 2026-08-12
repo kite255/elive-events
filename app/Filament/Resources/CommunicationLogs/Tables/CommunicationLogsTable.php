@@ -1,26 +1,21 @@
 <?php
 
-namespace App\Filament\Resources\CommunicationCampaigns\RelationManagers;
+namespace App\Filament\Resources\CommunicationLogs\Tables;
 
 use App\Filament\Resources\CommunicationLogs\CommunicationLogResource;
-use App\Jobs\RetryCommunicationLogJob;
 use App\Models\CommunicationLog;
 use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
-use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class LogsRelationManager extends RelationManager
+class CommunicationLogsTable
 {
-    protected static string $relationship = 'logs';
-
-    protected static ?string $title = 'Message Logs';
-
-    public function table(Table $table): Table
+    public static function configure(Table $table): Table
     {
         return $table
             ->defaultSort('id', 'desc')
@@ -29,19 +24,27 @@ class LogsRelationManager extends RelationManager
                 50,
                 100,
             ])
-            ->modifyQueryUsing(
-                fn (Builder $query): Builder =>
-                    $query->with([
-                        'attendee',
-                        'campaignRecipient',
-                    ])
-            )
             ->columns([
-                TextColumn::make('attendee.full_name')
-                    ->label('Attendee')
+                TextColumn::make('id')
+                    ->label('#')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('event.name')
+                    ->label('Event')
                     ->searchable()
                     ->sortable()
+                    ->limit(28)
+                    ->tooltip(
+                        fn (CommunicationLog $record): ?string =>
+                            $record->event?->name
+                    ),
+
+                TextColumn::make('attendee.full_name')
+                    ->label('Attendee')
                     ->placeholder('Unknown attendee')
+                    ->searchable()
+                    ->sortable()
                     ->limit(28),
 
                 TextColumn::make('recipient')
@@ -49,7 +52,6 @@ class LogsRelationManager extends RelationManager
                     ->searchable()
                     ->copyable()
                     ->copyMessage('Recipient copied')
-                    ->placeholder('—')
                     ->limit(26),
 
                 TextColumn::make('channel')
@@ -90,6 +92,13 @@ class LogsRelationManager extends RelationManager
                             }
                     ),
 
+                TextColumn::make('campaign.name')
+                    ->label('Campaign')
+                    ->placeholder('Automatic / Direct')
+                    ->searchable()
+                    ->limit(28)
+                    ->toggleable(),
+
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
@@ -125,44 +134,16 @@ class LogsRelationManager extends RelationManager
                     )
                     ->sortable(),
 
-                TextColumn::make('campaignRecipient.attempts')
-                    ->label('Attempts')
-                    ->numeric()
-                    ->placeholder('0')
-                    ->toggleable(),
-
                 TextColumn::make('provider_message_id')
                     ->label('Provider ID')
-                    ->copyable()
-                    ->copyMessage('Provider ID copied')
                     ->placeholder('—')
+                    ->copyable()
                     ->limit(24)
                     ->tooltip(
                         fn (CommunicationLog $record): ?string =>
                             $record->provider_message_id
                     )
                     ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('message')
-                    ->label('Message')
-                    ->limit(45)
-                    ->tooltip(
-                        fn (CommunicationLog $record): ?string =>
-                            $record->message
-                    )
-                    ->placeholder('—')
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('error')
-                    ->label('Error')
-                    ->limit(45)
-                    ->tooltip(
-                        fn (CommunicationLog $record): ?string =>
-                            $record->error
-                    )
-                    ->placeholder('—')
-                    ->color('danger')
-                    ->toggleable(),
 
                 TextColumn::make('queued_at')
                     ->label('Queued')
@@ -190,8 +171,49 @@ class LogsRelationManager extends RelationManager
                     ->placeholder('—')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('error')
+                    ->label('Error')
+                    ->placeholder('—')
+                    ->limit(35)
+                    ->tooltip(
+                        fn (CommunicationLog $record): ?string =>
+                            $record->error
+                    )
+                    ->color('danger')
+                    ->toggleable(),
             ])
             ->filters([
+                SelectFilter::make('event_id')
+                    ->label('Event')
+                    ->relationship(
+                        'event',
+                        'name'
+                    )
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('communication_campaign_id')
+                    ->label('Campaign')
+                    ->relationship(
+                        'campaign',
+                        'name'
+                    )
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('channel')
+                    ->options([
+                        CommunicationLog::CHANNEL_SMS =>
+                            'SMS',
+
+                        CommunicationLog::CHANNEL_WHATSAPP =>
+                            'WhatsApp',
+
+                        CommunicationLog::CHANNEL_EMAIL =>
+                            'Email',
+                    ]),
+
                 SelectFilter::make('status')
                     ->options([
                         CommunicationLog::STATUS_PENDING =>
@@ -213,18 +235,6 @@ class LogsRelationManager extends RelationManager
                             'Failed',
                     ]),
 
-                SelectFilter::make('channel')
-                    ->options([
-                        CommunicationLog::CHANNEL_SMS =>
-                            'SMS',
-
-                        CommunicationLog::CHANNEL_WHATSAPP =>
-                            'WhatsApp',
-
-                        CommunicationLog::CHANNEL_EMAIL =>
-                            'Email',
-                    ]),
-
                 Filter::make('failed_only')
                     ->label('Failed only')
                     ->query(
@@ -233,37 +243,6 @@ class LogsRelationManager extends RelationManager
                                 'status',
                                 CommunicationLog::STATUS_FAILED
                             )
-                    ),
-
-                Filter::make('incomplete_only')
-                    ->label('Pending / queued / sending')
-                    ->query(
-                        fn (Builder $query): Builder =>
-                            $query->whereIn(
-                                'status',
-                                [
-                                    CommunicationLog::STATUS_PENDING,
-                                    CommunicationLog::STATUS_QUEUED,
-                                    CommunicationLog::STATUS_SENDING,
-                                ]
-                            )
-                    ),
-
-                Filter::make('queued_over_10_minutes')
-                    ->label('Queued over 10 minutes')
-                    ->query(
-                        fn (Builder $query): Builder =>
-                            $query
-                                ->where(
-                                    'status',
-                                    CommunicationLog::STATUS_QUEUED
-                                )
-                                ->whereNotNull('queued_at')
-                                ->where(
-                                    'queued_at',
-                                    '<=',
-                                    now()->subMinutes(10)
-                                )
                     ),
 
                 Filter::make('today')
@@ -277,20 +256,7 @@ class LogsRelationManager extends RelationManager
                     ),
             ])
             ->recordActions([
-                Action::make('view_log')
-                    ->label('View')
-                    ->icon('heroicon-o-eye')
-                    ->color('gray')
-                    ->url(
-                        fn (CommunicationLog $record): string =>
-                            CommunicationLogResource::getUrl(
-                                'view',
-                                [
-                                    'record' =>
-                                        $record,
-                                ]
-                            )
-                    ),
+                ViewAction::make(),
 
                 Action::make('view_error')
                     ->label('View Error')
@@ -313,31 +279,45 @@ class LogsRelationManager extends RelationManager
                     ->label('Retry')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalHeading('Retry failed SMS?')
-                    ->modalDescription(
-                        'This SMS will be requeued using the communications queue.'
-                    )
-                    ->modalSubmitActionLabel('Retry SMS')
                     ->visible(
                         fn (CommunicationLog $record): bool =>
-                            $record->isSms()
-                            && $record->canRetry()
+                            $record->canRetry()
                     )
+                    ->requiresConfirmation()
+                    ->modalHeading('Retry failed communication?')
+                    ->modalDescription(
+                        'The failed log will be reset and requeued. The retry job must exist in the application for delivery to restart.'
+                    )
+                    ->modalSubmitActionLabel('Retry')
                     ->action(
                         function (
                             CommunicationLog $record
                         ): void {
+                            $jobClass =
+                                \App\Jobs\RetryCommunicationLogJob::class;
+
+                            if (! class_exists($jobClass)) {
+                                Notification::make()
+                                    ->title('Retry job not installed')
+                                    ->body(
+                                        'Create App\\Jobs\\RetryCommunicationLogJob before enabling automatic retries from this page.'
+                                    )
+                                    ->warning()
+                                    ->send();
+
+                                return;
+                            }
+
                             $record->prepareForRetry();
 
-                            RetryCommunicationLogJob::dispatch(
-                                $record->id
+                            $jobClass::dispatch(
+                                $record->getKey()
                             );
 
                             Notification::make()
-                                ->title('SMS queued for retry')
+                                ->title('Communication requeued')
                                 ->body(
-                                    "Recipient: {$record->recipient}"
+                                    'The failed communication has been sent back to the communications queue.'
                                 )
                                 ->success()
                                 ->send();
@@ -354,9 +334,11 @@ class LogsRelationManager extends RelationManager
                         ]
                     )
             )
-            ->emptyStateHeading('No message logs')
+            ->emptyStateHeading(
+                'No communication logs'
+            )
             ->emptyStateDescription(
-                'Campaign recipient activity will appear here as messages are queued and processed.'
+                'SMS, WhatsApp, and email activity will appear here.'
             )
             ->emptyStateIcon(
                 'heroicon-o-chat-bubble-left-right'

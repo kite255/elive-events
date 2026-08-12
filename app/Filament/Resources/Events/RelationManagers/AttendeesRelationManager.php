@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use App\Filament\Pages\BadgePrintStation;
 use App\Filament\Resources\Attendees\AttendeeResource;
 use App\Services\BadgeGenerationService;
 use Filament\Actions\Action;
@@ -131,15 +132,33 @@ class AttendeesRelationManager extends RelationManager
                     ->copyable(),
 
                 TextColumn::make('selected_days')
-                    ->label('Days')
-                    ->getStateUsing(
-                        fn ($record): string => $record
-                            ->eventDays
-                            ->pluck('name')
-                            ->filter()
-                            ->implode(', ')
-                    )
-                    ->placeholder('No days selected')
+                    ->label('Registered Days')
+                    ->getStateUsing(function ($record): string {
+                        if (! $record->relationLoaded('eventDays')) {
+                            $record->load('eventDays');
+                        }
+
+                        if ($record->eventDays->isEmpty()) {
+                            return 'General event';
+                        }
+
+                        return $record->eventDays
+                            ->sortBy([
+                                ['event_date', 'asc'],
+                                ['display_order', 'asc'],
+                                ['id', 'asc'],
+                            ])
+                            ->map(function ($day): string {
+                                if ($day->event_date) {
+                                    return $day->name
+                                        . ' · '
+                                        . $day->event_date->format('d M');
+                                }
+
+                                return $day->name;
+                            })
+                            ->implode(', ');
+                    })
                     ->wrap()
                     ->toggleable(),
 
@@ -243,15 +262,33 @@ class AttendeesRelationManager extends RelationManager
                     ->getStateUsing(fn ($record): bool => filled($record->public_token))
                     ->visible(fn (): bool => DbSchema::hasColumn('attendees', 'public_token')),
 
-                IconColumn::make('checked_in_at')
-                    ->label('Checked In')
-                    ->boolean()
-                    ->getStateUsing(fn ($record): bool => filled($record->checked_in_at)),
+                TextColumn::make('attendance_status')
+                    ->label('Attendance')
+                    ->badge()
+                    ->getStateUsing(
+                        fn ($record): string =>
+                            filled($record->checked_in_at)
+                                ? 'attended'
+                                : 'not_checked_in'
+                    )
+                    ->formatStateUsing(
+                        fn (string $state): string => match ($state) {
+                            'attended' => 'Attended',
+                            default => 'Not Checked In',
+                        }
+                    )
+                    ->color(
+                        fn (string $state): string => match ($state) {
+                            'attended' => 'success',
+                            default => 'gray',
+                        }
+                    ),
 
                 TextColumn::make('organization_name')
                     ->label('Organization')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->placeholder('—')
+                    ->toggleable(),
 
                 TextColumn::make('position')
                     ->label('Position')
@@ -283,6 +320,46 @@ class AttendeesRelationManager extends RelationManager
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                SelectFilter::make('category')
+                    ->label('Category')
+                    ->relationship('category', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('badge_type')
+                    ->label('Badge Type')
+                    ->relationship('badgeType', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('event_day')
+                    ->label('Registered Day')
+                    ->relationship('eventDays', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('attendance')
+                    ->label('Attendance')
+                    ->options([
+                        'checked_in' => 'Attended',
+                        'not_checked_in' => 'Not Checked In',
+                    ])
+                    ->query(function ($query, array $data) {
+                        return match ($data['value'] ?? null) {
+                            'checked_in' =>
+                                $query->whereNotNull(
+                                    'attendees.checked_in_at'
+                                ),
+
+                            'not_checked_in' =>
+                                $query->whereNull(
+                                    'attendees.checked_in_at'
+                                ),
+
+                            default => $query,
+                        };
+                    }),
+
                 SelectFilter::make('status')
                     ->label('Status')
                     ->options([
@@ -318,6 +395,10 @@ class AttendeesRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->label('Add Attendee')
+                    ->visible(
+                        fn (): bool =>
+                            AttendeeResource::canCreate()
+                    )
                     ->mutateDataUsing(function (array $data): array {
                         $data['event_id'] = $this->getOwnerRecord()->id;
 
@@ -326,6 +407,36 @@ class AttendeesRelationManager extends RelationManager
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('view_attendee')
+                        ->label('View Attendee')
+                        ->icon('heroicon-o-user')
+                        ->color('gray')
+                        ->url(
+                            fn ($record): string =>
+                                AttendeeResource::getUrl(
+                                    'view',
+                                    ['record' => $record]
+                                )
+                        ),
+
+                    Action::make('badge_print_station')
+                        ->label('Badge Print Station')
+                        ->icon('heroicon-o-printer')
+                        ->color('primary')
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canManageBadge(
+                                    $record
+                                )
+                        )
+                        ->url(
+                            fn ($record): string =>
+                                BadgePrintStation::getUrl([
+                                    'attendee' =>
+                                        (int) $record->getKey(),
+                                ])
+                        ),
+
                     Action::make('view_registration_details')
                         ->label('View Registration Details')
                         ->icon('heroicon-o-eye')
@@ -550,13 +661,31 @@ class AttendeesRelationManager extends RelationManager
                         ->label('View QR')
                         ->icon('heroicon-o-qr-code')
                         ->color('primary')
-                        ->url(fn ($record): string => AttendeeResource::getUrl('qr-code', [
-                            'record' => $record,
-                        ])),
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canViewQrCode(
+                                    $record
+                                )
+                        )
+                        ->url(
+                            fn ($record): string =>
+                                AttendeeResource::getUrl(
+                                    'qr-code',
+                                    ['record' => $record]
+                                )
+                        ),
 
-                    EditAction::make(),
+                    EditAction::make()
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canEdit($record)
+                        ),
 
-                    DeleteAction::make(),
+                    DeleteAction::make()
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canDelete($record)
+                        ),
                 ])
                     ->label('Actions')
                     ->icon('heroicon-m-ellipsis-vertical')
@@ -745,11 +874,18 @@ class AttendeesRelationManager extends RelationManager
                                 ->send();
                         }),
 
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(
+                            fn (): bool =>
+                                AttendeeResource::canDeleteAny()
+                        ),
                 ]),
             ])
             ->modifyQueryUsing(
                 fn ($query) => $query->with([
+                    'event.organization',
+                    'category',
+                    'badgeType',
                     'eventDays',
                     'merchandiseSelections',
                 ])

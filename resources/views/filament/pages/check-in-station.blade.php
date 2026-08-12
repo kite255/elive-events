@@ -19,23 +19,40 @@
 
         $resultStatus = $lastResult['status'] ?? null;
         $resultSuccess = (bool) ($lastResult['success'] ?? false);
+        $resultTone = $lastResult['tone'] ?? null;
 
-        $resultClass = match ($resultStatus) {
+        $resultClass = match ($resultTone) {
+            'success' => 'elive-result-success',
+            'warning' => 'elive-result-warning',
+            'danger' => 'elive-result-danger',
+            default => match ($resultStatus) {
+                'checked_in',
+                'onsite_registered' => 'elive-result-success',
+                'already_checked_in' => 'elive-result-warning',
+                'invalid_code',
+                'attendee_not_found',
+                'attendee_not_eligible',
+                'event_day_required',
+                'invalid_event_day',
+                'event_day_not_selected',
+                'invalid_event_session',
+                'session_check_in_disabled',
+                'event_session_not_selected',
+                'access_denied',
+                'check_in_failed' => 'elive-result-danger',
+                default => 'elive-result-neutral',
+            },
+        };
+
+        $resultSymbol = match ($resultTone ?? $resultStatus) {
+            'success',
             'checked_in',
-            'onsite_registered' => 'elive-result-success',
-            'already_checked_in' => 'elive-result-warning',
-            'invalid_code',
-            'attendee_not_found',
-            'attendee_not_eligible',
-            'event_day_required',
-            'invalid_event_day',
-            'event_day_not_selected',
-            'invalid_event_session',
-            'session_check_in_disabled',
-            'event_session_not_selected',
-            'access_denied',
-            'check_in_failed' => 'elive-result-danger',
-            default => 'elive-result-neutral',
+            'onsite_registered' => '✓',
+
+            'warning',
+            'already_checked_in' => '!',
+
+            default => '✕',
         };
     @endphp
 
@@ -43,6 +60,67 @@
         .elive-station {
             display: grid;
             gap: 1.25rem;
+        }
+
+        .elive-station-hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1.15rem 1.25rem;
+            border: 1px solid rgb(224 231 255);
+            border-radius: 1rem;
+            background:
+                linear-gradient(135deg, rgb(238 242 255), rgb(255 255 255));
+        }
+
+        .dark .elive-station-hero {
+            border-color: rgb(55 65 81);
+            background:
+                linear-gradient(135deg, rgb(49 46 129 / 0.35), rgb(17 24 39));
+        }
+
+        .elive-station-hero-title {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: rgb(30 41 59);
+        }
+
+        .dark .elive-station-hero-title {
+            color: white;
+        }
+
+        .elive-station-hero-meta {
+            margin-top: 0.35rem;
+            color: rgb(100 116 139);
+            font-size: 0.875rem;
+        }
+
+        .dark .elive-station-hero-meta {
+            color: rgb(148 163 184);
+        }
+
+        .elive-live-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.45rem 0.7rem;
+            border-radius: 999px;
+            background: rgb(220 252 231);
+            color: rgb(21 128 61);
+            font-size: 0.78rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .elive-live-pill::before {
+            content: "";
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 999px;
+            background: rgb(34 197 94);
+            box-shadow: 0 0 0 0.22rem rgb(34 197 94 / 0.14);
         }
 
         .elive-card {
@@ -110,10 +188,21 @@
         }
 
         .elive-stat {
-            padding: 1rem;
-            border: 1px solid rgb(229 231 235);
-            border-radius: 0.875rem;
-            background: rgb(249 250 251);
+            position: relative;
+            overflow: hidden;
+            padding: 1rem 1.05rem;
+            border: 1px solid rgb(226 232 240);
+            border-radius: 0.95rem;
+            background: white;
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+        }
+
+        .elive-stat::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: rgb(99 102 241);
         }
 
         .dark .elive-stat {
@@ -308,10 +397,69 @@
             color: rgb(229 231 235);
         }
 
+        .elive-result-head {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+        }
+
+        .elive-result-icon {
+            display: grid;
+            place-items: center;
+            width: 3.25rem;
+            height: 3.25rem;
+            flex: 0 0 auto;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 0.72);
+            font-size: 1.75rem;
+            font-weight: 900;
+        }
+
+        .dark .elive-result-icon {
+            background: rgb(17 24 39 / 0.45);
+        }
+
         .elive-result-title {
             margin: 0;
-            font-size: 1.25rem;
+            font-size: 1.35rem;
+            font-weight: 900;
+            line-height: 1.15;
+        }
+
+        .elive-result-name {
+            margin-top: 1rem;
+            font-size: clamp(1.4rem, 2.5vw, 2rem);
+            font-weight: 900;
+            line-height: 1.15;
+        }
+
+        .elive-result-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.7rem;
+        }
+
+        .elive-result-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.9rem;
+            padding: 0.3rem 0.65rem;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 0.68);
+            font-size: 0.76rem;
             font-weight: 800;
+        }
+
+        .dark .elive-result-chip {
+            background: rgb(17 24 39 / 0.45);
+        }
+
+        .elive-result-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+            margin-top: 1rem;
         }
 
         .elive-result-message {
@@ -466,12 +614,23 @@
         }
 
         .elive-camera-reader {
+            position: relative;
             overflow: hidden;
             width: 100%;
             min-height: 18rem;
-            border: 2px dashed rgb(209 213 219);
+            border: 2px solid rgb(203 213 225);
             border-radius: 1rem;
-            background: rgb(17 24 39);
+            background: rgb(15 23 42);
+            box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.03);
+        }
+
+        .elive-camera-reader::after {
+            content: "";
+            position: absolute;
+            inset: 14%;
+            border: 2px solid rgb(255 255 255 / 0.55);
+            border-radius: 1rem;
+            pointer-events: none;
         }
 
         .elive-camera-reader video {
@@ -669,6 +828,15 @@
         }
 
         @media (max-width: 640px) {
+            .elive-station-hero {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .elive-live-pill {
+                align-self: flex-start;
+            }
+
             .elive-station-settings,
             .elive-stat-grid,
             .elive-details {
@@ -703,6 +871,31 @@
         class="elive-station"
         wire:poll.15s
     >
+        <section class="elive-station-hero">
+            <div>
+                <h2 class="elive-station-hero-title">
+                    Live Check-in Operations
+                </h2>
+
+                <div class="elive-station-hero-meta">
+                    @if ($eventId)
+                        {{ $events->firstWhere('id', $eventId)?->name ?? 'Selected event' }}
+                        @if ($selectedEventDay)
+                            · {{ $selectedEventDay->name }}
+                        @endif
+                        @if ($selectedEventSession)
+                            · {{ $selectedEventSession->name }}
+                        @endif
+                    @else
+                        Select an event and station context to begin.
+                    @endif
+                </div>
+            </div>
+
+            <div class="elive-live-pill">
+                Station Ready
+            </div>
+        </section>
         {{-- Event and station selection --}}
         <section class="elive-card">
             <div class="elive-card-header">
@@ -1409,15 +1602,53 @@
                 <div class="elive-card-body">
                     @if ($lastResult)
                         <div class="elive-result {{ $resultClass }}">
-                            <h3 class="elive-result-title">
-                                {{ $lastResult['title'] ?? 'Check-in result' }}
-                            </h3>
+                            <div class="elive-result-head">
+                                <div class="elive-result-icon">
+                                    {{ $resultSymbol }}
+                                </div>
 
-                            <p class="elive-result-message">
-                                {{ $lastResult['message'] ?? '' }}
-                            </p>
+                                <div>
+                                    <h3 class="elive-result-title">
+                                        {{ $lastResult['title'] ?? 'Check-in result' }}
+                                    </h3>
+
+                                    <p class="elive-result-message">
+                                        {{ $lastResult['message'] ?? '' }}
+                                    </p>
+                                </div>
+                            </div>
 
                             @if (! empty($lastResult['attendee']))
+                                <div class="elive-result-name">
+                                    {{ $lastResult['attendee']['name'] ?? 'Attendee' }}
+                                </div>
+
+                                <div class="elive-result-chips">
+                                    @if (! empty($lastResult['attendee']['category']))
+                                        <span class="elive-result-chip">
+                                            {{ $lastResult['attendee']['category'] }}
+                                        </span>
+                                    @endif
+
+                                    @if (! empty($lastResult['attendee']['badge_type']))
+                                        <span class="elive-result-chip">
+                                            {{ $lastResult['attendee']['badge_type'] }}
+                                        </span>
+                                    @endif
+
+                                    @if (! empty($lastResult['event_day']))
+                                        <span class="elive-result-chip">
+                                            {{ $lastResult['event_day'] }}
+                                        </span>
+                                    @endif
+
+                                    @if (! empty($lastResult['event_session']))
+                                        <span class="elive-result-chip">
+                                            {{ $lastResult['event_session'] }}
+                                        </span>
+                                    @endif
+                                </div>
+
                                 <div class="elive-details">
                                     <div class="elive-detail">
                                         <div class="elive-detail-label">
@@ -1428,6 +1659,30 @@
                                             {{ $lastResult['attendee']['name'] ?? 'Not available' }}
                                         </div>
                                     </div>
+
+                                    @if (! empty($lastResult['attendee']['category']))
+                                        <div class="elive-detail">
+                                            <div class="elive-detail-label">
+                                                Category
+                                            </div>
+
+                                            <div class="elive-detail-value">
+                                                {{ $lastResult['attendee']['category'] }}
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    @if (! empty($lastResult['attendee']['badge_type']))
+                                        <div class="elive-detail">
+                                            <div class="elive-detail-label">
+                                                Badge Type
+                                            </div>
+
+                                            <div class="elive-detail-value">
+                                                {{ $lastResult['attendee']['badge_type'] }}
+                                            </div>
+                                        </div>
+                                    @endif
 
                                     <div class="elive-detail">
                                         <div class="elive-detail-label">
@@ -1512,21 +1767,24 @@
                                     </div>
                                 </div>
 
-                                @if ($lastOnsiteBadgePrintUrl)
-                                    <div style="
-                                        display: flex;
-                                        flex-wrap: wrap;
-                                        gap: 0.75rem;
-                                        margin-top: 1rem;
-                                    ">
+                                <div class="elive-result-actions">
+                                    @if ($lastOnsiteBadgePrintUrl)
                                         <a
                                             href="{{ $lastOnsiteBadgePrintUrl }}"
                                             class="elive-button elive-button-primary"
                                         >
                                             Print Badge Now
                                         </a>
-                                    </div>
-                                @endif
+                                    @endif
+
+                                    <button
+                                        type="button"
+                                        class="elive-button elive-button-secondary"
+                                        wire:click="clearLastResult"
+                                    >
+                                        Continue Scanning
+                                    </button>
+                                </div>
                             @endif
                         </div>
                     @else
