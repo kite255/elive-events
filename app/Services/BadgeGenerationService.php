@@ -35,7 +35,7 @@ class BadgeGenerationService
     protected const NAME_FONT_WEIGHT = '400';
 
     protected const CATEGORY_DEFAULT_X = 819;
-    protected const CATEGORY_DEFAULT_Y = 1040;
+    protected const CATEGORY_DEFAULT_Y = 1015;
     protected const CATEGORY_DEFAULT_FONT_SIZE = 80;
     protected const CATEGORY_MIN_FONT_SIZE = 66;
     protected const CATEGORY_MAX_WIDTH = 1250;
