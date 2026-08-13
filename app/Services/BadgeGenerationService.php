@@ -29,21 +29,21 @@ class BadgeGenerationService
     // Text Y values are baselines because Imagick/SVG use baseline positioning.
     protected const NAME_DEFAULT_X = 819;
     protected const NAME_DEFAULT_Y = 920;
-    protected const NAME_DEFAULT_FONT_SIZE = 108;
-    protected const NAME_MIN_FONT_SIZE = 60;
-    protected const NAME_MAX_WIDTH = 1238;
+    protected const NAME_DEFAULT_FONT_SIZE = 112;
+    protected const NAME_MIN_FONT_SIZE = 88;
+    protected const NAME_MAX_WIDTH = 1450;
     protected const NAME_FONT_WEIGHT = '400';
 
     protected const CATEGORY_DEFAULT_X = 819;
     protected const CATEGORY_DEFAULT_Y = 1040;
-    protected const CATEGORY_DEFAULT_FONT_SIZE = 74;
-    protected const CATEGORY_MIN_FONT_SIZE = 52;
-    protected const CATEGORY_MAX_WIDTH = 1100;
+    protected const CATEGORY_DEFAULT_FONT_SIZE = 80;
+    protected const CATEGORY_MIN_FONT_SIZE = 66;
+    protected const CATEGORY_MAX_WIDTH = 1250;
     protected const CATEGORY_FONT_WEIGHT = '400';
 
     protected const QR_DEFAULT_X = 819;
     protected const QR_DEFAULT_Y = 1160;
-    protected const QR_DEFAULT_SIZE = 610;
+    protected const QR_DEFAULT_SIZE = 600;
     protected const QR_DEFAULT_PADDING = 20;
 
     /*
