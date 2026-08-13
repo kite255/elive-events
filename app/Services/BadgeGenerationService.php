@@ -1353,47 +1353,11 @@ SVG;
 
         /*
         |--------------------------------------------------------------------------
-        | Shadow
-        |--------------------------------------------------------------------------
-        */
-
-        $shadow =
-            new ImagickDraw();
-
-        $shadow->setFont(
-            $fontPath
-        );
-
-        $shadow->setFontSize(
-            $fontSize
-        );
-
-        $shadow->setFontWeight(
-            $fontWeight
-        );
-
-        $shadow->setTextAlignment(
-            Imagick::ALIGN_CENTER
-        );
-
-        $shadow->setFillColor(
-            new ImagickPixel(
-                'rgba(0,0,0,0.10)'
-            )
-        );
-
-        $image->annotateImage(
-            $shadow,
-            $x,
-            $y + 2,
-            0,
-            $value
-        );
-
-        /*
-        |--------------------------------------------------------------------------
         | Main Text
         |--------------------------------------------------------------------------
+        |
+        | Clean Bebas Neue rendering: no shadow, matching the reference badge.
+        |
         */
 
         $draw =
@@ -1429,7 +1393,6 @@ SVG;
             $value
         );
 
-        $shadow->clear();
         $draw->clear();
     }
 
@@ -2278,21 +2241,7 @@ SVG;
             . "'Liberation Sans Narrow', "
             . 'Arial, sans-serif';
 
-        $shadowY =
-            $y + 2;
-
         return <<<SVG
-
-    <text
-        x="{$x}"
-        y="{$shadowY}"
-        text-anchor="{$textAnchor}"
-        font-family="{$svgFontStack}"
-        font-size="{$fontSize}"
-        font-weight="{$fontWeight}"
-        fill="#000000"
-        opacity="0.10"
-    >{$safeText}</text>
 
     <text
         x="{$x}"
