@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Imagick;
+use ImagickDraw;
 use ImagickPixel;
 use RuntimeException;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -80,7 +81,7 @@ class BadgeGenerationService
         try {
             /*
             |--------------------------------------------------------------------------
-            | Template
+            | Resolve Template
             |--------------------------------------------------------------------------
             */
 
@@ -97,7 +98,7 @@ class BadgeGenerationService
 
             /*
             |--------------------------------------------------------------------------
-            | Layout
+            | Resolve Layout
             |--------------------------------------------------------------------------
             */
 
@@ -106,17 +107,19 @@ class BadgeGenerationService
                     $template
                 );
 
-            $width = (int) data_get(
-                $layout,
-                'canvas.width',
-                $template->width ?: 1638
-            );
+            $width =
+                (int) data_get(
+                    $layout,
+                    'canvas.width',
+                    $template->width ?: 1638
+                );
 
-            $height = (int) data_get(
-                $layout,
-                'canvas.height',
-                $template->height ?: 2048
-            );
+            $height =
+                (int) data_get(
+                    $layout,
+                    'canvas.height',
+                    $template->height ?: 2048
+                );
 
             if (
                 $width <= 0
@@ -182,7 +185,7 @@ class BadgeGenerationService
 
             /*
             |--------------------------------------------------------------------------
-            | Text Elements
+            | SVG Text Elements
             |--------------------------------------------------------------------------
             */
 
@@ -250,7 +253,7 @@ class BadgeGenerationService
 
             /*
             |--------------------------------------------------------------------------
-            | Background
+            | SVG Background
             |--------------------------------------------------------------------------
             */
 
@@ -293,19 +296,21 @@ SVG;
 
             /*
             |--------------------------------------------------------------------------
-            | Save SVG Master
+            | Save Master SVG
             |--------------------------------------------------------------------------
             */
 
-            Storage::disk(
-                'public'
-            )->put(
-                $svgPath,
-                $svg
-            );
+            $svgSaved =
+                Storage::disk(
+                    'public'
+                )->put(
+                    $svgPath,
+                    $svg
+                );
 
             if (
-                ! Storage::disk(
+                ! $svgSaved
+                || ! Storage::disk(
                     'public'
                 )->exists(
                     $svgPath
@@ -318,13 +323,28 @@ SVG;
 
             /*
             |--------------------------------------------------------------------------
-            | Generate PNG Delivery Version
+            | Generate PNG Directly
             |--------------------------------------------------------------------------
+            |
+            | IMPORTANT:
+            |
+            | Do NOT rasterize the master SVG here.
+            |
+            | The digital PNG is composed directly using:
+            |
+            | background
+            | category
+            | attendee name
+            | QR
+            |
             */
 
             $this->generatePngBadge(
-                svg:
-                    $svg,
+                attendee:
+                    $attendee,
+
+                layout:
+                    $layout,
 
                 pngPath:
                     $pngPath,
@@ -337,6 +357,9 @@ SVG;
 
                 backgroundImagePath:
                     $backgroundImagePath,
+
+                backgroundColor:
+                    $backgroundColor,
             );
 
             /*
@@ -361,7 +384,7 @@ SVG;
 
             /*
             |--------------------------------------------------------------------------
-            | Generate PDF
+            | PDF
             |--------------------------------------------------------------------------
             */
 
@@ -398,12 +421,6 @@ SVG;
                         now(),
                 ]
             );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Log
-            |--------------------------------------------------------------------------
-            */
 
             Log::info(
                 'Badge generated successfully.',
@@ -494,23 +511,18 @@ SVG;
 
     /*
     |--------------------------------------------------------------------------
-    | Generate PNG
-    |--------------------------------------------------------------------------
-    |
-    | Master SVG remains completely self-contained.
-    |
-    | For Imagick rendering we create a temporary copy of the SVG and replace
-    | embedded raster/SVG data URIs with temporary local files.
-    |
+    | Generate PNG Directly
     |--------------------------------------------------------------------------
     */
 
     protected function generatePngBadge(
-        string $svg,
+        Attendee $attendee,
+        array $layout,
         string $pngPath,
         int $width,
         int $height,
-        ?string $backgroundImagePath = null
+        ?string $backgroundImagePath,
+        string $backgroundColor
     ): string {
         if (
             ! class_exists(
@@ -522,220 +534,471 @@ SVG;
             );
         }
 
-        $image =
+        $canvas =
             null;
 
-        $temporaryFiles =
-            [];
+        $background =
+            null;
+
+        $qrImage =
+            null;
+
+        $qrBox =
+            null;
 
         try {
             /*
             |--------------------------------------------------------------------------
-            | Temporary Directory
+            | Canvas
             |--------------------------------------------------------------------------
             */
 
-            $temporaryDirectory =
-                storage_path(
-                    'app/tmp/badges'
-                );
-
-            if (
-                ! is_dir(
-                    $temporaryDirectory
-                )
-            ) {
-                if (
-                    ! mkdir(
-                        $temporaryDirectory,
-                        0775,
-                        true
-                    )
-                    && ! is_dir(
-                        $temporaryDirectory
-                    )
-                ) {
-                    throw new RuntimeException(
-                        'Unable to create temporary badge rendering directory.'
-                    );
-                }
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Prepare SVG For Rasterization
-            |--------------------------------------------------------------------------
-            */
-
-            $rasterSvg =
-                $this->prepareSvgForRasterization(
-                    svg:
-                        $svg,
-
-                    temporaryDirectory:
-                        $temporaryDirectory,
-
-                    temporaryFiles:
-                        $temporaryFiles,
-
-                    backgroundImagePath:
-                        $backgroundImagePath,
-                );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Write Temporary SVG
-            |--------------------------------------------------------------------------
-            */
-
-            $temporarySvgPath =
-                $temporaryDirectory
-                . '/badge-'
-                . Str::uuid()
-                . '.svg';
-
-            if (
-                file_put_contents(
-                    $temporarySvgPath,
-                    $rasterSvg
-                ) === false
-            ) {
-                throw new RuntimeException(
-                    'Unable to create temporary SVG badge.'
-                );
-            }
-
-            $temporaryFiles[] =
-                $temporarySvgPath;
-
-            /*
-            |--------------------------------------------------------------------------
-            | Create Imagick
-            |--------------------------------------------------------------------------
-            */
-
-            $image =
+            $canvas =
                 new Imagick();
 
-            /*
-            |--------------------------------------------------------------------------
-            | Resolution
-            |--------------------------------------------------------------------------
-            */
-
-            $image->setResolution(
-                144,
-                144
-            );
-
-            $image->setBackgroundColor(
+            $canvas->newImage(
+                $width,
+                $height,
                 new ImagickPixel(
-                    'white'
-                )
+                    $backgroundColor
+                ),
+                'png'
+            );
+
+            $canvas->setImageColorspace(
+                Imagick::COLORSPACE_SRGB
             );
 
             /*
             |--------------------------------------------------------------------------
-            | Read SVG File
+            | Background Image
             |--------------------------------------------------------------------------
             */
-
-            $image->readImage(
-                $temporarySvgPath
-            );
 
             if (
-                $image->getNumberImages()
-                > 1
+                filled(
+                    $backgroundImagePath
+                )
+                && Storage::disk(
+                    'public'
+                )->exists(
+                    $backgroundImagePath
+                )
             ) {
-                $image->setIteratorIndex(
+                $absoluteBackgroundPath =
+                    Storage::disk(
+                        'public'
+                    )->path(
+                        $backgroundImagePath
+                    );
+
+                $background =
+                    new Imagick(
+                        $absoluteBackgroundPath
+                    );
+
+                if (
+                    $background
+                        ->getNumberImages()
+                    > 1
+                ) {
+                    $background
+                        ->setIteratorIndex(
+                            0
+                        );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Match Badge Canvas Exactly
+                |--------------------------------------------------------------------------
+                |
+                | Existing badge design stretches the supplied artwork to the
+                | badge canvas using preserveAspectRatio="none".
+                |
+                */
+
+                $background->resizeImage(
+                    $width,
+                    $height,
+                    Imagick::FILTER_LANCZOS,
+                    1,
+                    false
+                );
+
+                $background->setImagePage(
+                    0,
+                    0,
+                    0,
+                    0
+                );
+
+                $canvas->compositeImage(
+                    $background,
+                    Imagick::COMPOSITE_OVER,
+                    0,
                     0
                 );
             }
 
             /*
             |--------------------------------------------------------------------------
-            | Flatten
+            | Category
             |--------------------------------------------------------------------------
             */
 
-            $image->setImageBackgroundColor(
-                new ImagickPixel(
-                    'white'
-                )
-            );
-
-            $flattened =
-                $image->mergeImageLayers(
-                    Imagick::LAYERMETHOD_FLATTEN
+            $enabledElements =
+                data_get(
+                    $layout,
+                    'enabled_elements',
+                    [
+                        'category',
+                        'name',
+                        'qr_code',
+                    ]
                 );
 
             if (
-                $flattened
-                instanceof Imagick
+                in_array(
+                    'category',
+                    $enabledElements,
+                    true
+                )
+                && (bool) data_get(
+                    $layout,
+                    'category.visible',
+                    true
+                )
             ) {
+                $category =
+                    $attendee
+                        ->category
+                        ?->name
+                    ?? $attendee
+                        ->badgeType
+                        ?->name
+                    ?? 'Guest';
+
+                $categoryConfig =
+                    data_get(
+                        $layout,
+                        'category',
+                        []
+                    );
+
+                $this->drawTextOnImage(
+                    image:
+                        $canvas,
+
+                    value:
+                        $category,
+
+                    config:
+                        $categoryConfig,
+
+                    defaultX:
+                        self::CATEGORY_DEFAULT_X,
+
+                    defaultY:
+                        self::CATEGORY_MIN_Y,
+
+                    defaultFontSize:
+                        self::CATEGORY_DEFAULT_FONT_SIZE,
+
+                    defaultMinFontSize:
+                        self::CATEGORY_MIN_FONT_SIZE,
+
+                    defaultWidth:
+                        self::CATEGORY_MAX_WIDTH,
+
+                    defaultWeight:
+                        self::CATEGORY_FONT_WEIGHT,
+
+                    defaultColor:
+                        '#FFFFFF',
+
+                    defaultFontFamily:
+                        'Bebas Neue',
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Name
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                in_array(
+                    'name',
+                    $enabledElements,
+                    true
+                )
+                && (bool) data_get(
+                    $layout,
+                    'name.visible',
+                    true
+                )
+            ) {
+                $name =
+                    $attendee->full_name
+                        ?: 'Guest';
+
+                $nameConfig =
+                    data_get(
+                        $layout,
+                        'name',
+                        []
+                    );
+
+                $this->drawTextOnImage(
+                    image:
+                        $canvas,
+
+                    value:
+                        $name,
+
+                    config:
+                        $nameConfig,
+
+                    defaultX:
+                        self::NAME_DEFAULT_X,
+
+                    defaultY:
+                        self::NAME_MIN_Y,
+
+                    defaultFontSize:
+                        self::NAME_DEFAULT_FONT_SIZE,
+
+                    defaultMinFontSize:
+                        self::NAME_MIN_FONT_SIZE,
+
+                    defaultWidth:
+                        self::NAME_MAX_WIDTH,
+
+                    defaultWeight:
+                        self::NAME_FONT_WEIGHT,
+
+                    defaultColor:
+                        '#FFFFFF',
+
+                    defaultFontFamily:
+                        'Bebas Neue',
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | QR
+            |--------------------------------------------------------------------------
+            */
+
+            $qrConfig =
+                data_get(
+                    $layout,
+                    'qr_code',
+                    []
+                );
+
+            if (
+                in_array(
+                    'qr_code',
+                    $enabledElements,
+                    true
+                )
+                && (bool) data_get(
+                    $qrConfig,
+                    'visible',
+                    true
+                )
+            ) {
+                $qrPath =
+                    sprintf(
+                        'events/%s/qr-codes/attendee-%s.svg',
+                        $attendee->event_id,
+                        $attendee->id
+                    );
+
                 if (
-                    $flattened !== $image
+                    ! Storage::disk(
+                        'public'
+                    )->exists(
+                        $qrPath
+                    )
                 ) {
-                    $image->clear();
-                    $image->destroy();
+                    throw new RuntimeException(
+                        'The attendee QR code could not be found for PNG generation.'
+                    );
                 }
 
-                $image =
-                    $flattened;
-            }
+                $qrSvg =
+                    Storage::disk(
+                        'public'
+                    )->get(
+                        $qrPath
+                    );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Exact Pixel Dimensions
-            |--------------------------------------------------------------------------
-            */
+                /*
+                |--------------------------------------------------------------------------
+                | Rasterize Only QR SVG
+                |--------------------------------------------------------------------------
+                |
+                | The QR SVG contains only vector QR paths/shapes and does not
+                | contain external/base64 badge artwork.
+                |
+                */
 
-            if (
-                $image->getImageWidth()
-                    !== $width
-                || $image->getImageHeight()
-                    !== $height
-            ) {
-                $image->resizeImage(
-                    $width,
-                    $height,
-                    Imagick::FILTER_LANCZOS,
-                    1
+                $qrImage =
+                    new Imagick();
+
+                $qrImage->setResolution(
+                    144,
+                    144
+                );
+
+                $qrImage->setBackgroundColor(
+                    new ImagickPixel(
+                        'white'
+                    )
+                );
+
+                $qrImage->readImageBlob(
+                    $qrSvg
+                );
+
+                $qrImage->setImageBackgroundColor(
+                    new ImagickPixel(
+                        'white'
+                    )
+                );
+
+                $flattenedQr =
+                    $qrImage->mergeImageLayers(
+                        Imagick::LAYERMETHOD_FLATTEN
+                    );
+
+                if (
+                    $flattenedQr
+                    instanceof Imagick
+                ) {
+                    if (
+                        $flattenedQr
+                        !== $qrImage
+                    ) {
+                        $qrImage->clear();
+                        $qrImage->destroy();
+                    }
+
+                    $qrImage =
+                        $flattenedQr;
+                }
+
+                $size =
+                    self::QR_DEFAULT_SIZE;
+
+                $padding =
+                    self::QR_DEFAULT_PADDING;
+
+                $centerX =
+                    self::QR_DEFAULT_X;
+
+                $y =
+                    self::QR_MIN_Y;
+
+                $x =
+                    (int) round(
+                        $centerX
+                        - ($size / 2)
+                    );
+
+                $padding =
+                    max(
+                        0,
+                        min(
+                            $padding,
+                            (int) (
+                                $size / 4
+                            )
+                        )
+                    );
+
+                $innerSize =
+                    max(
+                        20,
+                        $size
+                        - ($padding * 2)
+                    );
+
+                $qrImage->resizeImage(
+                    $innerSize,
+                    $innerSize,
+                    Imagick::FILTER_POINT,
+                    1,
+                    false
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | White QR Box
+                |--------------------------------------------------------------------------
+                */
+
+                $qrBox =
+                    new Imagick();
+
+                $qrBox->newImage(
+                    $size,
+                    $size,
+                    new ImagickPixel(
+                        '#FFFFFF'
+                    ),
+                    'png'
+                );
+
+                $qrBox->compositeImage(
+                    $qrImage,
+                    Imagick::COMPOSITE_OVER,
+                    $padding,
+                    $padding
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Add QR To Badge
+                |--------------------------------------------------------------------------
+                */
+
+                $canvas->compositeImage(
+                    $qrBox,
+                    Imagick::COMPOSITE_OVER,
+                    $x,
+                    $y
                 );
             }
 
-            $image->setImagePage(
-                0,
-                0,
-                0,
-                0
-            );
-
             /*
             |--------------------------------------------------------------------------
-            | PNG
+            | Final PNG
             |--------------------------------------------------------------------------
             */
 
-            $image->setImageFormat(
+            $canvas->setImageFormat(
                 'png'
             );
 
-            $image->stripImage();
+            $canvas->setImageColorspace(
+                Imagick::COLORSPACE_SRGB
+            );
 
-            $image->setOption(
+            $canvas->stripImage();
+
+            $canvas->setOption(
                 'png:compression-level',
                 '9'
             );
 
-            $image->setOption(
-                'png:compression-filter',
-                '5'
-            );
-
             $png =
-                $image->getImageBlob();
+                $canvas->getImageBlob();
 
             if (
                 ! is_string(
@@ -754,15 +1017,17 @@ SVG;
             |--------------------------------------------------------------------------
             */
 
-            Storage::disk(
-                'public'
-            )->put(
-                $pngPath,
-                $png
-            );
+            $saved =
+                Storage::disk(
+                    'public'
+                )->put(
+                    $pngPath,
+                    $png
+                );
 
             if (
-                ! Storage::disk(
+                ! $saved
+                || ! Storage::disk(
                     'public'
                 )->exists(
                     $pngPath
@@ -773,9 +1038,46 @@ SVG;
                 );
             }
 
+            $sizeBytes =
+                Storage::disk(
+                    'public'
+                )->size(
+                    $pngPath
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Detect Suspicious Output
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $sizeBytes < 10000
+            ) {
+                Log::warning(
+                    'Generated PNG badge is unusually small.',
+                    [
+                        'attendee_id' =>
+                            $attendee->id,
+
+                        'png_path' =>
+                            $pngPath,
+
+                        'size_bytes' =>
+                            $sizeBytes,
+
+                        'background_image_path' =>
+                            $backgroundImagePath,
+                    ]
+                );
+            }
+
             Log::info(
                 'PNG delivery badge generated.',
                 [
+                    'attendee_id' =>
+                        $attendee->id,
+
                     'png_path' =>
                         $pngPath,
 
@@ -786,11 +1088,10 @@ SVG;
                         $height,
 
                     'size_bytes' =>
-                        Storage::disk(
-                            'public'
-                        )->size(
-                            $pngPath
-                        ),
+                        $sizeBytes,
+
+                    'background_image_path' =>
+                        $backgroundImagePath,
                 ]
             );
 
@@ -801,6 +1102,9 @@ SVG;
             Log::error(
                 'PNG badge generation failed.',
                 [
+                    'attendee_id' =>
+                        $attendee->id,
+
                     'png_path' =>
                         $pngPath,
 
@@ -819,29 +1123,20 @@ SVG;
                     $exception
             );
         } finally {
-            if (
-                $image
-                instanceof Imagick
-            ) {
-                $image->clear();
-                $image->destroy();
-            }
-
             foreach (
-                $temporaryFiles
-                as $temporaryFile
+                [
+                    $background,
+                    $qrImage,
+                    $qrBox,
+                    $canvas,
+                ] as $image
             ) {
                 if (
-                    is_string(
-                        $temporaryFile
-                    )
-                    && file_exists(
-                        $temporaryFile
-                    )
+                    $image
+                    instanceof Imagick
                 ) {
-                    @unlink(
-                        $temporaryFile
-                    );
+                    $image->clear();
+                    $image->destroy();
                 }
             }
         }
@@ -849,214 +1144,405 @@ SVG;
 
     /*
     |--------------------------------------------------------------------------
-    | Prepare SVG For Imagick
+    | Draw Text Directly On PNG
     |--------------------------------------------------------------------------
     */
 
-    protected function prepareSvgForRasterization(
-        string $svg,
-        string $temporaryDirectory,
-        array &$temporaryFiles,
-        ?string $backgroundImagePath = null
-    ): string {
-        $rasterSvg =
-            $svg;
+    protected function drawTextOnImage(
+        Imagick $image,
+        string $value,
+        array $config,
+        int $defaultX,
+        int $defaultY,
+        int $defaultFontSize,
+        int $defaultMinFontSize,
+        int $defaultWidth,
+        string $defaultWeight,
+        string $defaultColor,
+        string $defaultFontFamily = 'Bebas Neue',
+    ): void {
+        $uppercase =
+            (bool) data_get(
+                $config,
+                'uppercase',
+                true
+            );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Replace Embedded Background
-        |--------------------------------------------------------------------------
-        */
+        $value =
+            trim(
+                $value
+            );
 
-        if (
-            filled(
-                $backgroundImagePath
-            )
-            && Storage::disk(
-                'public'
-            )->exists(
-                $backgroundImagePath
-            )
-        ) {
-            $absoluteBackgroundPath =
-                Storage::disk(
-                    'public'
-                )->path(
-                    $backgroundImagePath
+        if ($uppercase) {
+            $value =
+                Str::upper(
+                    $value
                 );
-
-            $backgroundUri =
-                $this->fileUri(
-                    $absoluteBackgroundPath
-                );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Replace href
-            |--------------------------------------------------------------------------
-            */
-
-            $updatedSvg =
-                preg_replace(
-                    '/href="data:image\/(?:png|jpe?g|webp|gif);base64,[^"]+"/i',
-                    'href="'
-                    . htmlspecialchars(
-                        $backgroundUri,
-                        ENT_QUOTES
-                            | ENT_XML1,
-                        'UTF-8'
-                    )
-                    . '"',
-                    $rasterSvg,
-                    1
-                );
-
-            if (
-                is_string(
-                    $updatedSvg
-                )
-            ) {
-                $rasterSvg =
-                    $updatedSvg;
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Replace xlink:href
-            |--------------------------------------------------------------------------
-            */
-
-            $updatedSvg =
-                preg_replace(
-                    '/xlink:href="data:image\/(?:png|jpe?g|webp|gif);base64,[^"]+"/i',
-                    'xlink:href="'
-                    . htmlspecialchars(
-                        $backgroundUri,
-                        ENT_QUOTES
-                            | ENT_XML1,
-                        'UTF-8'
-                    )
-                    . '"',
-                    $rasterSvg,
-                    1
-                );
-
-            if (
-                is_string(
-                    $updatedSvg
-                )
-            ) {
-                $rasterSvg =
-                    $updatedSvg;
-            }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Replace Embedded SVG Assets
-        |--------------------------------------------------------------------------
-        |
-        | This mainly handles the embedded QR SVG.
-        |
-        */
+        if ($value === '') {
+            return;
+        }
 
-        $rasterSvg =
-            preg_replace_callback(
-                '/(?P<attribute>href|xlink:href)="data:image\/svg\+xml;base64,(?P<data>[^"]+)"/i',
-                function (
-                    array $matches
-                ) use (
-                    $temporaryDirectory,
-                    &$temporaryFiles
-                ): string {
-                    $decoded =
-                        base64_decode(
-                            $matches[
-                                'data'
-                            ],
-                            true
-                        );
+        $x =
+            (int) data_get(
+                $config,
+                'x',
+                $defaultX
+            );
 
-                    if (
-                        $decoded
-                        === false
-                    ) {
-                        throw new RuntimeException(
-                            'Unable to decode an embedded SVG badge asset.'
-                        );
-                    }
+        $y =
+            (int) data_get(
+                $config,
+                'y',
+                $defaultY
+            );
 
-                    $temporaryAssetPath =
-                        $temporaryDirectory
-                        . '/asset-'
-                        . Str::uuid()
-                        . '.svg';
+        $maxWidth =
+            max(
+                100,
+                (int) data_get(
+                    $config,
+                    'width',
+                    $defaultWidth
+                )
+            );
 
-                    if (
-                        file_put_contents(
-                            $temporaryAssetPath,
-                            $decoded
-                        ) === false
-                    ) {
-                        throw new RuntimeException(
-                            'Unable to create temporary SVG badge asset.'
-                        );
-                    }
+        $desiredFontSize =
+            max(
+                1,
+                (int) data_get(
+                    $config,
+                    'font_size',
+                    $defaultFontSize
+                )
+            );
 
-                    $temporaryFiles[] =
-                        $temporaryAssetPath;
-
-                    $uri =
-                        htmlspecialchars(
-                            $this->fileUri(
-                                $temporaryAssetPath
-                            ),
-                            ENT_QUOTES
-                                | ENT_XML1,
-                            'UTF-8'
-                        );
-
-                    return $matches[
-                        'attribute'
-                    ]
-                        . '="'
-                        . $uri
-                        . '"';
-                },
-                $rasterSvg
+        $minimumFontSize =
+            max(
+                1,
+                (int) data_get(
+                    $config,
+                    'min_font_size',
+                    $defaultMinFontSize
+                )
             );
 
         if (
-            ! is_string(
-                $rasterSvg
-            )
+            $minimumFontSize
+            > $desiredFontSize
         ) {
-            throw new RuntimeException(
-                'Unable to prepare badge SVG for PNG rendering.'
-            );
+            $minimumFontSize =
+                $desiredFontSize;
         }
 
-        return $rasterSvg;
+        $preferredFontFamily =
+            trim(
+                (string) data_get(
+                    $config,
+                    'font_family',
+                    $defaultFontFamily
+                )
+            );
+
+        if (
+            $preferredFontFamily === ''
+        ) {
+            $preferredFontFamily =
+                $defaultFontFamily;
+        }
+
+        $fontPath =
+            $this->resolveImagickFontPath(
+                $preferredFontFamily
+            );
+
+        $fontWeight =
+            (int) data_get(
+                $config,
+                'font_weight',
+                $defaultWeight
+            );
+
+        $fontWeight =
+            max(
+                100,
+                min(
+                    900,
+                    $fontWeight
+                )
+            );
+
+        $color =
+            (string) data_get(
+                $config,
+                'color',
+                $defaultColor
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Find Actual Font Size
+        |--------------------------------------------------------------------------
+        */
+
+        $fontSize =
+            $this->fitImagickFontSize(
+                image:
+                    $image,
+
+                text:
+                    $value,
+
+                fontPath:
+                    $fontPath,
+
+                fontWeight:
+                    $fontWeight,
+
+                desiredFontSize:
+                    $desiredFontSize,
+
+                minimumFontSize:
+                    $minimumFontSize,
+
+                maxWidth:
+                    $maxWidth,
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Shadow
+        |--------------------------------------------------------------------------
+        */
+
+        $shadow =
+            new ImagickDraw();
+
+        $shadow->setFont(
+            $fontPath
+        );
+
+        $shadow->setFontSize(
+            $fontSize
+        );
+
+        $shadow->setFontWeight(
+            $fontWeight
+        );
+
+        $shadow->setTextAlignment(
+            Imagick::ALIGN_CENTER
+        );
+
+        $shadow->setFillColor(
+            new ImagickPixel(
+                'rgba(0,0,0,0.10)'
+            )
+        );
+
+        $image->annotateImage(
+            $shadow,
+            $x,
+            $y + 2,
+            0,
+            $value
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Main Text
+        |--------------------------------------------------------------------------
+        */
+
+        $draw =
+            new ImagickDraw();
+
+        $draw->setFont(
+            $fontPath
+        );
+
+        $draw->setFontSize(
+            $fontSize
+        );
+
+        $draw->setFontWeight(
+            $fontWeight
+        );
+
+        $draw->setTextAlignment(
+            Imagick::ALIGN_CENTER
+        );
+
+        $draw->setFillColor(
+            new ImagickPixel(
+                $color
+            )
+        );
+
+        $image->annotateImage(
+            $draw,
+            $x,
+            $y,
+            0,
+            $value
+        );
+
+        $shadow->clear();
+        $draw->clear();
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Local File URI
+    | Resolve Installed Font
     |--------------------------------------------------------------------------
     */
 
-    protected function fileUri(
-        string $path
+    protected function resolveImagickFontPath(
+        string $preferredFontFamily
     ): string {
-        $path =
-            str_replace(
-                '\\',
-                '/',
-                $path
+        $fontMap = [
+            'bebas neue' =>
+                public_path(
+                    'fonts/bebas-neue/BebasNeue-Regular.ttf'
+                ),
+
+            'bebasneue' =>
+                public_path(
+                    'fonts/bebas-neue/BebasNeue-Regular.ttf'
+                ),
+        ];
+
+        $key =
+            strtolower(
+                trim(
+                    $preferredFontFamily
+                )
             );
 
-        return 'file://'
-            . $path;
+        $fontPath =
+            $fontMap[
+                $key
+            ]
+            ?? null;
+
+        if (
+            filled(
+                $fontPath
+            )
+            && is_file(
+                $fontPath
+            )
+            && is_readable(
+                $fontPath
+            )
+        ) {
+            return $fontPath;
+        }
+
+        $fallbackCandidates = [
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        ];
+
+        foreach (
+            $fallbackCandidates
+            as $fallback
+        ) {
+            if (
+                is_file(
+                    $fallback
+                )
+                && is_readable(
+                    $fallback
+                )
+            ) {
+                Log::warning(
+                    'Preferred badge font file was not found. Falling back to DejaVu Sans.',
+                    [
+                        'preferred_font' =>
+                            $preferredFontFamily,
+
+                        'fallback_font' =>
+                            $fallback,
+                    ]
+                );
+
+                return $fallback;
+            }
+        }
+
+        throw new RuntimeException(
+            'No usable badge font file was found.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accurate PNG Font Fitting
+    |--------------------------------------------------------------------------
+    */
+
+    protected function fitImagickFontSize(
+        Imagick $image,
+        string $text,
+        string $fontPath,
+        int $fontWeight,
+        int $desiredFontSize,
+        int $minimumFontSize,
+        int $maxWidth
+    ): int {
+        $fontSize =
+            $desiredFontSize;
+
+        while (
+            $fontSize
+            >= $minimumFontSize
+        ) {
+            $draw =
+                new ImagickDraw();
+
+            $draw->setFont(
+                $fontPath
+            );
+
+            $draw->setFontWeight(
+                $fontWeight
+            );
+
+            $draw->setFontSize(
+                $fontSize
+            );
+
+            $metrics =
+                $image->queryFontMetrics(
+                    $draw,
+                    $text,
+                    false
+                );
+
+            $draw->clear();
+
+            $textWidth =
+                (float) (
+                    $metrics[
+                        'textWidth'
+                    ]
+                    ?? PHP_FLOAT_MAX
+                );
+
+            if (
+                $textWidth
+                <= $maxWidth
+            ) {
+                return $fontSize;
+            }
+
+            $fontSize -=
+                2;
+        }
+
+        return $minimumFontSize;
     }
 
     /*
@@ -1118,51 +1604,49 @@ SVG;
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-    <style>
-        @page {
-            margin: 0;
-        }
+<style>
+@page {
+    margin: 0;
+}
 
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: {$widthPoints}pt;
-            height: {$heightPoints}pt;
-            overflow: hidden;
-        }
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: {$widthPoints}pt;
+    height: {$heightPoints}pt;
+    overflow: hidden;
+}
 
-        body {
-            position: relative;
-        }
+body {
+    position: relative;
+}
 
-        .badge {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: {$widthPoints}pt;
-            height: {$heightPoints}pt;
-            margin: 0;
-            padding: 0;
-        }
+.badge {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: {$widthPoints}pt;
+    height: {$heightPoints}pt;
+}
 
-        .badge img {
-            display: block;
-            width: {$widthPoints}pt;
-            height: {$heightPoints}pt;
-            margin: 0;
-            padding: 0;
-            border: 0;
-        }
-    </style>
+.badge img {
+    display: block;
+    width: {$widthPoints}pt;
+    height: {$heightPoints}pt;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+</style>
 </head>
 
 <body>
-    <div class="badge">
-        <img src="{$dataUri}" alt="">
-    </div>
+<div class="badge">
+    <img src="{$dataUri}" alt="">
+</div>
 </body>
 </html>
 HTML;
@@ -1195,15 +1679,17 @@ HTML;
                 );
             }
 
-            Storage::disk(
-                'public'
-            )->put(
-                $pdfPath,
-                $pdfOutput
-            );
+            $saved =
+                Storage::disk(
+                    'public'
+                )->put(
+                    $pdfPath,
+                    $pdfOutput
+                );
 
             if (
-                ! Storage::disk(
+                ! $saved
+                || ! Storage::disk(
                     'public'
                 )->exists(
                     $pdfPath
@@ -1319,7 +1805,7 @@ HTML;
 
     /*
     |--------------------------------------------------------------------------
-    | Background
+    | SVG Background
     |--------------------------------------------------------------------------
     */
 
@@ -1426,7 +1912,7 @@ SVG;
 
     /*
     |--------------------------------------------------------------------------
-    | Designed Elements
+    | SVG Designed Elements
     |--------------------------------------------------------------------------
     */
 
@@ -1448,12 +1934,6 @@ SVG;
 
         $svg =
             '';
-
-        /*
-        |--------------------------------------------------------------------------
-        | Category
-        |--------------------------------------------------------------------------
-        */
 
         if (
             in_array(
@@ -1482,46 +1962,6 @@ SVG;
                     'category',
                     []
                 );
-
-            $categoryConfig[
-                'x'
-            ] =
-                self::CATEGORY_DEFAULT_X;
-
-            $categoryConfig[
-                'y'
-            ] =
-                self::CATEGORY_MIN_Y;
-
-            $categoryConfig[
-                'width'
-            ] =
-                self::CATEGORY_MAX_WIDTH;
-
-            $categoryConfig[
-                'font_size'
-            ] =
-                self::CATEGORY_DEFAULT_FONT_SIZE;
-
-            $categoryConfig[
-                'min_font_size'
-            ] =
-                self::CATEGORY_MIN_FONT_SIZE;
-
-            $categoryConfig[
-                'font_weight'
-            ] =
-                self::CATEGORY_FONT_WEIGHT;
-
-            $categoryConfig[
-                'align'
-            ] =
-                'center';
-
-            $categoryConfig[
-                'uppercase'
-            ] =
-                true;
 
             $svg .=
                 $this->renderTextElement(
@@ -1557,12 +1997,6 @@ SVG;
                 );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Name
-        |--------------------------------------------------------------------------
-        */
-
         if (
             in_array(
                 'name',
@@ -1585,46 +2019,6 @@ SVG;
                     'name',
                     []
                 );
-
-            $nameConfig[
-                'x'
-            ] =
-                self::NAME_DEFAULT_X;
-
-            $nameConfig[
-                'y'
-            ] =
-                self::NAME_MIN_Y;
-
-            $nameConfig[
-                'width'
-            ] =
-                self::NAME_MAX_WIDTH;
-
-            $nameConfig[
-                'font_size'
-            ] =
-                self::NAME_DEFAULT_FONT_SIZE;
-
-            $nameConfig[
-                'min_font_size'
-            ] =
-                self::NAME_MIN_FONT_SIZE;
-
-            $nameConfig[
-                'font_weight'
-            ] =
-                self::NAME_FONT_WEIGHT;
-
-            $nameConfig[
-                'align'
-            ] =
-                'center';
-
-            $nameConfig[
-                'uppercase'
-            ] =
-                true;
 
             $svg .=
                 $this->renderTextElement(
@@ -1665,7 +2059,7 @@ SVG;
 
     /*
     |--------------------------------------------------------------------------
-    | Text
+    | SVG Text
     |--------------------------------------------------------------------------
     */
 
@@ -1700,9 +2094,7 @@ SVG;
                 );
         }
 
-        if (
-            $value === ''
-        ) {
+        if ($value === '') {
             return '';
         }
 
@@ -1767,9 +2159,7 @@ SVG;
                 )
             );
 
-        if (
-            $fontFamily === ''
-        ) {
+        if ($fontFamily === '') {
             $fontFamily =
                 $defaultFontFamily;
         }
@@ -1877,7 +2267,7 @@ SVG;
 
     /*
     |--------------------------------------------------------------------------
-    | Font Fitting
+    | SVG Font Fitting
     |--------------------------------------------------------------------------
     */
 
@@ -2071,10 +2461,12 @@ SVG;
             );
 
         $innerX =
-            $x + $padding;
+            $x
+            + $padding;
 
         $innerY =
-            $y + $padding;
+            $y
+            + $padding;
 
         $innerSize =
             max(
@@ -2191,6 +2583,12 @@ SVG;
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Category
+        |--------------------------------------------------------------------------
+        */
+
         data_set(
             $layout,
             'category.x',
@@ -2239,6 +2637,12 @@ SVG;
             true
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Name
+        |--------------------------------------------------------------------------
+        */
+
         data_set(
             $layout,
             'name.x',
@@ -2286,6 +2690,12 @@ SVG;
             'name.uppercase',
             true
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | QR
+        |--------------------------------------------------------------------------
+        */
 
         data_set(
             $layout,
@@ -2539,7 +2949,7 @@ SVG;
 
     /*
     |--------------------------------------------------------------------------
-    | Template
+    | Resolve Template
     |--------------------------------------------------------------------------
     */
 
