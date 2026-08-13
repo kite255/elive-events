@@ -415,13 +415,20 @@ SVG;
             |--------------------------------------------------------------------------
             | Mark Generated
             |--------------------------------------------------------------------------
+            |
+            | PNG is the primary digital badge used for previews, sharing,
+            | WhatsApp delivery, and attendee badge_path.
+            |
+            | SVG is still preserved as the vector/master output.
+            | PDF remains the print-ready output.
+            |
             */
 
             $this->updateBadgeState(
                 $attendee,
                 [
                     'badge_path' =>
-                        $svgPath,
+                        $pngPath,
 
                     'badge_status' =>
                         'generated',
@@ -444,6 +451,9 @@ SVG;
                         $svgPath,
 
                     'png_path' =>
+                        $pngPath,
+
+                    'primary_badge_path' =>
                         $pngPath,
 
                     'pdf_path' =>
@@ -488,7 +498,7 @@ SVG;
                 $attendee
             );
 
-            return $svgPath;
+            return $pngPath;
         } catch (
             Throwable $exception
         ) {
