@@ -24,26 +24,27 @@ class BadgeGenerationService
     |--------------------------------------------------------------------------
     */
 
-    protected const CATEGORY_MIN_Y = 1085;
-    protected const NAME_MIN_Y = 1245;
-    protected const QR_MIN_Y = 1375;
-
-    protected const CATEGORY_DEFAULT_X = 819;
+    // 1638 × 2048 reference badge layout.
+    // Text X values are horizontal centres.
+    // Text Y values are baselines because Imagick/SVG use baseline positioning.
     protected const NAME_DEFAULT_X = 819;
-    protected const QR_DEFAULT_X = 819;
-
-    protected const CATEGORY_DEFAULT_FONT_SIZE = 105;
-    protected const CATEGORY_MIN_FONT_SIZE = 58;
-    protected const CATEGORY_MAX_WIDTH = 1250;
-    protected const CATEGORY_FONT_WEIGHT = '600';
-
-    protected const NAME_DEFAULT_FONT_SIZE = 58;
-    protected const NAME_MIN_FONT_SIZE = 38;
-    protected const NAME_MAX_WIDTH = 1150;
+    protected const NAME_DEFAULT_Y = 920;
+    protected const NAME_DEFAULT_FONT_SIZE = 108;
+    protected const NAME_MIN_FONT_SIZE = 60;
+    protected const NAME_MAX_WIDTH = 1238;
     protected const NAME_FONT_WEIGHT = '400';
 
-    protected const QR_DEFAULT_SIZE = 360;
-    protected const QR_DEFAULT_PADDING = 16;
+    protected const CATEGORY_DEFAULT_X = 819;
+    protected const CATEGORY_DEFAULT_Y = 1040;
+    protected const CATEGORY_DEFAULT_FONT_SIZE = 74;
+    protected const CATEGORY_MIN_FONT_SIZE = 52;
+    protected const CATEGORY_MAX_WIDTH = 1100;
+    protected const CATEGORY_FONT_WEIGHT = '400';
+
+    protected const QR_DEFAULT_X = 819;
+    protected const QR_DEFAULT_Y = 1160;
+    protected const QR_DEFAULT_SIZE = 610;
+    protected const QR_DEFAULT_PADDING = 20;
 
     /*
     |--------------------------------------------------------------------------
@@ -240,14 +241,22 @@ class BadgeGenerationService
                             (int) data_get(
                                 $qrConfig,
                                 'y',
-                                self::QR_MIN_Y
+                                self::QR_DEFAULT_Y
                             ),
 
                         size:
-                            self::QR_DEFAULT_SIZE,
+                            (int) data_get(
+                                $qrConfig,
+                                'size',
+                                self::QR_DEFAULT_SIZE
+                            ),
 
                         padding:
-                            self::QR_DEFAULT_PADDING,
+                            (int) data_get(
+                                $qrConfig,
+                                'padding',
+                                self::QR_DEFAULT_PADDING
+                            ),
                     );
             }
 
@@ -700,7 +709,7 @@ SVG;
                         self::CATEGORY_DEFAULT_X,
 
                     defaultY:
-                        self::CATEGORY_MIN_Y,
+                        self::CATEGORY_DEFAULT_Y,
 
                     defaultFontSize:
                         self::CATEGORY_DEFAULT_FONT_SIZE,
@@ -765,7 +774,7 @@ SVG;
                         self::NAME_DEFAULT_X,
 
                     defaultY:
-                        self::NAME_MIN_Y,
+                        self::NAME_DEFAULT_Y,
 
                     defaultFontSize:
                         self::NAME_DEFAULT_FONT_SIZE,
@@ -894,16 +903,38 @@ SVG;
                 }
 
                 $size =
-                    self::QR_DEFAULT_SIZE;
+                    max(
+                        20,
+                        (int) data_get(
+                            $qrConfig,
+                            'size',
+                            self::QR_DEFAULT_SIZE
+                        )
+                    );
 
                 $padding =
-                    self::QR_DEFAULT_PADDING;
+                    max(
+                        0,
+                        (int) data_get(
+                            $qrConfig,
+                            'padding',
+                            self::QR_DEFAULT_PADDING
+                        )
+                    );
 
                 $centerX =
-                    self::QR_DEFAULT_X;
+                    (int) data_get(
+                        $qrConfig,
+                        'x',
+                        self::QR_DEFAULT_X
+                    );
 
                 $y =
-                    self::QR_MIN_Y;
+                    (int) data_get(
+                        $qrConfig,
+                        'y',
+                        self::QR_DEFAULT_Y
+                    );
 
                 $x =
                     (int) round(
@@ -1975,7 +2006,7 @@ SVG;
                         self::CATEGORY_DEFAULT_X,
 
                     defaultY:
-                        self::CATEGORY_MIN_Y,
+                        self::CATEGORY_DEFAULT_Y,
 
                     defaultFontSize:
                         self::CATEGORY_DEFAULT_FONT_SIZE,
@@ -2032,7 +2063,7 @@ SVG;
                         self::NAME_DEFAULT_X,
 
                     defaultY:
-                        self::NAME_MIN_Y,
+                        self::NAME_DEFAULT_Y,
 
                     defaultFontSize:
                         self::NAME_DEFAULT_FONT_SIZE,
@@ -2426,17 +2457,17 @@ SVG;
             $qrSvgContent
         );
 
-        $centerX =
-            self::QR_DEFAULT_X;
-
-        $y =
-            self::QR_MIN_Y;
-
         $size =
-            self::QR_DEFAULT_SIZE;
+            max(
+                20,
+                $size
+            );
 
         $padding =
-            self::QR_DEFAULT_PADDING;
+            max(
+                0,
+                $padding
+            );
 
         $x =
             (int) round(
@@ -2598,7 +2629,7 @@ SVG;
         data_set(
             $layout,
             'category.y',
-            self::CATEGORY_MIN_Y
+            self::CATEGORY_DEFAULT_Y
         );
 
         data_set(
@@ -2652,7 +2683,7 @@ SVG;
         data_set(
             $layout,
             'name.y',
-            self::NAME_MIN_Y
+            self::NAME_DEFAULT_Y
         );
 
         data_set(
@@ -2706,7 +2737,7 @@ SVG;
         data_set(
             $layout,
             'qr_code.y',
-            self::QR_MIN_Y
+            self::QR_DEFAULT_Y
         );
 
         data_set(
@@ -2799,7 +2830,7 @@ SVG;
                     self::CATEGORY_DEFAULT_X;
 
                 $element['y'] =
-                    self::CATEGORY_MIN_Y;
+                    self::CATEGORY_DEFAULT_Y;
 
                 $element['width'] =
                     self::CATEGORY_MAX_WIDTH;
@@ -2834,7 +2865,7 @@ SVG;
                     self::NAME_DEFAULT_X;
 
                 $element['y'] =
-                    self::NAME_MIN_Y;
+                    self::NAME_DEFAULT_Y;
 
                 $element['width'] =
                     self::NAME_MAX_WIDTH;
@@ -2862,7 +2893,7 @@ SVG;
                     self::QR_DEFAULT_X;
 
                 $element['y'] =
-                    self::QR_MIN_Y;
+                    self::QR_DEFAULT_Y;
 
                 $element['size'] =
                     self::QR_DEFAULT_SIZE;
@@ -2912,7 +2943,7 @@ SVG;
                     self::QR_DEFAULT_X,
 
                 'y' =>
-                    self::QR_MIN_Y,
+                    self::QR_DEFAULT_Y,
 
                 'size' =>
                     self::QR_DEFAULT_SIZE,
@@ -2934,7 +2965,7 @@ SVG;
                 self::QR_DEFAULT_X,
 
             'y' =>
-                self::QR_MIN_Y,
+                self::QR_DEFAULT_Y,
 
             'size' =>
                 self::QR_DEFAULT_SIZE,
