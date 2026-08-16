@@ -625,6 +625,109 @@
             color: #FFFFFF;
         }
 
+        .mobile-menu-button {
+            display: none;
+            width: 44px;
+            height: 44px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #E2E8F0;
+            border-radius: 999px;
+            background: #FFFFFF;
+            color: var(--elive-navy);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+            cursor: pointer;
+            transition:
+                background .2s ease,
+                border-color .2s ease,
+                color .2s ease,
+                transform .2s ease;
+        }
+
+        .mobile-menu-button:hover {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+        }
+
+        .mobile-menu-button:focus-visible {
+            outline: none;
+            border-color: var(--elive-blue);
+            box-shadow: 0 0 0 3px rgba(0, 122, 178, .14);
+        }
+
+        .mobile-menu-button svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .mobile-menu-icon-close {
+            display: none;
+        }
+
+        .mobile-menu-button[aria-expanded="true"] .mobile-menu-icon-open {
+            display: none;
+        }
+
+        .mobile-menu-button[aria-expanded="true"] .mobile-menu-icon-close {
+            display: block;
+        }
+
+        .mobile-nav {
+            display: none;
+            border-top: 1px solid #EEF2F7;
+            padding: 10px 0 16px;
+        }
+
+        .mobile-nav.is-open {
+            display: block;
+        }
+
+        .mobile-nav-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .mobile-nav-link {
+            display: flex;
+            align-items: center;
+            min-height: 44px;
+            padding: 0 14px;
+            border-radius: 9px;
+            color: #475569;
+            font-size: 14px;
+            font-weight: 600;
+            transition:
+                background .2s ease,
+                color .2s ease;
+        }
+
+        .mobile-nav-link:hover,
+        .mobile-nav-link.active {
+            background: #F8FAFC;
+            color: var(--elive-navy);
+        }
+
+        .mobile-nav-login {
+            display: inline-flex;
+            width: 100%;
+            min-height: 44px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 8px;
+            border-radius: 9px;
+            background: var(--elive-navy);
+            color: #FFFFFF;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 5px 14px rgba(22, 25, 67, .16);
+            transition: background .2s ease;
+        }
+
+        .mobile-nav-login:hover {
+            background: var(--elive-blue);
+        }
+
         @media (max-width: 980px) {
             .events-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -645,16 +748,11 @@
             }
 
             .nav {
-                gap: 12px;
-            }
-
-            .nav .nav-link {
                 display: none;
             }
 
-            .login-btn {
-                min-height: 40px;
-                padding: 0 16px;
+            .mobile-menu-button {
+                display: inline-flex;
             }
 
             .hero-inner {
@@ -727,34 +825,106 @@
 <body>
 
 <header class="site-header">
-    <div class="container header-inner">
-        <a href="{{ route('home') }}" class="brand">
-            <img
-                src="{{ asset('eLive-Logo.png') }}"
-                alt="eLive Events"
-            >
-        </a>
+    <div class="container">
 
-        <nav class="nav">
-            <a href="{{ route('home') }}" class="nav-link">
-                Home
-            </a>
-
+        <div class="header-inner">
             <a
-                href="{{ route('public.events.index') }}"
-                class="nav-link active"
+                href="{{ route('home') }}"
+                class="brand"
+                aria-label="eLive Events home"
             >
-                Events
+                <img
+                    src="{{ asset('eLive-Logo.png') }}"
+                    alt="eLive Events"
+                >
             </a>
 
-            <a href="{{ route('home') }}#contact" class="nav-link">
-                Contact
-            </a>
+            <nav class="nav" aria-label="Primary navigation">
+                <a href="{{ route('home') }}" class="nav-link">
+                    Home
+                </a>
 
-            <a href="/admin" class="login-btn">
-                Login
-            </a>
-        </nav>
+                <a
+                    href="{{ route('public.events.index') }}"
+                    class="nav-link active"
+                    aria-current="page"
+                >
+                    Events
+                </a>
+
+                <a href="{{ route('home') }}#contact" class="nav-link">
+                    Contact
+                </a>
+
+                <a href="/admin" class="login-btn">
+                    Login
+                </a>
+            </nav>
+
+            <button
+                type="button"
+                id="mobile-menu-button"
+                class="mobile-menu-button"
+                aria-label="Open navigation menu"
+                aria-expanded="false"
+                aria-controls="mobile-menu"
+            >
+                <svg
+                    class="mobile-menu-icon-open"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    aria-hidden="true"
+                >
+                    <path d="M4 7h16M4 12h16M4 17h16"/>
+                </svg>
+
+                <svg
+                    class="mobile-menu-icon-close"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    aria-hidden="true"
+                >
+                    <path d="M6 6l12 12M18 6L6 18"/>
+                </svg>
+            </button>
+        </div>
+
+        <div id="mobile-menu" class="mobile-nav">
+            <nav class="mobile-nav-list" aria-label="Mobile navigation">
+                <a
+                    href="{{ route('home') }}"
+                    class="mobile-nav-link"
+                >
+                    Home
+                </a>
+
+                <a
+                    href="{{ route('public.events.index') }}"
+                    class="mobile-nav-link active"
+                    aria-current="page"
+                >
+                    Events
+                </a>
+
+                <a
+                    href="{{ route('home') }}#contact"
+                    class="mobile-nav-link"
+                >
+                    Contact
+                </a>
+
+                <a href="/admin" class="mobile-nav-login">
+                    Organizer Login
+                </a>
+            </nav>
+        </div>
+
     </div>
 </header>
 
@@ -1152,6 +1322,53 @@
 
     </div>
 </footer>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        if (!mobileMenuButton || !mobileMenu) {
+            return;
+        }
+
+        const closeMobileMenu = function () {
+            mobileMenu.classList.remove('is-open');
+            mobileMenuButton.setAttribute('aria-expanded', 'false');
+            mobileMenuButton.setAttribute('aria-label', 'Open navigation menu');
+        };
+
+        mobileMenuButton.addEventListener('click', function () {
+            const isOpen = mobileMenuButton.getAttribute('aria-expanded') === 'true';
+
+            if (isOpen) {
+                closeMobileMenu();
+                return;
+            }
+
+            mobileMenu.classList.add('is-open');
+            mobileMenuButton.setAttribute('aria-expanded', 'true');
+            mobileMenuButton.setAttribute('aria-label', 'Close navigation menu');
+        });
+
+        mobileMenu.querySelectorAll('a').forEach(function (link) {
+            link.addEventListener('click', closeMobileMenu);
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeMobileMenu();
+            }
+        });
+
+        window.addEventListener('resize', function () {
+            if (window.innerWidth > 760) {
+                closeMobileMenu();
+            }
+        });
+    });
+</script>
 
 </body>
 </html>

@@ -391,61 +391,168 @@
             }
         }
 
+        .mobile-nav-panel {
+            display: none;
+        }
+
+        .mobile-nav-panel.is-open {
+            display: block;
+        }
+
+        .mobile-menu-icon-open,
+        .mobile-menu-icon-close {
+            transition: opacity .2s ease, transform .2s ease;
+        }
+
+        .mobile-menu-icon-close {
+            display: none;
+        }
+
+        .mobile-menu-button[aria-expanded="true"] .mobile-menu-icon-open {
+            display: none;
+        }
+
+        .mobile-menu-button[aria-expanded="true"] .mobile-menu-icon-close {
+            display: block;
+        }
+
     </style>
 </head>
 
 <body class="bg-white text-slate-900 antialiased">
 
     {{-- HEADER --}}
-    <header class="border-b border-slate-100 bg-white">
-        <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
+    <header class="sticky top-0 z-50 border-b border-slate-100/80 bg-white/95 backdrop-blur-md">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
 
-            <a href="{{ route('home') }}" class="flex items-center">
-                <img
-                    src="{{ asset('eLive-Logo.png') }}"
-                    alt="eLive Events"
-                    class="h-11 w-auto sm:h-12"
-                >
-            </a>
-
-            <nav class="hidden items-center gap-8 md:flex">
+            <div class="flex items-center justify-between py-3.5">
 
                 <a
                     href="{{ route('home') }}"
-                    class="text-sm font-semibold text-elive-navy"
+                    class="flex items-center"
+                    aria-label="eLive Events home"
                 >
-                    Home
+                    <img
+                        src="{{ asset('eLive-Logo.png') }}"
+                        alt="eLive Events"
+                        class="h-10 w-auto sm:h-11"
+                    >
                 </a>
 
-                <a
-                    href="{{ route('public.events.index') }}"
-                    class="text-sm font-medium text-slate-600 transition hover:text-elive-navy"
+                <nav class="hidden items-center gap-7 md:flex" aria-label="Primary navigation">
+
+                    <a
+                        href="{{ route('home') }}"
+                        aria-current="page"
+                        class="relative text-sm font-semibold text-elive-navy
+                               after:absolute after:-bottom-2 after:left-0 after:h-0.5 after:w-full
+                               after:rounded-full after:bg-elive-orange"
+                    >
+                        Home
+                    </a>
+
+                    <a
+                        href="{{ route('public.events.index') }}"
+                        class="text-sm font-medium text-slate-600 transition-colors duration-200 hover:text-elive-navy"
+                    >
+                        Events
+                    </a>
+
+                    <a
+                        href="#contact"
+                        class="text-sm font-medium text-slate-600 transition-colors duration-200 hover:text-elive-navy"
+                    >
+                        Contact
+                    </a>
+
+                    <a
+                        href="/admin"
+                        class="inline-flex min-h-10 items-center justify-center rounded-lg bg-elive-navy px-[18px] py-2.5
+                               text-sm font-semibold text-white shadow-sm transition-all duration-200
+                               hover:-translate-y-0.5 hover:bg-elive-blue hover:shadow-md
+                               focus:outline-none focus:ring-2 focus:ring-elive-blue/30 focus:ring-offset-2"
+                    >
+                        Login
+                    </a>
+
+                </nav>
+
+                <button
+                    type="button"
+                    id="mobile-menu-button"
+                    class="mobile-menu-button inline-flex h-11 w-11 items-center justify-center rounded-full
+                           border border-slate-200 bg-white text-elive-navy shadow-sm transition
+                           hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-elive-blue/30 md:hidden"
+                    aria-label="Open navigation menu"
+                    aria-expanded="false"
+                    aria-controls="mobile-menu"
                 >
-                    Events
-                </a>
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        class="mobile-menu-icon-open h-6 w-6"
+                        aria-hidden="true"
+                    >
+                        <path d="M4 7h16M4 12h16M4 17h16"/>
+                    </svg>
 
-                <a
-                    href="#contact"
-                    class="text-sm font-medium text-slate-600 transition hover:text-elive-navy"
-                >
-                    Contact
-                </a>
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        class="mobile-menu-icon-close h-6 w-6"
+                        aria-hidden="true"
+                    >
+                        <path d="M6 6l12 12M18 6L6 18"/>
+                    </svg>
+                </button>
 
-                <a
-                    href="/admin"
-                    class="rounded-xl bg-elive-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#007AB2]"
-                >
-                    Login
-                </a>
+            </div>
 
-            </nav>
-
-            <a
-                href="/admin"
-                class="rounded-lg bg-elive-navy px-4 py-2 text-sm font-semibold text-white md:hidden"
+            <div
+                id="mobile-menu"
+                class="mobile-nav-panel border-t border-slate-100 pb-4 pt-3 md:hidden"
             >
-                Login
-            </a>
+                <nav class="flex flex-col gap-1" aria-label="Mobile navigation">
+
+                    <a
+                        href="{{ route('home') }}"
+                        aria-current="page"
+                        class="rounded-lg bg-slate-50 px-4 py-3 text-sm font-semibold text-elive-navy"
+                    >
+                        Home
+                    </a>
+
+                    <a
+                        href="{{ route('public.events.index') }}"
+                        class="rounded-lg px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-elive-navy"
+                    >
+                        Events
+                    </a>
+
+                    <a
+                        href="#contact"
+                        data-mobile-menu-link
+                        class="rounded-lg px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-elive-navy"
+                    >
+                        Contact
+                    </a>
+
+                    <a
+                        href="/admin"
+                        class="mt-2 inline-flex min-h-11 items-center justify-center rounded-lg bg-elive-navy px-4 py-2.5
+                               text-sm font-semibold text-white shadow-sm transition hover:bg-elive-blue"
+                    >
+                        Login
+                    </a>
+
+                </nav>
+            </div>
 
         </div>
     </header>
@@ -1829,6 +1936,45 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+
+            if (mobileMenuButton && mobileMenu) {
+                const closeMobileMenu = function () {
+                    mobileMenu.classList.remove('is-open');
+                    mobileMenuButton.setAttribute('aria-expanded', 'false');
+                    mobileMenuButton.setAttribute('aria-label', 'Open navigation menu');
+                };
+
+                mobileMenuButton.addEventListener('click', function () {
+                    const isOpen = mobileMenuButton.getAttribute('aria-expanded') === 'true';
+
+                    if (isOpen) {
+                        closeMobileMenu();
+                    } else {
+                        mobileMenu.classList.add('is-open');
+                        mobileMenuButton.setAttribute('aria-expanded', 'true');
+                        mobileMenuButton.setAttribute('aria-label', 'Close navigation menu');
+                    }
+                });
+
+                mobileMenu.querySelectorAll('a').forEach(function (link) {
+                    link.addEventListener('click', closeMobileMenu);
+                });
+
+                window.addEventListener('resize', function () {
+                    if (window.innerWidth >= 768) {
+                        closeMobileMenu();
+                    }
+                });
+
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape') {
+                        closeMobileMenu();
+                    }
+                });
+            }
+
             document.querySelectorAll('[data-event-carousel]').forEach(function (carousel) {
                 const track = carousel.querySelector('[data-carousel-track]');
                 const section = carousel.parentElement;
