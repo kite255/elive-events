@@ -6,13 +6,13 @@
 
     /*
      * Homepage SEO / social sharing metadata.
-     * Use the eLive logo for shared-link previews instead of the hero image.
-     * eLive-Logo.png already exists in /public and is publicly accessible.
+     * Use the eLive favicon artwork for shared-link previews.
+     * Keep favicon.ico for browser tabs and favicon.png for social platforms.
      */
     $seoTitle = 'eLive Events | Smart Event Registration & Management';
     $seoDescription = 'Manage event registration, digital badges, attendee communication, QR check-in and attendance with eLive Events.';
     $seoCanonicalUrl = route('home');
-    $seoImageUrl = asset('eLive-Logo.png');
+    $seoImageUrl = asset('favicon.png');
 
     $happeningNowEvents = \App\Models\Event::query()
         ->whereNotIn('status', ['draft', 'cancelled'])
@@ -108,8 +108,9 @@
 
     {{-- Favicons --}}
     <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
-    <link rel="apple-touch-icon" href="{{ asset('eLive-Logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('favicon.png') }}">
 
     {{-- Open Graph / WhatsApp / Facebook / LinkedIn --}}
     <meta property="og:locale" content="{{ str_replace('_', '-', app()->getLocale()) }}">
