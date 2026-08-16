@@ -6,13 +6,13 @@
 
     /*
      * Homepage SEO / social sharing metadata.
-     * event.jpg is used as the default Open Graph image because it already
-     * exists in the public directory and is publicly accessible.
+     * Use the eLive logo for shared-link previews instead of the hero image.
+     * eLive-Logo.png already exists in /public and is publicly accessible.
      */
     $seoTitle = 'eLive Events | Smart Event Registration & Management';
     $seoDescription = 'Manage event registration, digital badges, attendee communication, QR check-in and attendance with eLive Events.';
     $seoCanonicalUrl = route('home');
-    $seoImageUrl = asset('event.jpg') . '?v=' . $heroImageVersion;
+    $seoImageUrl = asset('eLive-Logo.png');
 
     $happeningNowEvents = \App\Models\Event::query()
         ->whereNotIn('status', ['draft', 'cancelled'])
@@ -120,14 +120,14 @@
     <meta property="og:url" content="{{ $seoCanonicalUrl }}">
     <meta property="og:image" content="{{ $seoImageUrl }}">
     <meta property="og:image:secure_url" content="{{ $seoImageUrl }}">
-    <meta property="og:image:alt" content="eLive Events smart event management platform">
+    <meta property="og:image:alt" content="eLive Events">
 
     {{-- X / Twitter Card --}}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ $seoTitle }}">
     <meta name="twitter:description" content="{{ $seoDescription }}">
     <meta name="twitter:image" content="{{ $seoImageUrl }}">
-    <meta name="twitter:image:alt" content="eLive Events smart event management platform">
+    <meta name="twitter:image:alt" content="eLive Events">
 
     {{-- Preload hero image and automatically refresh it when event.jpg changes --}}
     <link
