@@ -1,3 +1,13 @@
+/*
+|--------------------------------------------------------------------------
+| eLive Events - Creato Display Font
+|--------------------------------------------------------------------------
+|
+| Official eLive Company Limited typography.
+|
+|--------------------------------------------------------------------------
+*/
+
 @font-face {
     font-family: 'Creato Display';
     src: url('/fonts/creato-display/CreatoDisplay-Regular.otf') format('opentype');
@@ -36,4 +46,211 @@
     font-weight: 900;
     font-style: normal;
     font-display: swap;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Global Font Application
+|--------------------------------------------------------------------------
+*/
+
+:root {
+    --elive-font:
+        'Creato Display',
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        sans-serif;
+}
+
+html,
+body {
+    font-family: var(--elive-font);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Typography
+|--------------------------------------------------------------------------
+*/
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+a,
+label,
+small,
+strong {
+    font-family: var(--elive-font);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-weight: 700;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Forms
+|--------------------------------------------------------------------------
+*/
+
+button,
+input,
+textarea,
+select,
+option {
+    font-family: var(--elive-font);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Filament
+|--------------------------------------------------------------------------
+*/
+
+.fi-body,
+.fi-layout,
+.fi-main,
+.fi-main-ctn,
+.fi-sidebar,
+.fi-sidebar-nav,
+.fi-topbar,
+.fi-header,
+.fi-section,
+.fi-section-header,
+.fi-section-content,
+.fi-btn,
+.fi-input,
+.fi-select-input,
+.fi-ta,
+.fi-fo-field-wrp,
+.fi-dropdown,
+.fi-dropdown-list,
+.fi-modal,
+.fi-tabs,
+.fi-badge,
+.fi-pagination,
+.fi-wi,
+.fi-no-notification {
+    font-family: var(--elive-font);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Filament Tables
+|--------------------------------------------------------------------------
+*/
+
+.fi-ta,
+.fi-ta-table,
+.fi-ta-header-cell,
+.fi-ta-text,
+.fi-ta-cell,
+.fi-ta-record {
+    font-family: var(--elive-font);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Filament Forms
+|--------------------------------------------------------------------------
+*/
+
+.fi-fo,
+.fi-fo-field-wrp,
+.fi-fo-field-wrp-label,
+.fi-input-wrp,
+.fi-input,
+.fi-select-input,
+.fi-checkbox-input,
+.fi-radio-input {
+    font-family: var(--elive-font);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Filament Navigation
+|--------------------------------------------------------------------------
+*/
+
+.fi-sidebar-item,
+.fi-sidebar-item-label,
+.fi-sidebar-group-label,
+.fi-topbar-item,
+.fi-breadcrumbs,
+.fi-breadcrumbs-item-label {
+    font-family: var(--elive-font);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Filament Buttons / Actions
+|--------------------------------------------------------------------------
+*/
+
+.fi-btn,
+.fi-ac-btn-action,
+.fi-dropdown-list-item,
+.fi-link {
+    font-family: var(--elive-font);
+    font-weight: 500;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Filament Headings
+|--------------------------------------------------------------------------
+*/
+
+.fi-header-heading,
+.fi-section-header-heading,
+.fi-modal-heading {
+    font-family: var(--elive-font);
+    font-weight: 700;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Utility Font Weights
+|--------------------------------------------------------------------------
+*/
+
+.font-normal {
+    font-weight: 400;
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.font-semibold {
+    font-weight: 700;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.font-extrabold {
+    font-weight: 800;
+}
+
+.font-black {
+    font-weight: 900;
 }

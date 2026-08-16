@@ -197,13 +197,6 @@
 
     <link rel="icon" href="{{ asset('favicon.ico') }}">
     <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
-
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link
-        href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700"
-        rel="stylesheet"
-    >
-
     @if (
         file_exists(public_path('build/manifest.json'))
         || file_exists(public_path('hot'))
@@ -213,13 +206,20 @@
 
     <style>
         :root {
-            --elive-blue: #233F7D;
-            --elive-blue-dark: #17233F;
-            --elive-orange: #FF9418;
-            --elive-bg: #F3F6FA;
-            --elive-border: #DDE3EC;
-            --elive-muted: #64748B;
-            --elive-green: #16A34A;
+            --elive-navy: #161943;
+            --elive-blue: #007AB2;
+            --elive-orange: #FF9800;
+
+            --elive-bg: #F7F8FC;
+            --elive-surface: #FFFFFF;
+            --elive-border: #E6E8EF;
+            --elive-muted: #667085;
+
+            --elive-success: #16A34A;
+            --elive-danger: #DC2626;
+
+            --elive-navy-hover: #20265C;
+            --elive-blue-hover: #006B9D;
         }
 
         * {
@@ -234,7 +234,7 @@
             margin: 0;
             background: var(--elive-bg);
             color: #0F172A;
-            font-family: 'Creato Display', 'Instrument Sans', sans-serif;
+            font-family: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -295,11 +295,17 @@
             min-height: 42px;
             padding: 0 20px;
             border-radius: 11px;
-            background: var(--elive-blue);
+            background: var(--elive-navy);
             color: #FFFFFF;
             font-size: 14px;
             font-weight: 700;
-            box-shadow: 0 5px 14px rgba(35, 63, 125, .16);
+            box-shadow: 0 5px 14px rgba(22, 25, 67, .16);
+            transition: background .2s ease, transform .2s ease;
+        }
+
+        .login-btn:hover {
+            background: var(--elive-blue);
+            transform: translateY(-1px);
         }
 
         .page-hero {
@@ -335,22 +341,21 @@
 
         .hero-visual {
             position: relative;
-            min-height: 330px;
+            height: 370px;
             background: #DDE4EE;
             overflow: hidden;
         }
 
         .hero-image {
             width: 100%;
-            height: 100%;
-            min-height: 330px;
+            height: 370px;
             display: block;
             object-fit: cover;
         }
 
         .hero-fallback {
-            min-height: 330px;
-            background: var(--elive-blue);
+            height: 370px;
+            background: linear-gradient(135deg, var(--elive-navy), var(--elive-blue));
         }
 
         .hero-overlay {
@@ -367,9 +372,9 @@
 
         .hero-content {
             position: absolute;
-            left: 34px;
-            right: 34px;
-            bottom: 30px;
+            left: 32px;
+            right: 32px;
+            bottom: 34px;
             z-index: 2;
             color: #FFFFFF;
         }
@@ -377,24 +382,24 @@
         .status-pill {
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            min-height: 30px;
-            padding: 0 12px;
+            gap: 6px;
+            min-height: 26px;
+            padding: 0 10px;
             border-radius: 999px;
-            font-size: 11px;
+            font-size: 9px;
             font-weight: 800;
-            letter-spacing: .07em;
+            letter-spacing: .06em;
             text-transform: uppercase;
-            margin-bottom: 14px;
+            margin-bottom: 11px;
         }
 
         .status-pill.live {
-            background: var(--elive-green);
+            background: var(--elive-success);
             color: #FFFFFF;
         }
 
         .status-pill.upcoming {
-            background: rgba(35, 63, 125, .95);
+            background: var(--elive-orange);
             color: #FFFFFF;
         }
 
@@ -405,8 +410,8 @@
 
         .status-pill.live::before {
             content: '';
-            width: 7px;
-            height: 7px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background: #FFFFFF;
         }
@@ -414,19 +419,19 @@
         .hero-title {
             margin: 0;
             max-width: 860px;
-            font-size: clamp(34px, 5vw, 58px);
-            line-height: 1.02;
-            letter-spacing: -.04em;
+            font-size: clamp(32px, 4.5vw, 52px);
+            line-height: 1.03;
+            letter-spacing: -.035em;
             font-weight: 800;
         }
 
         .hero-meta {
-            margin-top: 16px;
+            margin-top: 13px;
             display: flex;
             flex-wrap: wrap;
-            gap: 12px 22px;
-            color: rgba(255, 255, 255, .88);
-            font-size: 14px;
+            gap: 10px 20px;
+            color: rgba(255, 255, 255, .90);
+            font-size: 13px;
             font-weight: 600;
         }
 
@@ -437,8 +442,8 @@
         }
 
         .hero-meta svg {
-            width: 17px;
-            height: 17px;
+            width: 16px;
+            height: 16px;
             flex: 0 0 auto;
         }
 
@@ -476,7 +481,7 @@
 
         .section-title {
             margin: 0;
-            color: var(--elive-blue);
+            color: var(--elive-navy);
             font-size: 25px;
             line-height: 1.15;
             letter-spacing: -.025em;
@@ -555,7 +560,7 @@
 
         .info-title {
             margin: 0 0 18px;
-            color: var(--elive-blue);
+            color: var(--elive-navy);
             font-size: 20px;
             line-height: 1.2;
         }
@@ -579,7 +584,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: #F1F5F9;
+            background: rgba(0, 122, 178, .08);
             color: var(--elive-blue);
         }
 
@@ -618,16 +623,16 @@
             align-items: center;
             justify-content: center;
             border-radius: 12px;
-            background: var(--elive-blue);
+            background: var(--elive-navy);
             color: #FFFFFF;
             font-size: 14px;
             font-weight: 800;
-            box-shadow: 0 7px 16px rgba(35, 63, 125, .17);
+            box-shadow: 0 7px 16px rgba(22, 25, 67, .17);
             transition: background .2s ease, transform .2s ease;
         }
 
         .register-btn:hover {
-            background: #1B3267;
+            background: var(--elive-blue);
             transform: translateY(-1px);
         }
 
@@ -645,7 +650,7 @@
         }
 
         .site-footer {
-            background: var(--elive-blue-dark);
+            background: var(--elive-navy);
             color: #CBD5E1;
         }
 
@@ -713,21 +718,21 @@
             .hero-visual,
             .hero-image,
             .hero-fallback {
-                min-height: 300px;
+                height: 300px;
             }
 
             .hero-content {
-                left: 22px;
-                right: 22px;
-                bottom: 22px;
+                left: 20px;
+                right: 20px;
+                bottom: 24px;
             }
 
             .hero-title {
-                font-size: clamp(30px, 9vw, 42px);
+                font-size: clamp(28px, 8vw, 38px);
             }
 
             .hero-meta {
-                font-size: 13px;
+                font-size: 12px;
             }
 
             .details-section {

@@ -107,25 +107,52 @@
         content="width=device-width, initial-scale=1.0"
     >
 
+    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
+
     <style>
         :root {
+            /*
+            |--------------------------------------------------------------------------
+            | Event branding
+            |--------------------------------------------------------------------------
+            | Event-specific colors remain configurable.
+            */
             --primary:
-                {{ $branding['primary_color'] ?? '#1e3a8a' }};
+                {{ $branding['primary_color'] ?? '#161943' }};
 
             --button:
-                {{ $branding['button_color'] ?? '#1e40af' }};
+                {{ $branding['button_color'] ?? '#161943' }};
 
             --background:
-                {{ $branding['background_color'] ?? '#f8fafc' }};
+                {{ $branding['background_color'] ?? '#F7F8FC' }};
 
-            --text: #0f172a;
-            --muted: #64748b;
-            --border: #e2e8f0;
-            --soft: #f8fafc;
+            /*
+            |--------------------------------------------------------------------------
+            | eLive platform foundation
+            |--------------------------------------------------------------------------
+            */
+            --elive-navy: #161943;
+            --elive-blue: #007AB2;
+            --elive-orange: #FF9800;
 
-            --success: #16a34a;
-            --warning: #d97706;
-            --danger: #dc2626;
+            --text: #0F172A;
+            --muted: #667085;
+            --border: #E6E8EF;
+            --soft: #F7F8FC;
+
+            --success: #16A34A;
+            --warning: #D97706;
+            --danger: #DC2626;
+
+            --font:
+                'Creato Display',
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                sans-serif;
         }
 
         * {
@@ -143,30 +170,45 @@
             padding: 36px 20px;
 
             background:
+                radial-gradient(
+                    circle at top left,
+                    rgba(0, 122, 178, 0.08),
+                    transparent 34%
+                ),
                 linear-gradient(
                     180deg,
-                    #f8fafc 0%,
+                    #F7F8FC 0%,
                     var(--background) 100%
                 );
 
             color: var(--text);
 
-            font-family:
-                Inter,
-                ui-sans-serif,
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
+            font-family: var(--font);
+        }
+
+        button,
+        input,
+        select,
+        textarea,
+        option,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: var(--font);
         }
 
         .success-card {
+            position: relative;
+            overflow: hidden;
+
             width: min(100%, 620px);
 
             padding: 42px 32px;
 
-            background: #ffffff;
+            background: #FFFFFF;
 
             border: 1px solid var(--border);
 
@@ -174,9 +216,24 @@
 
             box-shadow:
                 0 20px 50px
-                rgba(15, 23, 42, 0.10);
+                rgba(22, 25, 67, 0.10);
 
             text-align: center;
+        }
+
+        .success-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(
+                90deg,
+                var(--elive-navy),
+                var(--elive-blue),
+                var(--elive-orange)
+            );
         }
 
         .logo {
@@ -207,18 +264,18 @@
         }
 
         .icon.success {
-            background: #dcfce7;
-            color: #15803d;
+            background: #DCFCE7;
+            color: #15803D;
         }
 
         .icon.warning {
-            background: #ffedd5;
-            color: #c2410c;
+            background: #FFEDD5;
+            color: #C2410C;
         }
 
         .icon.danger {
-            background: #fee2e2;
-            color: #b91c1c;
+            background: #FEE2E2;
+            color: #B91C1C;
         }
 
         h1 {
@@ -279,9 +336,9 @@
                     color-mix(
                         in srgb,
                         var(--primary) 5%,
-                        #ffffff
+                        #FFFFFF
                     ),
-                    #ffffff
+                    #FFFFFF
                 );
 
             text-align: left;
@@ -344,8 +401,8 @@
 
             border-radius: 999px;
 
-            background: #fff7ed;
-            color: #9a3412;
+            background: rgba(255, 152, 0, 0.10);
+            color: #9A5A00;
 
             font-size: 11px;
             font-weight: 900;
@@ -359,7 +416,7 @@
             border: 1px solid var(--border);
             border-radius: 14px;
 
-            background: #ffffff;
+            background: #FFFFFF;
         }
 
         .payment-row {
@@ -409,7 +466,7 @@
 
             border-radius: 13px;
 
-            background: #f8fafc;
+            background: #F8FAFC;
 
             color: #475569;
 
@@ -442,7 +499,7 @@
             border-radius: 14px;
 
             background: var(--button);
-            color: #ffffff;
+            color: #FFFFFF;
 
             text-decoration: none;
 
@@ -450,7 +507,26 @@
 
             box-shadow:
                 0 12px 24px
-                rgba(30, 64, 175, 0.20);
+                rgba(22, 25, 67, 0.20);
+        }
+
+        .button {
+            transition:
+                transform 150ms ease,
+                box-shadow 150ms ease,
+                opacity 150ms ease;
+        }
+
+        .button:hover {
+            transform: translateY(-1px);
+            box-shadow:
+                0 16px 30px
+                rgba(22, 25, 67, 0.24);
+        }
+
+        .button:focus-visible {
+            outline: 3px solid rgba(0, 122, 178, 0.28);
+            outline-offset: 3px;
         }
 
         .footer {
@@ -459,6 +535,11 @@
             color: var(--muted);
 
             font-size: 12px;
+        }
+
+        .footer strong {
+            color: var(--elive-navy);
+            font-weight: 800;
         }
 
         @media (max-width: 600px) {
@@ -658,7 +739,7 @@
         @endif
 
         <div class="footer">
-            Powered by eLive Events
+            Powered by <strong>eLive Events</strong>
         </div>
 
     </main>

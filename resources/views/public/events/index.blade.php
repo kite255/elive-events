@@ -112,13 +112,6 @@
 
     <link rel="icon" href="{{ asset('favicon.ico') }}">
     <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
-
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link
-        href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700"
-        rel="stylesheet"
-    >
-
     @if (
         file_exists(public_path('build/manifest.json'))
         || file_exists(public_path('hot'))
@@ -128,17 +121,21 @@
 
     <style>
         :root {
-            --elive-blue: #233F7E;
-            --elive-blue-dark: #0B1F3A;
-            --elive-orange: #F99A12;
-            --elive-bg: #F8FAFC;
-            --elive-border: #DFE6EF;
-            --elive-muted: #64748B;
-            --elive-green: #16A34A;
-            --elive-blue-hover: #1D356A;
-            --elive-orange-hover: #E48600;
-            --elive-warning: #F59E0B;
+            --elive-navy: #161943;
+            --elive-blue: #007AB2;
+            --elive-orange: #FF9800;
+
+            --elive-bg: #F7F8FC;
+            --elive-surface: #FFFFFF;
+            --elive-border: #E6E8EF;
+            --elive-muted: #667085;
+
+            --elive-success: #16A34A;
+            --elive-warning: #FF9800;
             --elive-danger: #DC2626;
+
+            --elive-navy-hover: #20265C;
+            --elive-blue-hover: #006B9D;
         }
 
         * {
@@ -153,7 +150,7 @@
             margin: 0;
             background: var(--elive-bg);
             color: #0F172A;
-            font-family: 'Creato Display', 'Instrument Sans', sans-serif;
+            font-family: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -215,15 +212,15 @@
             min-height: 42px;
             padding: 0 20px;
             border-radius: 11px;
-            background: var(--elive-blue);
+            background: var(--elive-navy);
             color: #FFFFFF;
             font-size: 14px;
             font-weight: 700;
-            box-shadow: 0 5px 14px rgba(35, 63, 125, .16);
+            box-shadow: 0 5px 14px rgba(22, 25, 67, .16);
         }
 
         .login-btn:hover {
-            background: var(--elive-blue-hover);
+            background: var(--elive-blue);
         }
 
         .hero {
@@ -246,7 +243,7 @@
 
         .hero h1 {
             margin: 12px 0 0;
-            color: var(--elive-blue);
+            color: var(--elive-navy);
             font-size: clamp(38px, 5vw, 56px);
             line-height: 1.04;
             letter-spacing: -.035em;
@@ -291,14 +288,14 @@
 
         .search-input:focus {
             border-color: var(--elive-blue);
-            box-shadow: 0 0 0 3px rgba(35, 63, 125, .10);
+            box-shadow: 0 0 0 3px rgba(0, 122, 178, .14);
         }
 
         .search-btn {
             height: 48px;
             border: 0;
             border-radius: 11px;
-            background: var(--elive-blue);
+            background: var(--elive-navy);
             color: #FFFFFF;
             padding: 0 24px;
             font: inherit;
@@ -308,7 +305,7 @@
         }
 
         .search-btn:hover {
-            background: var(--elive-blue-hover);
+            background: var(--elive-blue);
         }
 
         .filters {
@@ -333,13 +330,13 @@
         }
 
         .filter-btn:hover {
-            border-color: var(--elive-blue-hover);
-            color: var(--elive-blue-hover);
+            border-color: var(--elive-blue);
+            color: var(--elive-blue);
         }
 
         .filter-btn.active {
-            border-color: var(--elive-blue);
-            background: var(--elive-blue);
+            border-color: var(--elive-navy);
+            background: var(--elive-navy);
             color: #FFFFFF;
         }
 
@@ -414,7 +411,7 @@
         }
 
         .event-card-fallback {
-            background: linear-gradient(135deg, var(--elive-blue), var(--elive-blue-hover));
+            background: linear-gradient(135deg, var(--elive-navy), var(--elive-blue));
         }
 
         .event-card-shade {
@@ -542,18 +539,19 @@
             min-height: 36px;
             padding: 0 14px;
             border-radius: 8px;
-            border: 1px solid var(--elive-blue);
-            background: var(--elive-blue);
+            border: 1px solid var(--elive-navy);
+            background: var(--elive-navy);
             color: #FFFFFF;
             font-size: 13px;
             font-weight: 700;
             text-decoration: none;
-            box-shadow: 0 4px 10px rgba(35, 63, 126, .22);
+            box-shadow: 0 4px 10px rgba(22, 25, 67, .22);
             transition: background .2s ease, transform .2s ease;
         }
 
         .register-btn:hover {
-            background: var(--elive-blue-hover);
+            background: var(--elive-blue);
+            border-color: var(--elive-blue);
             transform: translateY(-1px);
         }
 
@@ -583,7 +581,7 @@
 
         .empty-state h2 {
             margin: 0;
-            color: var(--elive-blue);
+            color: var(--elive-navy);
             font-size: 22px;
         }
 
@@ -598,7 +596,7 @@
         }
 
         .site-footer {
-            background: var(--elive-blue-dark);
+            background: var(--elive-navy);
             color: #CBD5E1;
         }
 

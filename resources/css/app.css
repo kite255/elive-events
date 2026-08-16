@@ -7,13 +7,38 @@
 
 /*
 |--------------------------------------------------------------------------
+| eLive Events Brand Foundation
+|--------------------------------------------------------------------------
+|
+| Official eLive Company Limited brand:
+|
+| Deep Navy Blue : #161943
+| Light Blue     : #007AB2
+| Orange Peel    : #FF9800
+| Font           : Creato Display
+|
+|--------------------------------------------------------------------------
+*/
+
+/*
+|--------------------------------------------------------------------------
 | Creato Display
+|--------------------------------------------------------------------------
+|
+| Available font files:
+|
+| CreatoDisplay-Regular.otf
+| CreatoDisplay-Medium.otf
+| CreatoDisplay-Bold.otf
+| CreatoDisplay-ExtraBold.otf
+| CreatoDisplay-Black.otf
+|
 |--------------------------------------------------------------------------
 */
 
 @font-face {
     font-family: 'Creato Display';
-    src: url('/fonts/creato-display/CreatoDisplay-Regular.woff2') format('woff2');
+    src: url('/fonts/creato-display/CreatoDisplay-Regular.otf') format('opentype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -21,7 +46,7 @@
 
 @font-face {
     font-family: 'Creato Display';
-    src: url('/fonts/creato-display/CreatoDisplay-Medium.woff2') format('woff2');
+    src: url('/fonts/creato-display/CreatoDisplay-Medium.otf') format('opentype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -29,15 +54,7 @@
 
 @font-face {
     font-family: 'Creato Display';
-    src: url('/fonts/creato-display/CreatoDisplay-SemiBold.woff2') format('woff2');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'Creato Display';
-    src: url('/fonts/creato-display/CreatoDisplay-Bold.woff2') format('woff2');
+    src: url('/fonts/creato-display/CreatoDisplay-Bold.otf') format('opentype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -45,8 +62,16 @@
 
 @font-face {
     font-family: 'Creato Display';
-    src: url('/fonts/creato-display/CreatoDisplay-ExtraBold.woff2') format('woff2');
+    src: url('/fonts/creato-display/CreatoDisplay-ExtraBold.otf') format('opentype');
     font-weight: 800;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Creato Display';
+    src: url('/fonts/creato-display/CreatoDisplay-Black.otf') format('opentype');
+    font-weight: 900;
     font-style: normal;
     font-display: swap;
 }
@@ -58,22 +83,548 @@
 */
 
 @theme {
-    --font-sans: 'Creato Display', ui-sans-serif, system-ui, sans-serif,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Typography
+    |--------------------------------------------------------------------------
+    */
+
+    --font-sans:
+        'Creato Display',
+        ui-sans-serif,
+        system-ui,
+        sans-serif,
         'Apple Color Emoji',
         'Segoe UI Emoji',
         'Segoe UI Symbol',
         'Noto Color Emoji';
 
-    --font-creato: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
+    --font-creato:
+        'Creato Display',
+        ui-sans-serif,
+        system-ui,
+        sans-serif;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Official eLive Brand Colors
+    |--------------------------------------------------------------------------
+    */
+
+    --color-elive-navy: #161943;
+    --color-elive-blue: #007AB2;
+    --color-elive-orange: #FF9800;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Supporting Colors
+    |--------------------------------------------------------------------------
+    */
+
+    --color-elive-background: #F7F8FC;
+    --color-elive-surface: #FFFFFF;
+
+    --color-elive-text: #161943;
+    --color-elive-muted: #667085;
+
+    --color-elive-border: #E6E8EF;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Border Radius
+    |--------------------------------------------------------------------------
+    */
+
+    --radius-elive-sm: 0.5rem;
+    --radius-elive-md: 0.75rem;
+    --radius-elive-lg: 1rem;
+    --radius-elive-xl: 1.25rem;
 }
 
 /*
 |--------------------------------------------------------------------------
-| Global Typography
+| Base Layer
 |--------------------------------------------------------------------------
 */
 
-html,
-body {
-    font-family: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
+@layer base {
+
+    html {
+        font-family:
+            'Creato Display',
+            ui-sans-serif,
+            system-ui,
+            sans-serif;
+
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+        margin: 0;
+
+        font-family:
+            'Creato Display',
+            ui-sans-serif,
+            system-ui,
+            sans-serif;
+
+        background-color: #F7F8FC;
+        color: #161943;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-family:
+            'Creato Display',
+            ui-sans-serif,
+            system-ui,
+            sans-serif;
+
+        font-weight: 700;
+    }
+
+    button,
+    input,
+    select,
+    textarea,
+    option {
+        font-family:
+            'Creato Display',
+            ui-sans-serif,
+            system-ui,
+            sans-serif;
+    }
+
+    a {
+        font-family: inherit;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| eLive Components
+|--------------------------------------------------------------------------
+*/
+
+@layer components {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Primary Button
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-btn-primary {
+        @apply
+            inline-flex
+            items-center
+            justify-center
+            gap-2
+            rounded-xl
+            bg-elive-navy
+            px-5
+            py-3
+            font-semibold
+            text-white
+            transition
+            duration-200
+            hover:opacity-90
+            focus:outline-none
+            focus:ring-2
+            focus:ring-elive-navy/30
+            disabled:cursor-not-allowed
+            disabled:opacity-50;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Orange CTA Button
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-btn-orange {
+        @apply
+            inline-flex
+            items-center
+            justify-center
+            gap-2
+            rounded-xl
+            bg-elive-orange
+            px-5
+            py-3
+            font-semibold
+            text-white
+            transition
+            duration-200
+            hover:opacity-90
+            focus:outline-none
+            focus:ring-2
+            focus:ring-elive-orange/30
+            disabled:cursor-not-allowed
+            disabled:opacity-50;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Blue Button
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-btn-blue {
+        @apply
+            inline-flex
+            items-center
+            justify-center
+            gap-2
+            rounded-xl
+            bg-elive-blue
+            px-5
+            py-3
+            font-semibold
+            text-white
+            transition
+            duration-200
+            hover:opacity-90
+            focus:outline-none
+            focus:ring-2
+            focus:ring-elive-blue/30
+            disabled:cursor-not-allowed
+            disabled:opacity-50;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Secondary Button
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-btn-secondary {
+        @apply
+            inline-flex
+            items-center
+            justify-center
+            gap-2
+            rounded-xl
+            border
+            border-elive-navy/15
+            bg-white
+            px-5
+            py-3
+            font-semibold
+            text-elive-navy
+            transition
+            duration-200
+            hover:bg-elive-background
+            focus:outline-none
+            focus:ring-2
+            focus:ring-elive-blue/20
+            disabled:cursor-not-allowed
+            disabled:opacity-50;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cards
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-card {
+        @apply
+            rounded-2xl
+            border
+            border-elive-border
+            bg-white
+            shadow-sm;
+    }
+
+    .elive-card-hover {
+        @apply
+            rounded-2xl
+            border
+            border-elive-border
+            bg-white
+            shadow-sm
+            transition
+            duration-200
+            hover:-translate-y-0.5
+            hover:shadow-md;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Inputs
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-input {
+        @apply
+            w-full
+            rounded-xl
+            border
+            border-elive-border
+            bg-white
+            px-4
+            py-3
+            text-elive-navy
+            outline-none
+            transition
+            placeholder:text-slate-400
+            focus:border-elive-blue
+            focus:ring-2
+            focus:ring-elive-blue/15;
+    }
+
+    .elive-select {
+        @apply
+            w-full
+            rounded-xl
+            border
+            border-elive-border
+            bg-white
+            px-4
+            py-3
+            text-elive-navy
+            outline-none
+            transition
+            focus:border-elive-blue
+            focus:ring-2
+            focus:ring-elive-blue/15;
+    }
+
+    .elive-textarea {
+        @apply
+            w-full
+            rounded-xl
+            border
+            border-elive-border
+            bg-white
+            px-4
+            py-3
+            text-elive-navy
+            outline-none
+            transition
+            placeholder:text-slate-400
+            focus:border-elive-blue
+            focus:ring-2
+            focus:ring-elive-blue/15;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Section Titles
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-section-title {
+        @apply
+            text-2xl
+            font-bold
+            tracking-tight
+            text-elive-navy
+            md:text-3xl;
+    }
+
+    .elive-page-title {
+        @apply
+            text-3xl
+            font-bold
+            tracking-tight
+            text-elive-navy
+            md:text-4xl;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Supporting Text
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-muted {
+        @apply text-elive-muted;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Status Badges
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-badge-blue {
+        @apply
+            inline-flex
+            items-center
+            rounded-full
+            bg-elive-blue/10
+            px-3
+            py-1
+            text-sm
+            font-semibold
+            text-elive-blue;
+    }
+
+    .elive-badge-orange {
+        @apply
+            inline-flex
+            items-center
+            rounded-full
+            bg-elive-orange/10
+            px-3
+            py-1
+            text-sm
+            font-semibold
+            text-elive-orange;
+    }
+
+    .elive-badge-navy {
+        @apply
+            inline-flex
+            items-center
+            rounded-full
+            bg-elive-navy/10
+            px-3
+            py-1
+            text-sm
+            font-semibold
+            text-elive-navy;
+    }
+
+    .elive-badge-success {
+        @apply
+            inline-flex
+            items-center
+            rounded-full
+            bg-green-100
+            px-3
+            py-1
+            text-sm
+            font-semibold
+            text-green-700;
+    }
+
+    .elive-badge-danger {
+        @apply
+            inline-flex
+            items-center
+            rounded-full
+            bg-red-100
+            px-3
+            py-1
+            text-sm
+            font-semibold
+            text-red-700;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Navigation
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-nav-link {
+        @apply
+            font-semibold
+            text-elive-navy
+            transition
+            hover:text-elive-blue;
+    }
+
+    .elive-nav-link-active {
+        @apply
+            font-semibold
+            text-elive-blue;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Brand Backgrounds
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-bg-primary {
+        @apply bg-elive-navy text-white;
+    }
+
+    .elive-bg-secondary {
+        @apply bg-elive-blue text-white;
+    }
+
+    .elive-bg-accent {
+        @apply bg-elive-orange text-white;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dividers
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-divider {
+        @apply border-elive-border;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Utilities
+|--------------------------------------------------------------------------
+*/
+
+@layer utilities {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Font Weights
+    |--------------------------------------------------------------------------
+    |
+    | There is no Creato Display SemiBold file in the current project.
+    | 600 will therefore be synthesized from the closest installed face.
+    |
+    */
+
+    .font-creato {
+        font-family:
+            'Creato Display',
+            ui-sans-serif,
+            system-ui,
+            sans-serif;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Brand Gradient
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-brand-gradient {
+        background:
+            linear-gradient(
+                135deg,
+                #161943 0%,
+                #007AB2 70%,
+                #FF9800 100%
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Navy Gradient
+    |--------------------------------------------------------------------------
+    */
+
+    .elive-navy-gradient {
+        background:
+            linear-gradient(
+                135deg,
+                #161943 0%,
+                #20265C 100%
+            );
+    }
 }

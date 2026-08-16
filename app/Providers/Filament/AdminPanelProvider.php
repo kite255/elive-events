@@ -34,16 +34,13 @@ class AdminPanelProvider extends PanelProvider
             |--------------------------------------------------------------------------
             | Authentication
             |--------------------------------------------------------------------------
-            |
-            | Use the custom eLive Events split-screen login page.
-            |
             */
 
             ->login(Login::class)
 
             /*
             |--------------------------------------------------------------------------
-            | Branding
+            | eLive Branding
             |--------------------------------------------------------------------------
             */
 
@@ -57,8 +54,8 @@ class AdminPanelProvider extends PanelProvider
             | Font
             |--------------------------------------------------------------------------
             |
-            | Creato Display is loaded from:
-            | public/css/creato-font.css
+            | Official eLive typography:
+            | Creato Display
             |
             */
 
@@ -70,15 +67,24 @@ class AdminPanelProvider extends PanelProvider
 
             /*
             |--------------------------------------------------------------------------
-            | Colors
+            | Official eLive Brand Colors
             |--------------------------------------------------------------------------
+            |
+            | Deep Navy Blue : #161943
+            | Light Blue     : #007AB2
+            | Orange Peel    : #FF9800
+            |
+            | Filament's primary color is set to eLive Navy.
+            |
             */
 
             ->colors([
-                'primary' => Color::hex('#233F7E'),
+                'primary' => Color::hex('#161943'),
+                'info' => Color::hex('#007AB2'),
+                'warning' => Color::hex('#FF9800'),
+
                 'gray' => Color::Slate,
                 'success' => Color::Green,
-                'warning' => Color::Amber,
                 'danger' => Color::Red,
             ])
 

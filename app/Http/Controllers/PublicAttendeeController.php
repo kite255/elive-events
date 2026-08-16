@@ -39,7 +39,7 @@ class PublicAttendeeController extends Controller
 
             'primary_color' => $event?->registration_primary_color
                 ?: $organization?->primary_color
-                ?: '#233F7E',
+                ?: '#161943',
 
             'background_color' => $event?->registration_background_color
                 ?: $organization?->background_color
@@ -47,7 +47,7 @@ class PublicAttendeeController extends Controller
 
             'button_color' => $event?->registration_button_color
                 ?: $organization?->button_color
-                ?: '#233F7E',
+                ?: '#161943',
 
             'support_email' => $organization?->support_email ?: $organization?->email,
             'support_phone' => $organization?->support_phone ?: $organization?->phone,

@@ -1,24 +1,51 @@
 <x-filament-panels::page.simple>
     <style>
         :root {
-            --elive-blue: #233F7E;
-            --elive-blue-dark: #17233F;
-            --elive-orange: #FF9418;
-            --elive-muted: #64748B;
+            --elive-navy: #161943;
+            --elive-blue: #007AB2;
+            --elive-orange: #FF9800;
+
+            --elive-background: #F7F8FC;
+            --elive-surface: #FFFFFF;
+            --elive-muted: #667085;
+            --elive-border: #E6E8EF;
+
+            --elive-navy-hover: #20265C;
+            --elive-blue-hover: #006B9D;
         }
 
         .elive-login-page {
-            background: #EEF3F8;
+            background: var(--elive-background);
+            font-family:
+                'Creato Display',
+                ui-sans-serif,
+                system-ui,
+                sans-serif;
+        }
+
+        .elive-login-page button,
+        .elive-login-page input,
+        .elive-login-page label,
+        .elive-login-page a,
+        .elive-login-page h1,
+        .elive-login-page h2,
+        .elive-login-page p,
+        .elive-login-page span {
+            font-family:
+                'Creato Display',
+                ui-sans-serif,
+                system-ui,
+                sans-serif;
         }
 
         .elive-login-page .fi-simple-main {
-            width: min(1080px, calc(100vw - 32px)) !important;
-            max-width: 1080px !important;
+            width: min(840px, calc(100vw - 32px)) !important;
+            max-width: 840px !important;
             padding: 0 !important;
             overflow: hidden;
-            border-radius: 24px;
-            background: #FFFFFF;
-            box-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
+            border-radius: 22px;
+            background: var(--elive-surface);
+            box-shadow: 0 18px 48px rgba(22, 25, 67, 0.11);
         }
 
         .elive-login-page .fi-simple-header,
@@ -27,10 +54,10 @@
         }
 
         .elive-login-shell {
-            min-height: 590px;
+            min-height: 450px;
             display: grid;
-            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-            background: #FFFFFF;
+            grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+            background: var(--elive-surface);
         }
 
         /*
@@ -41,12 +68,37 @@
 
         .elive-login-brand {
             position: relative;
-            padding: 54px 50px;
+            overflow: hidden;
+            padding: 30px 30px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            background: var(--elive-blue);
+            background: var(--elive-navy);
             color: #FFFFFF;
+        }
+
+        .elive-login-brand::before {
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            right: -110px;
+            top: -90px;
+            border-radius: 999px;
+            background: rgba(0, 122, 178, 0.18);
+            pointer-events: none;
+        }
+
+        .elive-login-brand::after {
+            content: "";
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            left: -80px;
+            bottom: -90px;
+            border-radius: 999px;
+            background: rgba(255, 152, 0, 0.12);
+            pointer-events: none;
         }
 
         .elive-login-brand-top,
@@ -59,12 +111,12 @@
         .elive-login-brand-logo {
             display: flex;
             align-items: center;
-            width: 205px;
-            min-height: 74px;
+            width: 120px;
+            min-height: 44px;
         }
 
         .elive-login-brand-logo img {
-            width: 205px;
+            width: 120px;
             max-width: 100%;
             height: auto;
             display: block;
@@ -72,15 +124,15 @@
         }
 
         .elive-login-brand-copy {
-            max-width: 370px;
-            margin-top: 58px;
+            max-width: 275px;
+            margin-top: 28px;
             margin-bottom: auto;
         }
 
         .elive-login-kicker {
-            margin: 0 0 12px;
-            color: #FFD1A0;
-            font-size: 12px;
+            margin: 0 0 9px;
+            color: var(--elive-orange);
+            font-size: 11px;
             font-weight: 800;
             letter-spacing: 0.13em;
             text-transform: uppercase;
@@ -88,25 +140,25 @@
 
         .elive-login-brand-copy h1 {
             margin: 0;
-            color: #FFFFFF;
-            font-size: clamp(34px, 3.6vw, 46px);
-            line-height: 1.05;
+            color: #FFFFFF !important;
+            font-size: clamp(26px, 2.5vw, 32px);
+            line-height: 1.06;
             letter-spacing: -0.035em;
         }
 
         .elive-login-brand-copy p {
-            margin: 18px 0 0;
-            max-width: 340px;
+            margin: 10px 0 0;
+            max-width: 270px;
             color: rgba(255, 255, 255, 0.80);
-            font-size: 15px;
-            line-height: 1.7;
+            font-size: 12px;
+            line-height: 1.55;
         }
 
         .elive-login-brand-footer {
             margin-top: auto;
-            padding-top: 32px;
+            padding-top: 24px;
             color: rgba(255, 255, 255, 0.68);
-            font-size: 12px;
+            font-size: 11px;
         }
 
         /*
@@ -116,21 +168,21 @@
         */
 
         .elive-login-form-panel {
-            padding: 68px 64px 50px;
+            padding: 32px 36px 30px;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            background: #FFFFFF;
+            background: var(--elive-surface);
         }
 
         .elive-login-form-header {
-            margin-bottom: 24px;
+            margin-bottom: 12px;
         }
 
         .elive-login-form-header .eyebrow {
-            margin: 0 0 9px;
+            margin: 0 0 7px;
             color: var(--elive-orange);
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 800;
             letter-spacing: 0.12em;
             text-transform: uppercase;
@@ -138,17 +190,17 @@
 
         .elive-login-form-header h2 {
             margin: 0;
-            color: var(--elive-blue);
-            font-size: 32px;
+            color: var(--elive-navy);
+            font-size: 24px;
             line-height: 1.1;
             letter-spacing: -0.025em;
         }
 
         .elive-login-form-header p {
-            margin: 10px 0 0;
+            margin: 6px 0 0;
             color: var(--elive-muted);
-            font-size: 14px;
-            line-height: 1.6;
+            font-size: 12px;
+            line-height: 1.55;
         }
 
         /*
@@ -158,7 +210,7 @@
         */
 
         .elive-login-page .fi-fo-field-wrp {
-            margin-bottom: 18px;
+            margin-bottom: 9px;
         }
 
         .elive-login-page .fi-fo-field-wrp-label,
@@ -173,9 +225,9 @@
         .elive-login-page .fi-fo-field-wrp-label {
             display: flex !important;
             align-items: center !important;
-            min-height: 20px;
-            margin-bottom: 7px !important;
-            font-size: 13px !important;
+            min-height: 18px;
+            margin-bottom: 5px !important;
+            font-size: 12px !important;
             font-weight: 700 !important;
         }
 
@@ -220,21 +272,22 @@
         }
 
         .elive-login-page .fi-input-wrp {
-            min-height: 48px !important;
+            min-height: 39px !important;
             border: 1px solid #CBD5E1 !important;
-            border-radius: 12px !important;
+            border-radius: 10px !important;
             background: #FFFFFF !important;
             box-shadow: none !important;
         }
 
         .elive-login-page .fi-input-wrp:focus-within {
             border-color: var(--elive-blue) !important;
-            box-shadow: 0 0 0 3px rgba(35, 63, 126, 0.10) !important;
+            box-shadow: 0 0 0 3px rgba(0, 122, 178, 0.12) !important;
         }
 
         .elive-login-page .fi-input {
-            min-height: 46px !important;
+            min-height: 37px !important;
             color: #0F172A !important;
+            font-size: 12.5px !important;
         }
 
         .elive-login-page input::placeholder {
@@ -249,7 +302,7 @@
             color: #475569 !important;
             opacity: 1 !important;
             visibility: visible !important;
-            font-size: 13px !important;
+            font-size: 12px !important;
             font-weight: 600 !important;
         }
 
@@ -259,31 +312,42 @@
 
         .elive-login-page .fi-btn.fi-color-primary,
         .elive-login-page button[type="submit"] {
-            min-height: 50px !important;
-            border-radius: 12px !important;
-            background: var(--elive-blue) !important;
+            min-height: 41px !important;
+            border-radius: 10px !important;
+            background: var(--elive-navy) !important;
             color: #FFFFFF !important;
+            font-size: 13px !important;
             font-weight: 800 !important;
-            box-shadow: 0 8px 18px rgba(35, 63, 126, 0.16) !important;
+            box-shadow: 0 6px 14px rgba(22, 25, 67, 0.14) !important;
+            transition:
+                background 0.2s ease,
+                transform 0.2s ease,
+                box-shadow 0.2s ease !important;
         }
 
         .elive-login-page .fi-btn.fi-color-primary:hover,
         .elive-login-page button[type="submit"]:hover {
-            background: #1B3267 !important;
+            background: var(--elive-blue) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 9px 18px rgba(0, 122, 178, 0.18) !important;
         }
 
         .elive-login-page .fi-link {
             color: var(--elive-blue) !important;
         }
 
+        .elive-login-page .fi-link:hover {
+            color: var(--elive-navy) !important;
+        }
+
         .elive-login-back {
-            margin-top: 20px;
+            margin-top: 8px;
             text-align: center;
         }
 
         .elive-login-back a {
             color: var(--elive-muted);
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
             text-decoration: none;
             transition: color 0.2s ease;
@@ -301,7 +365,7 @@
 
         @media (max-width: 880px) {
             .elive-login-page .fi-simple-main {
-                width: min(620px, calc(100vw - 24px)) !important;
+                width: min(580px, calc(100vw - 24px)) !important;
             }
 
             .elive-login-shell {
@@ -309,16 +373,16 @@
             }
 
             .elive-login-brand {
-                min-height: 270px;
-                padding: 34px 34px 30px;
+                min-height: 230px;
+                padding: 28px 30px 26px;
             }
 
             .elive-login-brand-copy {
-                margin: 34px 0 0;
+                margin: 26px 0 0;
             }
 
             .elive-login-brand-copy h1 {
-                font-size: 36px;
+                font-size: 28px;
             }
 
             .elive-login-brand-footer {
@@ -326,7 +390,7 @@
             }
 
             .elive-login-form-panel {
-                padding: 44px 34px 36px;
+                padding: 34px 30px 30px;
             }
         }
 
@@ -337,21 +401,21 @@
             }
 
             .elive-login-brand {
-                min-height: 230px;
-                padding: 28px 24px;
+                min-height: 205px;
+                padding: 24px 22px;
             }
 
             .elive-login-brand-logo,
             .elive-login-brand-logo img {
-                width: 160px;
+                width: 112px;
             }
 
             .elive-login-brand-logo {
-                min-height: 58px;
+                min-height: 42px;
             }
 
             .elive-login-brand-copy {
-                margin-top: 28px;
+                margin-top: 22px;
             }
 
             .elive-login-brand-copy h1 {
@@ -359,15 +423,15 @@
             }
 
             .elive-login-brand-copy p {
-                font-size: 13px;
+                font-size: 12px;
             }
 
             .elive-login-form-panel {
-                padding: 38px 24px 30px;
+                padding: 30px 22px 26px;
             }
 
             .elive-login-form-header h2 {
-                font-size: 28px;
+                font-size: 25px;
             }
         }
     </style>

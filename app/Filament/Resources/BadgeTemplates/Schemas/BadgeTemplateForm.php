@@ -509,7 +509,7 @@ class BadgeTemplateForm
                     ->hidden(),
 
                 ColorPicker::make('header_color')
-                    ->default('#233F7E')
+                    ->default('#161943')
                     ->hidden(),
 
                 ColorPicker::make('accent_color')

@@ -124,7 +124,7 @@
         }
 
         .elive-btn-primary {
-            background: #233F7E;
+            background: #161943;
             color: #ffffff;
         }
 

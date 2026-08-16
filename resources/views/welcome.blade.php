@@ -101,14 +101,6 @@
         as="image"
         href="{{ asset('event.jpg') }}?v={{ $heroImageVersion }}"
     >
-
-    {{-- Instrument Sans --}}
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link
-        href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700"
-        rel="stylesheet"
-    >
-
     {{-- Use compiled Vite assets when available --}}
     @if (
         file_exists(public_path('build/manifest.json'))
@@ -126,7 +118,7 @@
 
         html,
         body {
-            font-family: 'Instrument Sans', sans-serif;
+            font-family: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
         }
 
         #events,
@@ -216,7 +208,7 @@
         }
 
         .home-event-fallback {
-            background: linear-gradient(135deg, #233F7D, #1B3267);
+            background: linear-gradient(135deg, #161943, #007AB2);
         }
 
         .home-status-badge {
@@ -242,7 +234,7 @@
         }
 
         .home-status-badge.upcoming {
-            background: #FF9418;
+            background: #FF9800;
         }
 
         .home-status-badge.ended {
@@ -265,7 +257,7 @@
         }
 
         .home-event-title a:hover {
-            color: #233F7D;
+            color: #161943;
         }
 
         .home-event-meta {
@@ -291,7 +283,7 @@
             width: 15px;
             height: 15px;
             flex: 0 0 auto;
-            color: #233F7D;
+            color: #161943;
         }
 
         .home-event-description {
@@ -316,18 +308,18 @@
             min-height: 36px;
             padding: 0 14px;
             border-radius: 8px;
-            border: 1px solid #233F7D;
-            background: #233F7D;
+            border: 1px solid #161943;
+            background: #161943;
             color: #FFFFFF;
             font-size: 13px;
             font-weight: 700;
             text-decoration: none;
-            box-shadow: 0 4px 10px rgba(35, 63, 125, .18);
+            box-shadow: 0 4px 10px rgba(22, 25, 67, .18);
             transition: background .2s ease, transform .2s ease;
         }
 
         .home-register-btn:hover {
-            background: #1B3267;
+            background: #007AB2;
             transform: translateY(-1px);
         }
 
@@ -359,16 +351,16 @@
             border: 1px solid #D8E0EA;
             border-radius: 10px;
             background: #FFFFFF;
-            color: #233F7D;
+            color: #161943;
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
             transition: background .2s ease, color .2s ease, border-color .2s ease, transform .2s ease;
         }
 
         .home-carousel-btn:hover {
-            background: #233F7D;
+            background: #161943;
             color: #FFFFFF;
-            border-color: #233F7D;
+            border-color: #161943;
             transform: translateY(-1px);
         }
 
@@ -420,28 +412,28 @@
 
                 <a
                     href="{{ route('home') }}"
-                    class="text-sm font-semibold text-[#233F7D]"
+                    class="text-sm font-semibold text-elive-navy"
                 >
                     Home
                 </a>
 
                 <a
                     href="{{ route('public.events.index') }}"
-                    class="text-sm font-medium text-slate-600 transition hover:text-[#233F7D]"
+                    class="text-sm font-medium text-slate-600 transition hover:text-elive-navy"
                 >
                     Events
                 </a>
 
                 <a
                     href="#contact"
-                    class="text-sm font-medium text-slate-600 transition hover:text-[#233F7D]"
+                    class="text-sm font-medium text-slate-600 transition hover:text-elive-navy"
                 >
                     Contact
                 </a>
 
                 <a
                     href="/admin"
-                    class="rounded-xl bg-[#233F7D] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1b3267]"
+                    class="rounded-xl bg-elive-navy px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#007AB2]"
                 >
                     Login
                 </a>
@@ -450,7 +442,7 @@
 
             <a
                 href="/admin"
-                class="rounded-lg bg-[#233F7D] px-4 py-2 text-sm font-semibold text-white md:hidden"
+                class="rounded-lg bg-elive-navy px-4 py-2 text-sm font-semibold text-white md:hidden"
             >
                 Login
             </a>
@@ -468,11 +460,11 @@
         >
 
             {{-- Premium dark base overlay --}}
-            <div class="absolute inset-0 bg-[#17233F]/45"></div>
+            <div class="absolute inset-0 bg-elive-navy/45"></div>
 
             {{-- Strong left-side readability while preserving the event image on the right --}}
             <div
-                class="absolute inset-0 bg-gradient-to-r from-[#17233F]/95 via-[#17233F]/75 to-[#17233F]/25"
+                class="absolute inset-0 bg-gradient-to-r from-elive-navy/95 via-elive-navy/75 to-elive-navy/25"
             ></div>
 
             {{-- Hero content --}}
@@ -492,7 +484,7 @@
                         class="text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-[56px]"
                     >
                         Manage Your Events
-                        <span class="mt-2 block text-[#FF9418]">
+                        <span class="mt-2 block text-elive-orange">
                             Simply &amp; Professionally.
                         </span>
                     </h1>
@@ -508,14 +500,14 @@
 
                         <a
                             href="#contact"
-                            class="rounded-xl bg-[#FF9418] px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:bg-[#ed8611] sm:text-base"
+                            class="rounded-xl bg-elive-orange px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:opacity-90 sm:text-base"
                         >
                             Contact eLive
                         </a>
 
                         <a
                             href="{{ route('public.events.index') }}"
-                            class="rounded-xl border border-white/35 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white hover:text-[#233F7D] sm:text-base"
+                            class="rounded-xl border border-white/35 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white hover:text-elive-navy sm:text-base"
                         >
                             Explore Events
                         </a>
@@ -528,7 +520,7 @@
 
             {{-- Bottom accent --}}
             <div
-                class="absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r from-[#FF9418] via-[#FF9418] to-[#233F7D]"
+                class="absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r from-elive-orange via-elive-orange to-elive-navy"
             ></div>
 
         </section>
@@ -542,11 +534,11 @@
                 {{-- Section header --}}
                 <div class="mx-auto max-w-3xl text-center">
 
-                    <p class="text-sm font-bold uppercase tracking-wider text-[#FF9418]">
+                    <p class="text-sm font-bold uppercase tracking-wider text-elive-orange">
                         Events
                     </p>
 
-                    <h2 class="mt-3 text-3xl font-bold text-[#233F7D] sm:text-4xl">
+                    <h2 class="mt-3 text-3xl font-bold text-elive-navy sm:text-4xl">
                         Discover Events
                     </h2>
 
@@ -556,7 +548,7 @@
 
                     <a
                         href="{{ route('public.events.index') }}"
-                        class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#233F7D] transition hover:text-[#FF9418]"
+                        class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-elive-navy transition hover:text-elive-orange"
                     >
                         View All Events
                         <span aria-hidden="true">→</span>
@@ -577,7 +569,7 @@
                                     <div class="flex items-center gap-3">
                                         <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
 
-                                        <h3 class="text-xl font-bold text-[#233F7D]">
+                                        <h3 class="text-xl font-bold text-elive-navy">
                                             Happening Now
                                         </h3>
                                     </div>
@@ -811,9 +803,9 @@
 
                             <div>
                                 <div class="flex items-center gap-3">
-                                    <span class="h-2.5 w-2.5 rounded-full bg-[#FF9418]"></span>
+                                    <span class="h-2.5 w-2.5 rounded-full bg-elive-orange"></span>
 
-                                    <h3 class="text-xl font-bold text-[#233F7D]">
+                                    <h3 class="text-xl font-bold text-elive-navy">
                                         Upcoming Events
                                     </h3>
                                 </div>
@@ -1041,7 +1033,7 @@
                         @else
 
                             <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
-                                <p class="font-semibold text-[#233F7D]">
+                                <p class="font-semibold text-elive-navy">
                                     No upcoming events yet
                                 </p>
 
@@ -1065,7 +1057,7 @@
                                     <div class="flex items-center gap-3">
                                         <span class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
 
-                                        <h3 class="text-xl font-bold text-[#233F7D]">
+                                        <h3 class="text-xl font-bold text-elive-navy">
                                             Past Events
                                         </h3>
                                     </div>
@@ -1296,11 +1288,11 @@
 
                 <div class="mx-auto max-w-2xl text-center">
 
-                    <p class="text-sm font-bold uppercase tracking-wider text-[#FF9418]">
+                    <p class="text-sm font-bold uppercase tracking-wider text-elive-orange">
                         Platform Capabilities
                     </p>
 
-                    <h2 class="mt-3 text-3xl font-bold text-[#233F7D] sm:text-4xl">
+                    <h2 class="mt-3 text-3xl font-bold text-elive-navy sm:text-4xl">
                         More Than Registration
                     </h2>
 
@@ -1314,8 +1306,8 @@
                 <div class="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
 
                     <div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                        <div class="h-1 w-12 rounded-full bg-[#233F7D]"></div>
-                        <h3 class="mt-5 text-xl font-bold text-[#233F7D]">
+                        <div class="h-1 w-12 rounded-full bg-elive-navy"></div>
+                        <h3 class="mt-5 text-xl font-bold text-elive-navy">
                             Multi-Event Management
                         </h3>
                         <p class="mt-3 leading-7 text-slate-600">
@@ -1325,8 +1317,8 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                        <div class="h-1 w-12 rounded-full bg-[#FF9418]"></div>
-                        <h3 class="mt-5 text-xl font-bold text-[#233F7D]">
+                        <div class="h-1 w-12 rounded-full bg-elive-orange"></div>
+                        <h3 class="mt-5 text-xl font-bold text-elive-navy">
                             Communication
                         </h3>
                         <p class="mt-3 leading-7 text-slate-600">
@@ -1336,8 +1328,8 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                        <div class="h-1 w-12 rounded-full bg-[#233F7D]"></div>
-                        <h3 class="mt-5 text-xl font-bold text-[#233F7D]">
+                        <div class="h-1 w-12 rounded-full bg-elive-navy"></div>
+                        <h3 class="mt-5 text-xl font-bold text-elive-navy">
                             Attendance Management
                         </h3>
                         <p class="mt-3 leading-7 text-slate-600">
@@ -1347,8 +1339,8 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                        <div class="h-1 w-12 rounded-full bg-[#FF9418]"></div>
-                        <h3 class="mt-5 text-xl font-bold text-[#233F7D]">
+                        <div class="h-1 w-12 rounded-full bg-elive-orange"></div>
+                        <h3 class="mt-5 text-xl font-bold text-elive-navy">
                             Event Reporting
                         </h3>
                         <p class="mt-3 leading-7 text-slate-600">
@@ -1358,8 +1350,8 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                        <div class="h-1 w-12 rounded-full bg-[#233F7D]"></div>
-                        <h3 class="mt-5 text-xl font-bold text-[#233F7D]">
+                        <div class="h-1 w-12 rounded-full bg-elive-navy"></div>
+                        <h3 class="mt-5 text-xl font-bold text-elive-navy">
                             Multi-Day Events
                         </h3>
                         <p class="mt-3 leading-7 text-slate-600">
@@ -1369,8 +1361,8 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                        <div class="h-1 w-12 rounded-full bg-[#FF9418]"></div>
-                        <h3 class="mt-5 text-xl font-bold text-[#233F7D]">
+                        <div class="h-1 w-12 rounded-full bg-elive-orange"></div>
+                        <h3 class="mt-5 text-xl font-bold text-elive-navy">
                             Event Branding
                         </h3>
                         <p class="mt-3 leading-7 text-slate-600">
@@ -1390,11 +1382,11 @@
 
             <div class="mx-auto max-w-6xl px-6 text-center lg:px-8">
 
-                <p class="text-sm font-bold uppercase tracking-wider text-[#FF9418]">
+                <p class="text-sm font-bold uppercase tracking-wider text-elive-orange">
                     Simple Process
                 </p>
 
-                <h2 class="mt-3 text-3xl font-bold text-[#233F7D]">
+                <h2 class="mt-3 text-3xl font-bold text-elive-navy">
                     From Registration to Check-in
                 </h2>
 
@@ -1405,7 +1397,7 @@
                 <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
                     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-6">
-                        <span class="text-sm font-bold text-[#FF9418]">
+                        <span class="text-sm font-bold text-elive-orange">
                             01
                         </span>
 
@@ -1419,7 +1411,7 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-6">
-                        <span class="text-sm font-bold text-[#FF9418]">
+                        <span class="text-sm font-bold text-elive-orange">
                             02
                         </span>
 
@@ -1433,7 +1425,7 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-6">
-                        <span class="text-sm font-bold text-[#FF9418]">
+                        <span class="text-sm font-bold text-elive-orange">
                             03
                         </span>
 
@@ -1447,7 +1439,7 @@
                     </div>
 
                     <div class="rounded-2xl border border-slate-100 bg-slate-50 p-6">
-                        <span class="text-sm font-bold text-[#FF9418]">
+                        <span class="text-sm font-bold text-elive-orange">
                             04
                         </span>
 
@@ -1474,11 +1466,11 @@
 
                 <div class="mx-auto max-w-2xl text-center">
 
-                    <p class="text-sm font-bold uppercase tracking-wider text-[#FF9418]">
+                    <p class="text-sm font-bold uppercase tracking-wider text-elive-orange">
                         Contact eLive
                     </p>
 
-                    <h2 class="mt-3 text-3xl font-bold text-[#233F7D] sm:text-4xl">
+                    <h2 class="mt-3 text-3xl font-bold text-elive-navy sm:text-4xl">
                         Get in Touch
                     </h2>
 
@@ -1495,11 +1487,11 @@
                         href="tel:+255745939140"
                         class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                     >
-                        <p class="text-xs font-bold uppercase tracking-wider text-[#FF9418]">
+                        <p class="text-xs font-bold uppercase tracking-wider text-elive-orange">
                             Call Us
                         </p>
 
-                        <p class="mt-3 text-xl font-bold text-[#233F7D]">
+                        <p class="mt-3 text-xl font-bold text-elive-navy">
                             +255 745 939 140
                         </p>
 
@@ -1514,11 +1506,11 @@
                         rel="noopener noreferrer"
                         class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                     >
-                        <p class="text-xs font-bold uppercase tracking-wider text-[#FF9418]">
+                        <p class="text-xs font-bold uppercase tracking-wider text-elive-orange">
                             WhatsApp
                         </p>
 
-                        <p class="mt-3 text-xl font-bold text-[#233F7D]">
+                        <p class="mt-3 text-xl font-bold text-elive-navy">
                             +255 777 792 017
                         </p>
 
@@ -1531,11 +1523,11 @@
                         href="mailto:info@elive.co.tz"
                         class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                     >
-                        <p class="text-xs font-bold uppercase tracking-wider text-[#FF9418]">
+                        <p class="text-xs font-bold uppercase tracking-wider text-elive-orange">
                             Email
                         </p>
 
-                        <p class="mt-3 text-xl font-bold text-[#233F7D]">
+                        <p class="mt-3 text-xl font-bold text-elive-navy">
                             info@elive.co.tz
                         </p>
 
@@ -1550,11 +1542,11 @@
                         rel="noopener noreferrer"
                         class="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                     >
-                        <p class="text-xs font-bold uppercase tracking-wider text-[#FF9418]">
+                        <p class="text-xs font-bold uppercase tracking-wider text-elive-orange">
                             Location
                         </p>
 
-                        <p class="mt-3 text-xl font-bold text-[#233F7D]">
+                        <p class="mt-3 text-xl font-bold text-elive-navy">
                             Kinondoni B
                         </p>
 
@@ -1574,7 +1566,7 @@
         <section class="px-6 pb-16 sm:pb-20 lg:px-8">
 
             <div
-                class="mx-auto max-w-7xl rounded-3xl bg-[#233F7D] px-6 py-14 text-center shadow-xl sm:px-12"
+                class="mx-auto max-w-7xl rounded-3xl bg-elive-navy px-6 py-14 text-center shadow-xl sm:px-12"
             >
 
                 <h2 class="text-3xl font-bold text-white">
@@ -1588,7 +1580,7 @@
 
                 <a
                     href="#contact"
-                    class="mt-8 inline-flex rounded-xl bg-[#FF9418] px-7 py-3.5 font-semibold text-white transition hover:bg-[#ed8611]"
+                    class="mt-8 inline-flex rounded-xl bg-elive-orange px-7 py-3.5 font-semibold text-white transition hover:opacity-90"
                 >
                     Contact eLive
                 </a>
@@ -1601,7 +1593,7 @@
 
 
     {{-- FOOTER --}}
-    <footer class="bg-[#0B1F3A] text-white">
+    <footer class="bg-elive-navy text-white">
 
         <div class="mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-14">
 
@@ -1627,14 +1619,14 @@
                         href="https://wa.me/255777792017"
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="mt-6 inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-[#FF9418] hover:text-[#FF9418]"
+                        class="mt-6 inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-elive-orange hover:text-elive-orange"
                     >
                         <svg
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             stroke-width="1.8"
-                            class="h-5 w-5 text-[#FF9418]"
+                            class="h-5 w-5 text-elive-orange"
                         >
                             <path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.6-5.1A8.5 8.5 0 1 1 21 11.5Z"/>
                             <path d="M8.5 8.5c.7 2.7 2.3 4.3 5 5"/>
@@ -1650,7 +1642,7 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label="Instagram"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-elive-orange hover:bg-elive-orange"
                         >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4.5 w-4.5">
                                 <rect x="3" y="3" width="18" height="18" rx="5"/>
@@ -1664,7 +1656,7 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label="TikTok"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-elive-orange hover:bg-elive-orange"
                         >
                             <svg viewBox="0 0 24 24" fill="currentColor" class="h-4.5 w-4.5">
                                 <path d="M14.2 3c.3 1.9 1.4 3.2 3.3 3.9.8.3 1.5.4 2.3.4v3.4c-2.2 0-4.1-.7-5.6-2v6.2a5.8 5.8 0 1 1-5.8-5.8c.4 0 .8 0 1.2.1v3.5a2.7 2.7 0 0 0-1.2-.3 2.5 2.5 0 1 0 2.5 2.5V3h3.3Z"/>
@@ -1676,7 +1668,7 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label="Facebook"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-elive-orange hover:bg-elive-orange"
                         >
                             <svg viewBox="0 0 24 24" fill="currentColor" class="h-4.5 w-4.5">
                                 <path d="M13.7 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5H17V3.9c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3V10H7.5v3h2.8v8h3.4Z"/>
@@ -1688,7 +1680,7 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             aria-label="LinkedIn"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-elive-orange hover:bg-elive-orange"
                         >
                             <svg viewBox="0 0 24 24" fill="currentColor" class="h-4.5 w-4.5">
                                 <path d="M6.5 8.5H3.3V21h3.2V8.5ZM4.9 3A1.9 1.9 0 1 0 5 6.8 1.9 1.9 0 0 0 4.9 3ZM21 13.8c0-3.8-2-5.6-4.7-5.6-2.2 0-3.1 1.2-3.7 2v-1.7H9.4V21h3.2v-6.2c0-1.6.3-3.2 2.3-3.2s2 1.9 2 3.3V21H21v-7.2Z"/>
@@ -1702,7 +1694,7 @@
                 {{-- Quick Links --}}
                 <div>
 
-                    <h3 class="text-sm font-bold uppercase tracking-wide text-[#FF9418]">
+                    <h3 class="text-sm font-bold uppercase tracking-wide text-elive-orange">
                         Quick Links
                     </h3>
 
@@ -1711,7 +1703,7 @@
                     
                         <a
                             href="{{ route('public.events.index') }}"
-                            class="block transition hover:text-[#FF9418]"
+                            class="block transition hover:text-elive-orange"
                         >
                             Events
                         </a>
@@ -1720,14 +1712,14 @@
 
                         <a
                             href="{{ route('home') }}#contact"
-                            class="block transition hover:text-[#FF9418]"
+                            class="block transition hover:text-elive-orange"
                         >
                             Contact
                         </a>
 
                         <a
                             href="/admin"
-                            class="block transition hover:text-[#FF9418]"
+                            class="block transition hover:text-elive-orange"
                         >
                             Organizer Login
                         </a>
@@ -1736,7 +1728,7 @@
                     href="https://elive.co.tz/"
                         target="_blank"
                  rel="noopener noreferrer"
-                 class="block transition hover:text-[#FF9418]"
+                 class="block transition hover:text-elive-orange"
                     >
         eLive Website
     </a>
@@ -1748,7 +1740,7 @@
                 {{-- Contact --}}
                 <div>
 
-                    <h3 class="text-sm font-bold uppercase tracking-wide text-[#FF9418]">
+                    <h3 class="text-sm font-bold uppercase tracking-wide text-elive-orange">
                         Contact
                     </h3>
 
@@ -1765,7 +1757,7 @@
                                 fill="none"
                                 stroke="currentColor"
                                 stroke-width="1.8"
-                                class="mt-0.5 h-5 w-5 shrink-0 text-[#FF9418]"
+                                class="mt-0.5 h-5 w-5 shrink-0 text-elive-orange"
                             >
                                 <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/>
                                 <circle cx="12" cy="10" r="2"/>
@@ -1785,7 +1777,7 @@
                                 fill="none"
                                 stroke="currentColor"
                                 stroke-width="1.8"
-                                class="h-5 w-5 shrink-0 text-[#FF9418]"
+                                class="h-5 w-5 shrink-0 text-elive-orange"
                             >
                                 <path d="M6.5 3h3l1.3 4.2-2 1.4a15.7 15.7 0 0 0 6.6 6.6l1.4-2L21 14.5v3c0 1.7-1.3 3-3 3C10 20.5 3.5 14 3.5 6A3 3 0 0 1 6.5 3Z"/>
                             </svg>
@@ -1804,7 +1796,7 @@
                                 fill="none"
                                 stroke="currentColor"
                                 stroke-width="1.8"
-                                class="h-5 w-5 shrink-0 text-[#FF9418]"
+                                class="h-5 w-5 shrink-0 text-elive-orange"
                             >
                                 <rect x="3" y="5" width="18" height="14" rx="2"/>
                                 <path d="m4 7 8 6 8-6"/>

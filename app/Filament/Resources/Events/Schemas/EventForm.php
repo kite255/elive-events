@@ -1042,7 +1042,7 @@ class EventForm
                                 'Primary Color'
                             )
                             ->default(
-                                '#233F7E'
+                                '#161943'
                             ),
 
                         ColorPicker::make(
@@ -1062,7 +1062,7 @@ class EventForm
                                 'Button Color'
                             )
                             ->default(
-                                '#233F7E'
+                                '#161943'
                             ),
                     ])
                     ->columns(2)

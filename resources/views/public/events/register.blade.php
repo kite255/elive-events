@@ -47,6 +47,9 @@
         content="width=device-width, initial-scale=1.0"
     >
 
+    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
+
     <meta
         name="description"
         content="{{ $shareDescription }}"
@@ -73,19 +76,46 @@
 
     <style>
         :root {
+            /*
+            |--------------------------------------------------------------------------
+            | Event branding
+            |--------------------------------------------------------------------------
+            | These remain configurable per event / organization.
+            */
             --elive-primary: {{ $branding['primary_color'] }};
             --elive-button: {{ $branding['button_color'] }};
             --elive-bg: {{ $branding['background_color'] }};
-            --elive-text: #0f172a;
-            --elive-muted: #64748b;
-            --elive-border: #e2e8f0;
-            --elive-soft: #f8fafc;
-            --elive-danger: #dc2626;
+
+            /*
+            |--------------------------------------------------------------------------
+            | eLive platform foundation
+            |--------------------------------------------------------------------------
+            */
+            --elive-navy: #161943;
+            --elive-blue: #007AB2;
+            --elive-orange: #FF9800;
+
+            --elive-text: #0F172A;
+            --elive-muted: #667085;
+            --elive-border: #E6E8EF;
+            --elive-soft: #F7F8FC;
+            --elive-danger: #DC2626;
+
             --elive-radius-lg: 24px;
             --elive-radius-md: 18px;
             --elive-radius-sm: 12px;
-            --elive-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
-            --elive-shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.07);
+
+            --elive-shadow: 0 24px 60px rgba(22, 25, 67, 0.12);
+            --elive-shadow-soft: 0 10px 26px rgba(22, 25, 67, 0.07);
+
+            --elive-font:
+                'Creato Display',
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                sans-serif;
         }
 
         * {
@@ -102,16 +132,35 @@
                 radial-gradient(circle at top left, color-mix(in srgb, var(--elive-primary) 12%, transparent), transparent 34%),
                 linear-gradient(180deg, #f8fafc 0%, var(--elive-bg) 42%, #eef2f7 100%) !important;
             color: var(--elive-text) !important;
-            font-family:
-                Inter,
-                ui-sans-serif,
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif !important;
+            font-family: var(--elive-font) !important;
             -webkit-font-smoothing: antialiased;
             text-rendering: optimizeLegibility;
+        }
+
+        button,
+        input,
+        select,
+        textarea,
+        option {
+            font-family: var(--elive-font) !important;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: var(--elive-font) !important;
+        }
+
+        .elive-shell :focus-visible {
+            outline: 3px solid color-mix(
+                in srgb,
+                var(--elive-primary) 32%,
+                transparent
+            );
+            outline-offset: 2px;
         }
 
         .elive-page {
@@ -154,8 +203,8 @@
             inset: 0;
             background: linear-gradient(
                 180deg,
-                rgba(15, 23, 42, 0.00) 68%,
-                rgba(15, 23, 42, 0.08) 100%
+                rgba(22, 25, 67, 0.00) 68%,
+                rgba(22, 25, 67, 0.08) 100%
             );
             pointer-events: none;
         }
@@ -176,7 +225,7 @@
             height: 78px !important;
             border-radius: 20px !important;
             border: 1px solid var(--elive-border) !important;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 8px 24px rgba(22, 25, 67, 0.08);
         }
 
         .elive-title {
@@ -207,7 +256,7 @@
                 linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
             border: 1px solid var(--elive-border) !important;
             border-radius: 18px !important;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+            box-shadow: 0 6px 18px rgba(22, 25, 67, 0.05);
         }
 
         .event-summary > div::before {
@@ -257,7 +306,7 @@
 
         form > div:hover {
             border-color: color-mix(in srgb, var(--elive-primary) 28%, var(--elive-border)) !important;
-            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.09) !important;
+            box-shadow: 0 14px 34px rgba(22, 25, 67, 0.09) !important;
         }
 
         form h2 {
@@ -397,7 +446,7 @@
         .elive-session-card:hover {
             transform: translateY(-1px);
             border-color: color-mix(in srgb, var(--elive-primary) 30%, var(--elive-border));
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+            box-shadow: 0 10px 24px rgba(22, 25, 67, 0.07);
         }
 
         .elive-session-card[data-full="1"] {
@@ -418,8 +467,8 @@
             margin-top: 7px;
             padding: 4px 8px;
             border-radius: 999px;
-            background: #eef2ff;
-            color: #3730a3;
+            background: color-mix(in srgb, var(--elive-primary) 10%, #ffffff);
+            color: var(--elive-primary);
             font-size: 10px;
             font-weight: 900;
             text-transform: uppercase;
@@ -429,7 +478,7 @@
         .elive-session-meta {
             display: block;
             margin-top: 5px;
-            color: #64748b;
+            color: var(--elive-muted);
             font-size: 12px;
             line-height: 1.5;
         }
@@ -446,7 +495,7 @@
             padding: 16px;
             border: 1px dashed var(--elive-border);
             border-radius: 14px;
-            color: #64748b;
+            color: var(--elive-muted);
             font-size: 13px;
             text-align: center;
         }
@@ -462,7 +511,7 @@
             border: 1px solid #dbe3ef !important;
             border-radius: 20px !important;
             padding: 20px !important;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+            box-shadow: 0 8px 24px rgba(22, 25, 67, 0.06);
             transition:
                 border-color 150ms ease,
                 transform 150ms ease,
@@ -472,7 +521,7 @@
         [data-merchandise-card]:hover {
             transform: translateY(-1px);
             border-color: color-mix(in srgb, var(--elive-primary) 34%, #dbe3ef) !important;
-            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.09);
+            box-shadow: 0 14px 30px rgba(22, 25, 67, 0.09);
         }
 
         .elive-merch-layout {
@@ -496,7 +545,7 @@
                     #e5e7eb 0%,
                     #f8fafc 100%
                 ) !important;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10) !important;
+            box-shadow: 0 8px 20px rgba(22, 25, 67, 0.10) !important;
         }
 
         .elive-merch-content {
@@ -613,7 +662,7 @@
             align-items: center;
             justify-content: center;
             padding: 24px;
-            background: rgba(15, 23, 42, 0.82);
+            background: rgba(22, 25, 67, 0.86);
             backdrop-filter: blur(5px);
         }
 
@@ -670,7 +719,7 @@
             justify-content: center;
             border: 0;
             border-radius: 999px;
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(22, 25, 67, 0.94);
             color: #ffffff;
             font-size: 24px;
             line-height: 1;
@@ -678,7 +727,7 @@
         }
 
         .elive-merch-image-close:hover {
-            background: #0f172a;
+            background: var(--elive-navy);
         }
 
         body.elive-image-modal-open {
@@ -739,10 +788,15 @@
         }
 
         .elive-footer {
-            padding: 8px 12px 0;
-            color: #64748b !important;
+            padding: 10px 12px 0;
+            color: var(--elive-muted) !important;
             font-size: 12px !important;
             line-height: 1.7;
+        }
+
+        .elive-footer strong {
+            color: var(--elive-navy);
+            font-weight: 800;
         }
 
         @media (max-width: 720px) {
@@ -887,7 +941,7 @@
     margin: 0;
     background: {{ $branding['background_color'] }};
     color: #0f172a;
-    font-family: Arial, sans-serif;
+    font-family: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
 ">
     <div class="elive-page" style="min-height: 100vh; padding: 28px 16px;">
         <div class="elive-container" style="max-width: 980px; margin: 0 auto;">
@@ -895,7 +949,7 @@
                 background: #ffffff;
                 border-radius: 24px;
                 overflow: hidden;
-                box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12);
+                box-shadow: 0 16px 35px rgba(22, 25, 67, 0.12);
                 border: 1px solid #e5e7eb;
             ">
                 @if ($branding['banner'])
@@ -946,7 +1000,7 @@
                                 {{ $event->registration_welcome_title ?: 'Register for ' . $event->name }}
                             </h1>
 
-                            <p class="elive-description" style="margin: 8px 0 0 0; color: #64748b; font-size: 15px;">
+                            <p class="elive-description" style="margin: 8px 0 0 0; color: var(--elive-muted); font-size: 15px;">
                                 {{ $event->registration_welcome_message ?: 'Complete the form below to register for this event.' }}
                             </p>
                         </div>
@@ -959,17 +1013,17 @@
                         gap: 12px;
                     ">
                         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;">
-                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Event</div>
+                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--elive-muted);">Event</div>
                             <div style="font-size:15px;font-weight:800;margin-top:5px;">{{ $event->name }}</div>
                         </div>
 
                         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;">
-                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Venue</div>
+                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--elive-muted);">Venue</div>
                             <div style="font-size:15px;font-weight:800;margin-top:5px;">{{ $event->venue ?: 'To be announced' }}</div>
                         </div>
 
                         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;">
-                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Date</div>
+                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--elive-muted);">Date</div>
                             <div style="font-size:15px;font-weight:800;margin-top:5px;">
                                 @if ($event->starts_at && $event->ends_at)
                                     @if ($event->starts_at->isSameDay($event->ends_at))
@@ -1152,7 +1206,7 @@
                                 border: 1px solid #e2e8f0;
                                 border-radius: 20px;
                                 padding: 22px;
-                                box-shadow: 0 8px 22px rgba(15,23,42,0.06);
+                                box-shadow: 0 8px 22px rgba(22,25,67,0.06);
                             ">
                                 <h2 style="
                                     margin: 0 0 18px 0;
@@ -1247,7 +1301,7 @@
                                     border:1px solid #e2e8f0;
                                     border-radius:20px;
                                     padding:22px;
-                                    box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                    box-shadow:0 8px 22px rgba(22,25,67,0.06);
                                 ">
                                     <h2 style="
                                         margin:0 0 18px 0;
@@ -1388,7 +1442,7 @@
                                     border: 1px solid #e2e8f0;
                                     border-radius: 20px;
                                     padding: 22px;
-                                    box-shadow: 0 8px 22px rgba(15,23,42,0.06);
+                                    box-shadow: 0 8px 22px rgba(22,25,67,0.06);
                                 ">
                                     <h2 style="
                                         margin: 0 0 18px 0;
@@ -1570,7 +1624,7 @@
                                                 @endif
 
                                                 @if ($helpText)
-                                                    <div style="font-size:12px;color:#64748b;margin-top:6px;">
+                                                    <div style="font-size:12px;color:var(--elive-muted);margin-top:6px;">
                                                         {{ $helpText }}
                                                     </div>
                                                 @endif
@@ -1609,7 +1663,7 @@
                                     border:1px solid #e2e8f0;
                                     border-radius:20px;
                                     padding:22px;
-                                    box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                    box-shadow:0 8px 22px rgba(22,25,67,0.06);
                                 ">
                                     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
                                         <div>
@@ -1622,7 +1676,7 @@
                                                 {{ $sectionLabels['attendance'] ?? 'Attendance Selection' }}
                                             </h2>
 
-                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                            <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
                                                 Choose the event days you plan to attend.
                                                 @if ($allowAllDaysSelection)
                                                     You may also select all available days at once.
@@ -1631,9 +1685,9 @@
                                         </div>
 
                                         <div style="
-                                            background:#eef2ff;
-                                            border:1px solid #c7d2fe;
-                                            color:#3730a3;
+                                            background:color-mix(in srgb, {{ $branding['primary_color'] }} 8%, #ffffff);
+                                            border:1px solid color-mix(in srgb, {{ $branding['primary_color'] }} 24%, #e2e8f0);
+                                            color:{{ $branding['primary_color'] }};
                                             border-radius:12px;
                                             padding:10px 12px;
                                             font-size:12px;
@@ -1747,7 +1801,7 @@
                                                     <span style="
                                                         display:block;
                                                         margin-top:5px;
-                                                        color:#64748b;
+                                                        color:var(--elive-muted);
                                                         font-size:13px;
                                                         line-height:1.5;
                                                     ">
@@ -1832,7 +1886,7 @@
                                         border:1px solid #e2e8f0;
                                         border-radius:20px;
                                         padding:22px;
-                                        box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                        box-shadow:0 8px 22px rgba(22,25,67,0.06);
                                     "
                                 >
                                     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
@@ -1846,7 +1900,7 @@
                                                 {{ $sectionLabels['sessions'] ?? 'Sessions / Activities' }}
                                             </h2>
 
-                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                            <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
                                                 Select the sessions or activities you would like to attend.
                                                 @if ($allowDaySelection)
                                                     Only sessions belonging to your selected event days are shown.
@@ -1902,7 +1956,7 @@
                                                             <span style="
                                                                 display:block;
                                                                 margin-top:3px;
-                                                                color:#64748b;
+                                                                color:var(--elive-muted);
                                                                 font-size:12px;
                                                             ">
                                                                 {{ $day->event_date?->format('d M Y') }}
@@ -2085,7 +2139,7 @@
                                     border: 1px solid #e2e8f0;
                                     border-radius: 20px;
                                     padding: 22px;
-                                    box-shadow: 0 8px 22px rgba(15,23,42,0.06);
+                                    box-shadow: 0 8px 22px rgba(22,25,67,0.06);
                                 ">
                                     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
                                         <div>
@@ -2098,7 +2152,7 @@
                                                 Merchandise Order
                                             </h2>
 
-                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                            <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
                                                 Select the items you would like to order, including the preferred size, color and quantity.
                                                 Payment instructions for paid items will be provided after registration.
                                             </p>
@@ -2283,7 +2337,7 @@
                                                                             style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                                                         >
 
-                                                                        <div style="font-size:12px;color:#64748b;margin-top:6px;">
+                                                                        <div style="font-size:12px;color:var(--elive-muted);margin-top:6px;">
                                                                             Maximum allowed: {{ $maximumQuantity }}
                                                                         </div>
 
@@ -2326,7 +2380,7 @@
                                         border:1px solid #e2e8f0;
                                         border-radius:20px;
                                         padding:22px;
-                                        box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                        box-shadow:0 8px 22px rgba(22,25,67,0.06);
                                     "
                                 >
                                     <h2 style="
@@ -2338,7 +2392,7 @@
                                         Payment
                                     </h2>
 
-                                    <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                    <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
                                         Payment is only required when a paid item is selected.
                                     </p>
 
@@ -2420,7 +2474,7 @@
 
                                                 <div style="
                                                     margin-top:2px;
-                                                    color:#64748b;
+                                                    color:var(--elive-muted);
                                                     font-size:12px;
                                                 ">
                                                     Use the details below to complete payment.
@@ -2434,7 +2488,7 @@
                                                 border-bottom:1px solid #e2e8f0;
                                             ">
                                                 <div style="
-                                                    color:#64748b;
+                                                    color:var(--elive-muted);
                                                     font-size:11px;
                                                     font-weight:800;
                                                     text-transform:uppercase;
@@ -2460,7 +2514,7 @@
                                                 border-bottom:1px solid #e2e8f0;
                                             ">
                                                 <div style="
-                                                    color:#64748b;
+                                                    color:var(--elive-muted);
                                                     font-size:11px;
                                                     font-weight:800;
                                                     text-transform:uppercase;
@@ -2486,7 +2540,7 @@
                                                 border-bottom:1px solid #e2e8f0;
                                             ">
                                                 <div style="
-                                                    color:#64748b;
+                                                    color:var(--elive-muted);
                                                     font-size:11px;
                                                     font-weight:800;
                                                     text-transform:uppercase;
@@ -2553,8 +2607,8 @@
                 </div>
             </div>
 
-            <div class="elive-footer" style="text-align:center;color:#64748b;font-size:13px;margin-top:18px;">
-                Powered by eLive Events
+            <div class="elive-footer" style="text-align:center;color:var(--elive-muted);font-size:13px;margin-top:18px;">
+                Powered by <strong>eLive Events</strong>
                 @if ($branding['support_email'])
                     | Support: {{ $branding['support_email'] }}
                 @endif

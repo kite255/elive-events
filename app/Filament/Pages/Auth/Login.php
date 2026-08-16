@@ -12,12 +12,18 @@ class Login extends BaseLogin
 {
     /*
     |--------------------------------------------------------------------------
-    | Custom Login View
+    | eLive Events Custom Login View
     |--------------------------------------------------------------------------
     |
+    | The visual branding for this page is handled by:
+    |
+    | resources/views/filament/pages/auth/login.blade.php
+    | public/css/creato-font.css
+    | resources/css/app.css
+    |
     | IMPORTANT:
-    | In your installed Filament version, SimplePage::$view is NON-STATIC.
-    | Therefore this property must also be non-static.
+    | In the installed Filament version, SimplePage::$view is non-static.
+    | Keep this property non-static.
     |
     */
 
@@ -27,6 +33,10 @@ class Login extends BaseLogin
     |--------------------------------------------------------------------------
     | Login Page Width
     |--------------------------------------------------------------------------
+    |
+    | Provides enough room for the custom eLive split/login layout while
+    | remaining responsive on smaller screens.
+    |
     */
 
     public function getMaxContentWidth(): Width
@@ -36,11 +46,11 @@ class Login extends BaseLogin
 
     /*
     |--------------------------------------------------------------------------
-    | Body Class
+    | Body Attributes
     |--------------------------------------------------------------------------
     |
-    | Used by resources/views/filament/pages/auth/login.blade.php
-    | to scope the custom eLive login styles.
+    | Used to scope the custom eLive login styles without affecting other
+    | Filament pages.
     |
     */
 

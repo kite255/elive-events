@@ -9,7 +9,7 @@
 <body class="bg-slate-50 min-h-screen flex items-center justify-center px-4">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
         <div class="text-center mb-6">
-            <h1 class="text-2xl font-bold text-[#233F7E]">Valid QR Code</h1>
+            <h1 class="text-2xl font-bold text-[#161943]">Valid QR Code</h1>
             <p class="text-sm text-slate-500 mt-1">Attendee verification successful</p>
         </div>
 
