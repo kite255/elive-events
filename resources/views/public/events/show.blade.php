@@ -27,21 +27,37 @@
         ->filter()
         ->values();
 
-    $isLive = $eventStart
-        && $eventStart->lte(now())
+    /*
+     * Assigned Event Days are the source of truth whenever they exist.
+     * This keeps the hero, status and Event Information card consistent
+     * for both single-day and multi-day events.
+     */
+    $firstAssignedDate = $dates->first();
+    $lastAssignedDate = $dates->last();
+
+    $scheduleStart = $firstAssignedDate
+        ? $firstAssignedDate->copy()->startOfDay()
+        : $eventStart;
+
+    $scheduleEnd = $lastAssignedDate
+        ? $lastAssignedDate->copy()->endOfDay()
+        : $eventEnd;
+
+    $isLive = $scheduleStart
+        && $scheduleStart->lte(now())
         && (
-            ($eventEnd && $eventEnd->gte(now()))
+            ($scheduleEnd && $scheduleEnd->gte(now()))
             || (
-                ! $eventEnd
-                && $eventStart->gte(now()->startOfDay())
+                ! $scheduleEnd
+                && $scheduleStart->gte(now()->startOfDay())
             )
         );
 
-    $isPast = $eventEnd
-        ? $eventEnd->lt(now())
+    $isPast = $scheduleEnd
+        ? $scheduleEnd->lt(now())
         : (
-            $eventStart
-            && $eventStart->lt(now()->startOfDay())
+            $scheduleStart
+            && $scheduleStart->lt(now()->startOfDay())
         );
 
     $statusText = $isLive
@@ -67,27 +83,99 @@
 
     $eventDetailsDateLabel = null;
 
+    /*
+     * Compact event date display:
+     *
+     * Single day:
+     * 23 Aug 2026
+     *
+     * Multi-day in the same month:
+     * 23 – 29 Aug 2026
+     *
+     * Multi-day across months:
+     * 30 Aug – 02 Sep 2026
+     *
+     * Multi-day across years:
+     * 31 Dec 2026 – 02 Jan 2027
+     *
+     * The Event Days section below still shows every configured day,
+     * so the hero stays compact without losing the detailed schedule.
+     */
     if ($dates->isNotEmpty()) {
-        $years = $dates
-            ->map(fn ($date) => $date->format('Y'))
-            ->unique();
+        $firstDate = $dates->first();
+        $lastDate = $dates->last();
 
-        $sameYear = $years->count() === 1;
-
-        $eventDetailsDateLabel = $dates
-            ->map(
-                fn ($date) => $sameYear
-                    ? $date->format('D, d M')
-                    : $date->format('D, d M Y')
-            )
-            ->implode(' • ');
-
-        if ($sameYear) {
-            $eventDetailsDateLabel .= ' ' . $dates->first()->format('Y');
+        if ($dates->count() === 1 || $firstDate->isSameDay($lastDate)) {
+            $eventDetailsDateLabel = $firstDate->format('d M Y');
+        } elseif (
+            $firstDate->year === $lastDate->year
+            && $firstDate->month === $lastDate->month
+        ) {
+            $eventDetailsDateLabel =
+                $firstDate->format('d')
+                . ' – '
+                . $lastDate->format('d M Y');
+        } elseif ($firstDate->year === $lastDate->year) {
+            $eventDetailsDateLabel =
+                $firstDate->format('d M')
+                . ' – '
+                . $lastDate->format('d M Y');
+        } else {
+            $eventDetailsDateLabel =
+                $firstDate->format('d M Y')
+                . ' – '
+                . $lastDate->format('d M Y');
         }
     } elseif ($eventStart) {
-        $eventDetailsDateLabel = $eventStart->format('D, d M Y');
+        if (
+            $eventEnd
+            && ! $eventStart->isSameDay($eventEnd)
+        ) {
+            if (
+                $eventStart->year === $eventEnd->year
+                && $eventStart->month === $eventEnd->month
+            ) {
+                $eventDetailsDateLabel =
+                    $eventStart->format('d')
+                    . ' – '
+                    . $eventEnd->format('d M Y');
+            } elseif ($eventStart->year === $eventEnd->year) {
+                $eventDetailsDateLabel =
+                    $eventStart->format('d M')
+                    . ' – '
+                    . $eventEnd->format('d M Y');
+            } else {
+                $eventDetailsDateLabel =
+                    $eventStart->format('d M Y')
+                    . ' – '
+                    . $eventEnd->format('d M Y');
+            }
+        } else {
+            $eventDetailsDateLabel = $eventStart->format('d M Y');
+        }
     }
+
+    /*
+     * Event Information helpers.
+     * We intentionally avoid the raw event starts_at / ends_at rows when
+     * assigned Event Days exist, because those values can be generic/default
+     * timestamps and may not match the actual configured event schedule.
+     */
+    $eventDayCount = $dates->isNotEmpty()
+        ? $dates->count()
+        : (
+            $eventStart && $eventEnd
+                ? max(1, $eventStart->copy()->startOfDay()->diffInDays($eventEnd->copy()->startOfDay()) + 1)
+                : ($eventStart ? 1 : null)
+        );
+
+    $eventDateHeading = ($eventDayCount ?? 0) > 1
+        ? 'Event Dates'
+        : 'Event Date';
+
+    $eventDurationLabel = $eventDayCount
+        ? $eventDayCount . ' ' . Str::plural('day', $eventDayCount)
+        : null;
 
     $registerUrl = route('public.events.register', [
         'event' => $event->slug,
@@ -474,7 +562,7 @@
 
         .info-list {
             display: grid;
-            gap: 14px;
+            gap: 16px;
         }
 
         .info-item {
@@ -852,6 +940,13 @@
                                         @if ($dayDate)
                                             <p class="day-date">
                                                 {{ $dayDate->format('l, d F Y') }}
+
+                                                @if ($day->starts_at)
+                                                    · {{ Carbon::parse($day->starts_at)->format('g:i A') }}
+                                                    @if ($day->ends_at)
+                                                        – {{ Carbon::parse($day->ends_at)->format('g:i A') }}
+                                                    @endif
+                                                @endif
                                             </p>
                                         @endif
                                     </div>
@@ -878,7 +973,7 @@
 
                 <div class="info-list">
 
-                    @if ($dates->isNotEmpty())
+                    @if ($eventDetailsDateLabel)
                         <div class="info-item">
                             <div class="info-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -888,53 +983,25 @@
                             </div>
 
                             <div class="info-copy">
-                                <strong>Event Days</strong>
-                                <span>
-                                    {{ $dates->count() }}
-                                    {{ Str::plural('day', $dates->count()) }}
-                                </span>
+                                <strong>{{ $eventDateHeading }}</strong>
+                                <span>{{ $eventDetailsDateLabel }}</span>
                             </div>
                         </div>
                     @endif
 
-                    @if ($eventStart)
+                    @if ($eventDurationLabel)
                         <div class="info-item">
                             <div class="info-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <circle cx="12" cy="12" r="9"/>
-                                    <path d="M12 7v5l3 2"/>
+                                    <path d="M8 3v3M16 3v3M4 9h16"/>
+                                    <rect x="3" y="5" width="18" height="16" rx="2"/>
+                                    <path d="M8 13h3M13 13h3M8 17h3M13 17h3"/>
                                 </svg>
                             </div>
 
                             <div class="info-copy">
-                                <strong>Starts</strong>
-                                <span>
-                                    {{ $eventStart->format('D, d M Y') }}
-                                    @if ($eventStart->format('H:i') !== '00:00')
-                                        · {{ $eventStart->format('H:i') }}
-                                    @endif
-                                </span>
-                            </div>
-                        </div>
-                    @endif
-
-                    @if ($eventEnd)
-                        <div class="info-item">
-                            <div class="info-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <circle cx="12" cy="12" r="9"/>
-                                    <path d="M12 7v5l3 2"/>
-                                </svg>
-                            </div>
-
-                            <div class="info-copy">
-                                <strong>Ends</strong>
-                                <span>
-                                    {{ $eventEnd->format('D, d M Y') }}
-                                    @if ($eventEnd->format('H:i') !== '00:00')
-                                        · {{ $eventEnd->format('H:i') }}
-                                    @endif
-                                </span>
+                                <strong>Duration</strong>
+                                <span>{{ $eventDurationLabel }}</span>
                             </div>
                         </div>
                     @endif
