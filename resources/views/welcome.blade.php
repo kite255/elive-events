@@ -135,6 +135,199 @@
             align-items: flex-end;
             padding: 16px;
         }
+
+        .home-events-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 24px;
+            align-items: start;
+        }
+
+        .home-event-card {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 18px;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .home-event-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 34px rgba(15, 23, 42, .12);
+        }
+
+        .home-event-card.live-card {
+            border-color: #86EFAC;
+        }
+
+        .home-event-media {
+            position: relative;
+            height: 180px;
+            overflow: hidden;
+            background: #DDE4EE;
+            display: block;
+        }
+
+        .home-event-image,
+        .home-event-fallback {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .home-event-image {
+            object-fit: cover;
+            transition: transform .3s ease;
+        }
+
+        .home-event-card:hover .home-event-image {
+            transform: scale(1.03);
+        }
+
+        .home-event-fallback {
+            background: linear-gradient(135deg, #233F7D, #1B3267);
+        }
+
+        .home-status-badge {
+            position: absolute;
+            left: 14px;
+            top: 14px;
+            z-index: 2;
+            min-height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px;
+            border-radius: 6px;
+            color: #FFFFFF;
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, .18);
+        }
+
+        .home-status-badge.live {
+            background: #16A34A;
+        }
+
+        .home-status-badge.upcoming {
+            background: #FF9418;
+        }
+
+        .home-status-badge.ended {
+            background: #DC2626;
+        }
+
+        .home-event-body {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            padding: 16px 16px 18px;
+        }
+
+        .home-event-title {
+            margin: 0;
+            color: #1F2937;
+            font-size: 17px;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+        .home-event-title a:hover {
+            color: #233F7D;
+        }
+
+        .home-event-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .home-meta-item {
+            min-width: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #6B7280;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .home-meta-item svg {
+            width: 15px;
+            height: 15px;
+            flex: 0 0 auto;
+            color: #233F7D;
+        }
+
+        .home-event-description {
+            margin: 12px 0 0;
+            color: #6B7280;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .home-event-actions {
+            margin-top: auto;
+            padding-top: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .home-register-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 36px;
+            padding: 0 14px;
+            border-radius: 8px;
+            border: 1px solid #233F7D;
+            background: #233F7D;
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            box-shadow: 0 4px 10px rgba(35, 63, 125, .18);
+            transition: background .2s ease, transform .2s ease;
+        }
+
+        .home-register-btn:hover {
+            background: #1B3267;
+            transform: translateY(-1px);
+        }
+
+        .home-ended-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 36px;
+            padding: 0 14px;
+            border-radius: 8px;
+            background: #E5E7EB;
+            color: #6B7280;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 980px) {
+            .home-events-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 700px) {
+            .home-events-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -300,8 +493,8 @@
 
                 </div>
 
-                {{-- Compact event list --}}
-                <div class="mx-auto mt-12" style="width:100%; max-width:760px;">
+                {{-- Compact event cards --}}
+                <div class="mx-auto mt-12" style="width:100%; max-width:1180px;">
 
                     {{-- HAPPENING NOW --}}
                     @if ($happeningNowEvents->isNotEmpty())
@@ -325,7 +518,7 @@
 
                             </div>
 
-                            <div class="space-y-4">
+                            <div class="home-events-grid">
 
                                 @foreach ($happeningNowEvents as $event)
 
@@ -339,7 +532,6 @@
                                             : null;
 
                                         $eventName = trim((string) $event->name);
-                                        $eventType = '';
 
                                         $assignedDays = $eventDaysByEvent
                                             ->get($event->id, collect())
@@ -356,29 +548,57 @@
 
                                         $usesAssignedDays = $assignedDates->isNotEmpty();
                                         $isAssignedMultiDay = $assignedDates->count() > 1;
-
                                         $displayDate = $assignedDates->first() ?? $eventStart;
-                                        $lastAssignedDate = $assignedDates->last() ?? $eventStart;
 
-                                        $assignedDatesLabel = null;
+                                        $cardDateLabel = null;
 
-                                        if ($usesAssignedDays) {
-                                            $years = $assignedDates
-                                                ->map(fn ($date) => $date->format('Y'))
-                                                ->unique();
+                                        if ($isAssignedMultiDay) {
+                                            $firstDate = $assignedDates->first();
+                                            $lastDate = $assignedDates->last();
 
-                                            $sameYear = $years->count() === 1;
+                                            if (
+                                                $firstDate->year === $lastDate->year
+                                                && $firstDate->month === $lastDate->month
+                                            ) {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            } elseif ($firstDate->year === $lastDate->year) {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d M')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            } else {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d M Y')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            }
+                                        } elseif ($displayDate) {
+                                            $cardDateLabel = $displayDate->format('d M Y');
+                                        }
 
-                                            $assignedDatesLabel = $assignedDates
-                                                ->map(
-                                                    fn ($date) => $sameYear
-                                                        ? $date->format('d M')
-                                                        : $date->format('d M Y')
-                                                )
-                                                ->implode(' • ');
+                                        $cardTimeLabel = null;
 
-                                            if ($sameYear) {
-                                                $assignedDatesLabel .= ' ' . $assignedDates->first()->format('Y');
+                                        if ($usesAssignedDays && $assignedDays->first()?->starts_at) {
+                                            $cardTimeLabel =
+                                                \Illuminate\Support\Carbon::parse(
+                                                    $assignedDays->first()->starts_at
+                                                )->format('g:i A');
+
+                                            if ($assignedDays->first()?->ends_at) {
+                                                $cardTimeLabel .=
+                                                    ' - '
+                                                    . \Illuminate\Support\Carbon::parse(
+                                                        $assignedDays->first()->ends_at
+                                                    )->format('g:i A');
+                                            }
+                                        } elseif ($eventStart) {
+                                            $cardTimeLabel = $eventStart->format('g:i A');
+
+                                            if ($eventEnd) {
+                                                $cardTimeLabel .= ' - ' . $eventEnd->format('g:i A');
                                             }
                                         }
 
@@ -397,153 +617,93 @@
                                                 $eventImageUrl = asset('storage/' . ltrim($eventImage, '/'));
                                             }
                                         }
+
+                                        $description = trim(strip_tags((string) $event->description));
                                     @endphp
 
-                                    <article
-                                        class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg"
-                                    >
+                                    <article class="home-event-card live-card">
 
-                                        <div style="display:grid; grid-template-columns:105px minmax(0,1fr) 90px; min-height:118px;">
+                                        <a
+                                            href="{{ $eventDetailsUrl }}"
+                                            class="home-event-media"
+                                            aria-label="{{ $eventName !== '' ? $eventName : 'View event' }}"
+                                        >
+                                            @if ($eventImageUrl)
+                                                <img
+                                                    src="{{ $eventImageUrl }}"
+                                                    alt="{{ $eventName !== '' ? $eventName : 'Event image' }}"
+                                                    class="home-event-image"
+                                                >
+                                            @else
+                                                <div class="home-event-fallback"></div>
+                                            @endif
 
-                                            {{-- Visual / status --}}
-                                            <a
-                                                href="{{ $eventDetailsUrl }}"
-                                                class="relative block overflow-hidden"
-                                                aria-label="{{ $eventName !== '' ? $eventName : 'View event' }}"
-                                            >
-                                                @if ($eventImageUrl)
-                                                    <img
-                                                        src="{{ $eventImageUrl }}"
-                                                        alt="{{ $eventName !== '' ? $eventName : 'Event image' }}"
-                                                        class="event-ticket-image"
-                                                    >
-                                                    <div
-                                                        class="absolute inset-0"
-                                                        style="background: linear-gradient(to top, rgba(16,42,82,.72), rgba(16,42,82,.08) 65%);"
-                                                    ></div>
-                                                    <div class="absolute bottom-0 left-0 p-4">
-                                                        <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#ffffff;">
-                                                            Live
-                                                        </span>
-                                                    </div>
-                                                @else
-                                                    <div
-                                                        class="event-ticket-fallback"
-                                                        style="background: linear-gradient(145deg, #102A52 0%, #233F7D 62%, #3B5FA5 100%);"
-                                                    >
-                                                        <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#ffffff;">
-                                                            Live
+                                            <span class="home-status-badge live">
+                                                Live Now
+                                            </span>
+                                        </a>
+
+                                        <div class="home-event-body">
+
+                                            <h4 class="home-event-title">
+                                                <a href="{{ $eventDetailsUrl }}">
+                                                    {{ $eventName !== '' ? $eventName : 'Event' }}
+                                                </a>
+                                            </h4>
+
+                                            <div class="home-event-meta">
+
+                                                @if ($cardDateLabel)
+                                                    <div class="home-meta-item">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                            <rect x="3" y="5" width="18" height="16" rx="2"/>
+                                                            <path d="M16 3v4M8 3v4M3 10h18"/>
+                                                        </svg>
+
+                                                        <span>
+                                                            {{ $cardDateLabel }}
+                                                            @if ($cardTimeLabel)
+                                                                · {{ $cardTimeLabel }}
+                                                            @endif
                                                         </span>
                                                     </div>
                                                 @endif
-                                            </a>
 
-                                            {{-- Event content --}}
-                                            <div class="flex min-w-0 flex-col justify-between px-5 py-3.5">
+                                                @if ($event->venue)
+                                                    <div class="home-meta-item">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                            <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/>
+                                                            <circle cx="12" cy="10" r="2"/>
+                                                        </svg>
 
-                                                <div class="min-w-0">
+                                                        <span>{{ $event->venue }}</span>
+                                                    </div>
+                                                @endif
 
-                                                    <h4 class="mt-1 truncate text-base font-bold text-slate-900 sm:text-lg">
-                                                        <a href="{{ $eventDetailsUrl }}" class="transition hover:text-[#233F7D]">
-                                                            {{ $eventName !== '' ? $eventName : 'Event' }}
-                                                        </a>
-                                                    </h4>
+                                            </div>
 
-                                                    @if ($event->venue)
-                                                        <p class="mt-1 truncate text-xs text-slate-500 sm:text-sm">
-                                                            {{ $event->venue }}
-                                                        </p>
-                                                    @endif
+                                            @if ($description !== '')
+                                                <p class="home-event-description">
+                                                    {{ \Illuminate\Support\Str::limit($description, 105) }}
+                                                </p>
+                                            @endif
 
-                                                    @if ($usesAssignedDays)
-                                                        <div class="mt-2">
-                                                            <p class="text-xs font-semibold text-slate-700 sm:text-sm">
-                                                                {{ $assignedDatesLabel }}
-                                                            </p>
-
-                                                            @if ($isAssignedMultiDay)
-                                                                <p class="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#FF9418]">
-                                                                    {{ $assignedDates->count() }} Assigned Days
-                                                                </p>
-                                                            @elseif ($assignedDays->first()?->starts_at)
-                                                                <p class="mt-0.5 text-[11px] text-slate-500">
-                                                                    {{ \Illuminate\Support\Carbon::parse($assignedDays->first()->starts_at)->format('g:i A') }}
-                                                                    @if ($assignedDays->first()?->ends_at)
-                                                                        – {{ \Illuminate\Support\Carbon::parse($assignedDays->first()->ends_at)->format('g:i A') }}
-                                                                    @endif
-                                                                </p>
-                                                            @endif
-                                                        </div>
-                                                    @elseif ($eventStart)
-                                                        <p class="mt-2 text-xs text-slate-600 sm:text-sm">
-                                                            {{ $eventStart->format('D, g:i A') }}
-                                                            @if ($eventEnd)
-                                                                – {{ $eventEnd->format('g:i A') }}
-                                                            @endif
-                                                        </p>
-                                                    @endif
-
-                                                </div>
-
-                                                <div class="mt-3 flex items-center justify-between gap-3">
+                                            <div class="home-event-actions">
 
                                                     @if ($event->registration_is_open)
-                                                        <span class="text-[11px] font-semibold text-emerald-700">
-                                                            Registration Open
-                                                        </span>
-
                                                         <a
                                                             href="{{ $eventRegisterUrl }}"
-                                                            class="rounded-lg bg-[#233F7D] px-4 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#1b3267]"
+                                                            class="home-register-btn"
                                                         >
-                                                            Register
+                                                            Register Now
                                                         </a>
                                                     @else
-                                                        <span class="text-[11px] font-semibold text-slate-500">
+                                                        <span class="home-ended-label">
                                                             Registration Closed
                                                         </span>
                                                     @endif
 
-                                                </div>
-
                                             </div>
-
-                                            {{-- Date ticket --}}
-                                            @if ($displayDate)
-                                                <div class="relative flex flex-col items-center justify-center border-l border-dashed border-slate-300 bg-slate-50 px-2 text-center">
-
-                                                    @if ($usesAssignedDays && $isAssignedMultiDay)
-                                                        <span class="text-[9px] font-bold uppercase tracking-wider text-[#FF9418]">
-                                                            {{ $assignedDates->count() }} Days
-                                                        </span>
-
-                                                        <span class="mt-1 text-2xl font-light leading-none text-slate-900">
-                                                            {{ $displayDate->format('d') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-[9px] font-semibold uppercase text-slate-400">
-                                                            {{ $displayDate->format('M') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-[9px] text-slate-400">
-                                                            {{ $displayDate->format('Y') }}
-                                                        </span>
-                                                    @else
-                                                        <span class="text-[10px] font-bold uppercase tracking-wider text-[#FF9418]">
-                                                            {{ $displayDate->format('M') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-3xl font-light leading-none text-slate-900 sm:text-4xl">
-                                                            {{ $displayDate->format('d') }}
-                                                        </span>
-
-                                                        <span class="mt-2 text-[9px] text-slate-400">
-                                                            {{ $displayDate->format('Y') }}
-                                                        </span>
-                                                    @endif
-
-                                                </div>
-                                            @endif
 
                                         </div>
 
@@ -578,7 +738,7 @@
 
                         @if ($upcomingEvents->isNotEmpty())
 
-                            <div class="space-y-4">
+                            <div class="home-events-grid">
 
                                 @foreach ($upcomingEvents as $event)
 
@@ -592,7 +752,6 @@
                                             : null;
 
                                         $eventName = trim((string) $event->name);
-                                        $eventType = '';
 
                                         $assignedDays = $eventDaysByEvent
                                             ->get($event->id, collect())
@@ -609,29 +768,57 @@
 
                                         $usesAssignedDays = $assignedDates->isNotEmpty();
                                         $isAssignedMultiDay = $assignedDates->count() > 1;
-
                                         $displayDate = $assignedDates->first() ?? $eventStart;
-                                        $lastAssignedDate = $assignedDates->last() ?? $eventStart;
 
-                                        $assignedDatesLabel = null;
+                                        $cardDateLabel = null;
 
-                                        if ($usesAssignedDays) {
-                                            $years = $assignedDates
-                                                ->map(fn ($date) => $date->format('Y'))
-                                                ->unique();
+                                        if ($isAssignedMultiDay) {
+                                            $firstDate = $assignedDates->first();
+                                            $lastDate = $assignedDates->last();
 
-                                            $sameYear = $years->count() === 1;
+                                            if (
+                                                $firstDate->year === $lastDate->year
+                                                && $firstDate->month === $lastDate->month
+                                            ) {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            } elseif ($firstDate->year === $lastDate->year) {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d M')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            } else {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d M Y')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            }
+                                        } elseif ($displayDate) {
+                                            $cardDateLabel = $displayDate->format('d M Y');
+                                        }
 
-                                            $assignedDatesLabel = $assignedDates
-                                                ->map(
-                                                    fn ($date) => $sameYear
-                                                        ? $date->format('d M')
-                                                        : $date->format('d M Y')
-                                                )
-                                                ->implode(' • ');
+                                        $cardTimeLabel = null;
 
-                                            if ($sameYear) {
-                                                $assignedDatesLabel .= ' ' . $assignedDates->first()->format('Y');
+                                        if ($usesAssignedDays && $assignedDays->first()?->starts_at) {
+                                            $cardTimeLabel =
+                                                \Illuminate\Support\Carbon::parse(
+                                                    $assignedDays->first()->starts_at
+                                                )->format('g:i A');
+
+                                            if ($assignedDays->first()?->ends_at) {
+                                                $cardTimeLabel .=
+                                                    ' - '
+                                                    . \Illuminate\Support\Carbon::parse(
+                                                        $assignedDays->first()->ends_at
+                                                    )->format('g:i A');
+                                            }
+                                        } elseif ($eventStart) {
+                                            $cardTimeLabel = $eventStart->format('g:i A');
+
+                                            if ($eventEnd) {
+                                                $cardTimeLabel .= ' - ' . $eventEnd->format('g:i A');
                                             }
                                         }
 
@@ -650,153 +837,93 @@
                                                 $eventImageUrl = asset('storage/' . ltrim($eventImage, '/'));
                                             }
                                         }
+
+                                        $description = trim(strip_tags((string) $event->description));
                                     @endphp
 
-                                    <article
-                                        class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg"
-                                    >
+                                    <article class="home-event-card ">
 
-                                        <div style="display:grid; grid-template-columns:105px minmax(0,1fr) 90px; min-height:118px;">
+                                        <a
+                                            href="{{ $eventDetailsUrl }}"
+                                            class="home-event-media"
+                                            aria-label="{{ $eventName !== '' ? $eventName : 'View event' }}"
+                                        >
+                                            @if ($eventImageUrl)
+                                                <img
+                                                    src="{{ $eventImageUrl }}"
+                                                    alt="{{ $eventName !== '' ? $eventName : 'Event image' }}"
+                                                    class="home-event-image"
+                                                >
+                                            @else
+                                                <div class="home-event-fallback"></div>
+                                            @endif
 
-                                            {{-- Visual / status --}}
-                                            <a
-                                                href="{{ $eventDetailsUrl }}"
-                                                class="relative block overflow-hidden"
-                                                aria-label="{{ $eventName !== '' ? $eventName : 'View event' }}"
-                                            >
-                                                @if ($eventImageUrl)
-                                                    <img
-                                                        src="{{ $eventImageUrl }}"
-                                                        alt="{{ $eventName !== '' ? $eventName : 'Event image' }}"
-                                                        class="event-ticket-image"
-                                                    >
-                                                    <div
-                                                        class="absolute inset-0"
-                                                        style="background: linear-gradient(to top, rgba(16,42,82,.56), rgba(16,42,82,.02) 62%);"
-                                                    ></div>
-                                                    <div class="absolute bottom-0 left-0 p-4">
-                                                        <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#ffffff;">
-                                                            Upcoming
-                                                        </span>
-                                                    </div>
-                                                @else
-                                                    <div
-                                                        class="event-ticket-fallback"
-                                                        style="background: linear-gradient(145deg, #E9EFF8 0%, #D9E3F1 100%);"
-                                                    >
-                                                        <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#233F7D;">
-                                                            Upcoming
+                                            <span class="home-status-badge upcoming">
+                                                Upcoming
+                                            </span>
+                                        </a>
+
+                                        <div class="home-event-body">
+
+                                            <h4 class="home-event-title">
+                                                <a href="{{ $eventDetailsUrl }}">
+                                                    {{ $eventName !== '' ? $eventName : 'Event' }}
+                                                </a>
+                                            </h4>
+
+                                            <div class="home-event-meta">
+
+                                                @if ($cardDateLabel)
+                                                    <div class="home-meta-item">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                            <rect x="3" y="5" width="18" height="16" rx="2"/>
+                                                            <path d="M16 3v4M8 3v4M3 10h18"/>
+                                                        </svg>
+
+                                                        <span>
+                                                            {{ $cardDateLabel }}
+                                                            @if ($cardTimeLabel)
+                                                                · {{ $cardTimeLabel }}
+                                                            @endif
                                                         </span>
                                                     </div>
                                                 @endif
-                                            </a>
 
-                                            {{-- Event content --}}
-                                            <div class="flex min-w-0 flex-col justify-between px-5 py-3.5">
+                                                @if ($event->venue)
+                                                    <div class="home-meta-item">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                            <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/>
+                                                            <circle cx="12" cy="10" r="2"/>
+                                                        </svg>
 
-                                                <div class="min-w-0">
+                                                        <span>{{ $event->venue }}</span>
+                                                    </div>
+                                                @endif
 
-                                                    <h4 class="mt-1 truncate text-base font-bold text-slate-900 sm:text-lg">
-                                                        <a href="{{ $eventDetailsUrl }}" class="transition hover:text-[#233F7D]">
-                                                            {{ $eventName !== '' ? $eventName : 'Event' }}
-                                                        </a>
-                                                    </h4>
+                                            </div>
 
-                                                    @if ($event->venue)
-                                                        <p class="mt-1 truncate text-xs text-slate-500 sm:text-sm">
-                                                            {{ $event->venue }}
-                                                        </p>
-                                                    @endif
+                                            @if ($description !== '')
+                                                <p class="home-event-description">
+                                                    {{ \Illuminate\Support\Str::limit($description, 105) }}
+                                                </p>
+                                            @endif
 
-                                                    @if ($usesAssignedDays)
-                                                        <div class="mt-2">
-                                                            <p class="text-xs font-semibold text-slate-700 sm:text-sm">
-                                                                {{ $assignedDatesLabel }}
-                                                            </p>
-
-                                                            @if ($isAssignedMultiDay)
-                                                                <p class="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#FF9418]">
-                                                                    {{ $assignedDates->count() }} Assigned Days
-                                                                </p>
-                                                            @elseif ($assignedDays->first()?->starts_at)
-                                                                <p class="mt-0.5 text-[11px] text-slate-500">
-                                                                    {{ \Illuminate\Support\Carbon::parse($assignedDays->first()->starts_at)->format('g:i A') }}
-                                                                    @if ($assignedDays->first()?->ends_at)
-                                                                        – {{ \Illuminate\Support\Carbon::parse($assignedDays->first()->ends_at)->format('g:i A') }}
-                                                                    @endif
-                                                                </p>
-                                                            @endif
-                                                        </div>
-                                                    @elseif ($eventStart)
-                                                        <p class="mt-2 text-xs text-slate-600 sm:text-sm">
-                                                            {{ $eventStart->format('D, g:i A') }}
-                                                            @if ($eventEnd)
-                                                                – {{ $eventEnd->format('g:i A') }}
-                                                            @endif
-                                                        </p>
-                                                    @endif
-
-                                                </div>
-
-                                                <div class="mt-3 flex items-center justify-between gap-3">
+                                            <div class="home-event-actions">
 
                                                     @if ($event->registration_is_open)
-                                                        <span class="text-[11px] font-semibold text-emerald-700">
-                                                            Registration Open
-                                                        </span>
-
                                                         <a
                                                             href="{{ $eventRegisterUrl }}"
-                                                            class="rounded-lg bg-[#233F7D] px-4 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#1b3267]"
+                                                            class="home-register-btn"
                                                         >
-                                                            Register
+                                                            Register Now
                                                         </a>
                                                     @else
-                                                        <span class="text-[11px] font-semibold text-slate-500">
+                                                        <span class="home-ended-label">
                                                             Registration Closed
                                                         </span>
                                                     @endif
 
-                                                </div>
-
                                             </div>
-
-                                            {{-- Date ticket --}}
-                                            @if ($displayDate)
-                                                <div class="relative flex flex-col items-center justify-center border-l border-dashed border-slate-300 bg-slate-50 px-2 text-center">
-
-                                                    @if ($usesAssignedDays && $isAssignedMultiDay)
-                                                        <span class="text-[9px] font-bold uppercase tracking-wider text-[#FF9418]">
-                                                            {{ $assignedDates->count() }} Days
-                                                        </span>
-
-                                                        <span class="mt-1 text-2xl font-light leading-none text-slate-900">
-                                                            {{ $displayDate->format('d') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-[9px] font-semibold uppercase text-slate-400">
-                                                            {{ $displayDate->format('M') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-[9px] text-slate-400">
-                                                            {{ $displayDate->format('Y') }}
-                                                        </span>
-                                                    @else
-                                                        <span class="text-[10px] font-bold uppercase tracking-wider text-[#FF9418]">
-                                                            {{ $displayDate->format('M') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-3xl font-light leading-none text-slate-900 sm:text-4xl">
-                                                            {{ $displayDate->format('d') }}
-                                                        </span>
-
-                                                        <span class="mt-2 text-[9px] text-slate-400">
-                                                            {{ $displayDate->format('Y') }}
-                                                        </span>
-                                                    @endif
-
-                                                </div>
-                                            @endif
 
                                         </div>
 
@@ -843,7 +970,7 @@
 
                             </div>
 
-                            <div class="space-y-4">
+                            <div class="home-events-grid">
 
                                 @foreach ($pastEvents as $event)
 
@@ -852,8 +979,11 @@
                                             ? \Illuminate\Support\Carbon::parse($event->starts_at)
                                             : null;
 
+                                        $eventEnd = $event->ends_at
+                                            ? \Illuminate\Support\Carbon::parse($event->ends_at)
+                                            : null;
+
                                         $eventName = trim((string) $event->name);
-                                        $eventType = '';
 
                                         $assignedDays = $eventDaysByEvent
                                             ->get($event->id, collect())
@@ -870,29 +1000,57 @@
 
                                         $usesAssignedDays = $assignedDates->isNotEmpty();
                                         $isAssignedMultiDay = $assignedDates->count() > 1;
-
                                         $displayDate = $assignedDates->first() ?? $eventStart;
-                                        $lastAssignedDate = $assignedDates->last() ?? $eventStart;
 
-                                        $assignedDatesLabel = null;
+                                        $cardDateLabel = null;
 
-                                        if ($usesAssignedDays) {
-                                            $years = $assignedDates
-                                                ->map(fn ($date) => $date->format('Y'))
-                                                ->unique();
+                                        if ($isAssignedMultiDay) {
+                                            $firstDate = $assignedDates->first();
+                                            $lastDate = $assignedDates->last();
 
-                                            $sameYear = $years->count() === 1;
+                                            if (
+                                                $firstDate->year === $lastDate->year
+                                                && $firstDate->month === $lastDate->month
+                                            ) {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            } elseif ($firstDate->year === $lastDate->year) {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d M')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            } else {
+                                                $cardDateLabel =
+                                                    $firstDate->format('d M Y')
+                                                    . ' - '
+                                                    . $lastDate->format('d M Y');
+                                            }
+                                        } elseif ($displayDate) {
+                                            $cardDateLabel = $displayDate->format('d M Y');
+                                        }
 
-                                            $assignedDatesLabel = $assignedDates
-                                                ->map(
-                                                    fn ($date) => $sameYear
-                                                        ? $date->format('d M')
-                                                        : $date->format('d M Y')
-                                                )
-                                                ->implode(' • ');
+                                        $cardTimeLabel = null;
 
-                                            if ($sameYear) {
-                                                $assignedDatesLabel .= ' ' . $assignedDates->first()->format('Y');
+                                        if ($usesAssignedDays && $assignedDays->first()?->starts_at) {
+                                            $cardTimeLabel =
+                                                \Illuminate\Support\Carbon::parse(
+                                                    $assignedDays->first()->starts_at
+                                                )->format('g:i A');
+
+                                            if ($assignedDays->first()?->ends_at) {
+                                                $cardTimeLabel .=
+                                                    ' - '
+                                                    . \Illuminate\Support\Carbon::parse(
+                                                        $assignedDays->first()->ends_at
+                                                    )->format('g:i A');
+                                            }
+                                        } elseif ($eventStart) {
+                                            $cardTimeLabel = $eventStart->format('g:i A');
+
+                                            if ($eventEnd) {
+                                                $cardTimeLabel .= ' - ' . $eventEnd->format('g:i A');
                                             }
                                         }
 
@@ -911,95 +1069,84 @@
                                                 $eventImageUrl = asset('storage/' . ltrim($eventImage, '/'));
                                             }
                                         }
+
+                                        $description = trim(strip_tags((string) $event->description));
                                     @endphp
 
-                                    <article
-                                        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-                                    >
+                                    <article class="home-event-card ">
 
-                                        <div style="display:grid; grid-template-columns:92px minmax(0,1fr) 90px; min-height:102px;">
+                                        <a
+                                            href="{{ $eventDetailsUrl }}"
+                                            class="home-event-media"
+                                            aria-label="{{ $eventName !== '' ? $eventName : 'View event' }}"
+                                        >
+                                            @if ($eventImageUrl)
+                                                <img
+                                                    src="{{ $eventImageUrl }}"
+                                                    alt="{{ $eventName !== '' ? $eventName : 'Event image' }}"
+                                                    class="home-event-image"
+                                                >
+                                            @else
+                                                <div class="home-event-fallback"></div>
+                                            @endif
 
-                                            <a
-                                                href="{{ $eventDetailsUrl }}"
-                                                class="relative block overflow-hidden"
-                                                aria-label="{{ $eventName !== '' ? $eventName : 'View event' }}"
-                                            >
-                                                @if ($eventImageUrl)
-                                                    <img
-                                                        src="{{ $eventImageUrl }}"
-                                                        alt="{{ $eventName !== '' ? $eventName : 'Event image' }}"
-                                                        class="event-ticket-image"
-                                                        style="filter: grayscale(35%); opacity:.82;"
-                                                    >
-                                                @else
-                                                    <div
-                                                        class="h-full w-full"
-                                                        style="background: linear-gradient(145deg, #D8DEE8 0%, #BAC4D1 100%);"
-                                                    ></div>
+                                            <span class="home-status-badge ended">
+                                                Ended
+                                            </span>
+                                        </a>
+
+                                        <div class="home-event-body">
+
+                                            <h4 class="home-event-title">
+                                                <a href="{{ $eventDetailsUrl }}">
+                                                    {{ $eventName !== '' ? $eventName : 'Event' }}
+                                                </a>
+                                            </h4>
+
+                                            <div class="home-event-meta">
+
+                                                @if ($cardDateLabel)
+                                                    <div class="home-meta-item">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                            <rect x="3" y="5" width="18" height="16" rx="2"/>
+                                                            <path d="M16 3v4M8 3v4M3 10h18"/>
+                                                        </svg>
+
+                                                        <span>
+                                                            {{ $cardDateLabel }}
+                                                            @if ($cardTimeLabel)
+                                                                · {{ $cardTimeLabel }}
+                                                            @endif
+                                                        </span>
+                                                    </div>
                                                 @endif
-                                            </a>
-
-                                            <div class="min-w-0 px-5 py-4">
-
-                                                <h4 class="mt-1 truncate text-base font-bold text-slate-700 sm:text-lg">
-                                                    <a href="{{ $eventDetailsUrl }}" class="transition hover:text-[#233F7D]">
-                                                        {{ $eventName !== '' ? $eventName : 'Event' }}
-                                                    </a>
-                                                </h4>
 
                                                 @if ($event->venue)
-                                                    <p class="mt-1 truncate text-xs text-slate-500 sm:text-sm">
-                                                        {{ $event->venue }}
-                                                    </p>
-                                                @endif
+                                                    <div class="home-meta-item">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                            <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/>
+                                                            <circle cx="12" cy="10" r="2"/>
+                                                        </svg>
 
-                                                @if ($usesAssignedDays)
-                                                    <p class="mt-2 text-[11px] text-slate-500">
-                                                        {{ $assignedDatesLabel }}
-                                                    </p>
+                                                        <span>{{ $event->venue }}</span>
+                                                    </div>
                                                 @endif
-
-                                                <p class="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                                                    Event Ended
-                                                </p>
 
                                             </div>
 
-                                            @if ($displayDate)
-                                                <div class="flex flex-col items-center justify-center border-l border-dashed border-slate-300 bg-slate-50 px-2 text-center">
-
-                                                    @if ($usesAssignedDays && $isAssignedMultiDay)
-                                                        <span class="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                                                            {{ $assignedDates->count() }} Days
-                                                        </span>
-
-                                                        <span class="mt-1 text-xl font-light leading-none text-slate-600">
-                                                            {{ $displayDate->format('d') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-[9px] font-semibold uppercase text-slate-400">
-                                                            {{ $displayDate->format('M') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-[9px] text-slate-400">
-                                                            {{ $displayDate->format('Y') }}
-                                                        </span>
-                                                    @else
-                                                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                                            {{ $displayDate->format('M') }}
-                                                        </span>
-
-                                                        <span class="mt-1 text-2xl font-light leading-none text-slate-600 sm:text-3xl">
-                                                            {{ $displayDate->format('d') }}
-                                                        </span>
-
-                                                        <span class="mt-2 text-[9px] text-slate-400">
-                                                            {{ $displayDate->format('Y') }}
-                                                        </span>
-                                                    @endif
-
-                                                </div>
+                                            @if ($description !== '')
+                                                <p class="home-event-description">
+                                                    {{ \Illuminate\Support\Str::limit($description, 105) }}
+                                                </p>
                                             @endif
+
+                                            <div class="home-event-actions">
+
+                                                    <span class="home-ended-label">
+                                                        Event Ended
+                                                    </span>
+
+                                            </div>
 
                                         </div>
 
