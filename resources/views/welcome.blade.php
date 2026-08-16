@@ -65,6 +65,19 @@
         ->orderBy('id')
         ->get()
         ->groupBy('event_id');
+
+    /*
+     * eLive social media links.
+     * Instagram and Facebook are filled from the public profiles found for eLive.
+     * Replace TikTok and LinkedIn below with the exact official profile URLs
+     * if your handles differ.
+     */
+    $socialLinks = [
+        'instagram' => 'https://www.instagram.com/elive.co.tz?igsh=aG44bjE0Nm1maTh3&igsi=aG44bjE0Nm1maTh3',
+        'tiktok' => 'https://www.tiktok.com/@elive_card',
+        'facebook' => 'https://www.facebook.com/elive.co.tz',
+        'linkedin' => 'https://www.linkedin.com/company/elive-company-limited',
+    ];
 @endphp
 
 <!DOCTYPE html>
@@ -136,23 +149,37 @@
             padding: 16px;
         }
 
-        .home-events-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+        .home-events-carousel {
+            position: relative;
+        }
+
+        .home-events-track {
+            display: flex;
             gap: 24px;
-            align-items: start;
+            overflow-x: auto;
+            scroll-behavior: smooth;
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding: 2px 2px 14px;
+        }
+
+        .home-events-track::-webkit-scrollbar {
+            display: none;
         }
 
         .home-event-card {
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            flex: 0 0 calc((100% - 48px) / 3);
             min-width: 0;
             background: #FFFFFF;
             border: 1px solid #E5E7EB;
             border-radius: 18px;
             box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
             transition: transform .2s ease, box-shadow .2s ease;
+            scroll-snap-align: start;
         }
 
         .home-event-card:hover {
@@ -317,17 +344,61 @@
             font-weight: 700;
         }
 
+        .home-carousel-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .home-carousel-btn {
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #D8E0EA;
+            border-radius: 10px;
+            background: #FFFFFF;
+            color: #233F7D;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+            transition: background .2s ease, color .2s ease, border-color .2s ease, transform .2s ease;
+        }
+
+        .home-carousel-btn:hover {
+            background: #233F7D;
+            color: #FFFFFF;
+            border-color: #233F7D;
+            transform: translateY(-1px);
+        }
+
+        .home-carousel-btn:disabled {
+            opacity: .35;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .home-carousel-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
         @media (max-width: 980px) {
-            .home-events-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+            .home-event-card {
+                flex-basis: calc((100% - 24px) / 2);
             }
         }
 
         @media (max-width: 700px) {
-            .home-events-grid {
-                grid-template-columns: 1fr;
+            .home-event-card {
+                flex-basis: 88%;
+            }
+
+            .home-events-track {
+                gap: 16px;
             }
         }
+
     </style>
 </head>
 
@@ -516,9 +587,24 @@
                                     </p>
                                 </div>
 
+                                <div class="home-carousel-controls">
+                                    <button type="button" class="home-carousel-btn" data-carousel-prev aria-label="Previous happening events">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="m15 18-6-6 6-6"/>
+                                        </svg>
+                                    </button>
+
+                                    <button type="button" class="home-carousel-btn" data-carousel-next aria-label="Next happening events">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="m9 18 6-6-6-6"/>
+                                        </svg>
+                                    </button>
+                                </div>
+
                             </div>
 
-                            <div class="home-events-grid">
+                            <div class="home-events-carousel" data-event-carousel>
+                                <div class="home-events-track" data-carousel-track>
 
                                 @foreach ($happeningNowEvents as $event)
 
@@ -711,6 +797,7 @@
 
                                 @endforeach
 
+                                </div>
                             </div>
 
                         </div>
@@ -720,25 +807,42 @@
                     {{-- UPCOMING EVENTS --}}
                     <div class="{{ $happeningNowEvents->isNotEmpty() ? 'mt-10' : '' }}">
 
-                        <div class="mb-4">
+                        <div class="mb-4 flex items-end justify-between gap-4">
 
-                            <div class="flex items-center gap-3">
-                                <span class="h-2.5 w-2.5 rounded-full bg-[#FF9418]"></span>
+                            <div>
+                                <div class="flex items-center gap-3">
+                                    <span class="h-2.5 w-2.5 rounded-full bg-[#FF9418]"></span>
 
-                                <h3 class="text-xl font-bold text-[#233F7D]">
-                                    Upcoming Events
-                                </h3>
+                                    <h3 class="text-xl font-bold text-[#233F7D]">
+                                        Upcoming Events
+                                    </h3>
+                                </div>
+
+                                <p class="mt-1 pl-5 text-sm text-slate-500">
+                                    Events scheduled to start soon.
+                                </p>
                             </div>
 
-                            <p class="mt-1 pl-5 text-sm text-slate-500">
-                                Events scheduled to start soon.
-                            </p>
+                            <div class="home-carousel-controls">
+                                <button type="button" class="home-carousel-btn" data-carousel-prev aria-label="Previous upcoming events">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="m15 18-6-6 6-6"/>
+                                    </svg>
+                                </button>
+
+                                <button type="button" class="home-carousel-btn" data-carousel-next aria-label="Next upcoming events">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="m9 18 6-6-6-6"/>
+                                    </svg>
+                                </button>
+                            </div>
 
                         </div>
 
                         @if ($upcomingEvents->isNotEmpty())
 
-                            <div class="home-events-grid">
+                            <div class="home-events-carousel" data-event-carousel>
+                                <div class="home-events-track" data-carousel-track>
 
                                 @foreach ($upcomingEvents as $event)
 
@@ -931,6 +1035,7 @@
 
                                 @endforeach
 
+                                </div>
                             </div>
 
                         @else
@@ -954,23 +1059,40 @@
                     @if ($pastEvents->isNotEmpty())
                         <div class="mt-10">
 
-                            <div class="mb-4">
+                            <div class="mb-4 flex items-end justify-between gap-4">
 
-                                <div class="flex items-center gap-3">
-                                    <span class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+                                <div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
 
-                                    <h3 class="text-xl font-bold text-[#233F7D]">
-                                        Past Events
-                                    </h3>
+                                        <h3 class="text-xl font-bold text-[#233F7D]">
+                                            Past Events
+                                        </h3>
+                                    </div>
+
+                                    <p class="mt-1 pl-5 text-sm text-slate-500">
+                                        Recently completed events.
+                                    </p>
                                 </div>
 
-                                <p class="mt-1 pl-5 text-sm text-slate-500">
-                                    Recently completed events.
-                                </p>
+                                <div class="home-carousel-controls">
+                                    <button type="button" class="home-carousel-btn" data-carousel-prev aria-label="Previous past events">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="m15 18-6-6 6-6"/>
+                                        </svg>
+                                    </button>
+
+                                    <button type="button" class="home-carousel-btn" data-carousel-next aria-label="Next past events">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="m9 18 6-6-6-6"/>
+                                        </svg>
+                                    </button>
+                                </div>
 
                             </div>
 
-                            <div class="home-events-grid">
+                            <div class="home-events-carousel" data-event-carousel>
+                                <div class="home-events-track" data-carousel-track>
 
                                 @foreach ($pastEvents as $event)
 
@@ -1154,6 +1276,7 @@
 
                                 @endforeach
 
+                                </div>
                             </div>
 
                         </div>
@@ -1478,72 +1601,293 @@
 
 
     {{-- FOOTER --}}
-    <footer class="bg-[#17233F]">
+    <footer class="bg-[#0B1F3A] text-white">
 
-        <div
-            class="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10 md:flex-row md:items-center md:justify-between lg:px-8"
-        >
+        <div class="mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-14">
 
-            <div>
+            <div class="grid gap-12 lg:grid-cols-[1.15fr_.8fr_1.15fr]">
 
-                <div class="inline-flex rounded-xl bg-white px-4 py-2">
-                    <img
-                        src="{{ asset('eLive-Logo.png') }}"
-                        alt="eLive Events"
-                        class="h-9 w-auto"
+                {{-- Brand --}}
+                <div>
+
+                    <a href="{{ route('home') }}" class="inline-flex items-center">
+                        <img
+                            src="{{ asset('eLive_W.png') }}"
+                            alt="eLive"
+                            class="h-12 w-auto"
+                        >
+                    </a>
+
+                    <p class="mt-4 max-w-md text-sm leading-7 text-slate-200 sm:text-base">
+                        Communication, event, branding, printing, and multimedia
+                        solutions for businesses and events.
+                    </p>
+
+                    <a
+                        href="https://wa.me/255777792017"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mt-6 inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-[#FF9418] hover:text-[#FF9418]"
                     >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            class="h-5 w-5 text-[#FF9418]"
+                        >
+                            <path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.6-5.1A8.5 8.5 0 1 1 21 11.5Z"/>
+                            <path d="M8.5 8.5c.7 2.7 2.3 4.3 5 5"/>
+                        </svg>
+                        WhatsApp
+                    </a>
+
+                    {{-- Social Media --}}
+                    <div class="mt-5 flex items-center gap-3">
+
+                        <a
+                            href="{{ $socialLinks['instagram'] ?? '#' }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Instagram"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4.5 w-4.5">
+                                <rect x="3" y="3" width="18" height="18" rx="5"/>
+                                <circle cx="12" cy="12" r="4"/>
+                                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+                            </svg>
+                        </a>
+
+                        <a
+                            href="{{ $socialLinks['tiktok'] ?? '#' }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="TikTok"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                        >
+                            <svg viewBox="0 0 24 24" fill="currentColor" class="h-4.5 w-4.5">
+                                <path d="M14.2 3c.3 1.9 1.4 3.2 3.3 3.9.8.3 1.5.4 2.3.4v3.4c-2.2 0-4.1-.7-5.6-2v6.2a5.8 5.8 0 1 1-5.8-5.8c.4 0 .8 0 1.2.1v3.5a2.7 2.7 0 0 0-1.2-.3 2.5 2.5 0 1 0 2.5 2.5V3h3.3Z"/>
+                            </svg>
+                        </a>
+
+                        <a
+                            href="{{ $socialLinks['facebook'] ?? '#' }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Facebook"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                        >
+                            <svg viewBox="0 0 24 24" fill="currentColor" class="h-4.5 w-4.5">
+                                <path d="M13.7 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5H17V3.9c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3V10H7.5v3h2.8v8h3.4Z"/>
+                            </svg>
+                        </a>
+
+                        <a
+                            href="{{ $socialLinks['linkedin'] ?? '#' }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="LinkedIn"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#FF9418] hover:bg-[#FF9418]"
+                        >
+                            <svg viewBox="0 0 24 24" fill="currentColor" class="h-4.5 w-4.5">
+                                <path d="M6.5 8.5H3.3V21h3.2V8.5ZM4.9 3A1.9 1.9 0 1 0 5 6.8 1.9 1.9 0 0 0 4.9 3ZM21 13.8c0-3.8-2-5.6-4.7-5.6-2.2 0-3.1 1.2-3.7 2v-1.7H9.4V21h3.2v-6.2c0-1.6.3-3.2 2.3-3.2s2 1.9 2 3.3V21H21v-7.2Z"/>
+                            </svg>
+                        </a>
+
+                    </div>
+
                 </div>
 
-                <p class="mt-4 text-sm text-slate-400">
-                    Smart event registration and management.
-                </p>
+                {{-- Quick Links --}}
+                <div>
 
-            </div>
+                    <h3 class="text-sm font-bold uppercase tracking-wide text-[#FF9418]">
+                        Quick Links
+                    </h3>
 
-            <div class="flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-300">
+                    <div class="mt-5 space-y-3 text-sm text-white sm:text-base">
 
-                <a
-                    href="{{ route('public.events.index') }}"
-                    class="transition hover:text-white"
-                >
-                    Events
-                </a>
+                    
+                        <a
+                            href="{{ route('public.events.index') }}"
+                            class="block transition hover:text-[#FF9418]"
+                        >
+                            Events
+                        </a>
 
-                <a
-                    href="#contact"
-                    class="transition hover:text-white"
-                >
-                    Contact
-                </a>
+                      
 
-                @if (Route::has('privacy'))
-                    <a href="{{ route('privacy') }}" class="transition hover:text-white">
-                        Privacy
-                    </a>
-                @else
-                    <a
-                        href="mailto:info@elive.co.tz?subject=Privacy%20Inquiry"
-                        class="transition hover:text-white"
+                        <a
+                            href="{{ route('home') }}#contact"
+                            class="block transition hover:text-[#FF9418]"
+                        >
+                            Contact
+                        </a>
+
+                        <a
+                            href="/admin"
+                            class="block transition hover:text-[#FF9418]"
+                        >
+                            Organizer Login
+                        </a>
+
+                          <a
+                    href="https://elive.co.tz/"
+                        target="_blank"
+                 rel="noopener noreferrer"
+                 class="block transition hover:text-[#FF9418]"
                     >
-                        Privacy
-                    </a>
-                @endif
+        eLive Website
+    </a>
+
+                    </div>
+
+                </div>
+
+                {{-- Contact --}}
+                <div>
+
+                    <h3 class="text-sm font-bold uppercase tracking-wide text-[#FF9418]">
+                        Contact
+                    </h3>
+
+                    <div class="mt-5 space-y-5">
+
+                        <a
+                            href="https://www.google.com/maps/search/?api=1&query=Ikungwi+Street+Kinondoni+B+Dar+es+Salaam"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="group flex items-start gap-4"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                class="mt-0.5 h-5 w-5 shrink-0 text-[#FF9418]"
+                            >
+                                <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/>
+                                <circle cx="12" cy="10" r="2"/>
+                            </svg>
+
+                            <span class="text-sm leading-6 text-slate-200 transition group-hover:text-white sm:text-base">
+                                Ikungwi Street, Kinondoni B, Dar es Salaam
+                            </span>
+                        </a>
+
+                        <a
+                            href="tel:+255745939140"
+                            class="group flex items-center gap-4"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                class="h-5 w-5 shrink-0 text-[#FF9418]"
+                            >
+                                <path d="M6.5 3h3l1.3 4.2-2 1.4a15.7 15.7 0 0 0 6.6 6.6l1.4-2L21 14.5v3c0 1.7-1.3 3-3 3C10 20.5 3.5 14 3.5 6A3 3 0 0 1 6.5 3Z"/>
+                            </svg>
+
+                            <span class="text-sm text-slate-200 transition group-hover:text-white sm:text-base">
+                                +255 745 939 140
+                            </span>
+                        </a>
+
+                        <a
+                            href="mailto:info@elive.co.tz"
+                            class="group flex items-center gap-4"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                class="h-5 w-5 shrink-0 text-[#FF9418]"
+                            >
+                                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                                <path d="m4 7 8 6 8-6"/>
+                            </svg>
+
+                            <span class="text-sm text-slate-200 transition group-hover:text-white sm:text-base">
+                                info@elive.co.tz
+                            </span>
+                        </a>
+
+                    </div>
+
+                </div>
 
             </div>
 
         </div>
 
+        {{-- Copyright --}}
         <div class="border-t border-white/10">
 
-            <div
-                class="mx-auto max-w-7xl px-6 py-5 text-sm text-slate-500 lg:px-8"
-            >
-                © {{ date('Y') }} eLive Events. All rights reserved.
+            <div class="mx-auto max-w-7xl px-6 py-5 text-xs text-slate-400 sm:text-sm lg:px-8">
+                © {{ date('Y') }} eLive Company Limited. All rights reserved.
             </div>
 
         </div>
 
     </footer>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-event-carousel]').forEach(function (carousel) {
+                const track = carousel.querySelector('[data-carousel-track]');
+                const section = carousel.parentElement;
+                const prev = section.querySelector('[data-carousel-prev]');
+                const next = section.querySelector('[data-carousel-next]');
+
+                if (!track || !prev || !next) {
+                    return;
+                }
+
+                function getScrollAmount() {
+                    const card = track.querySelector('.home-event-card');
+
+                    if (!card) {
+                        return track.clientWidth;
+                    }
+
+                    const styles = window.getComputedStyle(track);
+                    const gap = parseFloat(styles.gap || styles.columnGap || 0);
+
+                    return card.getBoundingClientRect().width + gap;
+                }
+
+                function updateButtons() {
+                    const max = track.scrollWidth - track.clientWidth - 2;
+
+                    prev.disabled = track.scrollLeft <= 2;
+                    next.disabled = track.scrollLeft >= max;
+                }
+
+                prev.addEventListener('click', function () {
+                    track.scrollBy({
+                        left: -getScrollAmount(),
+                        behavior: 'smooth'
+                    });
+                });
+
+                next.addEventListener('click', function () {
+                    track.scrollBy({
+                        left: getScrollAmount(),
+                        behavior: 'smooth'
+                    });
+                });
+
+                track.addEventListener('scroll', updateButtons, { passive: true });
+                window.addEventListener('resize', updateButtons);
+
+                updateButtons();
+            });
+        });
+    </script>
 
 </body>
 </html>
