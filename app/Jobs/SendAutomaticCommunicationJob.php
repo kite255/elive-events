@@ -8,6 +8,8 @@ use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -301,25 +303,53 @@ class SendAutomaticCommunicationJob implements ShouldQueue
     | Send Email
     |--------------------------------------------------------------------------
     |
-    | Email is intentionally still in local/test mode.
+    | Sends real email through Laravel Mail.
     |
-    | We will connect SMTP / Laravel Mail after WhatsApp registration
-    | confirmation is working correctly.
+    | Local:
+    | MAIL_HOST=mailpit
+    | MAIL_PORT=1025
+    |
+    | Production:
+    | Configure the real SMTP credentials through the production environment.
+    |
+    | If the attendee has a generated digital badge and the file exists on the
+    | public disk, the badge is attached automatically.
     |
     */
 
     protected function sendEmail(
         CommunicationLog $communicationLog
     ): ?string {
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Recipient
+        |--------------------------------------------------------------------------
+        */
+
+        $recipient =
+            strtolower(
+                trim(
+                    (string) $communicationLog->recipient
+                )
+            );
+
         if (
-            blank(
-                $communicationLog->recipient
+            blank($recipient)
+            || ! filter_var(
+                $recipient,
+                FILTER_VALIDATE_EMAIL
             )
         ) {
             throw new RuntimeException(
-                'Email recipient is missing.'
+                'Email recipient is missing or invalid.'
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Message
+        |--------------------------------------------------------------------------
+        */
 
         if (
             blank(
@@ -331,8 +361,174 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Subject
+        |--------------------------------------------------------------------------
+        */
+
+        $subject =
+            trim(
+                (string) $communicationLog->subject
+            );
+
+        if (blank($subject)) {
+            $eventName =
+                $communicationLog->event?->name
+                ?? $communicationLog->attendee?->event?->name
+                ?? null;
+
+            $subject =
+                filled($eventName)
+                    ? "Registration Confirmed – {$eventName}"
+                    : 'eLive Events Notification';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Optional Badge Attachment
+        |--------------------------------------------------------------------------
+        */
+
+        $badgeAbsolutePath = null;
+        $badgeAttachmentName = null;
+
+        $attendee =
+            $communicationLog->attendee;
+
+        if (
+            $attendee
+            && filled(
+                $attendee->badge_path
+            )
+        ) {
+            $badgePath =
+                trim(
+                    (string) $attendee->badge_path
+                );
+
+            /*
+             * badge_path may be stored as:
+             *
+             * badges/example.png
+             * storage/badges/example.png
+             * /storage/badges/example.png
+             *
+             * Normalize it to the public disk path before checking.
+             */
+
+            $normalizedBadgePath =
+                ltrim(
+                    $badgePath,
+                    '/'
+                );
+
+            if (
+                str_starts_with(
+                    $normalizedBadgePath,
+                    'storage/'
+                )
+            ) {
+                $normalizedBadgePath =
+                    substr(
+                        $normalizedBadgePath,
+                        strlen('storage/')
+                    );
+            }
+
+            try {
+                if (
+                    Storage::disk(
+                        'public'
+                    )->exists(
+                        $normalizedBadgePath
+                    )
+                ) {
+                    $badgeAbsolutePath =
+                        Storage::disk(
+                            'public'
+                        )->path(
+                            $normalizedBadgePath
+                        );
+
+                    $extension =
+                        pathinfo(
+                            $normalizedBadgePath,
+                            PATHINFO_EXTENSION
+                        );
+
+                    $safeExtension =
+                        filled($extension)
+                            ? strtolower($extension)
+                            : 'png';
+
+                    $badgeNumber =
+                        filled(
+                            $attendee->badge_number
+                        )
+                            ? preg_replace(
+                                '/[^A-Za-z0-9_-]+/',
+                                '-',
+                                (string) $attendee->badge_number
+                            )
+                            : (string) $attendee->id;
+
+                    $badgeAttachmentName =
+                        'eLive-Event-Badge-'
+                        . $badgeNumber
+                        . '.'
+                        . $safeExtension;
+                } else {
+                    Log::warning(
+                        'Email badge attachment was not found on the public disk.',
+                        [
+                            'communication_log_id' =>
+                                $communicationLog->id,
+
+                            'attendee_id' =>
+                                $attendee->id,
+
+                            'badge_path' =>
+                                $attendee->badge_path,
+
+                            'normalized_badge_path' =>
+                                $normalizedBadgePath,
+                        ]
+                    );
+                }
+            } catch (Throwable $exception) {
+                /*
+                 * Missing badge attachment must not prevent a valid email from
+                 * being sent. Record the problem and continue without it.
+                 */
+
+                Log::warning(
+                    'Email badge attachment could not be resolved.',
+                    [
+                        'communication_log_id' =>
+                            $communicationLog->id,
+
+                        'attendee_id' =>
+                            $attendee->id,
+
+                        'badge_path' =>
+                            $attendee->badge_path,
+
+                        'error' =>
+                            $exception->getMessage(),
+                    ]
+                );
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send Email
+        |--------------------------------------------------------------------------
+        */
+
         Log::info(
-            'Automatic email communication prepared.',
+            'Sending automatic email communication.',
             [
                 'communication_log_id' =>
                     $communicationLog->id,
@@ -344,17 +540,68 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     $communicationLog->attendee_id,
 
                 'recipient' =>
-                    $communicationLog->recipient,
+                    $recipient,
 
                 'subject' =>
-                    $communicationLog->subject,
+                    $subject,
 
-                'message' =>
-                    $communicationLog->message,
+                'has_badge_attachment' =>
+                    filled(
+                        $badgeAbsolutePath
+                    ),
             ]
         );
 
-        return 'local-email-'
+        Mail::raw(
+            $communicationLog->message,
+            function ($mail) use (
+                $recipient,
+                $subject,
+                $badgeAbsolutePath,
+                $badgeAttachmentName
+            ): void {
+                $mail
+                    ->to(
+                        $recipient
+                    )
+                    ->subject(
+                        $subject
+                    );
+
+                if (
+                    filled(
+                        $badgeAbsolutePath
+                    )
+                    && is_file(
+                        $badgeAbsolutePath
+                    )
+                ) {
+                    $mail->attach(
+                        $badgeAbsolutePath,
+                        [
+                            'as' =>
+                                $badgeAttachmentName
+                                ?? basename(
+                                    $badgeAbsolutePath
+                                ),
+                        ]
+                    );
+                }
+            }
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Internal Submission Reference
+        |--------------------------------------------------------------------------
+        |
+        | SMTP/Laravel Mail does not guarantee that the provider returns a
+        | provider message ID here. We still return a stable internal reference
+        | so CommunicationLog can record that Laravel submitted the message.
+        |
+        */
+
+        return 'smtp-email-'
             . $communicationLog->id;
     }
 

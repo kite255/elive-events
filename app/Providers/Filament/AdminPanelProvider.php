@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -28,7 +29,17 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+
+            /*
+            |--------------------------------------------------------------------------
+            | Authentication
+            |--------------------------------------------------------------------------
+            |
+            | Use the custom eLive Events split-screen login page.
+            |
+            */
+
+            ->login(Login::class)
 
             /*
             |--------------------------------------------------------------------------

@@ -12,6 +12,7 @@ use App\Services\SmsService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 use UnitEnum;
 
@@ -40,21 +41,28 @@ class CommunicationCenter extends Page
 
     public ?int $templateId = null;
 
+    public string $channel =
+        CommunicationTemplate::CHANNEL_EMAIL;
+
     public string $campaignName = '';
 
     public string $audience = 'all';
 
     public ?int $categoryId = null;
 
+    public ?string $subject = null;
+
     public string $message = '';
 
     /*
     |--------------------------------------------------------------------------
-    | Test SMS
+    | Test recipients
     |--------------------------------------------------------------------------
     */
 
     public string $testPhone = '';
+
+    public string $testEmail = '';
 
     /*
     |--------------------------------------------------------------------------
@@ -134,7 +142,9 @@ class CommunicationCenter extends Page
         $this->eventId = (int) $firstEvent->id;
 
         $this->campaignName =
-            $firstEvent->name . ' SMS Campaign';
+            $this->defaultCampaignName(
+                $firstEvent
+            );
 
         $this->refreshPreview();
     }
@@ -184,12 +194,31 @@ class CommunicationCenter extends Page
         $this->templateId = null;
         $this->categoryId = null;
         $this->message = '';
+        $this->subject = null;
 
         if ($event = $this->selectedEvent()) {
             $this->campaignName =
-                $event->name . ' SMS Campaign';
+                $this->defaultCampaignName(
+                    $event
+                );
         } else {
             $this->campaignName = '';
+        }
+
+        $this->refreshPreview();
+    }
+
+    public function updatedChannel(): void
+    {
+        $this->templateId = null;
+        $this->subject = null;
+        $this->message = '';
+
+        if ($event = $this->selectedEvent()) {
+            $this->campaignName =
+                $this->defaultCampaignName(
+                    $event
+                );
         }
 
         $this->refreshPreview();
@@ -224,9 +253,22 @@ class CommunicationCenter extends Page
         $this->message =
             (string) $template->body;
 
-        if (blank($this->campaignName)) {
+        $this->subject =
+            $template->isEmail()
+                ? (string) ($template->subject ?? '')
+                : null;
+
+        $event =
+            $this->selectedEvent();
+
+        if ($event) {
             $this->campaignName =
-                $template->name;
+                $event->name
+                . ' - '
+                . (
+                    $template->name
+                    ?: $this->channelLabel()
+                );
         }
     }
 
@@ -237,11 +279,15 @@ class CommunicationCenter extends Page
         $this->templateId = null;
         $this->audience = 'all';
         $this->categoryId = null;
+        $this->subject = null;
         $this->message = '';
         $this->testPhone = '';
+        $this->testEmail = '';
 
         $this->campaignName = $event
-            ? $event->name . ' SMS Campaign'
+            ? $this->defaultCampaignName(
+                $event
+            )
             : '';
 
         $this->resetValidation();
@@ -256,6 +302,13 @@ class CommunicationCenter extends Page
 
     public function smsCharacterCount(): int
     {
+        if (
+            $this->channel
+            !== CommunicationTemplate::CHANNEL_SMS
+        ) {
+            return 0;
+        }
+
         return mb_strlen(
             $this->message
         );
@@ -263,6 +316,13 @@ class CommunicationCenter extends Page
 
     public function smsSegmentCount(): int
     {
+        if (
+            $this->channel
+            !== CommunicationTemplate::CHANNEL_SMS
+        ) {
+            return 0;
+        }
+
         return app(
             SmsService::class
         )->segmentCount(
@@ -302,7 +362,8 @@ class CommunicationCenter extends Page
         )->preview(
             $event,
             $this->audience,
-            $this->categoryId
+            $this->categoryId,
+            $this->channel
         );
     }
 
@@ -424,6 +485,168 @@ class CommunicationCenter extends Page
 
     /*
     |--------------------------------------------------------------------------
+    | Send Test Email
+    |--------------------------------------------------------------------------
+    */
+
+    public function sendTestEmail(): void
+    {
+        $this->validate([
+            'eventId' => [
+                'required',
+                'integer',
+            ],
+
+            'testEmail' => [
+                'required',
+                'email',
+                'max:255',
+            ],
+
+            'subject' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'message' => [
+                'required',
+                'string',
+                'max:10000',
+            ],
+        ]);
+
+        if (
+            $this->channel
+            !== CommunicationTemplate::CHANNEL_EMAIL
+        ) {
+            Notification::make()
+                ->title('Email channel is not selected')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $event =
+            $this->selectedEvent();
+
+        abort_unless(
+            $event,
+            404
+        );
+
+        $this->authorizeEvent(
+            $event
+        );
+
+        $renderedMessage =
+            $this->renderTestMessage(
+                $event
+            );
+
+        $this->testEmail =
+            strtolower(
+                trim(
+                    $this->testEmail
+                )
+            );
+
+        $renderedSubject =
+            strtr(
+                trim(
+                    (string) $this->subject
+                ),
+                [
+                    '#EVENT_NAME#' =>
+                        (string) $event->name,
+
+                    '#EVENT_VENUE#' =>
+                        (string) ($event->venue ?? ''),
+
+                    '#NAME#' =>
+                        'Test Attendee',
+                ]
+            );
+
+        try {
+            Mail::send(
+                'emails.elive',
+                [
+                    'subject' =>
+                        $renderedSubject,
+
+                    'communicationLog' =>
+                        null,
+
+                    'attendee' =>
+                        null,
+
+                    'event' =>
+                        $event,
+
+                    'messageBody' =>
+                        $renderedMessage,
+
+                    'emailLabel' =>
+                        $this->selectedTemplate?->name
+                        ?: 'Event Communication',
+
+                    'alertTitle' =>
+                        null,
+
+                    'alertMessage' =>
+                        null,
+
+                    'actionUrl' =>
+                        null,
+
+                    'actionLabel' =>
+                        null,
+
+                    'actionIntro' =>
+                        null,
+
+                    'actionNote' =>
+                        null,
+                ],
+                function ($mail) use (
+                    $renderedSubject
+                ): void {
+                    $mail
+                        ->to(
+                            $this->testEmail
+                        )
+                        ->subject(
+                            $renderedSubject
+                        );
+                }
+            );
+
+            Notification::make()
+                ->title('Test email sent')
+                ->body(
+                    "A branded eLive Events test email was sent to {$this->testEmail}."
+                )
+                ->success()
+                ->send();
+        } catch (Throwable $exception) {
+            report(
+                $exception
+            );
+
+            Notification::make()
+                ->title('Test email failed')
+                ->body(
+                    $exception->getMessage()
+                )
+                ->danger()
+                ->send();
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Test placeholder rendering
     |--------------------------------------------------------------------------
     */
@@ -453,7 +676,11 @@ class CommunicationCenter extends Page
                 $this->testPhone,
 
             '#EMAIL#' =>
-                'test@example.com',
+                filled(
+                    $this->testEmail
+                )
+                    ? $this->testEmail
+                    : 'test@example.com',
 
             '#ORGANIZATION#' =>
                 'Test Organization',
@@ -488,7 +715,7 @@ class CommunicationCenter extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | Queue SMS campaign
+    | Queue Communication Campaign
     |--------------------------------------------------------------------------
     */
 
@@ -498,6 +725,11 @@ class CommunicationCenter extends Page
             'eventId' => [
                 'required',
                 'integer',
+            ],
+
+            'channel' => [
+                'required',
+                'in:sms,email,whatsapp',
             ],
 
             'campaignName' => [
@@ -521,10 +753,19 @@ class CommunicationCenter extends Page
                 'integer',
             ],
 
+            'subject' => [
+                $this->channel
+                === CommunicationTemplate::CHANNEL_EMAIL
+                    ? 'required'
+                    : 'nullable',
+                'string',
+                'max:255',
+            ],
+
             'message' => [
                 'required',
                 'string',
-                'max:5000',
+                'max:10000',
             ],
         ]);
 
@@ -551,9 +792,15 @@ class CommunicationCenter extends Page
             <= 0
         ) {
             Notification::make()
-                ->title('No valid SMS recipients')
+                ->title(
+                    'No valid recipients'
+                )
                 ->body(
-                    'The selected audience does not contain any attendees with a valid phone number.'
+                    'The selected audience does not contain any valid '
+                    . $this->recipientLabel()
+                    . ' for '
+                    . $this->channelLabel()
+                    . '.'
                 )
                 ->warning()
                 ->send();
@@ -597,22 +844,58 @@ class CommunicationCenter extends Page
         }
 
         try {
-            $campaign = app(
-                CommunicationCampaignService::class
-            )->queueSmsCampaign(
-                event: $event,
-                name: $this->campaignName,
-                message: $this->message,
-                audience: $this->audience,
-                categoryId: $this->categoryId,
-                template: $template,
-                createdBy: auth()->id()
-            );
+            $service =
+                app(
+                    CommunicationCampaignService::class
+                );
+
+            if (
+                $this->channel
+                === CommunicationTemplate::CHANNEL_SMS
+            ) {
+                $campaign =
+                    $service->queueSmsCampaign(
+                        event: $event,
+                        name: $this->campaignName,
+                        message: $this->message,
+                        audience: $this->audience,
+                        categoryId: $this->categoryId,
+                        template: $template,
+                        createdBy: auth()->id()
+                    );
+            } elseif (
+                $this->channel
+                === CommunicationTemplate::CHANNEL_EMAIL
+            ) {
+                $campaign =
+                    $service->queueEmailCampaign(
+                        event: $event,
+                        name: $this->campaignName,
+                        subject: (string) $this->subject,
+                        message: $this->message,
+                        audience: $this->audience,
+                        categoryId: $this->categoryId,
+                        template: $template,
+                        createdBy: auth()->id()
+                    );
+            } else {
+                Notification::make()
+                    ->title(
+                        'WhatsApp campaigns are not enabled from this screen yet'
+                    )
+                    ->warning()
+                    ->send();
+
+                return;
+            }
 
             Notification::make()
-                ->title('SMS campaign queued')
+                ->title(
+                    $this->channelLabel()
+                    . ' campaign queued'
+                )
                 ->body(
-                    "{$campaign->queued_count} SMS messages queued. "
+                    "{$campaign->queued_count} messages queued. "
                     . "{$campaign->failed_count} recipients skipped."
                 )
                 ->success()
@@ -622,11 +905,14 @@ class CommunicationCenter extends Page
              * Reset only message-related fields.
              * Keep the event and audience selected.
              */
+            $this->subject = null;
             $this->message = '';
             $this->templateId = null;
 
             $this->campaignName =
-                $event->name . ' SMS Campaign';
+                $this->defaultCampaignName(
+                    $event
+                );
 
             $this->refreshPreview();
         } catch (Throwable $exception) {
@@ -699,7 +985,7 @@ class CommunicationCenter extends Page
             )
             ->active()
             ->forChannel(
-                CommunicationTemplate::CHANNEL_SMS
+                $this->channel
             )
             ->orderBy(
                 'name'
@@ -755,9 +1041,10 @@ class CommunicationCenter extends Page
                 'event_id',
                 $eventIds
             )
-            ->with(
-                'event:id,name'
-            )
+            ->with([
+                'event:id,name',
+                'template:id,name,key',
+            ])
             ->latest('id')
             ->limit(10)
             ->get();
@@ -814,6 +1101,73 @@ class CommunicationCenter extends Page
             'cancelled' => 'gray',
             default => 'gray',
         };
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Channel Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    public function isSmsChannel(): bool
+    {
+        return $this->channel
+            === CommunicationTemplate::CHANNEL_SMS;
+    }
+
+    public function isEmailChannel(): bool
+    {
+        return $this->channel
+            === CommunicationTemplate::CHANNEL_EMAIL;
+    }
+
+    public function isWhatsAppChannel(): bool
+    {
+        return $this->channel
+            === CommunicationTemplate::CHANNEL_WHATSAPP;
+    }
+
+    public function recipientLabel(): string
+    {
+        return match ($this->channel) {
+            CommunicationTemplate::CHANNEL_EMAIL =>
+                'email addresses',
+
+            CommunicationTemplate::CHANNEL_SMS =>
+                'mobile numbers',
+
+            CommunicationTemplate::CHANNEL_WHATSAPP =>
+                'WhatsApp numbers',
+
+            default =>
+                'recipients',
+        };
+    }
+
+    public function channelOptions(): array
+    {
+        return CommunicationTemplate::channelOptions();
+    }
+
+    public function channelLabel(): string
+    {
+        return CommunicationTemplate::channelOptions()[
+            $this->channel
+        ]
+            ?? str(
+                $this->channel
+            )
+                ->headline()
+                ->toString();
+    }
+
+    private function defaultCampaignName(
+        Event $event
+    ): string {
+        return $event->name
+            . ' '
+            . $this->channelLabel()
+            . ' Campaign';
     }
 
     /*

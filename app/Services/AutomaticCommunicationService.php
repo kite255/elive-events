@@ -37,7 +37,14 @@ class AutomaticCommunicationService
     |    - Event must have registration SMS enabled.
     |    - Event must have a registration SMS template selected.
     |
-    | 2. WhatsApp
+    | 2. Email
+    |    - Attendee must be approved.
+    |    - Attendee must have a valid email address.
+    |    - Organization must have an active template named:
+    |      registration_confirmed_email
+    |    - If a badge already exists it can be attached by the email job.
+    |
+    | 3. WhatsApp
     |    - Attendee must be approved.
     |    - WhatsApp must be configured.
     |    - Attendee must have a valid phone number.
@@ -97,6 +104,33 @@ class AutomaticCommunicationService
 
         /*
         |--------------------------------------------------------------------------
+        | Automatic Email
+        |--------------------------------------------------------------------------
+        |
+        | Email can be queued immediately after approval.
+        |
+        | If the attendee badge already exists, the email sending job can attach
+        | it. If the badge is generated asynchronously, handleBadgeReady() will
+        | safely attempt the registration email again; duplicate protection
+        | prevents a second copy from being sent.
+        |
+        */
+
+        $emailLog =
+            $this->prepareRegistrationEmail(
+                $attendee
+            );
+
+        if ($emailLog) {
+            $logs->push(
+                $this->dispatchLog(
+                    $emailLog
+                )
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | Automatic WhatsApp
         |--------------------------------------------------------------------------
         |
@@ -141,6 +175,7 @@ class AutomaticCommunicationService
     |     ↓
     | handleBadgeReady()
     |     ↓
+    | Email registration confirmation (if not already sent)
     | WhatsApp registration confirmation
     |
     |--------------------------------------------------------------------------
@@ -167,20 +202,55 @@ class AutomaticCommunicationService
             return collect();
         }
 
-        $log =
+        $logs = collect();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Email
+        |--------------------------------------------------------------------------
+        |
+        | This second attempt is intentional. If registration email was already
+        | queued or sent, prepareCommunication() duplicate protection returns
+        | null. If it was not sent earlier, it can now be queued with the badge
+        | available for attachment by SendAutomaticCommunicationJob.
+        |
+        */
+
+        $emailLog =
+            $this->prepareRegistrationEmail(
+                $attendee
+            );
+
+        if ($emailLog) {
+            $logs->push(
+                $this->dispatchLog(
+                    $emailLog
+                )
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | WhatsApp
+        |--------------------------------------------------------------------------
+        */
+
+        $whatsAppLog =
             $this->prepareRegistrationWhatsApp(
                 $attendee
             );
 
-        if (! $log) {
-            return collect();
+        if ($whatsAppLog) {
+            $logs->push(
+                $this->dispatchLog(
+                    $whatsAppLog
+                )
+            );
         }
 
-        return collect([
-            $this->dispatchLog(
-                $log
-            ),
-        ])->filter()->values();
+        return $logs
+            ->filter()
+            ->values();
     }
 
     /*
@@ -231,6 +301,91 @@ class AutomaticCommunicationService
             $attendee,
             $template
         )) {
+            return null;
+        }
+
+        return $this->prepareCommunication(
+            $attendee,
+            $template
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prepare Registration Email
+    |--------------------------------------------------------------------------
+    |
+    | Uses the active organization communication template:
+    |
+    | registration_confirmed_email
+    |
+    |--------------------------------------------------------------------------
+    */
+
+    protected function prepareRegistrationEmail(
+        Attendee $attendee
+    ): ?CommunicationLog {
+        $event = $attendee->event;
+
+        if (! $event) {
+            return null;
+        }
+
+        if (! $attendee->isApproved()) {
+            return null;
+        }
+
+        if (! $event->organization_id) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Valid email address required
+        |--------------------------------------------------------------------------
+        */
+
+        $recipient =
+            $this->emailRecipient(
+                $attendee
+            );
+
+        if (blank($recipient)) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Registration confirmation email template
+        |--------------------------------------------------------------------------
+        */
+
+        $template =
+            CommunicationTemplate::query()
+                ->where(
+                    'organization_id',
+                    $event->organization_id
+                )
+                ->where(
+                    'channel',
+                    CommunicationTemplate::CHANNEL_EMAIL
+                )
+                ->where(
+                    'name',
+                    self::TRIGGER_REGISTRATION_CONFIRMED
+                        . '_email'
+                )
+                ->where(
+                    'is_active',
+                    true
+                )
+                ->first();
+
+        if (! $template) {
+            return null;
+        }
+
+        if (blank($template->body)) {
             return null;
         }
 

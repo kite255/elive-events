@@ -6,6 +6,7 @@ use App\Filament\Resources\CommunicationCampaigns\Pages\ListCommunicationCampaig
 use App\Filament\Resources\CommunicationCampaigns\Pages\ViewCommunicationCampaign;
 use App\Filament\Resources\CommunicationCampaigns\RelationManagers\LogsRelationManager;
 use App\Models\CommunicationCampaign;
+use App\Models\CommunicationTemplate;
 use App\Models\Event;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -223,10 +224,19 @@ class CommunicationCampaignResource extends Resource
                                     'template.name'
                                 )
                                     ->label(
-                                        'Template'
+                                        'Template Type'
                                     )
-                                    ->placeholder(
-                                        'Manual message'
+                                    ->state(
+                                        fn (
+                                            CommunicationCampaign $record
+                                        ): string =>
+                                            self::templateLabel(
+                                                $record
+                                            )
+                                    )
+                                    ->badge()
+                                    ->color(
+                                        'gray'
                                     ),
                             ]),
                     ]),
@@ -457,40 +467,37 @@ class CommunicationCampaignResource extends Resource
                         fn (
                             string $state
                         ): string =>
-                            match ($state) {
-                                CommunicationCampaign::CHANNEL_SMS =>
-                                    'SMS',
-
-                                CommunicationCampaign::CHANNEL_WHATSAPP =>
-                                    'WhatsApp',
-
-                                CommunicationCampaign::CHANNEL_EMAIL =>
-                                    'Email',
-
-                                default =>
-                                    str($state)
-                                        ->headline()
-                                        ->toString(),
-                            }
+                            self::channelLabel(
+                                $state
+                            )
                     )
                     ->color(
                         fn (
                             string $state
                         ): string =>
-                            match ($state) {
-                                CommunicationCampaign::CHANNEL_SMS =>
-                                    'info',
-
-                                CommunicationCampaign::CHANNEL_WHATSAPP =>
-                                    'success',
-
-                                CommunicationCampaign::CHANNEL_EMAIL =>
-                                    'primary',
-
-                                default =>
-                                    'gray',
-                            }
+                            self::channelColor(
+                                $state
+                            )
                     ),
+
+                TextColumn::make(
+                    'template.name'
+                )
+                    ->label(
+                        'Template'
+                    )
+                    ->state(
+                        fn (
+                            CommunicationCampaign $record
+                        ): string =>
+                            self::templateLabel(
+                                $record
+                            )
+                    )
+                    ->limit(
+                        26
+                    )
+                    ->toggleable(),
 
                 TextColumn::make(
                     'status'
@@ -822,7 +829,7 @@ class CommunicationCampaignResource extends Resource
                 'No communication campaigns'
             )
             ->emptyStateDescription(
-                'Campaigns created from Communication Center will appear here.'
+                'Email, SMS, and WhatsApp campaigns created from Communication Center will appear here.'
             )
             ->emptyStateIcon(
                 'heroicon-o-megaphone'
@@ -861,6 +868,129 @@ class CommunicationCampaignResource extends Resource
                     '/{record}'
                 ),
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | User-Friendly Labels
+    |--------------------------------------------------------------------------
+    */
+
+    private static function templateLabel(
+        CommunicationCampaign $record
+    ): string {
+        $template =
+            $record->template;
+
+        if (! $template) {
+            return 'Manual Message';
+        }
+
+        if (
+            filled(
+                $template->name
+            )
+        ) {
+            /*
+             * New templates store a friendly name directly.
+             */
+            if (
+                ! str_contains(
+                    (string) $template->name,
+                    '_'
+                )
+            ) {
+                return (string) $template->name;
+            }
+
+            /*
+             * Backward compatibility for older machine-style names.
+             */
+            $friendlyName =
+                CommunicationTemplate::friendlyNameForKey(
+                    $template->key
+                    ?: $template->name
+                );
+
+            if (
+                filled(
+                    $friendlyName
+                )
+            ) {
+                return $friendlyName;
+            }
+
+            return str(
+                $template->name
+            )
+                ->replace(
+                    '_',
+                    ' '
+                )
+                ->headline()
+                ->toString();
+        }
+
+        if (
+            filled(
+                $template->key
+            )
+        ) {
+            return CommunicationTemplate::friendlyNameForKey(
+                $template->key
+            )
+                ?? str(
+                    $template->key
+                )
+                    ->replace(
+                        '_',
+                        ' '
+                    )
+                    ->headline()
+                    ->toString();
+        }
+
+        return 'Template';
+    }
+
+    private static function channelLabel(
+        string $channel
+    ): string {
+        return match ($channel) {
+            CommunicationCampaign::CHANNEL_SMS =>
+                'SMS',
+
+            CommunicationCampaign::CHANNEL_WHATSAPP =>
+                'WhatsApp',
+
+            CommunicationCampaign::CHANNEL_EMAIL =>
+                'Email',
+
+            default =>
+                str(
+                    $channel
+                )
+                    ->headline()
+                    ->toString(),
+        };
+    }
+
+    private static function channelColor(
+        string $channel
+    ): string {
+        return match ($channel) {
+            CommunicationCampaign::CHANNEL_SMS =>
+                'info',
+
+            CommunicationCampaign::CHANNEL_WHATSAPP =>
+                'success',
+
+            CommunicationCampaign::CHANNEL_EMAIL =>
+                'primary',
+
+            default =>
+                'gray',
+        };
     }
 
     /*

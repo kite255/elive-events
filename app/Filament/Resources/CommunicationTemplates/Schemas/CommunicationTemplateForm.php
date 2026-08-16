@@ -2,14 +2,15 @@
 
 namespace App\Filament\Resources\CommunicationTemplates\Schemas;
 
+use App\Models\CommunicationTemplate;
 use App\Models\Organization;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Database\Eloquent\Builder;
 
 class CommunicationTemplateForm
 {
@@ -22,7 +23,7 @@ class CommunicationTemplateForm
                     'Template Details'
                 )
                     ->description(
-                        'Create reusable SMS, email, and WhatsApp message templates.'
+                        'Create reusable SMS, email, and WhatsApp message templates using friendly template types.'
                     )
                     ->schema([
                         Select::make(
@@ -38,20 +39,8 @@ class CommunicationTemplateForm
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->native(false),
-
-                        TextInput::make(
-                            'name'
-                        )
-                            ->label(
-                                'Template Name'
-                            )
-                            ->placeholder(
-                                'Registration Confirmation SMS'
-                            )
-                            ->required()
-                            ->maxLength(
-                                255
+                            ->native(
+                                false
                             ),
 
                         Select::make(
@@ -60,23 +49,112 @@ class CommunicationTemplateForm
                             ->label(
                                 'Channel'
                             )
-                            ->options([
-                                'sms' =>
-                                    'SMS',
-
-                                'email' =>
-                                    'Email',
-
-                                'whatsapp' =>
-                                    'WhatsApp',
-                            ])
+                            ->options(
+                                CommunicationTemplate::channelOptions()
+                            )
                             ->default(
-                                'sms'
+                                CommunicationTemplate::CHANNEL_EMAIL
                             )
                             ->required()
                             ->live()
                             ->native(
                                 false
+                            )
+                            ->afterStateUpdated(
+                                function (
+                                    callable $set
+                                ): void {
+                                    $set(
+                                        'key',
+                                        null
+                                    );
+
+                                    $set(
+                                        'name',
+                                        null
+                                    );
+                                }
+                            ),
+
+                        Select::make(
+                            'key'
+                        )
+                            ->label(
+                                'Template Type'
+                            )
+                            ->options(
+                                fn (
+                                    callable $get
+                                ): array =>
+                                    CommunicationTemplate::templateTypesForChannel(
+                                        $get(
+                                            'channel'
+                                        )
+                                    )
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->live()
+                            ->native(
+                                false
+                            )
+                            ->helperText(
+                                'Choose the purpose of this communication. eLive Events will keep the internal system key automatically.'
+                            )
+                            ->afterStateUpdated(
+                                function (
+                                    $state,
+                                    callable $set
+                                ): void {
+                                    $friendlyName =
+                                        CommunicationTemplate::friendlyNameForKey(
+                                            $state
+                                        );
+
+                                    if (
+                                        filled(
+                                            $friendlyName
+                                        )
+                                    ) {
+                                        $set(
+                                            'name',
+                                            $friendlyName
+                                        );
+                                    }
+
+                                    $channel =
+                                        CommunicationTemplate::channelForKey(
+                                            $state
+                                        );
+
+                                    if (
+                                        filled(
+                                            $channel
+                                        )
+                                    ) {
+                                        $set(
+                                            'channel',
+                                            $channel
+                                        );
+                                    }
+                                }
+                            ),
+
+                        TextInput::make(
+                            'name'
+                        )
+                            ->label(
+                                'Template Name'
+                            )
+                            ->helperText(
+                                'This user-friendly name is set automatically from the selected template type.'
+                            )
+                            ->disabled()
+                            ->dehydrated()
+                            ->required()
+                            ->maxLength(
+                                255
                             ),
 
                         Toggle::make(
@@ -107,17 +185,31 @@ class CommunicationTemplateForm
                                 'Email Subject'
                             )
                             ->placeholder(
-                                'Registration confirmed for #EVENT_NAME#'
+                                'Registration Confirmed – #EVENT_NAME#'
+                            )
+                            ->helperText(
+                                'Only used for email templates.'
                             )
                             ->maxLength(
                                 255
+                            )
+                            ->required(
+                                fn (
+                                    callable $get
+                                ): bool =>
+                                    $get(
+                                        'channel'
+                                    )
+                                    === CommunicationTemplate::CHANNEL_EMAIL
                             )
                             ->visible(
                                 fn (
                                     callable $get
                                 ): bool =>
-                                    $get('channel')
-                                    === 'email'
+                                    $get(
+                                        'channel'
+                                    )
+                                    === CommunicationTemplate::CHANNEL_EMAIL
                             ),
 
                         Textarea::make(
@@ -127,7 +219,7 @@ class CommunicationTemplateForm
                                 'Message Body'
                             )
                             ->placeholder(
-                                "Hello #NAME#,\n\nYour registration for #EVENT_NAME# has been completed successfully.\n\nCategory: #CATEGORY#\nVenue: #EVENT_VENUE#\n\nThank you,\neLive Events"
+                                "Hello #NAME#,\n\nYour registration for #EVENT_NAME# has been completed successfully.\n\nCategory: #CATEGORY#\nVenue: #EVENT_VENUE#\nDate: #EVENT_DATE#\nTime: #EVENT_TIME#\n\nThank you,\neLive Events"
                             )
                             ->required()
                             ->rows(
@@ -135,14 +227,14 @@ class CommunicationTemplateForm
                             )
                             ->columnSpanFull(),
 
-                        \Filament\Forms\Components\Placeholder::make(
+                        Placeholder::make(
                             'available_placeholders'
                         )
                             ->label(
                                 'Available Placeholders'
                             )
                             ->content(
-                                '#NAME#, #PHONE#, #EMAIL#, #ORGANIZATION#, #POSITION#, #CATEGORY#, #BADGE_NUMBER#, #EVENT_NAME#, #EVENT_VENUE#, #EVENT_DATE#, #EVENT_TIME#'
+                                '#NAME#, #PHONE#, #EMAIL#, #ORGANIZATION#, #POSITION#, #CATEGORY#, #PARTICIPANT_TYPE#, #BADGE_TYPE#, #BADGE_NUMBER#, #BADGE_LINK#, #EVENT_NAME#, #EVENT_VENUE#, #EVENT_DATE#, #EVENT_TIME#, #PUBLIC_LINK#, #REGISTRATION_LINK#'
                             )
                             ->columnSpanFull(),
                     ])
@@ -194,10 +286,7 @@ class CommunicationTemplateForm
 
         /*
         |--------------------------------------------------------------------------
-        | Normal organization users
-        |--------------------------------------------------------------------------
-        |
-        | We use the organizations relationship when available.
+        | Normal Organization Users
         |--------------------------------------------------------------------------
         */
 

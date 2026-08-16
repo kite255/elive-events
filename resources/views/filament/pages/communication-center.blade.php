@@ -810,12 +810,12 @@
             filled($eventId)
             && filled($campaignName)
             && filled($message)
-            && $validRecipients > 0;
-
-        $canSendTest =
-            filled($eventId)
-            && filled($testPhone)
-            && filled($message);
+            && $validRecipients > 0
+            && ! $this->isWhatsAppChannel()
+            && (
+                ! $this->isEmailChannel()
+                || filled($subject)
+            );
     @endphp
 
     <div class="elive-communication-center">
@@ -827,8 +827,8 @@
                 </h2>
 
                 <p class="elive-hero-text">
-                    Build SMS campaigns, preview recipients, send a test,
-                    then queue delivery through the communications worker.
+                    Build Email, SMS, and WhatsApp campaigns, preview recipients,
+                    send a test, then queue delivery through the communications worker.
                 </p>
 
                 @if ($selectedEvent)
@@ -843,7 +843,7 @@
             </div>
 
             <div class="elive-live-pill">
-                SMS Operations Ready
+                Communication Operations Ready
             </div>
         </section>
 
@@ -899,12 +899,12 @@
 
                     <div class="elive-card-header">
                         <h2 class="elive-card-title">
-                            New SMS Campaign
+                            New Communication Campaign
                         </h2>
 
                         <p class="elive-card-description">
-                            Select your event and audience, compose the message,
-                            send a test SMS, then queue the final campaign.
+                            Select the event, channel, audience, and template,
+                            then test and queue the campaign.
                         </p>
                     </div>
 
@@ -949,6 +949,36 @@
                                 @enderror
                             </div>
 
+                            {{-- Channel --}}
+                            <div class="elive-field">
+
+                                <label class="elive-label">
+                                    <span>Channel</span>
+
+                                    <span class="elive-required">
+                                        Required
+                                    </span>
+                                </label>
+
+                                <select
+                                    wire:model.live="channel"
+                                    class="elive-select"
+                                >
+                                    @foreach ($this->channelOptions() as $value => $label)
+                                        <option value="{{ $value }}">
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('channel')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+
+                            </div>
+
                             {{-- Campaign Name --}}
                             <div class="elive-field">
 
@@ -964,7 +994,7 @@
                                     type="text"
                                     wire:model="campaignName"
                                     class="elive-input"
-                                    placeholder="Example: Event reminder SMS"
+                                    placeholder="Example: Event Reminder"
                                 >
 
                                 @error('campaignName')
@@ -1033,7 +1063,7 @@
                             <div class="elive-field elive-field-full">
 
                                 <label class="elive-label">
-                                    SMS Template
+                                    Template Type
                                 </label>
 
                                 <select
@@ -1059,8 +1089,8 @@
                                 @enderror
 
                                 <div class="elive-help">
-                                    Select an existing SMS template or write
-                                    the message manually below.
+                                    Select a friendly template type for the chosen
+                                    channel, or write the message manually below.
                                 </div>
 
                                 @if ($selectedTemplate)
@@ -1071,6 +1101,40 @@
                                     </div>
                                 @endif
                             </div>
+
+                            {{-- Email Subject --}}
+                            @if ($this->isEmailChannel())
+                                <div class="elive-field elive-field-full">
+
+                                    <label class="elive-label">
+                                        <span>Email Subject</span>
+
+                                        <span class="elive-required">
+                                            Required
+                                        </span>
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        wire:model="subject"
+                                        class="elive-input"
+                                        placeholder="Important Update – #EVENT_NAME#"
+                                    >
+
+                                    @error('subject')
+                                        <div class="elive-error">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+
+                                    <div class="elive-help">
+                                        Placeholders such as
+                                        <strong>#EVENT_NAME#</strong>
+                                        are rendered for each attendee.
+                                    </div>
+
+                                </div>
+                            @endif
 
                             {{-- Message --}}
                             <div class="elive-field elive-field-full">
@@ -1095,24 +1159,26 @@
                                     </div>
                                 @enderror
 
-                                <div class="elive-message-meta">
+                                @if ($this->isSmsChannel())
+                                    <div class="elive-message-meta">
 
-                                    <span class="elive-meta-pill">
-                                        {{ number_format($characterCount) }}
-                                        characters
-                                    </span>
+                                        <span class="elive-meta-pill">
+                                            {{ number_format($characterCount) }}
+                                            characters
+                                        </span>
 
-                                    <span class="elive-meta-pill">
-                                        {{ number_format($segmentCount) }}
-                                        SMS segment{{ $segmentCount === 1 ? '' : 's' }}
-                                    </span>
+                                        <span class="elive-meta-pill">
+                                            {{ number_format($segmentCount) }}
+                                            SMS segment{{ $segmentCount === 1 ? '' : 's' }}
+                                        </span>
 
-                                    <span class="elive-meta-pill">
-                                        {{ number_format($estimatedSmsUnits) }}
-                                        estimated SMS units
-                                    </span>
+                                        <span class="elive-meta-pill">
+                                            {{ number_format($estimatedSmsUnits) }}
+                                            estimated SMS units
+                                        </span>
 
-                                </div>
+                                    </div>
+                                @endif
 
                                 <div class="elive-help">
                                     Personalize your message using placeholders.
@@ -1129,11 +1195,16 @@
                                         '#ORGANIZATION#',
                                         '#POSITION#',
                                         '#CATEGORY#',
+                                        '#PARTICIPANT_TYPE#',
+                                        '#BADGE_TYPE#',
                                         '#BADGE_NUMBER#',
+                                        '#BADGE_LINK#',
                                         '#EVENT_NAME#',
                                         '#EVENT_VENUE#',
                                         '#EVENT_DATE#',
                                         '#EVENT_TIME#',
+                                        '#PUBLIC_LINK#',
+                                        '#REGISTRATION_LINK#',
                                     ] as $placeholder)
 
                                         <span class="elive-placeholder">
@@ -1146,7 +1217,7 @@
 
                             </div>
 
-                            {{-- Test SMS --}}
+                            {{-- Test Communication --}}
                             <div class="elive-field elive-field-full">
 
                                 <div class="elive-test-box">
@@ -1154,74 +1225,150 @@
                                     <div class="elive-test-header">
 
                                         <div class="elive-test-title">
-                                            Send Test SMS
+                                            @if ($this->isSmsChannel())
+                                                Send Test SMS
+                                            @elseif ($this->isEmailChannel())
+                                                Send Test Email
+                                            @else
+                                                WhatsApp Test
+                                            @endif
                                         </div>
 
                                         <div class="elive-test-description">
-                                            Send the current message to one
-                                            phone number before launching the
-                                            campaign. No campaign recipients
-                                            are created.
+                                            @if ($this->isSmsChannel())
+                                                Send the current SMS to one phone number before launching the campaign.
+                                            @elseif ($this->isEmailChannel())
+                                                Send the current branded eLive Events email to one address before launching the campaign.
+                                            @else
+                                                Bulk WhatsApp campaign sending is not enabled from this screen yet.
+                                            @endif
                                         </div>
 
                                     </div>
 
-                                    <div class="elive-test-row">
+                                    @if ($this->isSmsChannel())
 
-                                        <div class="elive-field">
+                                        @php
+                                            $canSendTestSms =
+                                                filled($eventId)
+                                                && filled($testPhone)
+                                                && filled($message);
+                                        @endphp
 
-                                            <label class="elive-label">
-                                                Test Phone Number
-                                            </label>
+                                        <div class="elive-test-row">
 
-                                            <input
-                                                type="tel"
-                                                wire:model="testPhone"
-                                                class="elive-input"
-                                                placeholder="0768461644 or 255768461644"
+                                            <div class="elive-field">
+
+                                                <label class="elive-label">
+                                                    Test Phone Number
+                                                </label>
+
+                                                <input
+                                                    type="tel"
+                                                    wire:model="testPhone"
+                                                    class="elive-input"
+                                                    placeholder="0768461644 or 255768461644"
+                                                >
+
+                                                @error('testPhone')
+                                                    <div class="elive-error">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                wire:click="sendTestSms"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendTestSms"
+                                                class="elive-btn elive-btn-test"
+                                                @disabled(! $canSendTestSms)
                                             >
+                                                <span wire:loading.remove wire:target="sendTestSms">
+                                                    Send Test SMS
+                                                </span>
 
-                                            @error('testPhone')
-                                                <div class="elive-error">
-                                                    {{ $message }}
-                                                </div>
-                                            @enderror
+                                                <span wire:loading wire:target="sendTestSms">
+                                                    Sending...
+                                                </span>
+                                            </button>
 
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            wire:click="sendTestSms"
-                                            wire:loading.attr="disabled"
-                                            wire:target="sendTestSms"
-                                            class="elive-btn elive-btn-test"
-                                            @disabled(! $canSendTest)
-                                        >
+                                        <div class="elive-help">
+                                            Tanzania numbers such as
+                                            <strong>0768461644</strong>
+                                            are normalized automatically.
+                                        </div>
 
-                                            <span
-                                                wire:loading.remove
-                                                wire:target="sendTestSms"
+                                    @elseif ($this->isEmailChannel())
+
+                                        @php
+                                            $canSendTestEmail =
+                                                filled($eventId)
+                                                && filled($testEmail)
+                                                && filled($subject)
+                                                && filled($message);
+                                        @endphp
+
+                                        <div class="elive-test-row">
+
+                                            <div class="elive-field">
+
+                                                <label class="elive-label">
+                                                    Test Email Address
+                                                </label>
+
+                                                <input
+                                                    type="email"
+                                                    wire:model="testEmail"
+                                                    class="elive-input"
+                                                    placeholder="name@example.com"
+                                                >
+
+                                                @error('testEmail')
+                                                    <div class="elive-error">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                wire:click="sendTestEmail"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendTestEmail"
+                                                class="elive-btn elive-btn-test"
+                                                @disabled(! $canSendTestEmail)
                                             >
-                                                Send Test SMS
-                                            </span>
+                                                <span wire:loading.remove wire:target="sendTestEmail">
+                                                    Send Test Email
+                                                </span>
 
-                                            <span
-                                                wire:loading
-                                                wire:target="sendTestSms"
-                                            >
-                                                Sending...
-                                            </span>
+                                                <span wire:loading wire:target="sendTestEmail">
+                                                    Sending...
+                                                </span>
+                                            </button>
 
-                                        </button>
+                                        </div>
 
-                                    </div>
+                                        <div class="elive-help">
+                                            Test emails use the branded
+                                            <strong>eLive Events</strong>
+                                            HTML layout and do not create campaign recipients.
+                                        </div>
 
-                                    <div class="elive-help">
-                                        For Tanzania, numbers such as
-                                        <strong>0768461644</strong> are
-                                        automatically converted to
-                                        <strong>255768461644</strong>.
-                                    </div>
+                                    @else
+
+                                        <div class="elive-warning">
+                                            WhatsApp template campaigns will be connected in a later step.
+                                            Existing automatic WhatsApp registration confirmations remain unchanged.
+                                        </div>
+
+                                    @endif
 
                                 </div>
 
@@ -1287,7 +1434,7 @@
                                         wire:loading.remove
                                         wire:target="queueCampaign"
                                     >
-                                        Queue SMS Campaign
+                                        Queue {{ $this->channelLabel() }} Campaign
                                     </span>
 
                                     <span
@@ -1316,7 +1463,7 @@
                         </h2>
 
                         <p class="elive-card-description">
-                            Latest SMS campaigns created for events you manage.
+                            Latest Email, SMS, and WhatsApp campaigns for events you manage.
                         </p>
 
                     </div>
@@ -1330,7 +1477,7 @@
                             </div>
 
                             <div>
-                                Your first SMS campaign will appear here.
+                                Your first communication campaign will appear here.
                             </div>
 
                         </div>
@@ -1345,6 +1492,7 @@
                                     <tr>
                                         <th>Campaign</th>
                                         <th>Event</th>
+                                        <th>Template</th>
                                         <th>Status</th>
                                         <th>Recipients</th>
                                         <th>Queued</th>
@@ -1383,6 +1531,10 @@
 
                                             <td>
                                                 {{ $campaign->event?->name ?? '—' }}
+                                            </td>
+
+                                            <td>
+                                                {{ $campaign->template?->name ?? 'Manual Message' }}
                                             </td>
 
                                             <td>
@@ -1468,7 +1620,7 @@
                             <div class="elive-stat-card">
 
                                 <div class="elive-stat-label">
-                                    Valid SMS recipients
+                                    Valid {{ $this->channelLabel() }} recipients
                                 </div>
 
                                 <div class="elive-stat-value">
@@ -1493,7 +1645,7 @@
                             <div class="elive-stat-card">
 
                                 <div class="elive-stat-label">
-                                    Missing / invalid phones
+                                    Missing / invalid {{ $this->recipientLabel() }}
                                 </div>
 
                                 <div class="elive-stat-value">
@@ -1506,26 +1658,45 @@
 
                             </div>
 
-                            <div class="elive-stat-card">
+                            @if ($this->isSmsChannel())
+                                <div class="elive-stat-card">
 
-                                <div class="elive-stat-label">
-                                    Estimated SMS units
+                                    <div class="elive-stat-label">
+                                        Estimated SMS units
+                                    </div>
+
+                                    <div class="elive-stat-value">
+                                        {{ number_format($estimatedSmsUnits) }}
+                                    </div>
+
+                                    <div class="elive-stat-footer">
+
+                                        {{ number_format($validRecipients) }}
+                                        recipients ×
+                                        {{ number_format($segmentCount) }}
+                                        segment{{ $segmentCount === 1 ? '' : 's' }}
+
+                                    </div>
+
                                 </div>
+                            @else
+                                <div class="elive-stat-card">
 
-                                <div class="elive-stat-value">
-                                    {{ number_format($estimatedSmsUnits) }}
+                                    <div class="elive-stat-label">
+                                        Selected Channel
+                                    </div>
+
+                                    <div class="elive-stat-value" style="font-size:22px;">
+                                        {{ $this->channelLabel() }}
+                                    </div>
+
+                                    <div class="elive-stat-footer">
+                                        {{ number_format($validRecipients) }}
+                                        valid recipient(s)
+                                    </div>
+
                                 </div>
-
-                                <div class="elive-stat-footer">
-
-                                    {{ number_format($validRecipients) }}
-                                    recipients ×
-                                    {{ number_format($segmentCount) }}
-                                    segment{{ $segmentCount === 1 ? '' : 's' }}
-
-                                </div>
-
-                            </div>
+                            @endif
 
                         </div>
 
@@ -1553,7 +1724,7 @@
                                 </span>
 
                                 <span class="elive-summary-value">
-                                    SMS
+                                    {{ $this->channelLabel() }}
                                 </span>
 
                             </div>
@@ -1594,47 +1765,54 @@
 
                             </div>
 
-                            <div class="elive-summary-divider"></div>
+                            @if ($this->isSmsChannel())
 
-                            <div class="elive-summary-row">
+                                <div class="elive-summary-divider"></div>
 
-                                <span class="elive-summary-label">
-                                    Characters
-                                </span>
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Characters</span>
+                                    <span class="elive-summary-value">
+                                        {{ number_format($characterCount) }}
+                                    </span>
+                                </div>
 
-                                <span class="elive-summary-value">
-                                    {{ number_format($characterCount) }}
-                                </span>
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">SMS segments</span>
+                                    <span class="elive-summary-value">
+                                        {{ number_format($segmentCount) }}
+                                    </span>
+                                </div>
 
-                            </div>
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Estimated SMS units</span>
+                                    <span class="elive-summary-value">
+                                        {{ number_format($estimatedSmsUnits) }}
+                                    </span>
+                                </div>
 
-                            <div class="elive-summary-row">
+                            @elseif ($this->isEmailChannel())
 
-                                <span class="elive-summary-label">
-                                    SMS segments
-                                </span>
+                                <div class="elive-summary-divider"></div>
 
-                                <span class="elive-summary-value">
-                                    {{ number_format($segmentCount) }}
-                                </span>
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Subject</span>
+                                    <span class="elive-summary-value">
+                                        {{ filled($subject) ? $subject : '—' }}
+                                    </span>
+                                </div>
 
-                            </div>
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Branding</span>
+                                    <span class="elive-summary-value">
+                                        eLive Events + Event Branding
+                                    </span>
+                                </div>
 
-                            <div class="elive-summary-row">
-
-                                <span class="elive-summary-label">
-                                    Estimated SMS units
-                                </span>
-
-                                <span class="elive-summary-value">
-                                    {{ number_format($estimatedSmsUnits) }}
-                                </span>
-
-                            </div>
+                            @endif
 
                         </div>
 
-                        @if ($segmentCount > 1)
+                        @if ($this->isSmsChannel() && $segmentCount > 1)
 
                             <div
                                 class="elive-warning"
@@ -1660,7 +1838,7 @@
 
                     <div class="elive-card-header">
                         <h2 class="elive-card-title">
-                            SMS Queue
+                            Communication Queue
                         </h2>
                     </div>
 
@@ -1691,14 +1869,14 @@
                             </div>
 
                             <div>
-                                Test SMS messages are sent directly to the
-                                selected test number and do not create
+                                Test SMS and Email messages are sent directly
+                                to the selected test recipient and do not create
                                 campaign recipients.
                             </div>
 
                             <div>
-                                Invalid phone numbers are skipped before
-                                they reach the SMS provider.
+                                Invalid recipients are skipped before they
+                                reach the selected communication provider.
                             </div>
 
                         </div>
