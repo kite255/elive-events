@@ -4,6 +4,16 @@
         ? filemtime($heroImagePath)
         : time();
 
+    /*
+     * Homepage SEO / social sharing metadata.
+     * event.jpg is used as the default Open Graph image because it already
+     * exists in the public directory and is publicly accessible.
+     */
+    $seoTitle = 'eLive Events | Smart Event Registration & Management';
+    $seoDescription = 'Manage event registration, digital badges, attendee communication, QR check-in and attendance with eLive Events.';
+    $seoCanonicalUrl = route('home');
+    $seoImageUrl = asset('event.jpg') . '?v=' . $heroImageVersion;
+
     $happeningNowEvents = \App\Models\Event::query()
         ->whereNotIn('status', ['draft', 'cancelled'])
         ->where('starts_at', '<=', now())
@@ -86,14 +96,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>eLive Events | Smart Event Management</title>
+    <title>{{ $seoTitle }}</title>
 
-    <meta
-        name="description"
-        content="Manage event registration, digital badges, attendee communication and QR check-in with eLive Events."
-    >
+    {{-- Primary SEO --}}
+    <meta name="description" content="{{ $seoDescription }}">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="author" content="eLive Company Limited">
+    <meta name="theme-color" content="#161943">
 
-    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="canonical" href="{{ $seoCanonicalUrl }}">
+
+    {{-- Favicons --}}
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ asset('eLive-Logo.png') }}">
+
+    {{-- Open Graph / WhatsApp / Facebook / LinkedIn --}}
+    <meta property="og:locale" content="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="eLive Events">
+    <meta property="og:title" content="{{ $seoTitle }}">
+    <meta property="og:description" content="{{ $seoDescription }}">
+    <meta property="og:url" content="{{ $seoCanonicalUrl }}">
+    <meta property="og:image" content="{{ $seoImageUrl }}">
+    <meta property="og:image:secure_url" content="{{ $seoImageUrl }}">
+    <meta property="og:image:alt" content="eLive Events smart event management platform">
+
+    {{-- X / Twitter Card --}}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $seoTitle }}">
+    <meta name="twitter:description" content="{{ $seoDescription }}">
+    <meta name="twitter:image" content="{{ $seoImageUrl }}">
+    <meta name="twitter:image:alt" content="eLive Events smart event management platform">
 
     {{-- Preload hero image and automatically refresh it when event.jpg changes --}}
     <link
@@ -417,6 +451,45 @@
         }
 
     </style>
+
+    {{-- Structured data for search engines --}}
+    <script type="application/ld+json">
+        {!! json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Organization',
+            'name' => 'eLive Company Limited',
+            'url' => route('home'),
+            'logo' => asset('eLive-Logo.png'),
+            'email' => 'info@elive.co.tz',
+            'telephone' => '+255745939140',
+            'address' => [
+                '@type' => 'PostalAddress',
+                'streetAddress' => 'Ikungwi Street, Kinondoni B',
+                'addressLocality' => 'Dar es Salaam',
+                'addressCountry' => 'TZ',
+            ],
+            'sameAs' => array_values($socialLinks),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+    </script>
+
+    <script type="application/ld+json">
+        {!! json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => 'eLive Events',
+            'url' => route('home'),
+            'description' => $seoDescription,
+            'publisher' => [
+                '@type' => 'Organization',
+                'name' => 'eLive Company Limited',
+                'logo' => [
+                    '@type' => 'ImageObject',
+                    'url' => asset('eLive-Logo.png'),
+                ],
+            ],
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+    </script>
+
 </head>
 
 <body class="bg-white text-slate-900 antialiased">
