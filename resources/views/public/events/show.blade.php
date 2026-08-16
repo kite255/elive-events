@@ -2,99 +2,96 @@
     use Illuminate\Support\Carbon;
     use Illuminate\Support\Str;
 
-    $filter = request('filter', 'all');
-    $search = trim((string) request('search'));
+    $eventStart = $event->starts_at
+        ? Carbon::parse($event->starts_at)
+        : null;
 
-    $query = \App\Models\Event::query()
-        ->whereNotIn('status', ['draft', 'cancelled']);
+    $eventEnd = $event->ends_at
+        ? Carbon::parse($event->ends_at)
+        : null;
 
-    if ($search !== '') {
-        $query->where(function ($q) use ($search) {
-            $q->where('name', 'ilike', '%' . $search . '%')
-                ->orWhere('venue', 'ilike', '%' . $search . '%');
-        });
-    }
-
-    if ($filter === 'live') {
-        $query
-            ->where('starts_at', '<=', now())
-            ->where(function ($q) {
-                $q->where('ends_at', '>=', now())
-                    ->orWhere(function ($q) {
-                        $q->whereNull('ends_at')
-                            ->where('starts_at', '>=', now()->startOfDay());
-                    });
-            });
-    } elseif ($filter === 'upcoming') {
-        $query->where('starts_at', '>', now());
-    } elseif ($filter === 'past') {
-        $query->where(function ($q) {
-            $q->where('ends_at', '<', now())
-                ->orWhere(function ($q) {
-                    $q->whereNull('ends_at')
-                        ->where('starts_at', '<', now()->startOfDay());
-                });
-        });
-    }
-
-    $events = $query
-        ->orderByRaw("
-            CASE
-                WHEN starts_at <= NOW()
-                    AND (
-                        ends_at >= NOW()
-                        OR (
-                            ends_at IS NULL
-                            AND starts_at >= CURRENT_DATE
-                        )
-                    )
-                THEN 0
-                WHEN starts_at > NOW()
-                THEN 1
-                ELSE 2
-            END
-        ")
-        ->orderByRaw("
-            CASE
-                WHEN starts_at <= NOW()
-                    AND (
-                        ends_at >= NOW()
-                        OR (
-                            ends_at IS NULL
-                            AND starts_at >= CURRENT_DATE
-                        )
-                    )
-                THEN starts_at
-                ELSE NULL
-            END ASC
-        ")
-        ->orderByRaw("
-            CASE
-                WHEN starts_at > NOW()
-                THEN starts_at
-                ELSE NULL
-            END ASC
-        ")
-        ->orderByRaw("
-            CASE
-                WHEN starts_at < NOW()
-                THEN starts_at
-                ELSE NULL
-            END DESC
-        ")
-        ->paginate(12)
-        ->withQueryString();
-
-    $eventIds = $events->getCollection()->pluck('id');
-
-    $eventDaysByEvent = \App\Models\EventDay::query()
-        ->whereIn('event_id', $eventIds)
+    $days = \App\Models\EventDay::query()
+        ->where('event_id', $event->id)
         ->whereIn('status', ['active', 'completed'])
         ->orderBy('event_date')
         ->orderBy('display_order')
         ->orderBy('id')
-        ->get()
-        ->groupBy('event_id');
+        ->get();
+
+    $dates = $days
+        ->map(
+            fn ($day) => $day->event_date
+                ? Carbon::parse($day->event_date)
+                : null
+        )
+        ->filter()
+        ->values();
+
+    $isLive = $eventStart
+        && $eventStart->lte(now())
+        && (
+            ($eventEnd && $eventEnd->gte(now()))
+            || (
+                ! $eventEnd
+                && $eventStart->gte(now()->startOfDay())
+            )
+        );
+
+    $isPast = $eventEnd
+        ? $eventEnd->lt(now())
+        : (
+            $eventStart
+            && $eventStart->lt(now()->startOfDay())
+        );
+
+    $statusText = $isLive
+        ? 'Happening Now'
+        : ($isPast ? 'Event Ended' : 'Upcoming');
+
+    $statusClass = $isLive
+        ? 'live'
+        : ($isPast ? 'ended' : 'upcoming');
+
+    $eventImage = $event->registration_banner_image_path;
+    $eventImageUrl = null;
+
+    if ($eventImage) {
+        if (Str::startsWith($eventImage, ['http://', 'https://'])) {
+            $eventImageUrl = $eventImage;
+        } elseif (Str::startsWith($eventImage, ['storage/', '/storage/'])) {
+            $eventImageUrl = asset(ltrim($eventImage, '/'));
+        } else {
+            $eventImageUrl = asset('storage/' . ltrim($eventImage, '/'));
+        }
+    }
+
+    $eventDetailsDateLabel = null;
+
+    if ($dates->isNotEmpty()) {
+        $years = $dates
+            ->map(fn ($date) => $date->format('Y'))
+            ->unique();
+
+        $sameYear = $years->count() === 1;
+
+        $eventDetailsDateLabel = $dates
+            ->map(
+                fn ($date) => $sameYear
+                    ? $date->format('D, d M')
+                    : $date->format('D, d M Y')
+            )
+            ->implode(' • ');
+
+        if ($sameYear) {
+            $eventDetailsDateLabel .= ' ' . $dates->first()->format('Y');
+        }
+    } elseif ($eventStart) {
+        $eventDetailsDateLabel = $eventStart->format('D, d M Y');
+    }
+
+    $registerUrl = route('public.events.register', [
+        'event' => $event->slug,
+    ]);
 @endphp
 
 <!DOCTYPE html>
@@ -103,14 +100,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Events | eLive Events</title>
+    <title>{{ $event->name }} | eLive Events</title>
 
     <meta
         name="description"
-        content="Browse current, upcoming and past events managed with eLive Events."
+        content="{{ Str::limit(strip_tags((string) $event->description), 155) ?: 'Event details and registration information.' }}"
     >
 
     <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link
@@ -130,9 +128,10 @@
             --elive-blue: #233F7D;
             --elive-blue-dark: #17233F;
             --elive-orange: #FF9418;
-            --elive-bg: #F6F8FB;
+            --elive-bg: #F3F6FA;
             --elive-border: #DDE3EC;
             --elive-muted: #64748B;
+            --elive-green: #16A34A;
         }
 
         * {
@@ -145,9 +144,9 @@
 
         body {
             margin: 0;
-            background: #F3F6FA;
+            background: var(--elive-bg);
             color: #0F172A;
-            font-family: 'Instrument Sans', sans-serif;
+            font-family: 'Creato Display', 'Instrument Sans', sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -167,11 +166,10 @@
             z-index: 50;
             background: #FFFFFF;
             border-bottom: 1px solid #E8EDF4;
-            box-shadow: 0 1px 0 rgba(15, 23, 42, .02);
         }
 
         .header-inner {
-            min-height: 78px;
+            min-height: 76px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -203,457 +201,359 @@
         }
 
         .login-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 20px;
+            border-radius: 11px;
             background: var(--elive-blue);
-            color: white;
-            border-radius: 12px;
-            padding: 12px 20px;
+            color: #FFFFFF;
             font-size: 14px;
             font-weight: 700;
             box-shadow: 0 5px 14px rgba(35, 63, 125, .16);
         }
 
-        .hero {
-            background: #F8FAFD;
+        .page-hero {
+            background: #FFFFFF;
             border-bottom: 1px solid #E8EDF4;
         }
 
-        .hero-inner {
-            padding: 52px 0 38px;
+        .hero-shell {
+            padding: 34px 0 40px;
         }
 
-        .eyebrow {
-            margin: 0;
-            color: var(--elive-orange);
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: .14em;
-            text-transform: uppercase;
-        }
-
-        .hero h1 {
-            margin: 12px 0 0;
-            color: var(--elive-blue);
-            font-size: clamp(36px, 5vw, 54px);
-            line-height: 1.05;
-            letter-spacing: -.035em;
-        }
-
-        .hero-copy {
-            max-width: 650px;
-            margin: 16px 0 0;
-            color: var(--elive-muted);
-            font-size: 16px;
-            line-height: 1.7;
-        }
-
-        .search-panel {
-            margin-top: 28px;
-            padding: 18px;
-            background: #FFFFFF;
-            border: 1px solid #E6EBF2;
-            border-radius: 18px;
-        }
-
-        .search-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .search-input {
-            width: 100%;
-            height: 48px;
-            border: 1px solid #CBD5E1;
-            border-radius: 12px;
-            background: #FFFFFF;
-            padding: 0 16px;
-            color: #0F172A;
-            font: inherit;
-            font-size: 14px;
-            outline: none;
-            transition: border-color .2s ease, box-shadow .2s ease;
-        }
-
-        .search-input:focus {
-            border-color: var(--elive-blue);
-            box-shadow: 0 0 0 3px rgba(35, 63, 125, .10);
-        }
-
-        .search-btn {
-            height: 48px;
-            border: 0;
-            border-radius: 12px;
-            background: var(--elive-blue);
-            color: white;
-            padding: 0 22px;
-            font: inherit;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .filters {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 14px;
-        }
-
-        .filter-btn {
-            min-height: 40px;
-            border: 1px solid #CBD5E1;
-            border-radius: 10px;
-            background: white;
-            color: #475569;
-            padding: 0 14px;
-            font: inherit;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all .2s ease;
-        }
-
-        .filter-btn:hover {
-            border-color: var(--elive-blue);
-            color: var(--elive-blue);
-        }
-
-        .filter-btn.active {
-            border-color: var(--elive-blue);
-            background: var(--elive-blue);
-            color: white;
-        }
-
-        .events-section {
-            padding: 30px 0 64px;
-            background: #F3F6FA;
-        }
-
-        .results-bar {
-            width: min(760px, 100%);
-            margin: 0 auto 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-        }
-
-        .results-count {
-            margin: 0;
-            color: #475569;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .events-list {
-            width: min(760px, 100%);
-            margin-inline: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .event-ticket {
-            overflow: hidden;
-            background: #FFFFFF;
-            border: 1px solid #DCE4EE;
-            border-radius: 18px;
-            box-shadow: 0 5px 18px rgba(15, 23, 42, .05);
-            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
-        }
-
-        .event-ticket:hover {
-            transform: translateY(-2px);
-            border-color: #CBD5E1;
-            box-shadow: 0 14px 28px rgba(15, 23, 42, .09);
-        }
-
-        .event-ticket.live-event {
-            border-color: #86EFAC;
-            box-shadow: 0 8px 24px rgba(22, 163, 74, .10);
-        }
-
-        .event-ticket.live-event:hover {
-            border-color: #4ADE80;
-            box-shadow: 0 14px 30px rgba(22, 163, 74, .16);
-        }
-
-        .event-ticket.live-event .event-ticket-overlay {
-            background: linear-gradient(
-                to top,
-                rgba(20, 83, 45, .80),
-                rgba(16, 42, 82, .08) 68%
-            );
-        }
-
-        .event-ticket.live-event .event-ticket-status {
+        .back-link {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            background: #16A34A;
-            color: #FFFFFF;
-            padding: 6px 9px;
-            border-radius: 999px;
-            box-shadow: 0 4px 12px rgba(22, 163, 74, .28);
+            gap: 8px;
+            margin-bottom: 22px;
+            color: var(--elive-blue);
+            font-size: 13px;
+            font-weight: 700;
         }
 
-        .event-ticket.live-event .event-ticket-status::before {
-            content: '';
-            width: 6px;
-            height: 6px;
-            border-radius: 999px;
+        .back-link:hover {
+            color: var(--elive-orange);
+        }
+
+        .hero-card {
+            overflow: hidden;
+            border: 1px solid #DCE4EE;
+            border-radius: 24px;
             background: #FFFFFF;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, .07);
         }
 
-        .event-ticket.live-event .event-ticket-date {
-            background: #F0FDF4;
-            border-left-color: #86EFAC;
+        .hero-visual {
+            position: relative;
+            min-height: 330px;
+            background: #DDE4EE;
+            overflow: hidden;
         }
 
-        .event-ticket.live-event .event-ticket-date .month,
-        .event-ticket.live-event .event-ticket-date .multi {
-            color: #16A34A;
+        .hero-image {
+            width: 100%;
+            height: 100%;
+            min-height: 330px;
+            display: block;
+            object-fit: cover;
         }
 
-        .live-now-label {
-            margin: 4px 0 0;
-            color: #16A34A;
-            font-size: 10px;
+        .hero-fallback {
+            min-height: 330px;
+            background: var(--elive-blue);
+        }
+
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                to top,
+                rgba(15, 23, 42, .78),
+                rgba(15, 23, 42, .18) 58%,
+                rgba(15, 23, 42, .04)
+            );
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: absolute;
+            left: 34px;
+            right: 34px;
+            bottom: 30px;
+            z-index: 2;
+            color: #FFFFFF;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 30px;
+            padding: 0 12px;
+            border-radius: 999px;
+            font-size: 11px;
             font-weight: 800;
             letter-spacing: .07em;
             text-transform: uppercase;
+            margin-bottom: 14px;
         }
 
-        .event-ticket-grid {
-            display: grid;
-            grid-template-columns: 125px minmax(0, 1fr) 96px;
-            min-height: 124px;
+        .status-pill.live {
+            background: var(--elive-green);
+            color: #FFFFFF;
         }
 
-        .event-ticket-visual {
-            position: relative;
-            overflow: hidden;
-            background: #E2E8F0;
+        .status-pill.upcoming {
+            background: rgba(35, 63, 125, .95);
+            color: #FFFFFF;
         }
 
-        .event-ticket-image {
-            width: 100%;
-            height: 100%;
-            display: block;
-            object-fit: cover;
-            transition: transform .35s ease;
+        .status-pill.ended {
+            background: rgba(71, 85, 105, .94);
+            color: #FFFFFF;
         }
 
-        .event-ticket:hover .event-ticket-image {
-            transform: scale(1.025);
+        .status-pill.live::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #FFFFFF;
         }
 
-        .event-ticket-overlay {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(16,42,82,.70), rgba(16,42,82,.04) 64%);
-        }
-
-        .event-ticket-status {
-            position: absolute;
-            left: 14px;
-            bottom: 13px;
-            font-size: 10px;
+        .hero-title {
+            margin: 0;
+            max-width: 860px;
+            font-size: clamp(34px, 5vw, 58px);
+            line-height: 1.02;
+            letter-spacing: -.04em;
             font-weight: 800;
-            letter-spacing: .08em;
+        }
+
+        .hero-meta {
+            margin-top: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 22px;
+            color: rgba(255, 255, 255, .88);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .hero-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hero-meta svg {
+            width: 17px;
+            height: 17px;
+            flex: 0 0 auto;
+        }
+
+        .details-section {
+            padding: 34px 0 72px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 340px;
+            gap: 26px;
+            align-items: start;
+        }
+
+        .content-card,
+        .info-card {
+            background: #FFFFFF;
+            border: 1px solid var(--elive-border);
+            border-radius: 20px;
+            box-shadow: 0 7px 22px rgba(15, 23, 42, .04);
+        }
+
+        .content-card {
+            padding: 30px;
+        }
+
+        .section-eyebrow {
+            margin: 0 0 8px;
+            color: var(--elive-orange);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .12em;
             text-transform: uppercase;
         }
 
-        .event-ticket-status.live {
-            color: #FFFFFF;
+        .section-title {
+            margin: 0;
+            color: var(--elive-blue);
+            font-size: 25px;
+            line-height: 1.15;
+            letter-spacing: -.025em;
         }
 
-        .event-ticket-status.upcoming {
-            color: #FFFFFF;
+        .event-description {
+            margin-top: 18px;
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.8;
         }
 
-        .event-ticket-status.ended {
-            color: #FFFFFF;
+        .event-description p:first-child {
+            margin-top: 0;
         }
 
-        .event-ticket-fallback {
-            width: 100%;
-            height: 100%;
+        .event-description p:last-child {
+            margin-bottom: 0;
+        }
+
+        .days-section {
+            margin-top: 30px;
+            padding-top: 28px;
+            border-top: 1px solid #E8EDF4;
+        }
+
+        .days-list {
+            margin-top: 16px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .day-row {
             display: flex;
-            align-items: flex-end;
-            padding: 14px;
-            background: linear-gradient(145deg, #17233F, #233F7D 68%, #315AA5);
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 15px 16px;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            background: #F8FAFC;
         }
 
-        .event-ticket-content {
+        .day-main {
             min-width: 0;
-            padding: 18px 22px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
         }
 
-        .event-ticket-title {
+        .day-label {
             margin: 0;
             color: #0F172A;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 800;
-            line-height: 1.25;
-            letter-spacing: -.02em;
         }
 
-        .event-ticket-title a:hover {
+        .day-date {
+            margin: 4px 0 0;
+            color: #64748B;
+            font-size: 13px;
+        }
+
+        .day-number {
+            min-width: 66px;
+            color: var(--elive-blue);
+            font-size: 12px;
+            font-weight: 800;
+            text-align: right;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+        .info-card {
+            position: sticky;
+            top: 98px;
+            padding: 24px;
+        }
+
+        .info-title {
+            margin: 0 0 18px;
+            color: var(--elive-blue);
+            font-size: 20px;
+            line-height: 1.2;
+        }
+
+        .info-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .info-item {
+            display: grid;
+            grid-template-columns: 38px minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
+        }
+
+        .info-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #F1F5F9;
             color: var(--elive-blue);
         }
 
-        .event-ticket-venue {
-            margin: 5px 0 0;
-            color: var(--elive-muted);
-            font-size: 13px;
-            line-height: 1.45;
+        .info-icon svg {
+            width: 18px;
+            height: 18px;
         }
 
-        .event-ticket-date-line {
-            margin: 8px 0 0;
-            color: #475569;
+        .info-copy strong {
+            display: block;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+        .info-copy span {
+            display: block;
+            margin-top: 4px;
+            color: #64748B;
             font-size: 13px;
-            font-weight: 600;
             line-height: 1.5;
         }
 
-        .event-ticket-days {
-            margin: 3px 0 0;
-            color: var(--elive-orange);
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: .07em;
-            text-transform: uppercase;
-        }
-
-        .event-ticket-actions {
-            margin-top: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        .view-link {
-            color: var(--elive-blue);
-            font-size: 12px;
-            font-weight: 800;
-        }
-
-        .view-link:hover {
-            color: var(--elive-orange);
+        .info-divider {
+            margin: 20px 0;
+            border: 0;
+            border-top: 1px solid #E8EDF4;
         }
 
         .register-btn {
+            width: 100%;
+            min-height: 48px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-height: 38px;
-            border-radius: 10px;
+            border-radius: 12px;
             background: var(--elive-blue);
-            color: white;
-            padding: 0 15px;
-            font-size: 12px;
+            color: #FFFFFF;
+            font-size: 14px;
             font-weight: 800;
-            box-shadow: 0 5px 12px rgba(35, 63, 125, .16);
+            box-shadow: 0 7px 16px rgba(35, 63, 125, .17);
+            transition: background .2s ease, transform .2s ease;
         }
 
         .register-btn:hover {
             background: #1B3267;
+            transform: translateY(-1px);
         }
 
-        .ended-label {
-            color: #94A3B8;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: .06em;
-        }
-
-        .event-ticket-date {
-            border-left: 1px dashed #CBD5E1;
-            background: #F8FAFC;
-            padding: 10px 7px;
-            display: flex;
-            flex-direction: column;
+        .registration-state {
+            width: 100%;
+            min-height: 48px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            text-align: center;
-        }
-
-        .event-ticket-date .month {
-            color: var(--elive-orange);
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: .08em;
-            text-transform: uppercase;
-        }
-
-        .event-ticket-date .day {
-            margin-top: 4px;
-            color: #0F172A;
-            font-size: 34px;
-            font-weight: 400;
-            line-height: 1;
-        }
-
-        .event-ticket-date .year {
-            margin-top: 8px;
-            color: #94A3B8;
-            font-size: 10px;
-        }
-
-        .event-ticket-date .multi {
-            color: var(--elive-orange);
-            font-size: 9px;
-            font-weight: 800;
-            letter-spacing: .07em;
-            text-transform: uppercase;
-        }
-
-        .event-ticket-date .multi-day {
-            margin-top: 4px;
-            color: #0F172A;
-            font-size: 20px;
-            font-weight: 500;
-            line-height: 1.05;
-        }
-
-        .event-ticket-date .multi-month {
-            margin-top: 3px;
+            border-radius: 12px;
+            background: #F1F5F9;
             color: #64748B;
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .empty-state {
-            padding: 70px 24px;
-            background: white;
-            border: 1px dashed #CBD5E1;
-            border-radius: 20px;
-            text-align: center;
-        }
-
-        .empty-state h2 {
-            margin: 0;
-            color: var(--elive-blue);
-            font-size: 22px;
-        }
-
-        .empty-state p {
-            margin: 10px 0 0;
-            color: var(--elive-muted);
-            font-size: 14px;
-        }
-
-        .pagination-wrap {
-            margin-top: 36px;
+            font-size: 13px;
+            font-weight: 800;
         }
 
         .site-footer {
@@ -683,55 +583,110 @@
         }
 
         .footer-links a:hover {
-            color: white;
+            color: #FFFFFF;
         }
 
-@media (max-width: 760px) {
+        @media (max-width: 900px) {
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .info-card {
+                position: static;
+            }
+        }
+
+        @media (max-width: 760px) {
             .container {
                 width: min(100% - 28px, 1180px);
             }
 
             .header-inner {
-                min-height: 70px;
+                min-height: 68px;
             }
 
             .brand img {
-                height: 42px;
+                height: 40px;
             }
 
             .nav .nav-link {
                 display: none;
             }
 
-            .hero-inner {
-                padding: 38px 0 30px;
+            .login-btn {
+                min-height: 40px;
+                padding: 0 16px;
             }
 
-            .search-row {
-                grid-template-columns: 1fr;
+            .hero-shell {
+                padding: 24px 0 30px;
             }
 
-            .event-ticket-grid {
-                grid-template-columns: 96px minmax(0, 1fr) 76px;
-                min-height: 118px;
+            .hero-visual,
+            .hero-image,
+            .hero-fallback {
+                min-height: 300px;
             }
 
-            .event-ticket-content {
-                padding: 14px 15px;
+            .hero-content {
+                left: 22px;
+                right: 22px;
+                bottom: 22px;
             }
 
-            .event-ticket-title {
-                font-size: 16px;
+            .hero-title {
+                font-size: clamp(30px, 9vw, 42px);
             }
 
-            .event-ticket-date .day {
-                font-size: 28px;
+            .hero-meta {
+                font-size: 13px;
+            }
+
+            .details-section {
+                padding: 24px 0 54px;
+            }
+
+            .content-card,
+            .info-card {
+                border-radius: 16px;
+            }
+
+            .content-card {
+                padding: 22px;
+            }
+
+            .info-card {
+                padding: 20px;
+            }
+
+            .day-row {
+                align-items: flex-start;
             }
 
             .footer-inner {
                 padding: 24px 0;
                 flex-direction: column;
                 align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                width: calc(100% - 22px);
+            }
+
+            .hero-meta {
+                display: grid;
+                gap: 8px;
+            }
+
+            .day-row {
+                flex-direction: column;
+            }
+
+            .day-number {
+                min-width: 0;
+                text-align: left;
             }
         }
     </style>
@@ -773,321 +728,269 @@
 
 <main>
 
-    <section class="hero">
-        <div class="container hero-inner">
+    <section class="page-hero">
+        <div class="container hero-shell">
 
-            <p class="eyebrow">
-                Events
-            </p>
-
-            <h1>
-                Discover Events
-            </h1>
-
-            <p class="hero-copy">
-                Browse events happening now, upcoming events and recently completed events.
-            </p>
-
-            <form
-                method="GET"
-                action="{{ route('public.events.index') }}"
-                class="search-panel"
+            <a
+                href="{{ route('public.events.index') }}"
+                class="back-link"
             >
-                <div class="search-row">
-                    <input
-                        type="search"
-                        name="search"
-                        value="{{ $search }}"
-                        placeholder="Search by event name or venue"
-                        class="search-input"
-                    >
+                ← Back to Events
+            </a>
 
-                    <button
-                        type="submit"
-                        class="search-btn"
-                    >
-                        Search
-                    </button>
-                </div>
+            <article class="hero-card">
 
-                <div class="filters">
-                    @foreach ([
-                        'all' => 'All',
-                        'live' => 'Happening Now',
-                        'upcoming' => 'Upcoming',
-                        'past' => 'Past',
-                    ] as $key => $label)
+                <div class="hero-visual">
 
-                        <button
-                            type="submit"
-                            name="filter"
-                            value="{{ $key }}"
-                            class="filter-btn {{ $filter === $key ? 'active' : '' }}"
+                    @if ($eventImageUrl)
+                        <img
+                            src="{{ $eventImageUrl }}"
+                            alt="{{ $event->name }}"
+                            class="hero-image"
                         >
-                            {{ $label }}
-                        </button>
+                    @else
+                        <div class="hero-fallback"></div>
+                    @endif
 
-                    @endforeach
+                    <div class="hero-overlay"></div>
+
+                    <div class="hero-content">
+
+                        <span class="status-pill {{ $statusClass }}">
+                            {{ $statusText }}
+                        </span>
+
+                        <h1 class="hero-title">
+                            {{ $event->name }}
+                        </h1>
+
+                        <div class="hero-meta">
+
+                            @if ($event->venue)
+                                <span class="hero-meta-item">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/>
+                                        <circle cx="12" cy="10" r="2"/>
+                                    </svg>
+
+                                    {{ $event->venue }}
+                                </span>
+                            @endif
+
+                            @if ($eventDetailsDateLabel)
+                                <span class="hero-meta-item">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <rect x="3" y="5" width="18" height="16" rx="2"/>
+                                        <path d="M16 3v4M8 3v4M3 10h18"/>
+                                    </svg>
+
+                                    {{ $eventDetailsDateLabel }}
+                                </span>
+                            @endif
+
+                        </div>
+
+                    </div>
+
                 </div>
-            </form>
+
+            </article>
 
         </div>
     </section>
 
 
-    <section class="events-section">
-        <div class="container">
+    <section class="details-section">
+        <div class="container details-grid">
 
-            @if ($events->count())
+            <article class="content-card">
 
-                <div class="results-bar">
-                    <p class="results-count">
-                        {{ $events->total() }}
-                        {{ \Illuminate\Support\Str::plural('event', $events->total()) }}
-                        found
-                    </p>
+                <p class="section-eyebrow">
+                    Event Details
+                </p>
+
+                <h2 class="section-title">
+                    About this event
+                </h2>
+
+                <div class="event-description">
+                    @if ($event->description)
+                        {!! nl2br(e($event->description)) !!}
+                    @else
+                        <p>
+                            Event information will be available here.
+                        </p>
+                    @endif
                 </div>
 
-                <div class="events-list">
+                @if ($days->count())
+                    <div class="days-section">
 
-                    @foreach ($events as $event)
+                        <p class="section-eyebrow">
+                            Event Schedule
+                        </p>
 
-                        @php
-                            $eventStart = $event->starts_at
-                                ? Carbon::parse($event->starts_at)
-                                : null;
+                        <h2 class="section-title">
+                            Event Days
+                        </h2>
 
-                            $eventEnd = $event->ends_at
-                                ? Carbon::parse($event->ends_at)
-                                : null;
-
-                            $days = $eventDaysByEvent
-                                ->get($event->id, collect())
-                                ->values();
-
-                            $dates = $days
-                                ->map(
-                                    fn ($day) => $day->event_date
+                        <div class="days-list">
+                            @foreach ($days as $index => $day)
+                                @php
+                                    $dayDate = $day->event_date
                                         ? Carbon::parse($day->event_date)
-                                        : null
-                                )
-                                ->filter()
-                                ->values();
+                                        : null;
+                                @endphp
 
-                            $isLive = $eventStart
-                                && $eventStart->lte(now())
-                                && (
-                                    ($eventEnd && $eventEnd->gte(now()))
-                                    || (
-                                        ! $eventEnd
-                                        && $eventStart->gte(now()->startOfDay())
-                                    )
-                                );
+                                <div class="day-row">
 
-                            $isPast = $eventEnd
-                                ? $eventEnd->lt(now())
-                                : (
-                                    $eventStart
-                                    && $eventStart->lt(now()->startOfDay())
-                                );
+                                    <div class="day-main">
+                                        <p class="day-label">
+                                            {{ $day->name ?: 'Event Day ' . ($index + 1) }}
+                                        </p>
 
-                            $eventImage = $event->registration_banner_image_path;
-                            $eventImageUrl = null;
-
-                            if ($eventImage) {
-                                if (Str::startsWith($eventImage, ['http://', 'https://'])) {
-                                    $eventImageUrl = $eventImage;
-                                } elseif (Str::startsWith($eventImage, ['storage/', '/storage/'])) {
-                                    $eventImageUrl = asset(ltrim($eventImage, '/'));
-                                } else {
-                                    $eventImageUrl = asset('storage/' . ltrim($eventImage, '/'));
-                                }
-                            }
-
-                            $displayDate = $dates->first() ?? $eventStart;
-                            $lastDate = $dates->last() ?? $eventStart;
-                            $isMultiDay = $dates->count() > 1;
-
-                            $dateLabel = null;
-
-                            if ($dates->isNotEmpty()) {
-                                $years = $dates
-                                    ->map(fn ($date) => $date->format('Y'))
-                                    ->unique();
-
-                                $sameYear = $years->count() === 1;
-
-                                $dateLabel = $dates
-                                    ->map(
-                                        fn ($date) => $sameYear
-                                            ? $date->format('d M')
-                                            : $date->format('d M Y')
-                                    )
-                                    ->implode(' • ');
-
-                                if ($sameYear) {
-                                    $dateLabel .= ' ' . $dates->first()->format('Y');
-                                }
-                            } elseif ($eventStart) {
-                                $dateLabel = $eventStart->format('D, d M Y');
-                            }
-
-                            $statusText = $isLive
-                                ? 'Live'
-                                : ($isPast ? 'Ended' : 'Upcoming');
-
-                            $statusClass = $isLive
-                                ? 'live'
-                                : ($isPast ? 'ended' : 'upcoming');
-                        @endphp
-
-                        <article class="event-ticket {{ $isLive ? 'live-event' : '' }}">
-
-                            <div class="event-ticket-grid">
-
-                                <a
-                                    href="{{ route('public.events.show', $event->slug) }}"
-                                    class="event-ticket-visual"
-                                    aria-label="{{ $event->name }}"
-                                >
-                                    @if ($eventImageUrl)
-                                        <img
-                                            src="{{ $eventImageUrl }}"
-                                            alt="{{ $event->name }}"
-                                            class="event-ticket-image"
-                                        >
-                                        <div class="event-ticket-overlay"></div>
-                                    @else
-                                        <div class="event-ticket-fallback"></div>
-                                    @endif
-
-                                    <span class="event-ticket-status {{ $statusClass }}">
-                                        {{ $statusText }}
-                                    </span>
-                                </a>
-
-                                <div class="event-ticket-content">
-
-                                    <div>
-                                        <h2 class="event-ticket-title">
-                                            <a href="{{ route('public.events.show', $event->slug) }}">
-                                                {{ $event->name }}
-                                            </a>
-                                        </h2>
-
-                                        @if ($event->venue)
-                                            <p class="event-ticket-venue">
-                                                {{ $event->venue }}
-                                            </p>
-                                        @endif
-
-                                        @if ($dateLabel)
-                                            <p class="event-ticket-date-line">
-                                                {{ $dateLabel }}
-                                            </p>
-                                        @endif
-
-                                        @if ($isMultiDay)
-                                            <p class="event-ticket-days">
-                                                {{ $dates->count() }} {{ \Illuminate\Support\Str::plural('Day', $dates->count()) }}
-                                            </p>
-                                        @endif
-
-                                        @if ($isLive)
-                                            <p class="live-now-label">
-                                                Happening Now
+                                        @if ($dayDate)
+                                            <p class="day-date">
+                                                {{ $dayDate->format('l, d F Y') }}
                                             </p>
                                         @endif
                                     </div>
 
-                                    <div class="event-ticket-actions">
-
-                                        <a
-                                            href="{{ route('public.events.show', $event->slug) }}"
-                                            class="view-link"
-                                        >
-                                            View Event
-                                        </a>
-
-                                        @if ($event->registration_is_open && ! $isPast)
-                                            <a
-                                                href="{{ route('public.events.register', $event->slug) }}"
-                                                class="register-btn"
-                                            >
-                                                Register
-                                            </a>
-                                        @elseif ($isPast)
-                                            <span class="ended-label">
-                                                Event Ended
-                                            </span>
-                                        @else
-                                            <span class="ended-label">
-                                                Registration Closed
-                                            </span>
-                                        @endif
-
+                                    <div class="day-number">
+                                        Day {{ $index + 1 }}
                                     </div>
 
                                 </div>
+                            @endforeach
+                        </div>
 
-                                @if ($displayDate)
-                                    <div class="event-ticket-date">
+                    </div>
+                @endif
 
-                                        @if ($isMultiDay)
-                                            <span class="multi">
-                                                {{ $dates->count() }} Days
-                                            </span>
+            </article>
 
-                                            <span class="multi-day">
-                                                {{ $displayDate->format('d') }}
-                                            </span>
 
-                                            <span class="multi-month">
-                                                {{ $displayDate->format('M') }}
-                                            </span>
+            <aside class="info-card">
 
-                                            <span class="year">
-                                                {{ $displayDate->format('Y') }}
-                                            </span>
-                                        @else
-                                            <span class="month">
-                                                {{ $displayDate->format('M') }}
-                                            </span>
+                <h2 class="info-title">
+                    Event Information
+                </h2>
 
-                                            <span class="day">
-                                                {{ $displayDate->format('d') }}
-                                            </span>
+                <div class="info-list">
 
-                                            <span class="year">
-                                                {{ $displayDate->format('Y') }}
-                                            </span>
-                                        @endif
-
-                                    </div>
-                                @endif
-
+                    @if ($dates->isNotEmpty())
+                        <div class="info-item">
+                            <div class="info-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <rect x="3" y="5" width="18" height="16" rx="2"/>
+                                    <path d="M16 3v4M8 3v4M3 10h18"/>
+                                </svg>
                             </div>
 
-                        </article>
+                            <div class="info-copy">
+                                <strong>Event Days</strong>
+                                <span>
+                                    {{ $dates->count() }}
+                                    {{ Str::plural('day', $dates->count()) }}
+                                </span>
+                            </div>
+                        </div>
+                    @endif
 
-                    @endforeach
+                    @if ($eventStart)
+                        <div class="info-item">
+                            <div class="info-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <circle cx="12" cy="12" r="9"/>
+                                    <path d="M12 7v5l3 2"/>
+                                </svg>
+                            </div>
+
+                            <div class="info-copy">
+                                <strong>Starts</strong>
+                                <span>
+                                    {{ $eventStart->format('D, d M Y') }}
+                                    @if ($eventStart->format('H:i') !== '00:00')
+                                        · {{ $eventStart->format('H:i') }}
+                                    @endif
+                                </span>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if ($eventEnd)
+                        <div class="info-item">
+                            <div class="info-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <circle cx="12" cy="12" r="9"/>
+                                    <path d="M12 7v5l3 2"/>
+                                </svg>
+                            </div>
+
+                            <div class="info-copy">
+                                <strong>Ends</strong>
+                                <span>
+                                    {{ $eventEnd->format('D, d M Y') }}
+                                    @if ($eventEnd->format('H:i') !== '00:00')
+                                        · {{ $eventEnd->format('H:i') }}
+                                    @endif
+                                </span>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if ($event->venue)
+                        <div class="info-item">
+                            <div class="info-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/>
+                                    <circle cx="12" cy="10" r="2"/>
+                                </svg>
+                            </div>
+
+                            <div class="info-copy">
+                                <strong>Venue</strong>
+                                <span>{{ $event->venue }}</span>
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="info-item">
+                        <div class="info-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <circle cx="12" cy="12" r="9"/>
+                                <path d="M8.5 12.5 11 15l4.5-5"/>
+                            </svg>
+                        </div>
+
+                        <div class="info-copy">
+                            <strong>Status</strong>
+                            <span>{{ $statusText }}</span>
+                        </div>
+                    </div>
 
                 </div>
 
-                <div class="pagination-wrap">
-                    {{ $events->links() }}
-                </div>
+                <hr class="info-divider">
 
-            @else
+                @if ($event->registration_is_open && ! $isPast)
+                    <a
+                        href="{{ $registerUrl }}"
+                        class="register-btn"
+                    >
+                        Register for Event
+                    </a>
+                @elseif ($isPast)
+                    <div class="registration-state">
+                        Event Ended
+                    </div>
+                @else
+                    <div class="registration-state">
+                        Registration Closed
+                    </div>
+                @endif
 
-                <div class="empty-state">
-                    <h2>No events found</h2>
-                    <p>
-                        Try another search term or select a different event filter.
-                    </p>
-                </div>
-
-            @endif
+            </aside>
 
         </div>
     </section>
@@ -1107,12 +1010,12 @@
                 Home
             </a>
 
-            <a href="{{ route('home') }}#contact">
-                Contact
+            <a href="{{ route('public.events.index') }}">
+                Events
             </a>
 
-            <a href="/admin">
-                Login
+            <a href="{{ route('home') }}#contact">
+                Contact
             </a>
         </div>
 

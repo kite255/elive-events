@@ -362,6 +362,36 @@
             transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
         }
 
+        .event-ticket,
+        .event-ticket-grid,
+        .event-ticket-content,
+        .event-ticket-actions {
+            position: relative !important;
+        }
+
+        .event-ticket-content,
+        .event-ticket-actions {
+            z-index: 100 !important;
+        }
+
+        .event-ticket::before,
+        .event-ticket::after,
+        .event-ticket-grid::before,
+        .event-ticket-grid::after,
+        .event-ticket-overlay {
+            pointer-events: none !important;
+        }
+
+        .event-ticket a,
+        .view-event-btn,
+        .register-btn,
+        .event-ticket-title a,
+        .event-ticket-visual {
+            position: relative !important;
+            z-index: 999 !important;
+            pointer-events: auto !important;
+        }
+
         .event-ticket:hover {
             transform: translateY(-2px);
             border-color: #CBD5E1;
@@ -486,6 +516,8 @@
         }
 
         .event-ticket-content {
+            position: relative;
+            z-index: 2;
             min-width: 0;
             padding: 18px 22px;
             display: flex;
@@ -531,6 +563,8 @@
         }
 
         .event-ticket-actions {
+            position: relative;
+            z-index: 4;
             margin-top: 14px;
             display: flex;
             align-items: center;
@@ -538,17 +572,64 @@
             gap: 12px;
         }
 
-        .view-link {
+        .view-event-btn {
+            position: relative;
+            z-index: 20;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            border: 1px solid var(--elive-blue);
+            border-radius: 10px;
+            background: #FFFFFF;
+            font-family: inherit;
             color: var(--elive-blue);
+            padding: 0 15px;
             font-size: 12px;
             font-weight: 800;
+            line-height: 1;
+            cursor: pointer;
+            pointer-events: auto !important;
+            touch-action: manipulation;
+            user-select: none;
+            transition:
+                background .2s ease,
+                color .2s ease,
+                border-color .2s ease,
+                transform .2s ease,
+                box-shadow .2s ease;
         }
 
-        .view-link:hover {
-            color: var(--elive-orange);
+        .view-event-btn:hover {
+            background: #F1F5FB;
+            color: #1B3267;
+            border-color: #1B3267;
+            transform: translateY(-1px);
+            box-shadow: 0 5px 12px rgba(35, 63, 125, .10);
         }
+
+        .view-event-btn:focus-visible {
+            outline: 3px solid rgba(35, 63, 125, .18);
+            outline-offset: 2px;
+        }
+
+        .event-ticket-content,
+        .event-ticket-actions,
+        .view-event-btn {
+            pointer-events: auto !important;
+        }
+
+        .event-ticket-overlay {
+            pointer-events: none !important;
+        }
+        .event-ticket-actions a {
+            pointer-events: auto !important;
+        }
+
 
         .register-btn {
+            position: relative;
+            z-index: 999;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -938,6 +1019,14 @@
                             $statusClass = $isLive
                                 ? 'live'
                                 : ($isPast ? 'ended' : 'upcoming');
+
+                            $eventDetailsUrl = route('public.events.show', [
+                                'event' => $event->slug,
+                            ]);
+
+                            $eventRegisterUrl = route('public.events.register', [
+                                'event' => $event->slug,
+                            ]);
                         @endphp
 
                         <article class="event-ticket {{ $isLive ? 'live-event' : '' }}">
@@ -945,9 +1034,11 @@
                             <div class="event-ticket-grid">
 
                                 <a
-                                    href="{{ route('public.events.show', $event->slug) }}"
+                                    href="{{ $eventDetailsUrl }}"
                                     class="event-ticket-visual"
                                     aria-label="{{ $event->name }}"
+                                    data-event-link
+                                    onclick="window.location.assign(this.href); return false;"
                                 >
                                     @if ($eventImageUrl)
                                         <img
@@ -969,7 +1060,11 @@
 
                                     <div>
                                         <h2 class="event-ticket-title">
-                                            <a href="{{ route('public.events.show', $event->slug) }}">
+                                            <a
+                                                href="{{ $eventDetailsUrl }}"
+                                                data-event-link
+                                                onclick="window.location.assign(this.href); return false;"
+                                            >
                                                 {{ $event->name }}
                                             </a>
                                         </h2>
@@ -1002,16 +1097,21 @@
                                     <div class="event-ticket-actions">
 
                                         <a
-                                            href="{{ route('public.events.show', $event->slug) }}"
-                                            class="view-link"
+                                            href="{{ $eventDetailsUrl }}"
+                                            class="view-event-btn"
+                                            aria-label="View details for {{ $event->name }}"
+                                            data-event-link
+                                            onclick="window.location.assign(this.href); return false;"
                                         >
                                             View Event
                                         </a>
 
                                         @if ($event->registration_is_open && ! $isPast)
                                             <a
-                                                href="{{ route('public.events.register', $event->slug) }}"
+                                                href="{{ $eventRegisterUrl }}"
                                                 class="register-btn"
+                                                data-event-link
+                                                onclick="window.location.assign(this.href); return false;"
                                             >
                                                 Register
                                             </a>
@@ -1117,6 +1217,24 @@
 
     </div>
 </footer>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-event-link]').forEach(function (element) {
+            element.addEventListener('click', function (event) {
+                var href = element.getAttribute('href');
+
+                if (! href) {
+                    return;
+                }
+
+                event.preventDefault();
+                window.location.href = href;
+            });
+        });
+    });
+</script>
 
 </body>
 </html>
