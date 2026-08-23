@@ -100,7 +100,7 @@
                         "
                     >
                         <img
-                            src="{{ asset('images/elive-events-logo.png') }}"
+                            src="{{ url('/eLive-Logo.png') }}"
                             alt="eLive Events"
                             width="200"
                             class="email-logo"
