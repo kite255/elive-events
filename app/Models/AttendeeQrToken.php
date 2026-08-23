@@ -10,6 +10,7 @@ class AttendeeQrToken extends Model
     protected $fillable = [
         'attendee_id',
         'token_hash',
+        'encrypted_token',
         'token_last4',
         'expires_at',
         'used_at',

@@ -40,7 +40,7 @@ class AutomaticCommunicationService
     | 2. Email
     |    - Attendee must be approved.
     |    - Attendee must have a valid email address.
-    |    - Organization must have an active template named:
+    |    - Organization must have an active template key:
     |      registration_confirmed_email
     |    - If a badge already exists it can be attached by the email job.
     |
@@ -315,7 +315,7 @@ class AutomaticCommunicationService
     | Prepare Registration Email
     |--------------------------------------------------------------------------
     |
-    | Uses the active organization communication template:
+    | Uses the active organization communication template key:
     |
     | registration_confirmed_email
     |
@@ -371,7 +371,7 @@ class AutomaticCommunicationService
                     CommunicationTemplate::CHANNEL_EMAIL
                 )
                 ->where(
-                    'name',
+                    'key',
                     self::TRIGGER_REGISTRATION_CONFIRMED
                         . '_email'
                 )
@@ -607,10 +607,24 @@ class AutomaticCommunicationService
         CommunicationLog $log
     ): CommunicationLog {
         try {
+            $queue = match ($log->channel) {
+                CommunicationTemplate::CHANNEL_EMAIL =>
+                    'communications-email',
+
+                CommunicationTemplate::CHANNEL_SMS =>
+                    'communications-sms',
+
+                CommunicationTemplate::CHANNEL_WHATSAPP =>
+                    'communications-whatsapp',
+
+                default =>
+                    'default',
+            };
+
             SendAutomaticCommunicationJob::dispatch(
                 $log->id
             )->onQueue(
-                'communications'
+                $queue
             );
 
             return $log;
@@ -788,7 +802,7 @@ class AutomaticCommunicationService
                 ]
             )
             ->whereIn(
-                'name',
+                'key',
                 [
                     "{$trigger}_sms",
                     "{$trigger}_email",

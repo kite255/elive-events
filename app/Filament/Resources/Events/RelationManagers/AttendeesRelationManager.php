@@ -298,8 +298,7 @@ class AttendeesRelationManager extends RelationManager
                 TextColumn::make('email')
                     ->label('Email')
                     ->searchable()
-                    ->copyable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->copyable(),
 
                 TextColumn::make('registered_at')
                     ->label('Registered')

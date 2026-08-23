@@ -6,12 +6,14 @@ use App\Exports\AttendeesExport;
 use App\Filament\Pages\BadgePrintStation;
 use App\Filament\Resources\Attendees\AttendeeResource;
 use App\Services\BadgeGenerationService;
+use App\Services\QrTokenService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -21,8 +23,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Js;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Throwable;
+use ZipArchive;
 
 class AttendeesTable
 {
@@ -778,6 +783,205 @@ class AttendeesTable
                                 title: 'Badge generation completed',
                                 body: "Generated: {$generated}. Failed: {$failed}. Skipped: {$skipped}.",
                                 failed: $failed
+                            );
+                        }),
+
+
+                    BulkAction::make('download_qr_codes')
+                        ->label('Download QR Codes')
+                        ->icon('heroicon-o-qr-code')
+                        ->color('primary')
+                        ->form([
+                            Select::make('format')
+                                ->label('Choose Download Format')
+                                ->options([
+                                    'png' => 'PNG - Recommended',
+                                    'svg' => 'SVG - High Quality / Printing',
+                                ])
+                                ->default('png')
+                                ->required()
+                                ->native(false),
+                        ])
+                        ->modalHeading('Download QR Codes')
+                        ->modalDescription(
+                            'QR codes for all selected attendees will be packaged into a ZIP file.'
+                        )
+                        ->modalSubmitActionLabel('Download ZIP')
+                        ->modalCancelActionLabel('Cancel')
+                        ->action(function (Collection $records, array $data) {
+                            if ($records->isEmpty()) {
+                                Notification::make()
+                                    ->title('No attendees selected')
+                                    ->warning()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            $format = strtolower($data['format'] ?? 'png');
+
+                            if (! in_array($format, ['png', 'svg'], true)) {
+                                Notification::make()
+                                    ->title('Invalid QR format')
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            $temporaryDirectory = storage_path(
+                                'app/tmp/qr-downloads'
+                            );
+
+                            if (! is_dir($temporaryDirectory)) {
+                                mkdir(
+                                    $temporaryDirectory,
+                                    0755,
+                                    true
+                                );
+                            }
+
+                            $zipName = sprintf(
+                                'attendee-qr-codes-%s-%s.zip',
+                                now()->format('Y-m-d-His'),
+                                Str::lower(Str::random(6))
+                            );
+
+                            $zipPath = $temporaryDirectory
+                                . DIRECTORY_SEPARATOR
+                                . $zipName;
+
+                            $zip = new ZipArchive();
+
+                            $result = $zip->open(
+                                $zipPath,
+                                ZipArchive::CREATE | ZipArchive::OVERWRITE
+                            );
+
+                            if ($result !== true) {
+                                Notification::make()
+                                    ->title('Unable to create QR ZIP file')
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            $generated = 0;
+                            $failed = 0;
+
+                            foreach ($records as $attendee) {
+                                try {
+                                    $token = app(
+                                        QrTokenService::class
+                                    )->getTokenForAttendee(
+                                        $attendee
+                                    );
+
+                                    $checkInUrl = route(
+                                        'qr.check-in',
+                                        [
+                                            'token' => $token,
+                                        ]
+                                    );
+
+                                    $badgeNumber = filled($attendee->badge_number)
+                                        ? Str::slug($attendee->badge_number)
+                                        : 'attendee-' . $attendee->id;
+
+                                    $attendeeName = Str::slug(
+                                        $attendee->full_name ?: 'attendee'
+                                    );
+
+                                    $fileName = sprintf(
+                                        '%s-%s-%s-qr.%s',
+                                        $badgeNumber,
+                                        $attendeeName,
+                                        $attendee->id,
+                                        $format
+                                    );
+
+                                    if ($format === 'svg') {
+                                        $qrContent = QrCode::format('svg')
+                                            ->size(1000)
+                                            ->margin(1)
+                                            ->errorCorrection('H')
+                                            ->generate($checkInUrl);
+
+                                        $zip->addFromString(
+                                            $fileName,
+                                            (string) $qrContent
+                                        );
+
+                                        $generated++;
+
+                                        continue;
+                                    }
+
+                                    $qrContent = QrCode::format('png')
+                                        ->size(1000)
+                                        ->margin(1)
+                                        ->errorCorrection('H')
+                                        ->generate($checkInUrl);
+
+                                    $zip->addFromString(
+                                        $fileName,
+                                        $qrContent
+                                    );
+
+                                    $generated++;
+                                } catch (Throwable $e) {
+                                    report($e);
+                                    $failed++;
+                                }
+                            }
+
+                            $zip->close();
+
+                            if ($generated === 0) {
+                                if (file_exists($zipPath)) {
+                                    unlink($zipPath);
+                                }
+
+                                Notification::make()
+                                    ->title('QR generation failed')
+                                    ->body(
+                                        'No QR codes could be generated for the selected attendees.'
+                                    )
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            if ($failed > 0) {
+                                Notification::make()
+                                    ->title('QR ZIP prepared')
+                                    ->body(
+                                        "Generated: {$generated}. Failed: {$failed}."
+                                    )
+                                    ->warning()
+                                    ->send();
+                            }
+
+                            return response()->streamDownload(
+                                function () use ($zipPath): void {
+                                    $handle = fopen($zipPath, 'rb');
+
+                                    if ($handle !== false) {
+                                        fpassthru($handle);
+                                        fclose($handle);
+                                    }
+
+                                    if (file_exists($zipPath)) {
+                                        unlink($zipPath);
+                                    }
+                                },
+                                $zipName,
+                                [
+                                    'Content-Type' => 'application/zip',
+                                    'Cache-Control' => 'no-store, no-cache',
+                                ]
                             );
                         }),
 

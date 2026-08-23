@@ -303,7 +303,7 @@ class SendAutomaticCommunicationJob implements ShouldQueue
     | Send Email
     |--------------------------------------------------------------------------
     |
-    | Sends real email through Laravel Mail.
+    | Sends branded HTML email through resources/views/emails/elive.blade.php.
     |
     | Local:
     | MAIL_HOST=mailpit
@@ -552,8 +552,72 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             ]
         );
 
-        Mail::raw(
-            $communicationLog->message,
+        /*
+        |--------------------------------------------------------------------------
+        | Branded HTML Email
+        |--------------------------------------------------------------------------
+        |
+        | Render all automatic emails through the shared eLive Events Blade
+        | template instead of Mail::raw(), so recipients receive the branded
+        | logo, event hero, event details, message body, CTA area and footer.
+        |
+        */
+
+        $event =
+            $communicationLog->event
+            ?? $attendee?->event;
+
+        $emailLabel =
+            str_contains(
+                strtolower($subject),
+                'registration'
+            )
+                ? 'Registration Confirmed'
+                : 'Event Communication';
+
+        Mail::send(
+            'emails.elive',
+            [
+                'subject' =>
+                    $subject,
+
+                'messageBody' =>
+                    $communicationLog->message,
+
+                'attendee' =>
+                    $attendee,
+
+                'event' =>
+                    $event,
+
+                'emailLabel' =>
+                    $emailLabel,
+
+                'alertTitle' =>
+                    null,
+
+                'alertMessage' =>
+                    null,
+
+                /*
+                 * The badge continues to be attached below.
+                 *
+                 * Keep the CTA disabled until a canonical public badge URL is
+                 * available in the application. This prevents generating a
+                 * broken or guessed link in production email.
+                 */
+                'actionUrl' =>
+                    null,
+
+                'actionLabel' =>
+                    null,
+
+                'actionIntro' =>
+                    null,
+
+                'actionNote' =>
+                    null,
+            ],
             function ($mail) use (
                 $recipient,
                 $subject,

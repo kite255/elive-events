@@ -528,10 +528,24 @@ class CommunicationCampaignService
                                 |--------------------------------------------------------------------------
                                 */
 
+                                $queue = match ($channel) {
+                                    CommunicationTemplate::CHANNEL_EMAIL =>
+                                        'communications-email',
+
+                                    CommunicationTemplate::CHANNEL_SMS =>
+                                        'communications-sms',
+
+                                    CommunicationTemplate::CHANNEL_WHATSAPP =>
+                                        'communications-whatsapp',
+
+                                    default =>
+                                        'default',
+                                };
+
                                 SendAutomaticCommunicationJob::dispatch(
                                     $log->id
                                 )->onQueue(
-                                    'communications'
+                                    $queue
                                 );
 
                                 $queuedCount++;
