@@ -516,7 +516,15 @@
                         @endif
                     >
                         <span>{{ $link->label }}</span>
-                        <span aria-hidden="true">↗</span>
+
+                        <x-heroicon-o-arrow-top-right-on-square
+                            aria-hidden="true"
+                            style="
+                                width:16px;
+                                height:16px;
+                                flex:0 0 auto;
+                            "
+                        />
                     </a>
                 @endforeach
             </div>

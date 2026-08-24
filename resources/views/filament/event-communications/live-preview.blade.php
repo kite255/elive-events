@@ -638,7 +638,14 @@
                             "
                         >
                             {{ $link['label'] }}
-                            <span aria-hidden="true">↗</span>
+                            <x-heroicon-o-arrow-top-right-on-square
+                                aria-hidden="true"
+                                style="
+                                    width:13px;
+                                    height:13px;
+                                    flex:0 0 auto;
+                                "
+                            />
                         </span>
                     @endforeach
                 </div>
