@@ -1,4 +1,5 @@
 services:
+
   app:
     build:
       context: .
@@ -11,7 +12,7 @@ services:
       - postgres
       - redis
 
-  worker-communications-1:
+  worker-communications-email:
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,9 +20,10 @@ services:
     working_dir: /var/www/html
     command: >
       php artisan queue:work redis
-      --queue=communications
-      --sleep=1
+      --queue=communications-email
+      --sleep=3
       --tries=3
+      --backoff=30
       --timeout=120
       --max-time=3600
     volumes:
@@ -30,7 +32,7 @@ services:
       - postgres
       - redis
 
-  worker-communications-2:
+  worker-communications-sms:
     build:
       context: .
       dockerfile: Dockerfile
@@ -38,9 +40,30 @@ services:
     working_dir: /var/www/html
     command: >
       php artisan queue:work redis
-      --queue=communications
-      --sleep=1
+      --queue=communications-sms
+      --sleep=2
       --tries=3
+      --backoff=30
+      --timeout=120
+      --max-time=3600
+    volumes:
+      - elive_storage:/var/www/html/storage
+    depends_on:
+      - postgres
+      - redis
+
+  worker-communications-whatsapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: >
+      php artisan queue:work redis
+      --queue=communications-whatsapp
+      --sleep=2
+      --tries=3
+      --backoff=30
       --timeout=120
       --max-time=3600
     volumes:
@@ -60,6 +83,7 @@ services:
       --queue=badges
       --sleep=2
       --tries=3
+      --backoff=30
       --timeout=300
       --max-time=3600
     volumes:
@@ -79,6 +103,7 @@ services:
       --queue=default
       --sleep=2
       --tries=3
+      --backoff=30
       --timeout=120
       --max-time=3600
     volumes:
