@@ -78,6 +78,8 @@ class Event extends Model
         'registration_require_badge_type',
 
         'registration_sms_enabled',
+        'registration_email_enabled',
+        'registration_whatsapp_enabled',
         'registration_sms_template_id',
 
         'show_merchandise_images',
@@ -127,6 +129,8 @@ class Event extends Model
             'registration_require_badge_type' => 'boolean',
 
             'registration_sms_enabled' => 'boolean',
+            'registration_email_enabled' => 'boolean',
+            'registration_whatsapp_enabled' => 'boolean',
             'registration_sms_template_id' => 'integer',
 
             'show_merchandise_images' => 'boolean',
@@ -560,6 +564,15 @@ class Event extends Model
         );
     }
 
+    public function communications(): HasMany
+    {
+        return $this->hasMany(
+            EventCommunication::class
+        )
+            ->latest('published_at')
+            ->latest('id');
+    }
+
     public function registrationSmsTemplate(): BelongsTo
     {
         return $this->belongsTo(
@@ -574,6 +587,16 @@ class Event extends Model
             && filled(
                 $this->registration_sms_template_id
             );
+    }
+
+    public function shouldSendRegistrationEmail(): bool
+    {
+        return (bool) $this->registration_email_enabled;
+    }
+
+    public function shouldSendRegistrationWhatsApp(): bool
+    {
+        return (bool) $this->registration_whatsapp_enabled;
     }
 
     /*

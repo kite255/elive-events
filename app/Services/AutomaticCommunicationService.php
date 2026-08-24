@@ -38,6 +38,7 @@ class AutomaticCommunicationService
     |    - Event must have a registration SMS template selected.
     |
     | 2. Email
+    |    - Event must have registration email enabled.
     |    - Attendee must be approved.
     |    - Attendee must have a valid email address.
     |    - Organization must have an active template key:
@@ -45,6 +46,7 @@ class AutomaticCommunicationService
     |    - If a badge already exists it can be attached by the email job.
     |
     | 3. WhatsApp
+    |    - Event must have registration WhatsApp enabled.
     |    - Attendee must be approved.
     |    - WhatsApp must be configured.
     |    - Attendee must have a valid phone number.
@@ -331,6 +333,16 @@ class AutomaticCommunicationService
             return null;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Event-level automatic Email setting
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $event->shouldSendRegistrationEmail()) {
+            return null;
+        }
+
         if (! $attendee->isApproved()) {
             return null;
         }
@@ -415,6 +427,16 @@ class AutomaticCommunicationService
         $event = $attendee->event;
 
         if (! $event) {
+            return null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Event-level automatic WhatsApp setting
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $event->shouldSendRegistrationWhatsApp()) {
             return null;
         }
 

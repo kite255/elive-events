@@ -85,8 +85,9 @@ return [
     | Temporary File Uploads
     |--------------------------------------------------------------------------
     |
-    | This fixes Filament/FilePond upload stuck at:
-    | "Loading / Waiting for size"
+    | Accept normal file types broadly for Filament uploads.
+    | Individual Filament fields can still apply stricter rules, such as
+    | ->image() for Hero Image and Photo Gallery.
     |
     */
 
@@ -95,8 +96,7 @@ return [
 
         'rules' => [
             'file',
-            'max:12288',
-            'mimes:png,jpg,jpeg,webp,gif,svg',
+            'max:20480',
         ],
 
         'directory' => 'livewire-tmp',
@@ -209,7 +209,7 @@ return [
     */
 
     'payload' => [
-        'max_size' => 10 * 1024 * 1024,
+        'max_size' => 20 * 1024 * 1024,
         'max_nesting_depth' => 10,
         'max_calls' => 50,
         'max_components' => 200,
