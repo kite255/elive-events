@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\BadgePrintController;
 use App\Http\Controllers\CheckInController;
+use App\Http\Controllers\EventCommunicationPreviewController;
 use App\Http\Controllers\PublicAttendeeController;
+use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\QrVerificationController;
 use App\Models\Event;
@@ -42,6 +44,55 @@ Route::view('/', 'welcome')
 Route::get('/events', function () {
     return view('public.events.index');
 })->name('public.events.index');
+
+/*
+|--------------------------------------------------------------------------
+| Public Event Communications
+|--------------------------------------------------------------------------
+|
+| Reusable public pages for:
+| - Today's Highlights
+| - Announcements
+| - Event Updates
+| - Schedule / Program
+| - Reminders
+| - Notices
+| - Custom Communications
+|
+| Example:
+| /events/dcc-camp-meeting-2026/communications/todays-highlights-23-august-2026
+|
+| This route MUST stay above the generic /events/{event:slug} route.
+|
+*/
+
+Route::get(
+    '/events/{event:slug}/communications/{communication:slug}',
+    PublicEventCommunicationController::class
+)->name('public.event-communications.show');
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Event Communication Preview
+|--------------------------------------------------------------------------
+|
+| Used by Filament:
+| Events -> Event Communications -> Preview
+|
+| Example:
+| /admin/event-communications/12/preview
+|
+| This route is protected by authentication. The preview controller performs
+| the event-access authorization check before rendering the communication.
+|
+*/
+
+Route::get(
+    '/admin/event-communications/{communication}/preview',
+    EventCommunicationPreviewController::class
+)
+    ->middleware(['auth'])
+    ->name('admin.event-communications.preview');
 
 /*
 |--------------------------------------------------------------------------

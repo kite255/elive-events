@@ -2,7 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\CommunicationCampaign;
+use App\Models\CommunicationCampaignRecipient;
 use App\Models\CommunicationLog;
+use App\Models\EventCommunication;
 use App\Services\SmsService;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -30,9 +33,16 @@ class SendAutomaticCommunicationJob implements ShouldQueue
     public function __construct(
         public int $communicationLogId
     ) {
-        $this->onQueue(
-            'communications'
-        );
+        /*
+         * Queue selection is handled by the dispatching service.
+         *
+         * AutomaticCommunicationService routes:
+         * email    -> communications-email
+         * sms      -> communications-sms
+         * whatsapp -> communications-whatsapp
+         *
+         * Do not force the legacy shared "communications" queue here.
+         */
     }
 
     /*
@@ -50,20 +60,24 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     'attendee.event',
                     'attendee.category',
                     'attendee.badgeType',
+                    'campaign',
+                    'campaignRecipient',
                 ])
                 ->find(
                     $this->communicationLogId
                 );
 
         if (! $communicationLog) {
+            Log::warning(
+                'Automatic communication log could not be found.',
+                [
+                    'communication_log_id' =>
+                        $this->communicationLogId,
+                ]
+            );
+
             return;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Duplicate Send Protection
-        |--------------------------------------------------------------------------
-        */
 
         if (
             in_array(
@@ -75,29 +89,27 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 true
             )
         ) {
+            $this->syncCampaignLifecycle(
+                $communicationLog
+            );
+
             return;
         }
 
+        $this->incrementRecipientAttempts(
+            $communicationLog
+        );
+
         try {
-            /*
-            |--------------------------------------------------------------------------
-            | Mark Sending
-            |--------------------------------------------------------------------------
-            */
+            $communicationLog->markSending();
 
-            $communicationLog->update([
-                'status' =>
-                    CommunicationLog::STATUS_SENDING,
+            $this->markCampaignProcessing(
+                $communicationLog
+            );
 
-                'error' =>
-                    null,
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Send Based On Channel
-            |--------------------------------------------------------------------------
-            */
+            $this->syncCampaignLifecycle(
+                $communicationLog
+            );
 
             $providerMessageId = match (
                 $communicationLog->channel
@@ -124,14 +136,12 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     ),
             };
 
-            /*
-            |--------------------------------------------------------------------------
-            | Mark Sent
-            |--------------------------------------------------------------------------
-            */
-
             $communicationLog->markSent(
                 $providerMessageId
+            );
+
+            $this->syncCampaignLifecycle(
+                $communicationLog
             );
 
             Log::info(
@@ -140,42 +150,9 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     'communication_log_id' =>
                         $communicationLog->id,
 
-                    'event_id' =>
-                        $communicationLog->event_id,
-
-                    'attendee_id' =>
-                        $communicationLog->attendee_id,
-
-                    'channel' =>
-                        $communicationLog->channel,
-
-                    'recipient' =>
-                        $communicationLog->recipient,
-
-                    'provider_message_id' =>
-                        $providerMessageId,
-                ]
-            );
-        } catch (Throwable $exception) {
-            report(
-                $exception
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Mark Failed
-            |--------------------------------------------------------------------------
-            */
-
-            $communicationLog->markFailed(
-                $exception->getMessage()
-            );
-
-            Log::error(
-                'Automatic communication failed.',
-                [
-                    'communication_log_id' =>
-                        $communicationLog->id,
+                    'communication_campaign_id' =>
+                        $communicationLog
+                            ->communication_campaign_id,
 
                     'event_id' =>
                         $communicationLog->event_id,
@@ -192,25 +169,342 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     'attempt' =>
                         $this->attempts(),
 
+                    'provider_message_id' =>
+                        $providerMessageId,
+                ]
+            );
+        } catch (Throwable $exception) {
+            report(
+                $exception
+            );
+
+            $isFinalAttempt =
+                $this->attempts()
+                >= $this->tries;
+
+            if (! $isFinalAttempt) {
+                $communicationLog->forceFill([
+                    'status' =>
+                        CommunicationLog::STATUS_QUEUED,
+
+                    'error' =>
+                        $exception->getMessage(),
+
+                    'queued_at' =>
+                        now(),
+
+                    'failed_at' =>
+                        null,
+                ])->save();
+
+                $communicationLog
+                    ->syncCampaignRecipient();
+
+                $this->syncCampaignLifecycle(
+                    $communicationLog
+                );
+
+                Log::warning(
+                    'Automatic communication attempt failed and will be retried.',
+                    [
+                        'communication_log_id' =>
+                            $communicationLog->id,
+
+                        'communication_campaign_id' =>
+                            $communicationLog
+                                ->communication_campaign_id,
+
+                        'event_id' =>
+                            $communicationLog->event_id,
+
+                        'attendee_id' =>
+                            $communicationLog->attendee_id,
+
+                        'channel' =>
+                            $communicationLog->channel,
+
+                        'recipient' =>
+                            $communicationLog->recipient,
+
+                        'attempt' =>
+                            $this->attempts(),
+
+                        'max_attempts' =>
+                            $this->tries,
+
+                        'error' =>
+                            $exception->getMessage(),
+                    ]
+                );
+
+                throw $exception;
+            }
+
+            $communicationLog->markFailed(
+                $exception->getMessage()
+            );
+
+            $this->syncCampaignLifecycle(
+                $communicationLog
+            );
+
+            Log::error(
+                'Automatic communication failed after final attempt.',
+                [
+                    'communication_log_id' =>
+                        $communicationLog->id,
+
+                    'communication_campaign_id' =>
+                        $communicationLog
+                            ->communication_campaign_id,
+
+                    'event_id' =>
+                        $communicationLog->event_id,
+
+                    'attendee_id' =>
+                        $communicationLog->attendee_id,
+
+                    'channel' =>
+                        $communicationLog->channel,
+
+                    'recipient' =>
+                        $communicationLog->recipient,
+
+                    'attempt' =>
+                        $this->attempts(),
+
+                    'max_attempts' =>
+                        $this->tries,
+
                     'error' =>
                         $exception->getMessage(),
                 ]
             );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Throw Again
-            |--------------------------------------------------------------------------
-            |
-            | Laravel will retry according to:
-            |
-            | tries   = 3
-            | backoff = 60, 300, 900 seconds
-            |
-            */
-
             throw $exception;
         }
+    }
+
+    protected function incrementRecipientAttempts(
+        CommunicationLog $communicationLog
+    ): void {
+        $recipient =
+            $communicationLog
+                ->campaignRecipient;
+
+        if (! $recipient) {
+            return;
+        }
+
+        $recipient->forceFill([
+            'attempts' =>
+                ((int) $recipient->attempts)
+                + 1,
+        ])->save();
+
+        $communicationLog
+            ->unsetRelation(
+                'campaignRecipient'
+            );
+    }
+
+    protected function markCampaignProcessing(
+        CommunicationLog $communicationLog
+    ): void {
+        $campaign =
+            $communicationLog
+                ->campaign;
+
+        if (! $campaign) {
+            return;
+        }
+
+        if (
+            $campaign->status
+            !== CommunicationCampaign::STATUS_CANCELLED
+        ) {
+            $campaign->forceFill([
+                'status' =>
+                    CommunicationCampaign::STATUS_PROCESSING,
+
+                'started_at' =>
+                    $campaign->started_at
+                    ?? now(),
+
+                'completed_at' =>
+                    null,
+            ])->save();
+        }
+    }
+
+    protected function syncCampaignLifecycle(
+        CommunicationLog $communicationLog
+    ): void {
+        $campaignId =
+            $communicationLog
+                ->communication_campaign_id;
+
+        if (! $campaignId) {
+            return;
+        }
+
+        $campaign =
+            CommunicationCampaign::query()
+                ->find(
+                    $campaignId
+                );
+
+        if (! $campaign) {
+            return;
+        }
+
+        $counts =
+            CommunicationCampaignRecipient::query()
+                ->where(
+                    'communication_campaign_id',
+                    $campaign->id
+                )
+                ->selectRaw(
+                    "
+                    COUNT(*) AS total_count,
+                    COUNT(*) FILTER (
+                        WHERE status = 'pending'
+                    ) AS pending_count,
+                    COUNT(*) FILTER (
+                        WHERE status = 'queued'
+                    ) AS queued_count,
+                    COUNT(*) FILTER (
+                        WHERE status = 'processing'
+                    ) AS processing_count,
+                    COUNT(*) FILTER (
+                        WHERE status = 'sent'
+                    ) AS sent_count,
+                    COUNT(*) FILTER (
+                        WHERE status = 'delivered'
+                    ) AS delivered_count,
+                    COUNT(*) FILTER (
+                        WHERE status = 'failed'
+                    ) AS failed_count,
+                    COUNT(*) FILTER (
+                        WHERE status = 'skipped'
+                    ) AS skipped_count
+                    "
+                )
+                ->first();
+
+        if (! $counts) {
+            return;
+        }
+
+        $totalCount =
+            (int) $counts->total_count;
+
+        $pendingCount =
+            (int) $counts->pending_count;
+
+        $queuedCount =
+            (int) $counts->queued_count;
+
+        $processingCount =
+            (int) $counts->processing_count;
+
+        $sentCount =
+            (int) $counts->sent_count;
+
+        $deliveredCount =
+            (int) $counts->delivered_count;
+
+        $failedCount =
+            (int) $counts->failed_count;
+
+        $skippedCount =
+            (int) $counts->skipped_count;
+
+        $effectiveFailedCount =
+            $failedCount
+            + $skippedCount;
+
+        $activeCount =
+            $pendingCount
+            + $queuedCount
+            + $processingCount;
+
+        $successfulCount =
+            $sentCount
+            + $deliveredCount;
+
+        if (
+            $campaign->status
+            === CommunicationCampaign::STATUS_CANCELLED
+        ) {
+            $status =
+                CommunicationCampaign::STATUS_CANCELLED;
+        } elseif ($activeCount > 0) {
+            $status =
+                $processingCount > 0
+                    ? CommunicationCampaign::STATUS_PROCESSING
+                    : CommunicationCampaign::STATUS_QUEUED;
+        } elseif (
+            $totalCount > 0
+            && $successfulCount === 0
+            && $effectiveFailedCount > 0
+        ) {
+            $status =
+                CommunicationCampaign::STATUS_FAILED;
+        } elseif ($totalCount > 0) {
+            $status =
+                CommunicationCampaign::STATUS_COMPLETED;
+        } else {
+            $status =
+                CommunicationCampaign::STATUS_FAILED;
+        }
+
+        $isFinished =
+            in_array(
+                $status,
+                [
+                    CommunicationCampaign::STATUS_COMPLETED,
+                    CommunicationCampaign::STATUS_FAILED,
+                    CommunicationCampaign::STATUS_CANCELLED,
+                ],
+                true
+            );
+
+        $campaign->forceFill([
+            'total_recipients' =>
+                $totalCount,
+
+            'queued_count' =>
+                $queuedCount,
+
+            'sent_count' =>
+                $sentCount,
+
+            'delivered_count' =>
+                $deliveredCount,
+
+            'failed_count' =>
+                $effectiveFailedCount,
+
+            'status' =>
+                $status,
+
+            'sent_at' =>
+                $successfulCount > 0
+                    ? (
+                        $campaign->sent_at
+                        ?? now()
+                    )
+                    : $campaign->sent_at,
+
+            'completed_at' =>
+                $isFinished
+                    ? (
+                        $campaign->completed_at
+                        ?? now()
+                    )
+                    : null,
+        ])->save();
     }
 
     /*
@@ -345,12 +639,6 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate Message
-        |--------------------------------------------------------------------------
-        */
-
         if (
             blank(
                 $communicationLog->message
@@ -384,20 +672,51 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     : 'eLive Events Notification';
         }
 
+        $attendee =
+            $communicationLog->attendee;
+
+        $event =
+            $communicationLog->event
+            ?? $attendee?->event;
+
         /*
         |--------------------------------------------------------------------------
-        | Resolve Optional Badge Attachment
+        | Resolve Event Communication
         |--------------------------------------------------------------------------
+        |
+        | Event Communication campaigns include their public URL in the rendered
+        | message. Resolve the communication from that URL first because it is
+        | stable and avoids guessing from campaign names.
+        |
+        | Fallback:
+        | event_id + subject/title match.
+        |
+        */
+
+        $eventCommunication =
+            $this->resolveEventCommunication(
+                $communicationLog
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Registration / Generic Badge Attachment
+        |--------------------------------------------------------------------------
+        |
+        | Event Communication newsletters should reproduce the newsletter
+        | itself. They do not automatically attach the attendee badge.
+        |
+        | Registration and other normal automatic emails keep the existing
+        | badge attachment behaviour.
+        |
         */
 
         $badgeAbsolutePath = null;
         $badgeAttachmentName = null;
 
-        $attendee =
-            $communicationLog->attendee;
-
         if (
-            $attendee
+            ! $eventCommunication
+            && $attendee
             && filled(
                 $attendee->badge_path
             )
@@ -406,16 +725,6 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 trim(
                     (string) $attendee->badge_path
                 );
-
-            /*
-             * badge_path may be stored as:
-             *
-             * badges/example.png
-             * storage/badges/example.png
-             * /storage/badges/example.png
-             *
-             * Normalize it to the public disk path before checking.
-             */
 
             $normalizedBadgePath =
                 ltrim(
@@ -497,11 +806,6 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     );
                 }
             } catch (Throwable $exception) {
-                /*
-                 * Missing badge attachment must not prevent a valid email from
-                 * being sent. Record the problem and continue without it.
-                 */
-
                 Log::warning(
                     'Email badge attachment could not be resolved.',
                     [
@@ -521,17 +825,18 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Send Email
-        |--------------------------------------------------------------------------
-        */
-
         Log::info(
             'Sending automatic email communication.',
             [
                 'communication_log_id' =>
                     $communicationLog->id,
+
+                'communication_campaign_id' =>
+                    $communicationLog
+                        ->communication_campaign_id,
+
+                'event_communication_id' =>
+                    $eventCommunication?->id,
 
                 'event_id' =>
                     $communicationLog->event_id,
@@ -545,6 +850,11 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 'subject' =>
                     $subject,
 
+                'email_view' =>
+                    $eventCommunication
+                        ? 'emails.event-communication'
+                        : 'emails.elive',
+
                 'has_badge_attachment' =>
                     filled(
                         $badgeAbsolutePath
@@ -554,18 +864,61 @@ class SendAutomaticCommunicationJob implements ShouldQueue
 
         /*
         |--------------------------------------------------------------------------
-        | Branded HTML Email
+        | Event Communication Newsletter
         |--------------------------------------------------------------------------
         |
-        | Render all automatic emails through the shared eLive Events Blade
-        | template instead of Mail::raw(), so recipients receive the branded
-        | logo, event hero, event details, message body, CTA area and footer.
+        | When the log belongs to a published Event Communication campaign,
+        | send the full visual newsletter using:
+        |
+        | resources/views/emails/event-communication.blade.php
         |
         */
 
-        $event =
-            $communicationLog->event
-            ?? $attendee?->event;
+        if ($eventCommunication) {
+            $eventCommunication->loadMissing([
+                'event.organization',
+                'sections',
+                'links',
+                'images',
+                'attachments',
+            ]);
+
+            Mail::send(
+                'emails.event-communication',
+                [
+                    'subject' =>
+                        $subject,
+
+                    'communication' =>
+                        $eventCommunication,
+
+                    'event' =>
+                        $eventCommunication->event
+                        ?? $event,
+                ],
+                function ($mail) use (
+                    $recipient,
+                    $subject
+                ): void {
+                    $mail
+                        ->to(
+                            $recipient
+                        )
+                        ->subject(
+                            $subject
+                        );
+                }
+            );
+
+            return 'smtp-email-'
+                . $communicationLog->id;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Standard eLive Email
+        |--------------------------------------------------------------------------
+        */
 
         $emailLabel =
             str_contains(
@@ -599,13 +952,6 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 'alertMessage' =>
                     null,
 
-                /*
-                 * The badge continues to be attached below.
-                 *
-                 * Keep the CTA disabled until a canonical public badge URL is
-                 * available in the application. This prevents generating a
-                 * broken or guessed link in production email.
-                 */
                 'actionUrl' =>
                     null,
 
@@ -654,19 +1000,96 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             }
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Internal Submission Reference
-        |--------------------------------------------------------------------------
-        |
-        | SMTP/Laravel Mail does not guarantee that the provider returns a
-        | provider message ID here. We still return a stable internal reference
-        | so CommunicationLog can record that Laravel submitted the message.
-        |
-        */
-
         return 'smtp-email-'
             . $communicationLog->id;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Event Communication
+    |--------------------------------------------------------------------------
+    */
+
+    protected function resolveEventCommunication(
+        CommunicationLog $communicationLog
+    ): ?EventCommunication {
+        if (
+            ! $communicationLog
+                ->communication_campaign_id
+        ) {
+            return null;
+        }
+
+        $message =
+            (string) $communicationLog->message;
+
+        /*
+         * Prefer the communication slug embedded in the public URL:
+         *
+         * /events/{event}/communications/{communication}
+         */
+        if (
+            preg_match(
+                '#/communications/([^?\s/]+)#u',
+                $message,
+                $matches
+            )
+        ) {
+            $slug =
+                urldecode(
+                    trim(
+                        (string) (
+                            $matches[1]
+                            ?? ''
+                        )
+                    )
+                );
+
+            if ($slug !== '') {
+                $communication =
+                    EventCommunication::query()
+                        ->where(
+                            'event_id',
+                            $communicationLog
+                                ->event_id
+                        )
+                        ->where(
+                            'slug',
+                            $slug
+                        )
+                        ->first();
+
+                if ($communication) {
+                    return $communication;
+                }
+            }
+        }
+
+        /*
+         * Fallback for older campaign records where the public URL was not
+         * included in the message.
+         */
+        $subject =
+            trim(
+                (string) $communicationLog
+                    ->subject
+            );
+
+        if ($subject === '') {
+            return null;
+        }
+
+        return EventCommunication::query()
+            ->where(
+                'event_id',
+                $communicationLog->event_id
+            )
+            ->where(
+                'title',
+                $subject
+            )
+            ->latest('id')
+            ->first();
     }
 
     /*
@@ -883,6 +1306,10 @@ class SendAutomaticCommunicationJob implements ShouldQueue
     ): void {
         $communicationLog =
             CommunicationLog::query()
+                ->with([
+                    'campaign',
+                    'campaignRecipient',
+                ])
                 ->find(
                     $this->communicationLogId
                 );
@@ -896,11 +1323,19 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 ?: 'Automatic communication job failed.'
         );
 
+        $this->syncCampaignLifecycle(
+            $communicationLog
+        );
+
         Log::error(
             'Automatic communication job permanently failed.',
             [
                 'communication_log_id' =>
                     $communicationLog->id,
+
+                'communication_campaign_id' =>
+                    $communicationLog
+                        ->communication_campaign_id,
 
                 'event_id' =>
                     $communicationLog->event_id,

@@ -544,9 +544,11 @@ class CommunicationCampaignService
 
                                 SendAutomaticCommunicationJob::dispatch(
                                     $log->id
-                                )->onQueue(
-                                    $queue
-                                );
+                                )
+                                    ->onQueue(
+                                        $queue
+                                    )
+                                    ->afterCommit();
 
                                 $queuedCount++;
                             }

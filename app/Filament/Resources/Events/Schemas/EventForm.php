@@ -478,17 +478,17 @@ class EventForm
                     'Automatic Registration Communication'
                 )
                     ->description(
-                        'Automatically send an SMS when an attendee successfully completes registration.'
+                        'Choose which channels eLive Events should use to automatically confirm a successful attendee registration.'
                     )
                     ->schema([
                         Toggle::make(
                             'registration_sms_enabled'
                         )
                             ->label(
-                                'Send SMS After Registration'
+                                'Send Registration SMS'
                             )
                             ->helperText(
-                                'When enabled, registered attendees automatically receive the selected SMS template.'
+                                'Send an SMS confirmation immediately after successful registration.'
                             )
                             ->default(false)
                             ->live()
@@ -499,8 +499,7 @@ class EventForm
                                 ): void {
                                     if ($state) {
                                         /*
-                                         * SMS cannot work without a
-                                         * phone number.
+                                         * SMS requires a phone number.
                                          */
                                         $set(
                                             'registration_show_phone',
@@ -518,6 +517,77 @@ class EventForm
                                     $set(
                                         'registration_sms_template_id',
                                         null
+                                    );
+                                }
+                            ),
+
+                        Toggle::make(
+                            'registration_email_enabled'
+                        )
+                            ->label(
+                                'Send Registration Email'
+                            )
+                            ->helperText(
+                                'Send the branded eLive Events registration confirmation email.'
+                            )
+                            ->default(true)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (
+                                    bool $state,
+                                    Set $set
+                                ): void {
+                                    if (! $state) {
+                                        return;
+                                    }
+
+                                    /*
+                                     * Automatic email requires an email
+                                     * address from every registrant.
+                                     */
+                                    $set(
+                                        'registration_show_email',
+                                        true
+                                    );
+
+                                    $set(
+                                        'registration_require_email',
+                                        true
+                                    );
+                                }
+                            ),
+
+                        Toggle::make(
+                            'registration_whatsapp_enabled'
+                        )
+                            ->label(
+                                'Send Registration WhatsApp'
+                            )
+                            ->helperText(
+                                'Send the approved WhatsApp registration confirmation after the attendee badge is ready.'
+                            )
+                            ->default(false)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (
+                                    bool $state,
+                                    Set $set
+                                ): void {
+                                    if (! $state) {
+                                        return;
+                                    }
+
+                                    /*
+                                     * WhatsApp requires a valid phone number.
+                                     */
+                                    $set(
+                                        'registration_show_phone',
+                                        true
+                                    );
+
+                                    $set(
+                                        'registration_require_phone',
+                                        true
                                     );
                                 }
                             ),
@@ -592,40 +662,28 @@ class EventForm
                             ),
 
                         \Filament\Forms\Components\Placeholder::make(
-                            'registration_sms_information'
+                            'registration_channels_information'
                         )
                             ->label(
                                 'How it works'
                             )
                             ->content(
-                                'After a successful public registration, eLive Events creates the attendee and badge first, then queues the selected SMS through the communications queue.'
-                            )
-                            ->visible(
-                                fn (Get $get): bool =>
-                                    (bool) $get(
-                                        'registration_sms_enabled'
-                                    )
+                                'After a successful registration, eLive Events creates the attendee and queues confirmation messages only for the channels enabled above. Email and SMS can be sent immediately. WhatsApp confirmation is sent when the digital badge is ready.'
                             )
                             ->columnSpanFull(),
 
                         \Filament\Forms\Components\Placeholder::make(
-                            'registration_sms_status_information'
+                            'registration_channels_status_information'
                         )
                             ->label(
                                 'Registration Status'
                             )
                             ->content(
-                                'For now, this confirmation SMS is sent only when the attendee status is Registered. Pending approval and waitlisted attendees will use separate automatic templates later.'
-                            )
-                            ->visible(
-                                fn (Get $get): bool =>
-                                    (bool) $get(
-                                        'registration_sms_enabled'
-                                    )
+                                'Automatic registration confirmation is sent only to approved or registered attendees. Pending approval and waitlisted attendees will use separate communication templates later.'
                             )
                             ->columnSpanFull(),
                     ])
-                    ->columns(2)
+                    ->columns(3)
                     ->collapsible(),
 
                 /*
@@ -674,6 +732,11 @@ class EventForm
                                         );
 
                                         $set(
+                                            'registration_whatsapp_enabled',
+                                            false
+                                        );
+
+                                        $set(
                                             'registration_sms_template_id',
                                             null
                                         );
@@ -717,6 +780,11 @@ class EventForm
                                     if (! $state) {
                                         $set(
                                             'registration_require_email',
+                                            false
+                                        );
+
+                                        $set(
+                                            'registration_email_enabled',
                                             false
                                         );
                                     }
