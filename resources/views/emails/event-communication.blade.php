@@ -499,7 +499,6 @@
                                         "
                                     >
                                         {{ $link->label }}
-                                        ↗
                                     </a>
                                 @endforeach
                             </div>
