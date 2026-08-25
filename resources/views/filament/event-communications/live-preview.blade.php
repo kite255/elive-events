@@ -219,81 +219,183 @@
     | RichEditor live-state renderer
     |--------------------------------------------------------------------------
     |
-    | Filament RichEditor may expose its live state as an array while the
-    | user is typing. Render both HTML strings and structured array state
-    | safely without triggering "Array to string conversion".
+    | Saved RichEditor values arrive as HTML strings. While editing, Filament
+    | may expose TipTap/ProseMirror JSON. Convert that structured state to HTML
+    | so headings, paragraphs, emphasis, links and lists remain visible in the
+    | live preview instead of being flattened into plain text.
     |
     */
 
-    $extractRichText = function (
-        mixed $value
-    ) use (&$extractRichText): string {
-        if (! is_array($value)) {
+    $renderRichNode = function (
+        mixed $node
+    ) use (&$renderRichNode): string {
+        if (! is_array($node)) {
             return '';
         }
 
-        $parts = [];
-
-        if (
-            array_key_exists(
-                'text',
-                $value
-            )
-            && is_string(
-                $value['text']
-            )
-        ) {
-            $text = trim(
-                $value['text']
-            );
-
-            if ($text !== '') {
-                $parts[] = $text;
-            }
+        if (array_is_list($node)) {
+            return collect($node)
+                ->map(
+                    fn ($child): string =>
+                        $renderRichNode($child)
+                )
+                ->implode('');
         }
 
-        foreach (
-            $value
-            as $key => $child
-        ) {
-            if ($key === 'text') {
-                continue;
-            }
+        $type =
+            $node['type']
+            ?? null;
 
-            if (! is_array($child)) {
-                continue;
-            }
+        $attrs =
+            is_array($node['attrs'] ?? null)
+                ? $node['attrs']
+                : [];
 
-            $childText =
-                trim(
-                    $extractRichText(
-                        $child
+        $content =
+            is_array($node['content'] ?? null)
+                ? $node['content']
+                : [];
+
+        $children =
+            collect($content)
+                ->map(
+                    fn ($child): string =>
+                        $renderRichNode($child)
+                )
+                ->implode('');
+
+        if ($type === 'text') {
+            $html =
+                e(
+                    (string) (
+                        $node['text']
+                        ?? ''
                     )
                 );
 
-            if ($childText !== '') {
-                $parts[] =
-                    $childText;
+            $marks =
+                is_array($node['marks'] ?? null)
+                    ? $node['marks']
+                    : [];
+
+            foreach ($marks as $mark) {
+                if (! is_array($mark)) {
+                    continue;
+                }
+
+                $markType =
+                    $mark['type']
+                    ?? null;
+
+                $markAttrs =
+                    is_array($mark['attrs'] ?? null)
+                        ? $mark['attrs']
+                        : [];
+
+                $html = match ($markType) {
+                    'bold' =>
+                        '<strong>' . $html . '</strong>',
+
+                    'italic' =>
+                        '<em>' . $html . '</em>',
+
+                    'underline' =>
+                        '<u>' . $html . '</u>',
+
+                    'strike' =>
+                        '<s>' . $html . '</s>',
+
+                    'code' =>
+                        '<code>' . $html . '</code>',
+
+                    'link' =>
+                        '<a href="'
+                        . e(
+                            (string) (
+                                $markAttrs['href']
+                                ?? '#'
+                            )
+                        )
+                        . '" target="'
+                        . (
+                            ($markAttrs['target'] ?? null)
+                            === '_blank'
+                                ? '_blank'
+                                : '_self'
+                        )
+                        . '" rel="noopener noreferrer">'
+                        . $html
+                        . '</a>',
+
+                    default =>
+                        $html,
+                };
             }
+
+            return $html;
         }
 
-        return implode(
-            "\n",
-            $parts
-        );
+        if ($type === 'heading') {
+            $level =
+                min(
+                    6,
+                    max(
+                        1,
+                        (int) (
+                            $attrs['level']
+                            ?? 2
+                        )
+                    )
+                );
+
+            return
+                '<h'
+                . $level
+                . '>'
+                . $children
+                . '</h'
+                . $level
+                . '>';
+        }
+
+        return match ($type) {
+            'doc' =>
+                $children,
+
+            'paragraph' =>
+                '<p>' . $children . '</p>',
+
+            'bulletList' =>
+                '<ul>' . $children . '</ul>',
+
+            'orderedList' =>
+                '<ol>' . $children . '</ol>',
+
+            'listItem' =>
+                '<li>' . $children . '</li>',
+
+            'blockquote' =>
+                '<blockquote>' . $children . '</blockquote>',
+
+            'hardBreak' =>
+                '<br>',
+
+            'horizontalRule' =>
+                '<hr>',
+
+            default =>
+                $children,
+        };
     };
 
     $renderRichContent = function (
         mixed $value
-    ) use ($extractRichText): string {
+    ) use ($renderRichNode): string {
         if ($value === null) {
             return '';
         }
 
         if (is_string($value)) {
-            /*
-             * Saved RichEditor values are already HTML.
-             */
             return $value;
         }
 
@@ -303,22 +405,112 @@
             );
         }
 
-        $text =
-            trim(
-                $extractRichText(
-                    $value
-                )
-            );
-
-        if ($text === '') {
-            return '';
-        }
-
-        return nl2br(
-            e($text)
+        return $renderRichNode(
+            $value
         );
     };
 @endphp
+
+<style>
+    .elive-rich-preview > :first-child {
+        margin-top: 0;
+    }
+
+    .elive-rich-preview > :last-child {
+        margin-bottom: 0;
+    }
+
+    .elive-rich-preview p {
+        margin: 0 0 11px;
+    }
+
+    .elive-rich-preview h1,
+    .elive-rich-preview h2,
+    .elive-rich-preview h3,
+    .elive-rich-preview h4,
+    .elive-rich-preview h5,
+    .elive-rich-preview h6 {
+        margin: 17px 0 7px;
+        color: {{ $primary }};
+        line-height: 1.25;
+        font-weight: 800;
+    }
+
+    .elive-rich-preview h1 {
+        font-size: 18px;
+    }
+
+    .elive-rich-preview h2 {
+        font-size: 16px;
+    }
+
+    .elive-rich-preview h3 {
+        font-size: 14px;
+    }
+
+    .elive-rich-preview h4,
+    .elive-rich-preview h5,
+    .elive-rich-preview h6 {
+        font-size: 13px;
+    }
+
+    .elive-rich-preview strong {
+        font-weight: 800;
+        color: #1e293b;
+    }
+
+    .elive-rich-preview ul,
+    .elive-rich-preview ol {
+        margin: 8px 0 12px;
+        padding-left: 20px;
+    }
+
+    .elive-rich-preview li {
+        margin: 4px 0;
+    }
+
+    .elive-rich-preview blockquote {
+        margin: 12px 0;
+        padding: 9px 12px;
+        border-left: 3px solid {{ $blue }};
+        background: #f8fafc;
+        color: #475569;
+    }
+
+    .elive-rich-preview a {
+        color: {{ $blue }};
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .elive-rich-preview code {
+        padding: 2px 4px;
+        border-radius: 4px;
+        background: #f1f5f9;
+        font-size: .92em;
+    }
+
+    .elive-rich-preview hr {
+        margin: 14px 0;
+        border: 0;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .elive-rich-preview--compact p {
+        margin-bottom: 7px;
+    }
+
+    .elive-rich-preview--compact h1,
+    .elive-rich-preview--compact h2,
+    .elive-rich-preview--compact h3,
+    .elive-rich-preview--compact h4,
+    .elive-rich-preview--compact h5,
+    .elive-rich-preview--compact h6 {
+        margin-top: 10px;
+        margin-bottom: 5px;
+        font-size: 12px;
+    }
+</style>
 
 <div
     style="
@@ -490,11 +682,12 @@
 
         @if(filled($data['body'] ?? null))
             <div
+                class="elive-rich-preview"
                 style="
                     margin-bottom:22px;
                     color:#334155;
                     line-height:1.65;
-                    font-size:13px;
+                    font-size:12px;
                 "
             >
                 {!! $renderRichContent($data['body'] ?? null) !!}
@@ -582,6 +775,7 @@
                             )
                         )
                             <div
+                                class="elive-rich-preview elive-rich-preview--compact"
                                 style="
                                     margin-top:7px;
                                     color:#64748b;
