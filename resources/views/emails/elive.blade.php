@@ -9,22 +9,71 @@
     <title>{{ $subject ?? 'eLive Events' }}</title>
 
     <style>
+        /* Mobile email adjustments.
+           Critical visual styles are still inline for Gmail compatibility. */
         @media only screen and (max-width: 620px) {
             .email-wrapper {
-                padding: 15px 8px !important;
+                padding: 10px 0 !important;
             }
 
             .email-container {
                 width: 100% !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
             }
 
             .email-padding {
-                padding-left: 22px !important;
-                padding-right: 22px !important;
+                padding-left: 20px !important;
+                padding-right: 20px !important;
+            }
+
+            .brand-header {
+                padding: 20px !important;
+            }
+
+            .brand-logo-cell,
+            .brand-event-cell {
+                display: block !important;
+                width: 100% !important;
+                text-align: left !important;
+            }
+
+            .brand-event-cell {
+                padding-top: 16px !important;
+            }
+
+            .email-logo {
+                width: 135px !important;
+                max-width: 135px !important;
+            }
+
+            .header-event-name {
+                font-size: 17px !important;
+                line-height: 1.35 !important;
+            }
+
+            .header-event-venue {
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+            }
+
+            .hero-image {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+            }
+
+            .hero-copy {
+                padding: 22px 20px 24px !important;
+            }
+
+            .hero-title {
+                font-size: 34px !important;
+                line-height: 1.08 !important;
             }
 
             .event-title {
-                font-size: 25px !important;
+                font-size: 24px !important;
             }
 
             .detail-column {
@@ -33,9 +82,8 @@
                 box-sizing: border-box !important;
             }
 
-            .email-logo {
-                width: 175px !important;
-                max-width: 175px !important;
+            .main-message {
+                padding-top: 28px !important;
             }
         }
     </style>
@@ -52,6 +100,22 @@
         -ms-text-size-adjust:100%;
     "
 >
+
+@php
+    /*
+     * Optional Daily Highlights / campaign hero variables:
+     *
+     * $heroImageUrl  Absolute public URL to the thumbnail/banner image.
+     * $heroTitle     Example: "Day 2 Highlights".
+     * $heroDate      Example: "24 August 2026".
+     *
+     * Using a real <img> instead of CSS background-image is intentional:
+     * Gmail mobile is substantially more reliable with normal image tags.
+     */
+    $resolvedHeroImageUrl = $heroImageUrl ?? null;
+    $resolvedHeroTitle = $heroTitle ?? null;
+    $resolvedHeroDate = $heroDate ?? null;
+@endphp
 
 <table
     role="presentation"
@@ -88,102 +152,248 @@
             >
 
                 {{-- ========================================================= --}}
-                {{-- ELIVE HEADER                                              --}}
+                {{-- ELIVE / EVENT HEADER                                      --}}
                 {{-- ========================================================= --}}
 
                 <tr>
                     <td
-                        align="center"
+                        class="brand-header"
                         style="
-                            padding:28px 30px 24px;
+                            padding:20px 28px;
                             background:#FFFFFF;
                         "
                     >
-                        <img
-                            src="{{ url('/eLive-Logo.png') }}"
-                            alt="eLive Events"
-                            width="200"
-                            class="email-logo"
-                            style="
-                                width:200px;
-                                max-width:200px;
-                                height:auto;
-                                display:block;
-                                border:0;
-                                outline:none;
-                                text-decoration:none;
-                            "
+                        <table
+                            role="presentation"
+                            width="100%"
+                            cellspacing="0"
+                            cellpadding="0"
+                            border="0"
+                            style="width:100%;"
                         >
+                            <tr>
+                                <td
+                                    class="brand-logo-cell"
+                                    width="35%"
+                                    valign="middle"
+                                    align="left"
+                                    style="width:35%;"
+                                >
+                                    <img
+                                        src="{{ url('/eLive-Logo.png') }}"
+                                        alt="eLive Events"
+                                        width="145"
+                                        class="email-logo"
+                                        style="
+                                            width:145px;
+                                            max-width:145px;
+                                            height:auto;
+                                            display:block;
+                                            border:0;
+                                            outline:none;
+                                            text-decoration:none;
+                                        "
+                                    >
+                                </td>
+
+                                <td
+                                    class="brand-event-cell"
+                                    width="65%"
+                                    valign="middle"
+                                    align="right"
+                                    style="
+                                        width:65%;
+                                        text-align:right;
+                                    "
+                                >
+                                    <div
+                                        class="header-event-name"
+                                        style="
+                                            font-size:14px;
+                                            line-height:1.4;
+                                            font-weight:700;
+                                            color:#161943;
+                                        "
+                                    >
+                                        {{ $event?->name ?? 'eLive Events' }}
+                                    </div>
+
+                                    @if($event?->venue)
+                                        <div
+                                            class="header-event-venue"
+                                            style="
+                                                margin-top:3px;
+                                                font-size:12px;
+                                                line-height:1.45;
+                                                color:#667085;
+                                            "
+                                        >
+                                            {{ $event->venue }}
+                                        </div>
+                                    @endif
+                                </td>
+                            </tr>
+                        </table>
                     </td>
                 </tr>
 
 
                 {{-- ========================================================= --}}
-                {{-- EMAIL TYPE / EVENT HERO                                   --}}
+                {{-- OPTIONAL DAILY HIGHLIGHTS HERO                            --}}
+                {{-- Real IMG for Gmail mobile compatibility                   --}}
                 {{-- ========================================================= --}}
 
-                <tr>
-                    <td
-                        align="center"
-                        class="email-padding"
-                        style="
-                            background:#161943;
-                            padding:34px 35px;
-                            color:#FFFFFF;
-                        "
-                    >
-
-                        <div
+                @if(!empty($resolvedHeroImageUrl))
+                    <tr>
+                        <td
                             style="
-                                font-size:12px;
-                                line-height:1.4;
-                                text-transform:uppercase;
-                                letter-spacing:2px;
-                                color:#D8DCE6;
-                                margin-bottom:10px;
+                                padding:0;
+                                margin:0;
+                                background:#0F3B5D;
+                                line-height:0;
+                                font-size:0;
                             "
                         >
-                            {{ $emailLabel ?? 'Event Communication' }}
-                        </div>
+                            <img
+                                src="{{ $resolvedHeroImageUrl }}"
+                                alt="{{ $resolvedHeroTitle ?: ($event?->name ?? 'Event highlights') }}"
+                                width="680"
+                                class="hero-image"
+                                style="
+                                    display:block;
+                                    width:100%;
+                                    max-width:680px;
+                                    height:auto;
+                                    border:0;
+                                    outline:none;
+                                    text-decoration:none;
+                                    margin:0;
+                                    padding:0;
+                                "
+                            >
+                        </td>
+                    </tr>
 
-                        <div
-                            class="event-title"
+                    @if(!empty($resolvedHeroTitle) || !empty($resolvedHeroDate))
+                        <tr>
+                            <td
+                                class="hero-copy"
+                                style="
+                                    background:#0F3B5D;
+                                    padding:22px 30px 26px;
+                                    color:#FFFFFF;
+                                "
+                            >
+                                @if(!empty($resolvedHeroTitle))
+                                    <div
+                                        class="hero-title"
+                                        style="
+                                            margin:0;
+                                            font-size:40px;
+                                            line-height:1.08;
+                                            font-weight:800;
+                                            color:#FFFFFF;
+                                        "
+                                    >
+                                        {{ $resolvedHeroTitle }}
+                                    </div>
+                                @endif
+
+                                @if(!empty($resolvedHeroDate))
+                                    <table
+                                        role="presentation"
+                                        cellspacing="0"
+                                        cellpadding="0"
+                                        border="0"
+                                        style="margin-top:16px;"
+                                    >
+                                        <tr>
+                                            <td
+                                                bgcolor="#FF9800"
+                                                style="
+                                                    background:#FF9800;
+                                                    border-radius:999px;
+                                                    padding:7px 14px;
+                                                    color:#FFFFFF;
+                                                    font-size:12px;
+                                                    line-height:1.2;
+                                                    font-weight:700;
+                                                "
+                                            >
+                                                {{ $resolvedHeroDate }}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                @endif
+                            </td>
+                        </tr>
+                    @endif
+                @else
+                    {{-- ===================================================== --}}
+                    {{-- STANDARD EVENT HERO                                   --}}
+                    {{-- ===================================================== --}}
+
+                    <tr>
+                        <td
+                            align="center"
+                            class="email-padding"
                             style="
-                                font-size:30px;
-                                line-height:1.25;
-                                font-weight:700;
+                                background:#161943;
+                                padding:34px 35px;
                                 color:#FFFFFF;
                             "
                         >
-                            {{ $event?->name ?? 'eLive Events' }}
-                        </div>
-
-                        @if($event?->starts_at)
                             <div
                                 style="
-                                    font-size:14px;
-                                    line-height:1.6;
-                                    margin-top:14px;
-                                    color:#E7E9F0;
+                                    font-size:12px;
+                                    line-height:1.4;
+                                    text-transform:uppercase;
+                                    letter-spacing:2px;
+                                    color:#D8DCE6;
+                                    margin-bottom:10px;
                                 "
                             >
-                                {{ $event->starts_at->format('d M Y') }}
-
-                                @if(
-                                    $event->ends_at
-                                    && ! $event->starts_at->isSameDay($event->ends_at)
-                                )
-                                    – {{ $event->ends_at->format('d M Y') }}
-                                @endif
-
-                                @if($event?->venue)
-                                    &nbsp; • &nbsp; {{ $event->venue }}
-                                @endif
+                                {{ $emailLabel ?? 'Event Communication' }}
                             </div>
-                        @endif
 
-                    </td>
-                </tr>
+                            <div
+                                class="event-title"
+                                style="
+                                    font-size:30px;
+                                    line-height:1.25;
+                                    font-weight:700;
+                                    color:#FFFFFF;
+                                "
+                            >
+                                {{ $event?->name ?? 'eLive Events' }}
+                            </div>
+
+                            @if($event?->starts_at)
+                                <div
+                                    style="
+                                        font-size:14px;
+                                        line-height:1.6;
+                                        margin-top:14px;
+                                        color:#E7E9F0;
+                                    "
+                                >
+                                    {{ $event->starts_at->format('d M Y') }}
+
+                                    @if(
+                                        $event->ends_at
+                                        && ! $event->starts_at->isSameDay($event->ends_at)
+                                    )
+                                        – {{ $event->ends_at->format('d M Y') }}
+                                    @endif
+
+                                    @if($event?->venue)
+                                        &nbsp; • &nbsp; {{ $event->venue }}
+                                    @endif
+                                </div>
+                            @endif
+                        </td>
+                    </tr>
+                @endif
 
 
                 {{-- ========================================================= --}}
@@ -196,7 +406,6 @@
                             class="email-padding"
                             style="padding:30px 45px 0;"
                         >
-
                             <table
                                 role="presentation"
                                 width="100%"
@@ -212,7 +421,6 @@
                             >
                                 <tr>
                                     <td style="padding:18px 20px;">
-
                                         @if(!empty($alertTitle))
                                             <div
                                                 style="
@@ -238,11 +446,9 @@
                                                 {{ $alertMessage }}
                                             </div>
                                         @endif
-
                                     </td>
                                 </tr>
                             </table>
-
                         </td>
                     </tr>
                 @endif
@@ -254,15 +460,14 @@
 
                 <tr>
                     <td
-                        class="email-padding"
+                        class="email-padding main-message"
                         style="
-                            padding:38px 45px 24px;
+                            padding:34px 45px 24px;
                             font-size:16px;
                             line-height:1.7;
                             color:#161943;
                         "
                     >
-
                         @if($attendee)
                             <div
                                 style="
@@ -289,7 +494,6 @@
                                 {!! nl2br(e($messageBody)) !!}
                             </div>
                         @endif
-
                     </td>
                 </tr>
 
@@ -304,7 +508,6 @@
                             class="email-padding"
                             style="padding:0 45px 30px;"
                         >
-
                             <table
                                 role="presentation"
                                 width="100%"
@@ -319,7 +522,6 @@
                                     overflow:hidden;
                                 "
                             >
-
                                 <tr>
                                     <td
                                         width="50%"
@@ -427,7 +629,6 @@
                                             "
                                         >
                                             @if($event->starts_at)
-
                                                 {{ $event->starts_at->format('d M Y') }}
 
                                                 @if(
@@ -436,7 +637,6 @@
                                                 )
                                                     – {{ $event->ends_at->format('d M Y') }}
                                                 @endif
-
                                             @else
                                                 -
                                             @endif
@@ -478,9 +678,7 @@
                                         </div>
                                     </td>
                                 </tr>
-
                             </table>
-
                         </td>
                     </tr>
                 @endif
@@ -495,11 +693,8 @@
                         <td
                             align="center"
                             class="email-padding"
-                            style="
-                                padding:5px 45px 36px;
-                            "
+                            style="padding:5px 45px 36px;"
                         >
-
                             @if(!empty($actionIntro))
                                 <div
                                     style="
@@ -513,9 +708,6 @@
                                 </div>
                             @endif
 
-
-                            {{-- Table-based button for better email compatibility --}}
-
                             <table
                                 role="presentation"
                                 cellspacing="0"
@@ -527,9 +719,7 @@
                                     <td
                                         align="center"
                                         bgcolor="#007AB2"
-                                        style="
-                                            border-radius:8px;
-                                        "
+                                        style="border-radius:8px;"
                                     >
                                         <a
                                             href="{{ $actionUrl }}"
@@ -552,7 +742,6 @@
                                 </tr>
                             </table>
 
-
                             @if(!empty($actionNote))
                                 <div
                                     style="
@@ -565,7 +754,6 @@
                                     {{ $actionNote }}
                                 </div>
                             @endif
-
 
                             <div
                                 style="
@@ -589,7 +777,6 @@
                                     {{ $actionUrl }}
                                 </a>
                             </div>
-
                         </td>
                     </tr>
                 @endif
@@ -634,7 +821,6 @@
                             line-height:1.8;
                         "
                     >
-
                         <strong
                             style="
                                 color:#FFFFFF;
@@ -669,7 +855,6 @@
                         <span style="color:#D8DCE6;">
                             © {{ date('Y') }} eLive Events. All rights reserved.
                         </span>
-
                     </td>
                 </tr>
 
