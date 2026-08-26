@@ -148,6 +148,25 @@
     >
 
     <title>{{ $communicationTitle }}</title>
+
+    <style>
+        @media only screen and (max-width: 640px) {
+            .elive-email-shell {
+                width: 100% !important;
+            }
+
+            .elive-hero-image {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+            }
+
+            .elive-hero-title {
+                font-size: 26px !important;
+                line-height: 1.15 !important;
+            }
+        }
+    </style>
 </head>
 
 <body
@@ -180,6 +199,7 @@
                 cellpadding="0"
                 cellspacing="0"
                 border="0"
+                class="elive-email-shell"
                 style="
                     width: 100%;
                     max-width: 640px;
@@ -267,11 +287,15 @@
                                 src="{{ $heroImageUrl }}"
                                 alt="{{ $heroTitle }}"
                                 width="640"
+                                height="340"
+                                class="elive-hero-image"
                                 style="
                                     display: block;
                                     width: 100%;
                                     max-width: 640px;
-                                    height: auto;
+                                    height: 340px;
+                                    object-fit: cover;
+                                    object-position: center;
                                     border: 0;
                                     outline: none;
                                     text-decoration: none;
@@ -290,6 +314,7 @@
                         "
                     >
                         <div
+                            class="elive-hero-title"
                             style="
                                 font-size: 30px;
                                 line-height: 1.12;
