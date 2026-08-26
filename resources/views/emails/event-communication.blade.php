@@ -29,77 +29,85 @@
         $communication?->hero_subtitle
         ?: optional($publishedAt)->format('d F Y');
 
-    $heroImageUrl = null;
+    /*
+     * Convert a public-disk path into an absolute URL suitable for email
+     * clients. Email clients cannot reliably resolve /storage/... paths.
+     */
+    $absolutePublicUrl = function (
+        ?string $path
+    ): ?string {
+        if (blank($path)) {
+            return null;
+        }
 
-    if (
-        $communication
-        && filled($communication->hero_image_path)
-    ) {
-        $heroPath =
+        $normalizedPath =
             ltrim(
-                (string) $communication->hero_image_path,
+                (string) $path,
                 '/'
             );
 
         if (
             str_starts_with(
-                $heroPath,
+                $normalizedPath,
                 'storage/'
             )
         ) {
-            $heroPath =
+            $normalizedPath =
                 substr(
-                    $heroPath,
+                    $normalizedPath,
                     strlen('storage/')
                 );
         }
 
         if (
-            Storage::disk('public')->exists(
-                $heroPath
+            ! Storage::disk('public')->exists(
+                $normalizedPath
             )
         ) {
-            $heroImageUrl =
-                Storage::disk('public')->url(
-                    $heroPath
-                );
+            return null;
         }
-    }
+
+        $diskUrl =
+            Storage::disk('public')->url(
+                $normalizedPath
+            );
+
+        if (
+            str_starts_with(
+                $diskUrl,
+                'http://'
+            )
+            || str_starts_with(
+                $diskUrl,
+                'https://'
+            )
+        ) {
+            return $diskUrl;
+        }
+
+        return url(
+            '/' . ltrim(
+                $diskUrl,
+                '/'
+            )
+        );
+    };
+
+    $heroImageUrl =
+        $absolutePublicUrl(
+            $communication?->hero_image_path
+        );
 
     if (
         blank($heroImageUrl)
         && $event
-        && filled($event->banner_image)
     ) {
-        $eventHeroPath =
-            ltrim(
-                (string) $event->banner_image,
-                '/'
+        $heroImageUrl =
+            $absolutePublicUrl(
+                $event->registration_banner_image_path
+                    ?? $event->banner_image
+                    ?? null
             );
-
-        if (
-            str_starts_with(
-                $eventHeroPath,
-                'storage/'
-            )
-        ) {
-            $eventHeroPath =
-                substr(
-                    $eventHeroPath,
-                    strlen('storage/')
-                );
-        }
-
-        if (
-            Storage::disk('public')->exists(
-                $eventHeroPath
-            )
-        ) {
-            $heroImageUrl =
-                Storage::disk('public')->url(
-                    $eventHeroPath
-                );
-        }
     }
 
     $logoUrl =
@@ -250,62 +258,67 @@
                 @if(filled($heroImageUrl))
                     <tr>
                         <td
-                            background="{{ $heroImageUrl }}"
                             style="
-                                background-image:
-                                    linear-gradient(
-                                        rgba(12, 18, 48, 0.55),
-                                        rgba(12, 18, 48, 0.55)
-                                    ),
-                                    url('{{ $heroImageUrl }}');
-                                background-size: cover;
-                                background-position: center;
-                                padding: 54px 30px 46px 30px;
+                                padding: 0;
+                                background: #ffffff;
                             "
                         >
-                            <table
-                                role="presentation"
-                                width="100%"
-                                cellpadding="0"
-                                cellspacing="0"
-                                border="0"
+                            <img
+                                src="{{ $heroImageUrl }}"
+                                alt="{{ $heroTitle }}"
+                                width="640"
+                                style="
+                                    display: block;
+                                    width: 100%;
+                                    max-width: 640px;
+                                    height: auto;
+                                    border: 0;
+                                    outline: none;
+                                    text-decoration: none;
+                                "
                             >
-                                <tr>
-                                    <td>
-                                        <div
-                                            style="
-                                                font-size: 36px;
-                                                line-height: 1.08;
-                                                font-weight: 800;
-                                                color: #ffffff;
-                                                margin: 0 0 14px 0;
-                                            "
-                                        >
-                                            {{ $heroTitle }}
-                                        </div>
-
-                                        @if(filled($heroSubtitle))
-                                            <span
-                                                style="
-                                                    display: inline-block;
-                                                    background: #ff9800;
-                                                    color: #161943;
-                                                    border-radius: 999px;
-                                                    padding: 7px 12px;
-                                                    font-size: 10px;
-                                                    line-height: 1;
-                                                    font-weight: 700;
-                                                "
-                                            >
-                                                {{ $heroSubtitle }}
-                                            </span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            </table>
                         </td>
                     </tr>
                 @endif
+
+                <tr>
+                    <td
+                        style="
+                            padding: 24px 28px 22px 28px;
+                            background: #161943;
+                            color: #ffffff;
+                        "
+                    >
+                        <div
+                            style="
+                                font-size: 30px;
+                                line-height: 1.12;
+                                font-weight: 800;
+                                color: #ffffff;
+                                margin: 0 0 12px 0;
+                            "
+                        >
+                            {{ $heroTitle }}
+                        </div>
+
+                        @if(filled($heroSubtitle))
+                            <span
+                                style="
+                                    display: inline-block;
+                                    background: #ff9800;
+                                    color: #161943;
+                                    border-radius: 999px;
+                                    padding: 7px 12px;
+                                    font-size: 10px;
+                                    line-height: 1;
+                                    font-weight: 700;
+                                "
+                            >
+                                {{ $heroSubtitle }}
+                            </span>
+                        @endif
+                    </td>
+                </tr>
 
                 {{-- Main Content --}}
                 <tr>
@@ -533,15 +546,8 @@
                                 @foreach($attachments as $attachment)
                                     @php
                                         $attachmentUrl =
-                                            Storage::disk('public')->url(
-                                                ltrim(
-                                                    str_replace(
-                                                        'storage/',
-                                                        '',
-                                                        (string) $attachment->file_path
-                                                    ),
-                                                    '/'
-                                                )
+                                            $absolutePublicUrl(
+                                                $attachment->file_path
                                             );
                                     @endphp
 
@@ -580,17 +586,28 @@
                                                             line-height: 1.35;
                                                         "
                                                     >
-                                                        <a
-                                                            href="{{ $attachmentUrl }}"
-                                                            target="_blank"
-                                                            style="
-                                                                color: #a04e00;
-                                                                text-decoration: none;
-                                                                font-weight: 700;
-                                                            "
-                                                        >
-                                                            Open
-                                                        </a>
+                                                        @if(filled($attachmentUrl))
+                                                            <a
+                                                                href="{{ $attachmentUrl }}"
+                                                                target="_blank"
+                                                                style="
+                                                                    color: #a04e00;
+                                                                    text-decoration: none;
+                                                                    font-weight: 700;
+                                                                "
+                                                            >
+                                                                Open
+                                                            </a>
+                                                        @else
+                                                            <span
+                                                                style="
+                                                                    color: #9a3412;
+                                                                    font-weight: 700;
+                                                                "
+                                                            >
+                                                                Unavailable
+                                                            </span>
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             </table>

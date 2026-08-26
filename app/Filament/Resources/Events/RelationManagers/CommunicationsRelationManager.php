@@ -9,9 +9,11 @@ use App\Models\EventCommunication;
 use App\Services\EventCommunicationCampaignService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -22,6 +24,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class CommunicationsRelationManager extends RelationManager
@@ -267,8 +270,116 @@ class CommunicationsRelationManager extends RelationManager
                             )
                     ),
 
+                Action::make('sendTestEmail')
+                    ->label('Send Test Email')
+                    ->icon(
+                        'heroicon-o-envelope'
+                    )
+                    ->color('info')
+                    ->modalHeading(
+                        fn (
+                            EventCommunication $record
+                        ): string =>
+                            'Send Test Email: '
+                            . $record->title
+                    )
+                    ->modalDescription(
+                        'Send the exact Event Communication email to one address before broadcasting it to attendees.'
+                    )
+                    ->modalSubmitActionLabel(
+                        'Send Test Email'
+                    )
+                    ->form([
+                        TextInput::make('email')
+                            ->label('Test Email Address')
+                            ->email()
+                            ->required()
+                            ->default(
+                                fn (): ?string =>
+                                    auth()->user()?->email
+                            )
+                            ->placeholder(
+                                'name@example.com'
+                            ),
+                    ])
+                    ->action(
+                        function (
+                            EventCommunication $record,
+                            array $data
+                        ): void {
+                            try {
+                                $record->loadMissing([
+                                    'event.organization',
+                                    'sections',
+                                    'links',
+                                    'images',
+                                    'attachments',
+                                ]);
+
+                                $event =
+                                    $record->event
+                                    ?? $this->getOwnerRecord();
+
+                                $recipient =
+                                    (string) $data['email'];
+
+                                $subject =
+                                    '[TEST] '
+                                    . $record->title;
+
+                                Mail::send(
+                                    'emails.event-communication',
+                                    [
+                                        'subject' =>
+                                            $subject,
+
+                                        'communication' =>
+                                            $record,
+
+                                        'event' =>
+                                            $event,
+                                    ],
+                                    function ($mail) use (
+                                        $recipient,
+                                        $subject
+                                    ): void {
+                                        $mail
+                                            ->to($recipient)
+                                            ->subject($subject);
+                                    }
+                                );
+
+                                Notification::make()
+                                    ->title(
+                                        'Test email sent'
+                                    )
+                                    ->body(
+                                        'The Event Communication test email was sent to '
+                                        . $recipient
+                                        . '. Review it before broadcasting.'
+                                    )
+                                    ->success()
+                                    ->send();
+                            } catch (
+                                Throwable $exception
+                            ) {
+                                report($exception);
+
+                                Notification::make()
+                                    ->title(
+                                        'Test email could not be sent'
+                                    )
+                                    ->body(
+                                        $exception->getMessage()
+                                    )
+                                    ->danger()
+                                    ->send();
+                            }
+                        }
+                    ),
+
                 Action::make('sendCommunication')
-                    ->label('Send')
+                    ->label('Broadcast')
                     ->icon(
                         'heroicon-o-paper-airplane'
                     )
@@ -289,7 +400,7 @@ class CommunicationsRelationManager extends RelationManager
                             . $record->title
                     )
                     ->modalDescription(
-                        'Send the public communication link using the existing campaign engine.'
+                        'Broadcast this communication using the existing campaign engine. For email, send and review a test email first.'
                     )
                     ->modalWidth('2xl')
                     ->modalSubmitActionLabel(
@@ -314,6 +425,33 @@ class CommunicationsRelationManager extends RelationManager
                             ->required()
                             ->native(false)
                             ->live(),
+
+                        Checkbox::make('test_reviewed')
+                            ->label(
+                                'I have sent and reviewed a test email'
+                            )
+                            ->helperText(
+                                'Required before broadcasting an email campaign.'
+                            )
+                            ->visible(
+                                fn (
+                                    Get $get
+                                ): bool =>
+                                    ($get('channel')
+                                        ?: CommunicationTemplate::CHANNEL_EMAIL)
+                                    === CommunicationTemplate::CHANNEL_EMAIL
+                            )
+                            ->required(
+                                fn (
+                                    Get $get
+                                ): bool =>
+                                    ($get('channel')
+                                        ?: CommunicationTemplate::CHANNEL_EMAIL)
+                                    === CommunicationTemplate::CHANNEL_EMAIL
+                            )
+                            ->rules([
+                                'accepted',
+                            ]),
 
                         Select::make('audience')
                             ->label('Recipients')
