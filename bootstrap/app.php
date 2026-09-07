@@ -20,6 +20,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PROTO
                 | Request::HEADER_X_FORWARDED_AWS_ELB,
         );
+
+        /*
+         * Pesapal sends server-to-server IPN notifications.
+         * These requests do not contain Laravel CSRF tokens.
+         */
+        $middleware->validateCsrfTokens(
+            except: [
+                'payments/pesapal/ipn',
+            ],
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

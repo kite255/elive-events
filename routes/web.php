@@ -3,6 +3,9 @@
 use App\Http\Controllers\BadgePrintController;
 use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\EventCommunicationPreviewController;
+use App\Http\Controllers\Payments\PaymentController;
+use App\Http\Controllers\Payments\PesapalCallbackController;
+use App\Http\Controllers\Payments\PesapalIpnController;
 use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
@@ -93,6 +96,75 @@ Route::get(
 )
     ->middleware(['auth'])
     ->name('admin.event-communications.preview');
+
+/*
+|--------------------------------------------------------------------------
+| Online Payments
+|--------------------------------------------------------------------------
+|
+| Public payment entry point used after registration.
+|
+| The payment route uses the eLive payment reference instead of the numeric
+| database ID so public checkout URLs do not expose sequential record IDs.
+|
+| Example:
+| /payments/ELV-PAY-EBC26-260826123456-ABC123/pay
+|
+*/
+
+Route::get(
+    '/payments/{payment:reference}/pay',
+    [PaymentController::class, 'pay']
+)
+    ->middleware('throttle:30,1')
+    ->name('payments.pay');
+
+/*
+|--------------------------------------------------------------------------
+| Pesapal Browser Callback
+|--------------------------------------------------------------------------
+|
+| Pesapal redirects the attendee's browser here after checkout.
+|
+| IMPORTANT:
+| The callback itself is not proof of payment. The controller verifies the
+| transaction directly with Pesapal before updating the eLive payment.
+|
+| Production URL:
+| https://events.elive.co.tz/payments/pesapal/callback
+|
+*/
+
+Route::get(
+    '/payments/pesapal/callback',
+    PesapalCallbackController::class
+)->name('payments.pesapal.callback');
+
+/*
+|--------------------------------------------------------------------------
+| Pesapal IPN
+|--------------------------------------------------------------------------
+|
+| Server-to-server Instant Payment Notification endpoint.
+|
+| Pesapal may call this endpoint using GET or POST depending on the IPN
+| registration configuration. The controller accepts both methods and then
+| verifies the transaction using the Pesapal transaction-status endpoint.
+|
+| IMPORTANT:
+| If POST IPN is used, this URI must be excluded from Laravel CSRF
+| verification. We will configure that alongside the Pesapal sandbox setup.
+|
+| Production URL:
+| https://events.elive.co.tz/payments/pesapal/ipn
+|
+*/
+
+Route::match(
+    ['get', 'post'],
+    '/payments/pesapal/ipn',
+    PesapalIpnController::class
+)->name('payments.pesapal.ipn');
 
 /*
 |--------------------------------------------------------------------------

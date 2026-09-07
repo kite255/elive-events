@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Event extends Model
@@ -542,6 +543,92 @@ class Event extends Model
     public function checkIns(): HasMany
     {
         return $this->hasMany(CheckIn::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payments
+    |--------------------------------------------------------------------------
+    */
+
+    public function paymentSetting(): HasOne
+    {
+        return $this->hasOne(
+            EventPaymentSetting::class
+        );
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(
+            Payment::class
+        );
+    }
+
+    public function completedPayments(): HasMany
+    {
+        return $this->payments()
+            ->where(
+                'status',
+                Payment::STATUS_COMPLETED
+            );
+    }
+
+    public function paymentsAreEnabled(): bool
+    {
+        return (bool)
+            $this->paymentSetting
+            ?->payments_enabled;
+    }
+
+    public function registrationFee(): string
+    {
+        return (string) (
+            $this->paymentSetting
+            ?->registration_fee
+            ?? '0.00'
+        );
+    }
+
+    public function paymentCurrency(): string
+    {
+        return (string) (
+            $this->paymentSetting
+            ?->currency
+            ?? 'TZS'
+        );
+    }
+
+    public function requiresPaymentBeforeConfirmation(): bool
+    {
+        return $this->paymentsAreEnabled()
+            && (bool)
+                $this->paymentSetting
+                ?->payment_required_before_confirmation;
+    }
+
+    public function requiresPaymentBeforeBadge(): bool
+    {
+        return $this->paymentsAreEnabled()
+            && (bool)
+                $this->paymentSetting
+                ?->payment_required_before_badge;
+    }
+
+    public function blocksUnpaidCheckIn(): bool
+    {
+        return $this->paymentsAreEnabled()
+            && (bool)
+                $this->paymentSetting
+                ?->block_check_in_if_unpaid;
+    }
+
+    public function allowsManualPaymentConfirmation(): bool
+    {
+        return $this->paymentsAreEnabled()
+            && (bool)
+                $this->paymentSetting
+                ?->allow_manual_payment;
     }
 
     /*

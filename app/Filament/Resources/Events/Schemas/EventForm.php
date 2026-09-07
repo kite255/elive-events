@@ -981,15 +981,189 @@ class EventForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | Payment Settings
+                | Online Payment Settings
+                |--------------------------------------------------------------------------
+                |
+                | Stored in the event_payment_settings table through the
+                | Event::paymentSetting() HasOne relationship.
+                |
+                */
+
+                Section::make(
+                    'Online Payment Settings'
+                )
+                    ->description(
+                        'Configure whether this event accepts online registration payments and when payment is required.'
+                    )
+                    ->relationship(
+                        'paymentSetting'
+                    )
+                    ->schema([
+                        Toggle::make(
+                            'payments_enabled'
+                        )
+                            ->label(
+                                'Enable Online Payments'
+                            )
+                            ->helperText(
+                                'Enable this when attendees must be able to pay online for this event.'
+                            )
+                            ->default(false)
+                            ->live(),
+
+                        Select::make(
+                            'currency'
+                        )
+                            ->label('Currency')
+                            ->options([
+                                'TZS' => 'TZS - Tanzanian Shilling',
+                                'USD' => 'USD - US Dollar',
+                            ])
+                            ->default('TZS')
+                            ->required(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            )
+                            ->native(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            ),
+
+                        TextInput::make(
+                            'registration_fee'
+                        )
+                            ->label(
+                                'Registration Fee'
+                            )
+                            ->prefix(
+                                fn (Get $get): string =>
+                                    (string) (
+                                        $get('currency')
+                                        ?: 'TZS'
+                                    )
+                            )
+                            ->numeric()
+                            ->minValue(0)
+                            ->step(0.01)
+                            ->default(0)
+                            ->required(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            )
+                            ->helperText(
+                                'The base registration amount charged to one attendee for this event.'
+                            ),
+
+                        Toggle::make(
+                            'payment_required_before_confirmation'
+                        )
+                            ->label(
+                                'Require Payment Before Confirmation'
+                            )
+                            ->helperText(
+                                'Keep paid-event registrations pending until payment is verified successfully.'
+                            )
+                            ->default(true)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            ),
+
+                        Toggle::make(
+                            'payment_required_before_badge'
+                        )
+                            ->label(
+                                'Require Payment Before Badge Release'
+                            )
+                            ->helperText(
+                                'Do not release or automatically generate the attendee badge until payment is completed.'
+                            )
+                            ->default(true)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            ),
+
+                        Toggle::make(
+                            'block_check_in_if_unpaid'
+                        )
+                            ->label(
+                                'Block Check-in When Unpaid'
+                            )
+                            ->helperText(
+                                'Prevent an attendee from completing event check-in when payment is still outstanding.'
+                            )
+                            ->default(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            ),
+
+                        Toggle::make(
+                            'allow_manual_payment'
+                        )
+                            ->label(
+                                'Allow Manual Payment Confirmation'
+                            )
+                            ->helperText(
+                                'Allow authorized event or finance administrators to confirm cash, bank transfer, or other offline payments.'
+                            )
+                            ->default(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            ),
+
+                        \Filament\Forms\Components\Placeholder::make(
+                            'online_payment_status_information'
+                        )
+                            ->label('Payment Gateway')
+                            ->content(
+                                'Online payment settings are ready. Pesapal checkout, callback, IPN verification, and transaction processing will be connected in the next implementation step.'
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'payments_enabled'
+                                    )
+                            )
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Manual / Offline Payment Instructions
                 |--------------------------------------------------------------------------
                 */
 
                 Section::make(
-                    'Payment Settings'
+                    'Manual / Offline Payment Instructions'
                 )
                     ->description(
-                        'Configure event-level payment details used for paid merchandise and other payable registration items.'
+                        'Optional payment instructions for bank transfer, mobile money, cash, merchandise, or other offline payment methods.'
                     )
                     ->schema([
                         TextInput::make(
@@ -1039,12 +1213,13 @@ class EventForm
                                 'Example: Please complete payment after registration and keep your payment confirmation for verification.'
                             )
                             ->helperText(
-                                'Shown to attendees when a paid item is selected.'
+                                'Shown to attendees when an offline or manual payment method is used.'
                             )
                             ->columnSpanFull(),
                     ])
                     ->columns(2)
-                    ->collapsible(),
+                    ->collapsible()
+                    ->collapsed(),
 
                 /*
                 |--------------------------------------------------------------------------
