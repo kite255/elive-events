@@ -214,13 +214,29 @@ class PesapalService implements PaymentGateway
         $data =
             $response->json();
 
-        if (
-            ! $response->successful()
-            || filled(
-                data_get(
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                $this->errorMessage(
                     $data,
-                    'error.message'
+                    'Pesapal transaction status could not be retrieved.'
                 )
+            );
+        }
+
+        $errorMessage =
+            trim(
+                (string) data_get(
+                    $data,
+                    'error.message',
+                    ''
+                )
+            );
+
+        if (
+            $errorMessage !== ''
+            && ! str_contains(
+                Str::lower($errorMessage),
+                'pending payment'
             )
         ) {
             throw new RuntimeException(
@@ -229,6 +245,19 @@ class PesapalService implements PaymentGateway
                     'Pesapal transaction status could not be retrieved.'
                 )
             );
+        }
+
+        if (
+            $errorMessage !== ''
+            && blank(
+                data_get(
+                    $data,
+                    'payment_status_description'
+                )
+            )
+        ) {
+            $data['payment_status_description'] =
+                'PENDING';
         }
 
         return $data;
