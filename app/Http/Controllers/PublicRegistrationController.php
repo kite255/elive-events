@@ -13,6 +13,7 @@ use App\Models\MerchandiseVariant;
 use App\Services\AutomaticCommunicationService;
 use App\Services\BadgeGenerationService;
 use App\Services\PhoneNumberService;
+use App\Services\Payments\PaymentService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -86,6 +87,7 @@ class PublicRegistrationController extends Controller
         $event->load([
             'organization',
             'registrationFields',
+            'paymentSetting',
         ]);
 
         if (! $event->registration_is_open) {
@@ -298,6 +300,52 @@ class PublicRegistrationController extends Controller
         */
 
         $attendee->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Registration payment
+        |--------------------------------------------------------------------------
+        |
+        | Paid registrations are redirected to the configured payment gateway
+        | before confirmation communication and, where configured, badge release.
+        | Waitlisted and approval-pending attendees are not charged yet.
+        |
+        */
+
+        $paymentSetting = $event->paymentSetting;
+
+        $requiresPayment = (
+            $status === 'registered'
+            && $paymentSetting?->payments_enabled
+            && (float) $paymentSetting->registration_fee > 0
+        );
+
+        if ($requiresPayment) {
+            try {
+                $payment = app(PaymentService::class)
+                    ->createForAttendee($attendee);
+
+                return redirect()->route(
+                    'payments.pay',
+                    [
+                        'payment' => $payment->reference,
+                    ]
+                );
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return redirect()->route(
+                    'public.registration.success',
+                    [
+                        'event' => $event,
+                        'attendee' => $attendee,
+                    ]
+                )->with(
+                    'error',
+                    'Your registration was received, but payment could not be started. Please contact the event organizer or try again later.'
+                );
+            }
+        }
 
         if (
             $event->registration_auto_generate_badge
