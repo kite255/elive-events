@@ -249,11 +249,9 @@ class PesapalService implements PaymentGateway
 
         if (
             $errorMessage !== ''
-            && blank(
-                data_get(
-                    $data,
-                    'payment_status_description'
-                )
+            && str_contains(
+                Str::lower($errorMessage),
+                'pending payment'
             )
         ) {
             $data['payment_status_description'] =
