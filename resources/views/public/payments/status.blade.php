@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>
         Payment Status - {{ $payment->event?->name ?? 'eLive Events' }}
@@ -36,6 +40,7 @@
         body {
             margin: 0;
             min-height: 100vh;
+
             font-family:
                 Inter,
                 ui-sans-serif,
@@ -79,23 +84,38 @@
             align-items: center;
             justify-content: space-between;
 
-            gap: 20px;
+            gap: 24px;
 
             margin-bottom: 34px;
         }
 
-        .brand-name {
-            font-size: 24px;
-            font-weight: 800;
-            color: var(--elive-navy);
+        .brand-logo {
+            display: inline-flex;
+            align-items: center;
+
+            flex-shrink: 0;
+
+            text-decoration: none;
+        }
+
+        .brand-logo img {
+            display: block;
+
+            width: auto;
+            height: 52px;
+            max-width: 190px;
+
+            object-fit: contain;
         }
 
         .event-name {
             max-width: 300px;
 
             color: var(--muted);
+
             font-size: 14px;
             line-height: 1.4;
+
             text-align: right;
         }
 
@@ -173,6 +193,7 @@
 
         .detail-label {
             color: var(--muted);
+
             font-size: 14px;
         }
 
@@ -189,7 +210,6 @@
 
         .payment-status {
             display: inline-flex;
-
             align-items: center;
 
             padding: 6px 10px;
@@ -297,21 +317,33 @@
         @media (max-width: 640px) {
             .payment-page {
                 align-items: flex-start;
+
                 padding-top: 20px;
             }
 
             .payment-card {
                 padding: 26px 20px;
+
                 border-radius: 18px;
             }
 
             .brand {
                 align-items: flex-start;
                 flex-direction: column;
+
+                gap: 14px;
+
+                margin-bottom: 28px;
+            }
+
+            .brand-logo img {
+                height: 44px;
+                max-width: 165px;
             }
 
             .event-name {
                 max-width: none;
+
                 text-align: left;
             }
 
@@ -321,6 +353,7 @@
 
             .detail-row {
                 flex-direction: column;
+
                 gap: 5px;
             }
 
@@ -347,14 +380,23 @@
 
         <div class="brand">
 
-            <div class="brand-name">
-                eLive Events
-            </div>
+            <a
+                href="{{ route('home') }}"
+                class="brand-logo"
+                aria-label="eLive Events Home"
+            >
+                <img
+                    src="{{ asset('eLive-Logo.png') }}"
+                    alt="eLive Events"
+                >
+            </a>
 
             @if ($payment->event)
+
                 <div class="event-name">
                     {{ $payment->event->name }}
                 </div>
+
             @endif
 
         </div>
@@ -676,7 +718,8 @@
             <div class="notice">
                 Payment confirmation can take a short time depending
                 on the payment method. You can safely use
-                <strong>Check Again</strong> to refresh the status.
+                <strong>Check Again</strong>
+                to refresh the status.
             </div>
 
         @endif
