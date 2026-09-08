@@ -10,6 +10,7 @@ use App\Models\BadgeType;
 use App\Models\Event;
 use App\Models\EventSession;
 use App\Models\MerchandiseVariant;
+use App\Models\Payment;
 use App\Services\AutomaticCommunicationService;
 use App\Services\BadgeGenerationService;
 use App\Services\PhoneNumberService;
@@ -384,14 +385,19 @@ class PublicRegistrationController extends Controller
         );
     }
 
-    public function success(Event $event, Attendee $attendee): View
-    {
+    public function success(
+        Event $event,
+        Attendee $attendee
+    ): View {
         abort_unless(
             (int) $attendee->event_id === (int) $event->id,
             404
         );
 
-        $event->load('organization');
+        $event->load([
+            'organization',
+            'paymentSetting',
+        ]);
 
         $attendee->load([
             'eventDays',
@@ -400,12 +406,53 @@ class PublicRegistrationController extends Controller
             'merchandiseSelections.variant',
         ]);
 
-        return view('public.events.success', [
-            'event' => $event,
-            'attendee' => $attendee,
-            'branding' => $this->branding($event),
-            'registrationStats' => $this->registrationStats($event),
-        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | Registration Payment
+        |--------------------------------------------------------------------------
+        |
+        | Load the attendee's most recent payment so the success page can show:
+        | payment state and actions.
+        |
+        */
+
+        $payment = Payment::query()
+            ->where(
+                'event_id',
+                $event->id
+            )
+            ->where(
+                'attendee_id',
+                $attendee->id
+            )
+            ->latest('id')
+            ->first();
+
+        return view(
+            'public.events.success',
+            [
+                'event' => $event,
+                'attendee' => $attendee,
+                'payment' => $payment,
+
+                'paymentRequired' =>
+                    (bool) (
+                        $event->paymentSetting?->payments_enabled
+                        && (float) $event->paymentSetting
+                            ->registration_fee > 0
+                    ),
+
+                'branding' =>
+                    $this->branding(
+                        $event
+                    ),
+
+                'registrationStats' =>
+                    $this->registrationStats(
+                        $event
+                    ),
+            ]
+        );
     }
 
     protected function registrationRules(
