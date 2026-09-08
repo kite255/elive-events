@@ -3,6 +3,7 @@
 namespace App\Services\Payments;
 
 use App\Contracts\PaymentGateway as PaymentGatewayContract;
+use App\Jobs\FulfillCompletedPayment;
 use App\Models\Attendee;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
@@ -49,7 +50,8 @@ class PaymentService
             );
         }
 
-        $amount = (float) $settings->registration_fee;
+        $amount =
+            (float) $settings->registration_fee;
 
         if ($amount <= 0) {
             throw new RuntimeException(
@@ -72,7 +74,7 @@ class PaymentService
             ): Payment {
                 /*
                  * Reuse an existing unpaid registration payment
-                 * instead of generating duplicates when the
+                 * instead of creating duplicates when an
                  * attendee retries.
                  */
                 $existing =
@@ -157,7 +159,8 @@ class PaymentService
             'gateway'
         );
 
-        $gatewayModel = $payment->gateway;
+        $gatewayModel =
+            $payment->gateway;
 
         if (! $gatewayModel) {
             throw new RuntimeException(
@@ -183,8 +186,8 @@ class PaymentService
                 );
 
             /*
-             * Never accept an order response whose merchant
-             * reference differs from our local payment.
+             * Verify merchant reference returned during
+             * SubmitOrderRequest.
              */
             $returnedReference =
                 trim(
@@ -207,6 +210,9 @@ class PaymentService
                 );
             }
 
+            /*
+             * Pesapal must return an order tracking ID.
+             */
             $trackingId =
                 trim(
                     (string) data_get(
@@ -222,6 +228,9 @@ class PaymentService
                 );
             }
 
+            /*
+             * Pesapal must return a checkout URL.
+             */
             $redirectUrl =
                 trim(
                     (string) data_get(
@@ -251,6 +260,16 @@ class PaymentService
                             ->findOrFail(
                                 $payment->getKey()
                             );
+
+                    /*
+                     * Do not accidentally restart an already
+                     * completed transaction.
+                     */
+                    if ($lockedPayment->isCompleted()) {
+                        throw new RuntimeException(
+                            'This payment is already completed.'
+                        );
+                    }
 
                     $lockedPayment->update([
                         'status' =>
@@ -293,20 +312,32 @@ class PaymentService
 
             return $response;
         } catch (Throwable $exception) {
-            $payment
-                ->transactions()
-                ->create([
-                    'type' =>
-                        PaymentTransaction::TYPE_ORDER_CREATED,
+            /*
+             * Record order creation failure for troubleshooting
+             * and reconciliation.
+             */
+            try {
+                $payment
+                    ->transactions()
+                    ->create([
+                        'type' =>
+                            PaymentTransaction::TYPE_ORDER_CREATED,
 
-                    'status' =>
-                        'failed',
+                        'status' =>
+                            'failed',
 
-                    'error_message' =>
-                        $exception->getMessage(),
-                ]);
+                        'error_message' =>
+                            $exception->getMessage(),
+                    ]);
+            } catch (Throwable $loggingException) {
+                report(
+                    $loggingException
+                );
+            }
 
-            report($exception);
+            report(
+                $exception
+            );
 
             throw $exception;
         }
@@ -354,8 +385,8 @@ class PaymentService
             );
 
         /*
-         * Always ask the payment gateway for the authoritative
-         * transaction status.
+         * Always ask the gateway for the authoritative
+         * transaction state.
          */
         $response =
             $gateway->getPaymentStatus(
@@ -363,8 +394,8 @@ class PaymentService
             );
 
         /*
-         * Verify the response belongs to this payment before
-         * accepting any status change.
+         * Never change local payment state before verifying
+         * that the response belongs to this exact payment.
          */
         $this->verifyGatewayResponse(
             $payment,
@@ -399,36 +430,174 @@ class PaymentService
                     Payment::STATUS_PROCESSING,
             };
 
-        DB::transaction(
-            function () use (
-                $payment,
-                $trackingId,
-                $response,
-                $gatewayStatus,
-                $localStatus
-            ): void {
-                /*
-                 * Callback and IPN can arrive at nearly the
-                 * same time. Lock the payment while updating it.
-                 */
-                $lockedPayment =
-                    Payment::query()
-                        ->lockForUpdate()
-                        ->findOrFail(
-                            $payment->getKey()
+        /*
+         * This value is returned from inside the row lock.
+         *
+         * Only the process that actually changes:
+         *
+         * processing -> completed
+         *
+         * should dispatch fulfillment.
+         */
+        $transitionedToCompleted =
+            DB::transaction(
+                function () use (
+                    $payment,
+                    $trackingId,
+                    $response,
+                    $gatewayStatus,
+                    $localStatus
+                ): bool {
+                    /*
+                     * Callback and IPN may arrive at nearly the
+                     * same time. Lock the payment row.
+                     */
+                    $lockedPayment =
+                        Payment::query()
+                            ->lockForUpdate()
+                            ->findOrFail(
+                                $payment->getKey()
+                            );
+
+                    $previousStatus =
+                        $lockedPayment->status;
+
+                    /*
+                     * Never downgrade a payment that has already
+                     * been completed.
+                     *
+                     * Example:
+                     *
+                     * COMPLETED
+                     *     ↓
+                     * stale PENDING response
+                     *
+                     * must remain COMPLETED.
+                     */
+                    if (
+                        $previousStatus
+                        === Payment::STATUS_COMPLETED
+                        && $localStatus
+                        !== Payment::STATUS_COMPLETED
+                    ) {
+                        $lockedPayment
+                            ->transactions()
+                            ->create([
+                                'type' =>
+                                    PaymentTransaction::TYPE_PAYMENT_STATUS,
+
+                                'provider_reference' =>
+                                    $trackingId,
+
+                                'response_payload' =>
+                                    $response,
+
+                                'status' =>
+                                    Payment::STATUS_COMPLETED,
+                            ]);
+
+                        return false;
+                    }
+
+                    $confirmationCode =
+                        trim(
+                            (string) data_get(
+                                $response,
+                                'confirmation_code',
+                                ''
+                            )
                         );
 
-                /*
-                 * Do not allow a previously completed payment
-                 * to be downgraded by a later stale PENDING
-                 * response.
-                 */
-                if (
-                    $lockedPayment->status
-                    === Payment::STATUS_COMPLETED
-                    && $localStatus
-                    !== Payment::STATUS_COMPLETED
-                ) {
+                    $paymentMethod =
+                        trim(
+                            (string) data_get(
+                                $response,
+                                'payment_method',
+                                ''
+                            )
+                        );
+
+                    $paymentAccount =
+                        trim(
+                            (string) data_get(
+                                $response,
+                                'payment_account',
+                                ''
+                            )
+                        );
+
+                    $attributes = [
+                        'provider_tracking_id' =>
+                            $trackingId,
+
+                        /*
+                         * provider_reference remains the merchant
+                         * reference generated by eLive.
+                         *
+                         * Pesapal confirmation code is stored
+                         * separately in metadata.
+                         */
+                        'provider_reference' =>
+                            $lockedPayment
+                                ->provider_reference,
+
+                        'payment_method' =>
+                            $paymentMethod,
+
+                        'status' =>
+                            $localStatus,
+
+                        'metadata' =>
+                            array_merge(
+                                $lockedPayment->metadata
+                                    ?? [],
+                                [
+                                    'pesapal_status' =>
+                                        $gatewayStatus,
+
+                                    'pesapal_status_code' =>
+                                        data_get(
+                                            $response,
+                                            'status_code'
+                                        ),
+
+                                    'pesapal_payment_account' =>
+                                        $paymentAccount,
+
+                                    'pesapal_confirmation_code' =>
+                                        $confirmationCode,
+                                ]
+                            ),
+                    ];
+
+                    if (
+                        $localStatus
+                        === Payment::STATUS_COMPLETED
+                    ) {
+                        $attributes['paid_at'] =
+                            $lockedPayment->paid_at
+                            ?? now();
+
+                        $attributes['failed_at'] =
+                            null;
+
+                        $attributes['cancelled_at'] =
+                            null;
+                    }
+
+                    if (
+                        $localStatus
+                        === Payment::STATUS_FAILED
+                    ) {
+                        $attributes['failed_at'] =
+                            $lockedPayment->failed_at
+                            ?? now();
+                    }
+
+                    $lockedPayment->update(
+                        $attributes
+                    );
+
                     $lockedPayment
                         ->transactions()
                         ->create([
@@ -442,138 +611,51 @@ class PaymentService
                                 $response,
 
                             'status' =>
-                                Payment::STATUS_COMPLETED,
+                                $localStatus,
                         ]);
 
-                    return;
-                }
-
-                $confirmationCode =
-                    trim(
-                        (string) data_get(
-                            $response,
-                            'confirmation_code',
-                            ''
-                        )
-                    );
-
-                $paymentMethod =
-                    trim(
-                        (string) data_get(
-                            $response,
-                            'payment_method',
-                            ''
-                        )
-                    );
-
-                $paymentAccount =
-                    trim(
-                        (string) data_get(
-                            $response,
-                            'payment_account',
-                            ''
-                        )
-                    );
-
-                $attributes = [
-                    'provider_tracking_id' =>
-                        $trackingId,
-
                     /*
-                     * Keep provider_reference stable as the
-                     * merchant reference. Store Pesapal's
-                     * confirmation code in metadata.
+                     * True only when THIS transaction performed
+                     * the first transition into completed.
                      */
-                    'provider_reference' =>
-                        $lockedPayment
-                            ->provider_reference,
-
-                    'payment_method' =>
-                        $paymentMethod,
-
-                    'status' =>
-                        $localStatus,
-
-                    'metadata' =>
-                        array_merge(
-                            $lockedPayment->metadata
-                                ?? [],
-                            [
-                                'pesapal_status' =>
-                                    $gatewayStatus,
-
-                                'pesapal_status_code' =>
-                                    data_get(
-                                        $response,
-                                        'status_code'
-                                    ),
-
-                                'pesapal_payment_account' =>
-                                    $paymentAccount,
-
-                                'pesapal_confirmation_code' =>
-                                    $confirmationCode,
-                            ]
-                        ),
-                ];
-
-                if (
-                    $localStatus
-                    === Payment::STATUS_COMPLETED
-                ) {
-                    $attributes['paid_at'] =
-                        $lockedPayment->paid_at
-                        ?? now();
-
-                    $attributes['failed_at'] =
-                        null;
-
-                    $attributes['cancelled_at'] =
-                        null;
+                    return (
+                        $previousStatus
+                        !== Payment::STATUS_COMPLETED
+                        && $localStatus
+                        === Payment::STATUS_COMPLETED
+                    );
                 }
+            );
 
-                if (
-                    $localStatus
-                    === Payment::STATUS_FAILED
-                ) {
-                    $attributes['failed_at'] =
-                        $lockedPayment->failed_at
-                        ?? now();
-                }
-
-                $lockedPayment->update(
-                    $attributes
-                );
-
-                $lockedPayment
-                    ->transactions()
-                    ->create([
-                        'type' =>
-                            PaymentTransaction::TYPE_PAYMENT_STATUS,
-
-                        'provider_reference' =>
-                            $trackingId,
-
-                        'response_payload' =>
-                            $response,
-
-                        'status' =>
-                            $localStatus,
-                    ]);
-            }
-        );
+        $payment =
+            $payment->fresh();
 
         /*
-         * Attendee confirmation, badge release and
-         * communications will be connected after payment
-         * fulfillment is implemented.
+         * Dispatch fulfillment only after the database
+         * transaction has committed successfully.
+         *
+         * Duplicate callback/IPN requests will not dispatch
+         * another job because only the first request performs
+         * the transition to completed.
          */
-        return $payment->fresh();
+        if (
+            $transitionedToCompleted
+            && $payment->isCompleted()
+            && ! $payment->isFulfilled()
+        ) {
+            FulfillCompletedPayment::dispatch(
+                $payment->getKey()
+            )->onQueue(
+                'payments'
+            );
+        }
+
+        return $payment;
     }
 
     /**
-     * Verify that a payment-gateway response belongs to
-     * the exact local eLive payment being synchronized.
+     * Verify that a payment-gateway response belongs
+     * to the exact local eLive payment being synchronized.
      */
     private function verifyGatewayResponse(
         Payment $payment,
@@ -605,7 +687,7 @@ class PaymentService
         }
 
         /*
-         * 2. Verify order tracking ID.
+         * 2. Verify returned order tracking ID.
          */
         $responseTrackingId =
             trim(
@@ -629,8 +711,8 @@ class PaymentService
         }
 
         /*
-         * If this payment already has a provider tracking ID,
-         * the incoming tracking ID must also match it.
+         * If this local payment already has a provider tracking
+         * ID, the incoming tracking ID must match it.
          */
         if (
             filled(
@@ -678,10 +760,7 @@ class PaymentService
         }
 
         /*
-         * 4. Verify amount using BCMath.
-         *
-         * Never trust a COMPLETED status where the gateway
-         * amount differs from the registration amount.
+         * 4. Verify amount.
          */
         $gatewayAmount =
             data_get(
@@ -698,6 +777,10 @@ class PaymentService
             );
         }
 
+        /*
+         * Normalize both values to exactly two decimal places
+         * before comparing with BCMath.
+         */
         $normalizedGatewayAmount =
             number_format(
                 (float) $gatewayAmount,
@@ -728,7 +811,7 @@ class PaymentService
     }
 
     /**
-     * Resolve the gateway service implementation.
+     * Resolve the gateway implementation.
      */
     public function gatewayFor(
         PaymentGateway $gateway

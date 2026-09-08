@@ -33,6 +33,7 @@ class Payment extends Model
         'description',
         'initiated_at',
         'paid_at',
+        'fulfilled_at',
         'failed_at',
         'cancelled_at',
         'metadata',
@@ -44,6 +45,7 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'initiated_at' => 'datetime',
             'paid_at' => 'datetime',
+            'fulfilled_at' => 'datetime',
             'failed_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'metadata' => 'array',
@@ -67,21 +69,56 @@ class Payment extends Model
 
     public function gateway(): BelongsTo
     {
-        return $this->belongsTo(PaymentGateway::class, 'payment_gateway_id');
+        return $this->belongsTo(
+            PaymentGateway::class,
+            'payment_gateway_id'
+        );
     }
 
     public function transactions(): HasMany
     {
-        return $this->hasMany(PaymentTransaction::class);
+        return $this->hasMany(
+            PaymentTransaction::class
+        );
     }
 
-    public function scopeCompleted(Builder $query): Builder
-    {
-        return $query->where('status', self::STATUS_COMPLETED);
+    public function scopeCompleted(
+        Builder $query
+    ): Builder {
+        return $query->where(
+            'status',
+            self::STATUS_COMPLETED
+        );
     }
 
     public function isCompleted(): bool
     {
-        return $this->status === self::STATUS_COMPLETED;
+        return $this->status
+            === self::STATUS_COMPLETED;
+    }
+
+    public function isFulfilled(): bool
+    {
+        return filled(
+            $this->fulfilled_at
+        );
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status
+            === self::STATUS_PENDING;
+    }
+
+    public function isProcessing(): bool
+    {
+        return $this->status
+            === self::STATUS_PROCESSING;
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status
+            === self::STATUS_FAILED;
     }
 }
