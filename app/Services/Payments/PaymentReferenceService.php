@@ -9,48 +9,43 @@ use Illuminate\Support\Str;
 class PaymentReferenceService
 {
     /**
-     * Generate an eLive merchant reference accepted by Pesapal API 3.0.
-     *
-     * Pesapal allows letters, numbers, dash, underscore, dot and colon,
-     * with a maximum length of 50 characters.
+     * Generate a unique eLive merchant reference
+     * suitable for Pesapal API 3.0.
      */
-    public function generate(
-        Event $event
-    ): string {
+    public function generate(Event $event): string
+    {
         do {
-            $eventCode =
-                filled($event->event_code)
-                    ? Str::upper(
-                        preg_replace(
-                            '/[^A-Za-z0-9_-]/',
-                            '',
-                            (string) $event->event_code
-                        )
+            $eventCode = filled($event->event_code)
+                ? Str::upper(
+                    preg_replace(
+                        '/[^A-Za-z0-9_-]/',
+                        '',
+                        (string) $event->event_code
                     )
-                    : 'EV' . $event->getKey();
+                )
+                : 'EV' . $event->getKey();
 
-            $reference =
-                'ELV-PAY-'
-                . $eventCode
-                . '-'
-                . now()->format('ymdHis')
-                . '-'
-                . Str::upper(
-                    Str::random(6)
-                );
+            $eventCode = Str::limit(
+                $eventCode,
+                12,
+                ''
+            );
 
-            $reference =
-                Str::limit(
-                    $reference,
-                    50,
-                    ''
-                );
+            $reference = sprintf(
+                'ELV-PAY-%s-%s-%s',
+                $eventCode,
+                now()->format('ymdHis'),
+                Str::upper(Str::random(6))
+            );
+
+            $reference = Str::limit(
+                $reference,
+                50,
+                ''
+            );
         } while (
             Payment::query()
-                ->where(
-                    'reference',
-                    $reference
-                )
+                ->where('reference', $reference)
                 ->exists()
         );
 
