@@ -4,20 +4,28 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
+
     working_dir: /var/www/html
+
     volumes:
       - elive_storage:/var/www/html/storage
+
     depends_on:
       - postgres
       - redis
+
 
   worker-communications-email:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
+
     working_dir: /var/www/html
+
     command: >
       php artisan queue:work redis
       --queue=communications-email
@@ -26,18 +34,24 @@ services:
       --backoff=30
       --timeout=120
       --max-time=3600
+
     volumes:
       - elive_storage:/var/www/html/storage
+
     depends_on:
       - postgres
       - redis
+
 
   worker-communications-sms:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
+
     working_dir: /var/www/html
+
     command: >
       php artisan queue:work redis
       --queue=communications-sms
@@ -46,18 +60,24 @@ services:
       --backoff=30
       --timeout=120
       --max-time=3600
+
     volumes:
       - elive_storage:/var/www/html/storage
+
     depends_on:
       - postgres
       - redis
+
 
   worker-communications-whatsapp:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
+
     working_dir: /var/www/html
+
     command: >
       php artisan queue:work redis
       --queue=communications-whatsapp
@@ -66,18 +86,24 @@ services:
       --backoff=30
       --timeout=120
       --max-time=3600
+
     volumes:
       - elive_storage:/var/www/html/storage
+
     depends_on:
       - postgres
       - redis
+
 
   worker-badges:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
+
     working_dir: /var/www/html
+
     command: >
       php artisan queue:work redis
       --queue=badges
@@ -86,18 +112,50 @@ services:
       --backoff=30
       --timeout=300
       --max-time=3600
+
     volumes:
       - elive_storage:/var/www/html/storage
+
     depends_on:
       - postgres
       - redis
+
+
+  worker-payments:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    command: >
+      php artisan queue:work redis
+      --queue=payments
+      --sleep=2
+      --tries=5
+      --backoff=30
+      --timeout=120
+      --max-time=3600
+
+    volumes:
+      - elive_storage:/var/www/html/storage
+
+    depends_on:
+      - postgres
+      - redis
+
 
   worker-default:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
+
     working_dir: /var/www/html
+
     command: >
       php artisan queue:work redis
       --queue=default
@@ -106,37 +164,51 @@ services:
       --backoff=30
       --timeout=120
       --max-time=3600
+
     volumes:
       - elive_storage:/var/www/html/storage
+
     depends_on:
       - postgres
       - redis
+
 
   nginx:
     build:
       context: .
       dockerfile: docker/nginx/Dockerfile
+
     restart: unless-stopped
+
     depends_on:
       - app
+
     volumes:
       - elive_storage:/var/www/html/storage:ro
+
     expose:
       - "80"
 
+
   postgres:
     image: postgres:16
+
     restart: unless-stopped
+
     environment:
       POSTGRES_DB: elive_events
       POSTGRES_USER: elive_user
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+
     volumes:
       - elive_postgres_data:/var/lib/postgresql/data
 
+
   redis:
     image: redis:7-alpine
+
     restart: unless-stopped
+
 
 volumes:
   elive_postgres_data:
