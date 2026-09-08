@@ -121,6 +121,33 @@ Route::get(
 
 /*
 |--------------------------------------------------------------------------
+| Public Payment Status
+|--------------------------------------------------------------------------
+|
+| Public attendee-facing payment result page.
+|
+| This page can display:
+| - successful payments
+| - payments still processing
+| - failed payments
+| - cancelled payments
+|
+| It uses the eLive payment reference instead of the numeric database ID.
+|
+| Example:
+| /payments/ELV-PAY-EBC26-260826123456-ABC123/status
+|
+*/
+
+Route::get(
+    '/payments/{payment:reference}/status',
+    [PaymentController::class, 'status']
+)
+    ->middleware('throttle:60,1')
+    ->name('payments.status');
+
+/*
+|--------------------------------------------------------------------------
 | Pesapal Browser Callback
 |--------------------------------------------------------------------------
 |
@@ -129,6 +156,9 @@ Route::get(
 | IMPORTANT:
 | The callback itself is not proof of payment. The controller verifies the
 | transaction directly with Pesapal before updating the eLive payment.
+|
+| After verification, the attendee is redirected to the branded
+| public payment status page.
 |
 | Production URL:
 | https://events.elive.co.tz/payments/pesapal/callback
@@ -152,8 +182,8 @@ Route::get(
 | verifies the transaction using the Pesapal transaction-status endpoint.
 |
 | IMPORTANT:
-| If POST IPN is used, this URI must be excluded from Laravel CSRF
-| verification. We will configure that alongside the Pesapal sandbox setup.
+| If POST IPN is used, this URI must remain excluded from Laravel CSRF
+| verification.
 |
 | Production URL:
 | https://events.elive.co.tz/payments/pesapal/ipn
@@ -182,13 +212,23 @@ Route::match(
 
 Route::get('/events/{event:slug}', function (Event $event) {
     abort_if(
-        in_array($event->status, ['draft', 'cancelled'], true),
+        in_array(
+            $event->status,
+            [
+                'draft',
+                'cancelled',
+            ],
+            true
+        ),
         404
     );
 
-    return view('public.events.show', [
-        'event' => $event,
-    ]);
+    return view(
+        'public.events.show',
+        [
+            'event' => $event,
+        ]
+    );
 })->name('public.events.show');
 
 /*

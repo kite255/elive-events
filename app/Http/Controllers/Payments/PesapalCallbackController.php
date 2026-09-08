@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Payments;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Payments\PaymentService;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Throwable;
 
@@ -19,27 +19,33 @@ class PesapalCallbackController extends Controller
     /**
      * Browser callback after the customer leaves Pesapal.
      *
-     * Pesapal does not send the payment status in this callback, therefore
-     * eLive verifies the transaction using GetTransactionStatus first.
+     * The callback itself is not proof of payment.
+     * eLive verifies the transaction directly with Pesapal
+     * before redirecting the attendee to the public payment
+     * status page.
      */
     public function __invoke(
         Request $request
-    ): JsonResponse {
+    ): RedirectResponse {
         $trackingId =
-            (string) $request->query(
-                'OrderTrackingId',
-                ''
+            trim(
+                (string) $request->query(
+                    'OrderTrackingId',
+                    ''
+                )
             );
 
         $merchantReference =
-            (string) $request->query(
-                'OrderMerchantReference',
-                ''
+            trim(
+                (string) $request->query(
+                    'OrderMerchantReference',
+                    ''
+                )
             );
 
         abort_if(
-            blank($trackingId)
-            || blank($merchantReference),
+            $trackingId === ''
+            || $merchantReference === '',
             422,
             'Invalid Pesapal callback.'
         );
@@ -59,42 +65,24 @@ class PesapalCallbackController extends Controller
                         $payment,
                         $trackingId
                     );
-
-            /*
-             * Temporary development response.
-             * In the next step this will redirect to a branded
-             * success / pending / failed payment page.
-             */
-            return response()->json([
-                'payment_reference' =>
-                    $payment->reference,
-
-                'status' =>
-                    $payment->status,
-
-                'amount' =>
-                    $payment->amount,
-
-                'currency' =>
-                    $payment->currency,
-
-                'provider_tracking_id' =>
-                    $payment
-                        ->provider_tracking_id,
-            ]);
         } catch (Throwable $exception) {
+            /*
+             * Keep the attendee experience available even if
+             * Pesapal verification temporarily fails.
+             *
+             * The payment status page will display the most
+             * recent locally stored payment state.
+             */
             report($exception);
 
-            return response()->json(
-                [
-                    'message' =>
-                        'Payment verification could not be completed.',
-
-                    'payment_reference' =>
-                        $payment->reference,
-                ],
-                502
-            );
+            $payment =
+                $payment->fresh();
         }
+
+        return redirect()
+            ->route(
+                'payments.status',
+                $payment
+            );
     }
 }
