@@ -22,6 +22,7 @@ class Payment extends Model
         'organization_id',
         'event_id',
         'attendee_id',
+        'ticket_order_id',
         'payment_gateway_id',
         'reference',
         'provider_reference',
@@ -54,17 +55,30 @@ class Payment extends Model
 
     public function organization(): BelongsTo
     {
-        return $this->belongsTo(Organization::class);
+        return $this->belongsTo(
+            Organization::class
+        );
     }
 
     public function event(): BelongsTo
     {
-        return $this->belongsTo(Event::class);
+        return $this->belongsTo(
+            Event::class
+        );
     }
 
     public function attendee(): BelongsTo
     {
-        return $this->belongsTo(Attendee::class);
+        return $this->belongsTo(
+            Attendee::class
+        );
+    }
+
+    public function ticketOrder(): BelongsTo
+    {
+        return $this->belongsTo(
+            TicketOrder::class
+        );
     }
 
     public function gateway(): BelongsTo

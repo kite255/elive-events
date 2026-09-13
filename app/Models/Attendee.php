@@ -378,6 +378,27 @@ class Attendee extends Model
             );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ticketing
+    |--------------------------------------------------------------------------
+    */
+
+    public function ticketOrders(): HasMany
+    {
+        return $this->hasMany(
+            TicketOrder::class
+        );
+    }
+
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(
+            Ticket::class
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Attendance and Communication

@@ -1,0 +1,126 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+class TicketOrder extends Model
+{
+    use HasFactory;
+
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_PROCESSING = 'processing';
+    public const STATUS_PAID = 'paid';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_EXPIRED = 'expired';
+    public const STATUS_REFUNDED = 'refunded';
+    public const STATUS_PARTIALLY_REFUNDED = 'partially_refunded';
+
+    protected $fillable = [
+        'event_id',
+        'attendee_id',
+        'order_number',
+        'buyer_name',
+        'buyer_phone',
+        'buyer_email',
+        'quantity',
+        'subtotal',
+        'discount_amount',
+        'total',
+        'currency',
+        'status',
+        'paid_at',
+        'expires_at',
+        'metadata',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'quantity' => 'integer',
+            'subtotal' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
+            'total' => 'decimal:2',
+            'paid_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'metadata' => 'array',
+        ];
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
+    }
+
+    public function attendee(): BelongsTo
+    {
+        return $this->belongsTo(Attendee::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(
+            TicketOrderItem::class
+        );
+    }
+
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(
+            Ticket::class
+        );
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(
+            Payment::class
+        );
+    }
+
+    public function latestPayment(): HasOne
+    {
+        return $this->hasOne(
+            Payment::class
+        )->latestOfMany();
+    }
+
+    public function isPending(): bool
+    {
+        return in_array(
+            $this->status,
+            [
+                self::STATUS_PENDING,
+                self::STATUS_PROCESSING,
+            ],
+            true
+        );
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status
+            === self::STATUS_PAID;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status
+            === self::STATUS_CANCELLED;
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->status
+            === self::STATUS_EXPIRED;
+    }
+
+    public function canIssueTickets(): bool
+    {
+        return $this->isPaid();
+    }
+}
