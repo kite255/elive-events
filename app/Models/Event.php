@@ -545,6 +545,105 @@ class Event extends Model
         return $this->hasMany(CheckIn::class);
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ticketing
+    |--------------------------------------------------------------------------
+    */
+
+    public function ticketTypes(): HasMany
+    {
+        return $this->hasMany(TicketType::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function activeTicketTypes(): HasMany
+    {
+        return $this->ticketTypes()
+            ->where('is_active', true);
+    }
+
+    public function publicTicketTypes(): HasMany
+    {
+        return $this->ticketTypes()
+            ->where('is_active', true)
+            ->where('is_public', true);
+    }
+
+    public function ticketOrders(): HasMany
+    {
+        return $this->hasMany(TicketOrder::class);
+    }
+
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
+    public function issuedTickets(): HasMany
+    {
+        return $this->tickets()
+            ->where(
+                'status',
+                Ticket::STATUS_ISSUED
+            );
+    }
+
+    public function usedTickets(): HasMany
+    {
+        return $this->tickets()
+            ->where(
+                'status',
+                Ticket::STATUS_USED
+            );
+    }
+
+    public function paidTicketOrders(): HasMany
+    {
+        return $this->ticketOrders()
+            ->where(
+                'status',
+                TicketOrder::STATUS_PAID
+            );
+    }
+
+    public function ticketSalesAmount(): float
+    {
+        return (float) $this
+            ->paidTicketOrders()
+            ->sum('total');
+    }
+
+    public function ticketsSoldCount(): int
+    {
+        return $this
+            ->tickets()
+            ->whereNotIn(
+                'status',
+                [
+                    Ticket::STATUS_CANCELLED,
+                    Ticket::STATUS_REFUNDED,
+                ]
+            )
+            ->count();
+    }
+
+    public function ticketsUsedCount(): int
+    {
+        return $this
+            ->usedTickets()
+            ->count();
+    }
+
+    public function hasTicketing(): bool
+    {
+        return $this
+            ->ticketTypes()
+            ->exists();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Payments
@@ -621,6 +720,29 @@ class Event extends Model
             && (bool)
                 $this->paymentSetting
                 ?->block_check_in_if_unpaid;
+    }
+
+    public function attendeeHasCompletedPayment(
+        Attendee $attendee
+    ): bool {
+        if (
+            (int) $attendee->event_id
+            !== (int) $this->getKey()
+        ) {
+            return false;
+        }
+
+        return $this
+            ->payments()
+            ->where(
+                'attendee_id',
+                $attendee->getKey()
+            )
+            ->where(
+                'status',
+                Payment::STATUS_COMPLETED
+            )
+            ->exists();
     }
 
     public function allowsManualPaymentConfirmation(): bool
