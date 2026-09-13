@@ -2,6 +2,7 @@ services:
 
   app:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     build:
       context: .
@@ -21,6 +22,7 @@ services:
 
   scheduler:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     restart: unless-stopped
 
@@ -39,6 +41,7 @@ services:
 
   worker-communications-email:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     restart: unless-stopped
 
@@ -63,6 +66,7 @@ services:
 
   worker-communications-sms:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     restart: unless-stopped
 
@@ -87,6 +91,7 @@ services:
 
   worker-communications-whatsapp:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     restart: unless-stopped
 
@@ -111,6 +116,7 @@ services:
 
   worker-badges:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     restart: unless-stopped
 
@@ -135,6 +141,7 @@ services:
 
   worker-payments:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     restart: unless-stopped
 
@@ -159,6 +166,7 @@ services:
 
   worker-default:
     image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+    pull_policy: never
 
     restart: unless-stopped
 
