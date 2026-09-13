@@ -15,6 +15,47 @@ services:
     networks:
       - elive_events_network
 
+  worker-payments:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: elive_events_worker_payments
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: >
+      php artisan queue:work redis
+      --queue=payments
+      --sleep=2
+      --tries=5
+      --backoff=30
+      --timeout=120
+      --max-time=3600
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - elive_events_network
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: elive_events_scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan schedule:work
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - elive_events_network
+
   nginx:
     image: nginx:alpine
     container_name: elive_events_nginx

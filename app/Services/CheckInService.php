@@ -58,6 +58,7 @@ class CheckInService
                 $lockedAttendee = Attendee::query()
                     ->with([
                         'event.organization',
+                        'event.paymentSetting',
                         'eventDays',
                         'eventSessions',
                     ])
@@ -85,6 +86,15 @@ class CheckInService
 
                 if (! $eligibilityResult['success']) {
                     return $eligibilityResult;
+                }
+
+                $paymentEligibilityResult =
+                    $this->validatePaymentEligibility(
+                        $lockedAttendee
+                    );
+
+                if (! $paymentEligibilityResult['success']) {
+                    return $paymentEligibilityResult;
                 }
 
                 $eventDayResult = $this->resolveEventDay(
@@ -444,6 +454,54 @@ class CheckInService
         return [
             'success' => true,
             'status' => 'eligible',
+        ];
+    }
+
+    /**
+     * Validate payment eligibility before check-in.
+     *
+     * Payment only blocks check-in when the event explicitly enables
+     * the "block unpaid check-in" rule. A completed payment belonging
+     * to this attendee and this event is required.
+     */
+    private function validatePaymentEligibility(
+        Attendee $attendee
+    ): array {
+        $event = $attendee->event;
+
+        if (! $event) {
+            return $this->failure(
+                status: 'event_not_found',
+                message: 'The attendee is not linked to a valid event.',
+                attendee: $attendee
+            );
+        }
+
+        if (! $event->blocksUnpaidCheckIn()) {
+            return [
+                'success' => true,
+                'status' => 'payment_not_required_for_check_in',
+            ];
+        }
+
+        if (
+            ! $event->attendeeHasCompletedPayment(
+                $attendee
+            )
+        ) {
+            return $this->failure(
+                status: 'payment_required',
+                message: sprintf(
+                    '%s cannot be checked in because payment is still outstanding.',
+                    $attendee->full_name
+                ),
+                attendee: $attendee
+            );
+        }
+
+        return [
+            'success' => true,
+            'status' => 'payment_completed',
         ];
     }
 
