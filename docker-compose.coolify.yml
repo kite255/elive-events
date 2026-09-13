@@ -1,6 +1,8 @@
 services:
 
   app:
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+
     build:
       context: .
       dockerfile: Dockerfile
@@ -17,10 +19,26 @@ services:
       - redis
 
 
+  scheduler:
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
+
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    command: >
+      php artisan schedule:work
+
+    volumes:
+      - elive_storage:/var/www/html/storage
+
+    depends_on:
+      - postgres
+      - redis
+
+
   worker-communications-email:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
 
     restart: unless-stopped
 
@@ -44,9 +62,7 @@ services:
 
 
   worker-communications-sms:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
 
     restart: unless-stopped
 
@@ -70,9 +86,7 @@ services:
 
 
   worker-communications-whatsapp:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
 
     restart: unless-stopped
 
@@ -96,9 +110,7 @@ services:
 
 
   worker-badges:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
 
     restart: unless-stopped
 
@@ -122,9 +134,7 @@ services:
 
 
   worker-payments:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
 
     restart: unless-stopped
 
@@ -148,9 +158,7 @@ services:
 
 
   worker-default:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "${COOLIFY_RESOURCE_UUID:-elive-events}-app"
 
     restart: unless-stopped
 
