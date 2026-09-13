@@ -60,5 +60,5 @@ Artisan::command('payments:reconcile', function () {
 );
 
 Schedule::command('payments:reconcile')
-    ->everyFiveMinutes()
+    ->everyMinute()
     ->withoutOverlapping();
