@@ -7,58 +7,105 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+    $this->comment(
+        Inspiring::quote()
+    );
+})->purpose(
+    'Display an inspiring quote'
+);
 
-Artisan::command('payments:reconcile', function () {
-    $paymentService = app(PaymentService::class);
+Artisan::command(
+    'payments:reconcile',
+    function () {
+        $paymentService =
+            app(
+                PaymentService::class
+            );
 
-    $processed = 0;
-    $failed = 0;
+        $processed = 0;
+        $failed = 0;
 
-    Payment::query()
-        ->whereIn('status', [
-            Payment::STATUS_PENDING,
-            Payment::STATUS_PROCESSING,
-        ])
-        ->whereNotNull('provider_tracking_id')
-        ->where('provider_tracking_id', '<>', '')
-        ->chunkById(
-            100,
-            function ($payments) use (
-                $paymentService,
-                &$processed,
-                &$failed
-            ): void {
-                foreach ($payments as $payment) {
-                    try {
-                        $paymentService->syncFromGateway(
-                            $payment
-                        );
+        Payment::query()
+            ->whereIn(
+                'status',
+                [
+                    Payment::STATUS_PENDING,
+                    Payment::STATUS_PROCESSING,
+                ]
+            )
+            ->whereNotNull(
+                'provider_tracking_id'
+            )
+            ->where(
+                'provider_tracking_id',
+                '<>',
+                ''
+            )
+            ->chunkById(
+                100,
+                function ($payments) use (
+                    $paymentService,
+                    &$processed,
+                    &$failed
+                ): void {
+                    foreach (
+                        $payments as $payment
+                    ) {
+                        try {
+                            $paymentService
+                                ->syncFromGateway(
+                                    $payment
+                                );
 
-                        $processed++;
-                    } catch (\Throwable $exception) {
-                        $failed++;
+                            $processed++;
+                        } catch (
+                            \Throwable $exception
+                        ) {
+                            $failed++;
 
-                        report($exception);
+                            report(
+                                $exception
+                            );
+                        }
                     }
                 }
-            }
+            );
+
+        $this->info(
+            sprintf(
+                'Payment reconciliation completed. Processed: %d, Failed: %d.',
+                $processed,
+                $failed
+            )
         );
 
-    $this->info(
-        sprintf(
-            'Payment reconciliation completed. Processed: %d, Failed: %d.',
-            $processed,
-            $failed
-        )
-    );
-
-    return 0;
-})->purpose(
+        return 0;
+    }
+)->purpose(
     'Synchronize pending and processing payments with their payment gateway'
 );
 
-Schedule::command('payments:reconcile')
+/*
+|--------------------------------------------------------------------------
+| Scheduled Tasks
+|--------------------------------------------------------------------------
+|
+| Payment reconciliation runs every minute so delayed or missed Pesapal
+| callbacks/IPNs are recovered automatically.
+|
+| Ticket-order expiration also runs every minute so expired unpaid
+| reservations release their inventory quickly.
+|
+*/
+
+Schedule::command(
+    'payments:reconcile'
+)
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command(
+    'tickets:expire-orders'
+)
     ->everyMinute()
     ->withoutOverlapping();

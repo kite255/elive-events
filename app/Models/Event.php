@@ -552,6 +552,17 @@ class Event extends Model
     |--------------------------------------------------------------------------
     */
 
+    public function ticketSetting(): HasOne
+    {
+        return $this->hasOne(EventTicketSetting::class);
+    }
+
+    public function ticketReservationMinutes(): int
+    {
+        return $this->ticketSetting?->reservationMinutes()
+            ?? EventTicketSetting::DEFAULT_RESERVATION_MINUTES;
+    }
+
     public function ticketTypes(): HasMany
     {
         return $this->hasMany(TicketType::class)
