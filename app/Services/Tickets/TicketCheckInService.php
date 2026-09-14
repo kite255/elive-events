@@ -11,11 +11,23 @@ class TicketCheckInService
     public function checkInByQrToken(
         string $rawQrToken
     ): array {
+        return $this->checkInByCredential(
+            $rawQrToken
+        );
+    }
+
+    public function checkInByCredential(
+        string $credential
+    ): array {
+        $credential = trim(
+            $credential
+        );
+
         return DB::transaction(
-            function () use ($rawQrToken): array {
+            function () use ($credential): array {
                 $qrTokenHash = hash(
                     'sha256',
-                    $rawQrToken
+                    $credential
                 );
 
                 $ticket = Ticket::query()
@@ -27,6 +39,16 @@ class TicketCheckInService
                     ->first();
 
                 if (! $ticket) {
+                    $ticket = Ticket::query()
+                        ->lockForUpdate()
+                        ->where(
+                            'ticket_number',
+                            $credential
+                        )
+                        ->first();
+                }
+
+                if (! $ticket) {
                     return [
                         'success' => false,
                         'status' => 'ticket_not_found',
@@ -34,20 +56,17 @@ class TicketCheckInService
                     ];
                 }
 
-                /*
-                 * A ticket that has already been used is a duplicate scan,
-                 * not a generic unusable-ticket case.
-                 *
-                 * Return the original check-in timestamp so the scanner UI
-                 * can tell the officer when the ticket first entered.
-                 */
                 if ($ticket->isUsed()) {
-                    $existingCheckIn = DB::table('ticket_check_ins')
+                    $existingCheckIn = DB::table(
+                        'ticket_check_ins'
+                    )
                         ->where(
                             'ticket_id',
                             $ticket->id
                         )
-                        ->orderByDesc('checked_in_at')
+                        ->orderByDesc(
+                            'checked_in_at'
+                        )
                         ->first();
 
                     return [
@@ -75,41 +94,42 @@ class TicketCheckInService
 
                 $checkedInAt = now();
 
-                DB::table('ticket_check_ins')
-                    ->insert([
-                        'event_id' =>
-                            $ticket->event_id,
+                DB::table(
+                    'ticket_check_ins'
+                )->insert([
+                    'event_id' =>
+                        $ticket->event_id,
 
-                        'ticket_id' =>
-                            $ticket->id,
+                    'ticket_id' =>
+                        $ticket->id,
 
-                        'check_in_point_id' =>
-                            null,
+                    'check_in_point_id' =>
+                        null,
 
-                        'checked_in_by' =>
-                            Auth::id(),
+                    'checked_in_by' =>
+                        Auth::id(),
 
-                        'method' =>
-                            'qr',
+                    'method' =>
+                        'qr',
 
-                        'checked_in_at' =>
-                            $checkedInAt,
+                    'checked_in_at' =>
+                        $checkedInAt,
 
-                        'device_name' =>
-                            request()->userAgent(),
+                    'device_name' =>
+                        request()->userAgent(),
 
-                        'ip_address' =>
-                            request()->ip(),
+                    'ip_address' =>
+                        request()->ip(),
 
-                        'note' =>
-                            null,
+                    'note' =>
+                        null,
 
-                        'created_at' =>
-                            $checkedInAt,
+                    'created_at' =>
+                        $checkedInAt,
 
-                        'updated_at' =>
-                            $checkedInAt,
-                    ]);
+                    'updated_at' =>
+                        $checkedInAt,
+                ]);
 
                 $ticket->forceFill([
                     'status' =>

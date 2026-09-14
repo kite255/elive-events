@@ -293,4 +293,135 @@ class TicketScannerEndpointTest extends TestCase
         );
     }
 
+    public function test_authenticated_staff_can_check_in_using_ticket_number(): void
+{
+    $user = $this->createScannerUser();
+
+    [
+        'ticket' => $ticket,
+    ] = $this->createIssuedTicket();
+
+    $response = $this
+        ->actingAs($user)
+        ->postJson(
+            '/admin/ticket-scanner/scan',
+            [
+                'qr_token' => $ticket->ticket_number,
+            ]
+        );
+
+    $response
+        ->assertOk()
+        ->assertJsonPath(
+            'status',
+            'checked_in'
+        )
+        ->assertJsonPath(
+            'success',
+            true
+        )
+        ->assertJsonPath(
+            'ticket.ticket_number',
+            $ticket->ticket_number
+        );
+
+    $ticket->refresh();
+
+    $this->assertSame(
+        Ticket::STATUS_USED,
+        $ticket->status
+    );
+
+    $this->assertNotNull(
+        $ticket->used_at
+    );
+
+    $this->assertDatabaseHas(
+        'ticket_check_ins',
+        [
+            'ticket_id' => $ticket->id,
+            'event_id' => $ticket->event_id,
+        ]
+    );
+}
+
+public function test_duplicate_ticket_number_check_in_is_rejected_without_second_entry(): void
+{
+    $user = $this->createScannerUser();
+
+    [
+        'ticket' => $ticket,
+    ] = $this->createIssuedTicket();
+
+    $this
+        ->actingAs($user)
+        ->postJson(
+            '/admin/ticket-scanner/scan',
+            [
+                'qr_token' => $ticket->ticket_number,
+            ]
+        )
+        ->assertOk()
+        ->assertJsonPath(
+            'status',
+            'checked_in'
+        );
+
+    $response = $this
+        ->actingAs($user)
+        ->postJson(
+            '/admin/ticket-scanner/scan',
+            [
+                'qr_token' => $ticket->ticket_number,
+            ]
+        );
+
+    $response
+        ->assertOk()
+        ->assertJsonPath(
+            'status',
+            'already_used'
+        )
+        ->assertJsonPath(
+            'success',
+            false
+        );
+
+    $this->assertDatabaseCount(
+        'ticket_check_ins',
+        1
+    );
+}
+
+public function test_invalid_ticket_number_returns_ticket_not_found_without_creating_entry(): void
+{
+    $user = $this->createScannerUser();
+
+    $response = $this
+        ->actingAs($user)
+        ->postJson(
+            '/admin/ticket-scanner/scan',
+            [
+                'qr_token' =>
+                    'ELV-REG-INVALID-TICKET',
+            ]
+        );
+
+    $response
+        ->assertOk()
+        ->assertJsonPath(
+            'status',
+            'ticket_not_found'
+        )
+        ->assertJsonPath(
+            'success',
+            false
+        );
+
+    $this->assertDatabaseCount(
+        'ticket_check_ins',
+        0
+    );
+}
+
 }

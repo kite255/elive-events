@@ -21,30 +21,80 @@ class TicketScannerController extends Controller
             ],
         ]);
 
+        $credential = trim(
+            $validated['qr_token']
+        );
+
         /*
-         * Resolve the ticket only for authorization.
-         *
-         * We never query using the raw QR value itself. The raw credential
-         * is hashed exactly as it is in TicketCheckInService.
-         */
+        |--------------------------------------------------------------------------
+        | Resolve Ticket
+        |--------------------------------------------------------------------------
+        |
+        | The scanner accepts two input formats:
+        |
+        | 1. Secure QR credential
+        |    - Used by camera QR scanning
+        |    - The raw credential is never queried directly
+        |    - It is hashed using SHA-256 before lookup
+        |
+        | 2. Human-readable ticket number
+        |    - Used only as a manual fallback
+        |    - Example: ELV-REG-8-01-I5J5S2
+        |
+        | Secure QR scanning remains the primary entry method.
+        |
+        */
+
         $ticket = Ticket::query()
             ->with('event')
             ->where(
                 'qr_token_hash',
                 hash(
                     'sha256',
-                    $validated['qr_token']
+                    $credential
                 )
             )
             ->first();
 
         /*
-         * If the QR belongs to a real ticket, only a user who is allowed
-         * to perform check-in for that event may continue.
-         *
-         * Event::canBeCheckedInBy() already contains the project's
-         * super-admin / event-role authorization rules.
-         */
+        |--------------------------------------------------------------------------
+        | Manual Ticket Number Fallback
+        |--------------------------------------------------------------------------
+        |
+        | If the submitted value is not a valid QR credential, attempt an
+        | exact lookup using the human-readable ticket number.
+        |
+        | We deliberately use an exact match. Partial ticket-number searching
+        | does not belong in the check-in endpoint.
+        |
+        */
+
+        if (! $ticket) {
+            $ticket = Ticket::query()
+                ->with('event')
+                ->where(
+                    'ticket_number',
+                    $credential
+                )
+                ->first();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Authorization
+        |--------------------------------------------------------------------------
+        |
+        | If the input resolves to a real ticket, the authenticated user must
+        | be authorized to perform check-in for that ticket's event.
+        |
+        | This applies equally to:
+        |
+        | - Camera QR scans
+        | - Manual QR credentials
+        | - Manual ticket-number entry
+        |
+        */
+
         if (
             $ticket
             && ! $ticket->event?->canBeCheckedInBy(
@@ -54,9 +104,48 @@ class TicketScannerController extends Controller
             abort(403);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Determine Secure Check-in Credential
+        |--------------------------------------------------------------------------
+        |
+        | TicketCheckInService remains the single source of truth for:
+        |
+        | - ticket validation
+        | - duplicate-entry protection
+        | - database locking
+        | - ticket_check_ins creation
+        | - marking tickets as used
+        |
+        | If the officer entered a ticket number, we use the ticket's
+        | encrypted QR credential after Laravel decrypts it through the model
+        | cast. The service therefore still performs the exact same secure
+        | QR-token check-in flow.
+        |
+        */
+
+        $checkInCredential = $credential;
+
+        if (
+            $ticket
+            && hash(
+                'sha256',
+                $credential
+            ) !== $ticket->qr_token_hash
+        ) {
+            $checkInCredential =
+                $ticket->qr_token_encrypted;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Perform Check-in
+        |--------------------------------------------------------------------------
+        */
+
         $result = $ticketCheckInService
             ->checkInByQrToken(
-                $validated['qr_token']
+                $checkInCredential
             );
 
         return response()->json(

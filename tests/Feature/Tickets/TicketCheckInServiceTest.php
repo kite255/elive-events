@@ -239,4 +239,89 @@ class TicketCheckInServiceTest extends TestCase
             $ticket->used_at
         );
     }
+
+
+    public function test_ticket_number_checks_in_issued_ticket(): void
+{
+    [
+        'ticket' => $ticket,
+    ] = $this->createIssuedTicket();
+
+    $result = app(
+        TicketCheckInService::class
+    )->checkInByCredential(
+        $ticket->ticket_number
+    );
+
+    $this->assertSame(
+        'checked_in',
+        $result['status'] ?? null
+    );
+
+    $this->assertTrue(
+        $result['success'] ?? false
+    );
+
+    $ticket->refresh();
+
+    $this->assertSame(
+        Ticket::STATUS_USED,
+        $ticket->status
+    );
+
+    $this->assertNotNull(
+        $ticket->used_at
+    );
+
+    $this->assertDatabaseHas(
+        'ticket_check_ins',
+        [
+            'ticket_id' =>
+                $ticket->id,
+
+            'event_id' =>
+                $ticket->event_id,
+        ]
+    );
+}
+
+public function test_duplicate_ticket_number_is_rejected_without_second_check_in(): void
+{
+    [
+        'ticket' => $ticket,
+    ] = $this->createIssuedTicket();
+
+    $service = app(
+        TicketCheckInService::class
+    );
+
+    $firstResult =
+        $service->checkInByCredential(
+            $ticket->ticket_number
+        );
+
+    $secondResult =
+        $service->checkInByCredential(
+            $ticket->ticket_number
+        );
+
+    $this->assertSame(
+        'checked_in',
+        $firstResult['status'] ?? null
+    );
+
+    $this->assertSame(
+        'already_used',
+        $secondResult['status'] ?? null
+    );
+
+    $this->assertFalse(
+        $secondResult['success'] ?? true
+    );
+
+    $this->assertDatabaseCount(
+        'ticket_check_ins',
+        1
+    );
+}
 }
