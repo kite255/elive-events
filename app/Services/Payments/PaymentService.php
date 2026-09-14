@@ -655,6 +655,39 @@ class PaymentService
                     Payment::STATUS_PROCESSING,
             };
 
+        /*
+         * Pesapal may continue returning PENDING for an abandoned
+         * checkout even after the local ticket reservation has expired.
+         *
+         * In that case, expire the local payment without pretending
+         * that Pesapal reported a failed payment.
+         */
+        if (
+            $gatewayStatus === 'PENDING'
+            && $payment->ticket_order_id
+        ) {
+            $payment->loadMissing(
+                'ticketOrder'
+            );
+
+            $ticketOrder =
+                $payment->ticketOrder;
+
+            if (
+                $ticketOrder
+                && (
+                    $ticketOrder->isExpired()
+                    || (
+                        $ticketOrder->expires_at !== null
+                        && $ticketOrder->expires_at->isPast()
+                    )
+                )
+            ) {
+                $localStatus =
+                    Payment::STATUS_EXPIRED;
+            }
+        }
+
         $transitionedToCompleted =
             DB::transaction(
                 function () use (
