@@ -19,52 +19,70 @@ class AdminTicketLookupService
             return [];
         }
 
+        $search = '%' . $term . '%';
+
         return Ticket::query()
             ->with([
                 'event:id,name',
+
                 'order:id,event_id,order_number,public_token,buyer_name,buyer_phone,buyer_email,total,currency,status,paid_at',
+
                 'ticketType:id,name',
             ])
-            ->where(function (Builder $query) use ($term): void {
-                $query
-                    ->where('ticket_number', 'ilike', '%' . $term . '%')
-                    ->orWhereHas(
-                        'order',
-                        function (Builder $orderQuery) use ($term): void {
-                            $orderQuery
-                                ->where(
-                                    'order_number',
-                                    'ilike',
-                                    '%' . $term . '%'
-                                )
-                                ->orWhere(
-                                    'buyer_name',
-                                    'ilike',
-                                    '%' . $term . '%'
-                                )
-                                ->orWhere(
-                                    'buyer_phone',
-                                    'ilike',
-                                    '%' . $term . '%'
-                                )
-                                ->orWhere(
-                                    'buyer_email',
-                                    'ilike',
-                                    '%' . $term . '%'
-                                );
-                        }
-                    );
-            })
+            ->where(
+                function (
+                    Builder $query
+                ) use (
+                    $search
+                ): void {
+                    $query
+                        ->whereLike(
+                            'ticket_number',
+                            $search
+                        )
+                        ->orWhereHas(
+                            'order',
+                            function (
+                                Builder $orderQuery
+                            ) use (
+                                $search
+                            ): void {
+                                $orderQuery
+                                    ->whereLike(
+                                        'order_number',
+                                        $search
+                                    )
+                                    ->orWhereLike(
+                                        'buyer_name',
+                                        $search
+                                    )
+                                    ->orWhereLike(
+                                        'buyer_phone',
+                                        $search
+                                    )
+                                    ->orWhereLike(
+                                        'buyer_email',
+                                        $search
+                                    );
+                            }
+                        );
+                }
+            )
             ->latest('id')
             ->limit($limit)
             ->get()
             ->filter(
                 fn (Ticket $ticket): bool =>
-                    $this->canViewTicket($user, $ticket)
+                    $this->canViewTicket(
+                        $user,
+                        $ticket
+                    )
             )
             ->map(
                 fn (Ticket $ticket): array =>
-                    $this->mapTicket($ticket)
+                    $this->mapTicket(
+                        $ticket
+                    )
             )
             ->values()
             ->all();
@@ -74,7 +92,9 @@ class AdminTicketLookupService
         User $user,
         Ticket $ticket
     ): bool {
-        if ($user->isSuperAdmin()) {
+        if (
+            $user->isSuperAdmin()
+        ) {
             return true;
         }
 
@@ -84,25 +104,43 @@ class AdminTicketLookupService
             return false;
         }
 
-        return $user->canViewEventReports($event);
+        return $user
+            ->canViewEventReports(
+                $event
+            );
     }
 
-    private function mapTicket(Ticket $ticket): array
-    {
+    private function mapTicket(
+        Ticket $ticket
+    ): array {
         $order = $ticket->order;
         $event = $ticket->event;
         $ticketType = $ticket->ticketType;
 
         return [
-            'ticket_id' => $ticket->id,
-            'event_id' => $event?->id,
-            'event_name' => $event?->name ?? '-',
+            'ticket_id' =>
+                $ticket->id,
 
-            'order_id' => $order?->id,
-            'order_number' => $order?->order_number ?? '-',
+            'event_id' =>
+                $event?->id,
 
-            'ticket_number' => $ticket->ticket_number,
-            'ticket_type' => $ticketType?->name ?? '-',
+            'event_name' =>
+                $event?->name
+                ?? '-',
+
+            'order_id' =>
+                $order?->id,
+
+            'order_number' =>
+                $order?->order_number
+                ?? '-',
+
+            'ticket_number' =>
+                $ticket->ticket_number,
+
+            'ticket_type' =>
+                $ticketType?->name
+                ?? '-',
 
             'buyer_name' =>
                 $order?->buyer_name
@@ -143,15 +181,20 @@ class AdminTicketLookupService
                 $ticket->used_at !== null
                 || $ticket->isUsed(),
 
-            'used_at' => $ticket->used_at,
+            'used_at' =>
+                $ticket->used_at,
 
-            'paid_at' => $order?->paid_at,
+            'paid_at' =>
+                $order?->paid_at,
 
             'order_url' =>
                 $order?->public_token
                     ? route(
                         'public.ticket-orders.show',
-                        ['token' => $order->public_token]
+                        [
+                            'token' =>
+                                $order->public_token,
+                        ]
                     )
                     : null,
 
@@ -159,7 +202,10 @@ class AdminTicketLookupService
                 $ticket->public_token
                     ? route(
                         'public.tickets.show',
-                        ['token' => $ticket->public_token]
+                        [
+                            'token' =>
+                                $ticket->public_token,
+                        ]
                     )
                     : null,
         ];

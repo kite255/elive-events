@@ -9,9 +9,16 @@
         ->whereNotIn('status', ['draft', 'cancelled']);
 
     if ($search !== '') {
-        $query->where(function ($q) use ($search) {
-            $q->where('name', 'ilike', '%' . $search . '%')
-                ->orWhere('venue', 'ilike', '%' . $search . '%');
+        $searchPattern = '%' . $search . '%';
+
+        $query->where(function ($q) use ($searchPattern) {
+            $q->whereLike(
+                'name',
+                $searchPattern
+            )->orWhereLike(
+                'venue',
+                $searchPattern
+            );
         });
     }
 
@@ -22,80 +29,112 @@
                 $q->where('ends_at', '>=', now())
                     ->orWhere(function ($q) {
                         $q->whereNull('ends_at')
-                            ->where('starts_at', '>=', now()->startOfDay());
+                            ->where(
+                                'starts_at',
+                                '>=',
+                                now()->startOfDay()
+                            );
                     });
             });
     } elseif ($filter === 'upcoming') {
-        $query->where('starts_at', '>', now());
+        $query->where(
+            'starts_at',
+            '>',
+            now()
+        );
     } elseif ($filter === 'past') {
         $query->where(function ($q) {
-            $q->where('ends_at', '<', now())
-                ->orWhere(function ($q) {
-                    $q->whereNull('ends_at')
-                        ->where('starts_at', '<', now()->startOfDay());
-                });
+            $q->where(
+                'ends_at',
+                '<',
+                now()
+            )->orWhere(function ($q) {
+                $q->whereNull('ends_at')
+                    ->where(
+                        'starts_at',
+                        '<',
+                        now()->startOfDay()
+                    );
+            });
         });
     }
 
     $events = $query
         ->orderByRaw("
             CASE
-                WHEN starts_at <= NOW()
+                WHEN starts_at <= CURRENT_TIMESTAMP
                     AND (
-                        ends_at >= NOW()
+                        ends_at >= CURRENT_TIMESTAMP
                         OR (
                             ends_at IS NULL
                             AND starts_at >= CURRENT_DATE
                         )
                     )
                 THEN 0
-                WHEN starts_at > NOW()
+
+                WHEN starts_at > CURRENT_TIMESTAMP
                 THEN 1
+
                 ELSE 2
             END
         ")
         ->orderByRaw("
             CASE
-                WHEN starts_at <= NOW()
+                WHEN starts_at <= CURRENT_TIMESTAMP
                     AND (
-                        ends_at >= NOW()
+                        ends_at >= CURRENT_TIMESTAMP
                         OR (
                             ends_at IS NULL
                             AND starts_at >= CURRENT_DATE
                         )
                     )
                 THEN starts_at
+
                 ELSE NULL
             END ASC
         ")
         ->orderByRaw("
             CASE
-                WHEN starts_at > NOW()
+                WHEN starts_at > CURRENT_TIMESTAMP
                 THEN starts_at
+
                 ELSE NULL
             END ASC
         ")
         ->orderByRaw("
             CASE
-                WHEN starts_at < NOW()
+                WHEN starts_at < CURRENT_TIMESTAMP
                 THEN starts_at
+
                 ELSE NULL
             END DESC
         ")
         ->paginate(12)
         ->withQueryString();
 
-    $eventIds = $events->getCollection()->pluck('id');
+    $eventIds = $events
+        ->getCollection()
+        ->pluck('id');
 
     $eventDaysByEvent = \App\Models\EventDay::query()
-        ->whereIn('event_id', $eventIds)
-        ->whereIn('status', ['active', 'completed'])
+        ->whereIn(
+            'event_id',
+            $eventIds
+        )
+        ->whereIn(
+            'status',
+            [
+                'active',
+                'completed',
+            ]
+        )
         ->orderBy('event_date')
         ->orderBy('display_order')
         ->orderBy('id')
         ->get()
         ->groupBy('event_id');
 @endphp
+
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
