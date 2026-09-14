@@ -67,14 +67,29 @@ class AdminPanelProvider extends PanelProvider
 
             /*
             |--------------------------------------------------------------------------
+            | Filament Admin Theme
+            |--------------------------------------------------------------------------
+            |
+            | IMPORTANT:
+            | Do not load resources/css/app.css directly as the Filament theme.
+            |
+            | This dedicated stylesheet imports Filament's own base theme first,
+            | then applies eLive-specific customizations.
+            |
+            */
+
+            ->viteTheme(
+                'resources/css/filament/admin/theme.css'
+            )
+
+            /*
+            |--------------------------------------------------------------------------
             | Official eLive Brand Colors
             |--------------------------------------------------------------------------
             |
             | Deep Navy Blue : #161943
             | Light Blue     : #007AB2
             | Orange Peel    : #FF9800
-            |
-            | Filament's primary color is set to eLive Navy.
             |
             */
 
@@ -96,7 +111,7 @@ class AdminPanelProvider extends PanelProvider
 
             ->discoverResources(
                 in: app_path('Filament/Resources'),
-                for: 'App\Filament\Resources'
+                for: 'App\\Filament\\Resources'
             )
 
             /*
@@ -107,7 +122,7 @@ class AdminPanelProvider extends PanelProvider
 
             ->discoverPages(
                 in: app_path('Filament/Pages'),
-                for: 'App\Filament\Pages'
+                for: 'App\\Filament\\Pages'
             )
 
             ->pages([
@@ -122,7 +137,7 @@ class AdminPanelProvider extends PanelProvider
 
             ->discoverWidgets(
                 in: app_path('Filament/Widgets'),
-                for: 'App\Filament\Widgets'
+                for: 'App\\Filament\\Widgets'
             )
 
             ->widgets([
