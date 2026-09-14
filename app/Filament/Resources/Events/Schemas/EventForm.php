@@ -979,6 +979,154 @@ class EventForm
                     ->columns(2)
                     ->collapsible(),
 
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Ticket Sales Settings
+|--------------------------------------------------------------------------
+|
+| Stored in the event_ticket_settings table through the
+| Event::ticketSetting() HasOne relationship.
+|
+*/
+
+Section::make(
+    'Ticket Sales Settings'
+)
+    ->description(
+        'Configure public ticket sales, reservation time, purchase limits, and the overall ticket sales window for this event.'
+    )
+    ->relationship(
+        'ticketSetting'
+    )
+    ->schema([
+        Toggle::make(
+            'ticket_sales_enabled'
+        )
+            ->label(
+                'Enable Ticket Sales'
+            )
+            ->helperText(
+                'Allow customers to purchase tickets for this event.'
+            )
+            ->default(true)
+            ->live(),
+
+        Select::make(
+            'reservation_minutes'
+        )
+            ->label(
+                'Ticket Reservation Time'
+            )
+            ->options([
+                5 => '5 minutes',
+                10 => '10 minutes',
+                15 => '15 minutes',
+                20 => '20 minutes',
+                30 => '30 minutes',
+            ])
+            ->default(15)
+            ->required()
+            ->native(false)
+            ->visible(
+                fn (Get $get): bool =>
+                    (bool) $get(
+                        'ticket_sales_enabled'
+                    )
+            )
+            ->helperText(
+                'How long an unpaid order temporarily holds ticket inventory before the reservation expires.'
+            ),
+
+        TextInput::make(
+            'max_tickets_per_order'
+        )
+            ->label(
+                'Maximum Tickets Per Order'
+            )
+            ->numeric()
+            ->integer()
+            ->minValue(1)
+            ->maxValue(100)
+            ->default(10)
+            ->required()
+            ->visible(
+                fn (Get $get): bool =>
+                    (bool) $get(
+                        'ticket_sales_enabled'
+                    )
+            )
+            ->helperText(
+                'Maximum total number of tickets one customer can purchase in a single order.'
+            ),
+
+        Toggle::make(
+            'allow_guest_checkout'
+        )
+            ->label(
+                'Allow Guest Checkout'
+            )
+            ->helperText(
+                'Allow customers to purchase tickets without creating an account.'
+            )
+            ->default(true)
+            ->visible(
+                fn (Get $get): bool =>
+                    (bool) $get(
+                        'ticket_sales_enabled'
+                    )
+            ),
+
+        DateTimePicker::make(
+            'sales_start_at'
+        )
+            ->label(
+                'Ticket Sales Start'
+            )
+            ->seconds(false)
+            ->visible(
+                fn (Get $get): bool =>
+                    (bool) $get(
+                        'ticket_sales_enabled'
+                    )
+            )
+            ->helperText(
+                'Optional. Leave empty to allow ticket sales immediately.'
+            ),
+
+        DateTimePicker::make(
+            'sales_end_at'
+        )
+            ->label(
+                'Ticket Sales End'
+            )
+            ->seconds(false)
+            ->afterOrEqual(
+                'sales_start_at'
+            )
+            ->visible(
+                fn (Get $get): bool =>
+                    (bool) $get(
+                        'ticket_sales_enabled'
+                    )
+            )
+            ->helperText(
+                'Optional. Leave empty if ticket sales should remain open until manually disabled.'
+            ),
+    ])
+    ->columns(2)
+    ->collapsible(),
+
+
+
+
+
+
+
+
+
                 /*
                 |--------------------------------------------------------------------------
                 | Online Payment Settings

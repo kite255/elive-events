@@ -9,6 +9,7 @@ use App\Http\Controllers\Payments\PesapalIpnController;
 use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
+use App\Http\Controllers\PublicTicketController;
 use App\Http\Controllers\QrVerificationController;
 use App\Models\Event;
 use Illuminate\Support\Facades\Route;
@@ -23,8 +24,12 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::view('/', 'welcome')
-    ->name('home');
+Route::view(
+    '/',
+    'welcome'
+)->name(
+    'home'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -44,9 +49,16 @@ Route::view('/', 'welcome')
 |
 */
 
-Route::get('/events', function () {
-    return view('public.events.index');
-})->name('public.events.index');
+Route::get(
+    '/events',
+    function () {
+        return view(
+            'public.events.index'
+        );
+    }
+)->name(
+    'public.events.index'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -72,7 +84,64 @@ Route::get('/events', function () {
 Route::get(
     '/events/{event:slug}/communications/{communication:slug}',
     PublicEventCommunicationController::class
-)->name('public.event-communications.show');
+)->name(
+    'public.event-communications.show'
+);
+
+/*
+|--------------------------------------------------------------------------
+| Public Ticket Sales
+|--------------------------------------------------------------------------
+|
+| Public ticket-selection and checkout page.
+|
+| Example:
+| /events/dcc-concert-2026/tickets
+|
+| GET:
+| - show event ticket types
+| - show real-time availability
+| - show ticket prices
+| - show buyer checkout form
+|
+| POST:
+| - validate buyer details
+| - validate ticket quantities
+| - create temporary ticket reservation
+| - create pending payment
+| - redirect buyer to payment checkout
+|
+| These routes MUST stay above the generic /events/{event:slug} route.
+|
+*/
+
+Route::get(
+    '/events/{event}/tickets',
+    [
+        PublicTicketController::class,
+        'show',
+    ]
+)
+    ->middleware(
+        'throttle:120,1'
+    )
+    ->name(
+        'public.tickets.buy'
+    );
+
+Route::post(
+    '/events/{event}/tickets',
+    [
+        PublicTicketController::class,
+        'store',
+    ]
+)
+    ->middleware(
+        'throttle:20,1'
+    )
+    ->name(
+        'public.tickets.store'
+    );
 
 /*
 |--------------------------------------------------------------------------
@@ -94,15 +163,19 @@ Route::get(
     '/admin/event-communications/{communication}/preview',
     EventCommunicationPreviewController::class
 )
-    ->middleware(['auth'])
-    ->name('admin.event-communications.preview');
+    ->middleware([
+        'auth',
+    ])
+    ->name(
+        'admin.event-communications.preview'
+    );
 
 /*
 |--------------------------------------------------------------------------
 | Online Payments
 |--------------------------------------------------------------------------
 |
-| Public payment entry point used after registration.
+| Public payment entry point used after registration or ticket checkout.
 |
 | The payment route uses the eLive payment reference instead of the numeric
 | database ID so public checkout URLs do not expose sequential record IDs.
@@ -114,17 +187,24 @@ Route::get(
 
 Route::get(
     '/payments/{payment:reference}/pay',
-    [PaymentController::class, 'pay']
+    [
+        PaymentController::class,
+        'pay',
+    ]
 )
-    ->middleware('throttle:30,1')
-    ->name('payments.pay');
+    ->middleware(
+        'throttle:30,1'
+    )
+    ->name(
+        'payments.pay'
+    );
 
 /*
 |--------------------------------------------------------------------------
 | Public Payment Status
 |--------------------------------------------------------------------------
 |
-| Public attendee-facing payment result page.
+| Public attendee/ticket-buyer payment result page.
 |
 | This page can display:
 | - successful payments
@@ -141,24 +221,31 @@ Route::get(
 
 Route::get(
     '/payments/{payment:reference}/status',
-    [PaymentController::class, 'status']
+    [
+        PaymentController::class,
+        'status',
+    ]
 )
-    ->middleware('throttle:60,1')
-    ->name('payments.status');
+    ->middleware(
+        'throttle:60,1'
+    )
+    ->name(
+        'payments.status'
+    );
 
 /*
 |--------------------------------------------------------------------------
 | Pesapal Browser Callback
 |--------------------------------------------------------------------------
 |
-| Pesapal redirects the attendee's browser here after checkout.
+| Pesapal redirects the attendee/ticket buyer's browser here after checkout.
 |
 | IMPORTANT:
 | The callback itself is not proof of payment. The controller verifies the
 | transaction directly with Pesapal before updating the eLive payment.
 |
-| After verification, the attendee is redirected to the branded
-| public payment status page.
+| After verification, the customer is redirected to the branded public
+| payment status page.
 |
 | Production URL:
 | https://events.elive.co.tz/payments/pesapal/callback
@@ -168,7 +255,9 @@ Route::get(
 Route::get(
     '/payments/pesapal/callback',
     PesapalCallbackController::class
-)->name('payments.pesapal.callback');
+)->name(
+    'payments.pesapal.callback'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -191,10 +280,15 @@ Route::get(
 */
 
 Route::match(
-    ['get', 'post'],
+    [
+        'get',
+        'post',
+    ],
     '/payments/pesapal/ipn',
     PesapalIpnController::class
-)->name('payments.pesapal.ipn');
+)->name(
+    'payments.pesapal.ipn'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -210,26 +304,34 @@ Route::match(
 |
 */
 
-Route::get('/events/{event:slug}', function (Event $event) {
-    abort_if(
-        in_array(
-            $event->status,
-            [
-                'draft',
-                'cancelled',
-            ],
-            true
-        ),
-        404
-    );
+Route::get(
+    '/events/{event:slug}',
+    function (
+        Event $event
+    ) {
+        abort_if(
+            in_array(
+                $event->status,
+                [
+                    'draft',
+                    'cancelled',
+                ],
+                true
+            ),
+            404
+        );
 
-    return view(
-        'public.events.show',
-        [
-            'event' => $event,
-        ]
-    );
-})->name('public.events.show');
+        return view(
+            'public.events.show',
+            [
+                'event' =>
+                    $event,
+            ]
+        );
+    }
+)->name(
+    'public.events.show'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -247,18 +349,33 @@ Route::get('/events/{event:slug}', function (Event $event) {
 
 Route::get(
     '/register/{event:slug}',
-    [PublicRegistrationController::class, 'show']
-)->name('public.registration.show');
+    [
+        PublicRegistrationController::class,
+        'show',
+    ]
+)->name(
+    'public.registration.show'
+);
 
 Route::post(
     '/register/{event:slug}',
-    [PublicRegistrationController::class, 'store']
-)->name('public.registration.store');
+    [
+        PublicRegistrationController::class,
+        'store',
+    ]
+)->name(
+    'public.registration.store'
+);
 
 Route::get(
     '/register/{event:slug}/success/{attendee}',
-    [PublicRegistrationController::class, 'success']
-)->name('public.registration.success');
+    [
+        PublicRegistrationController::class,
+        'success',
+    ]
+)->name(
+    'public.registration.success'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -276,8 +393,13 @@ Route::get(
 
 Route::get(
     '/a/{token}',
-    [PublicAttendeeController::class, 'show']
-)->name('public.attendees.show');
+    [
+        PublicAttendeeController::class,
+        'show',
+    ]
+)->name(
+    'public.attendees.show'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -295,18 +417,33 @@ Route::get(
 
 Route::get(
     '/events/{event:slug}/register',
-    [PublicRegistrationController::class, 'show']
-)->name('public.events.register');
+    [
+        PublicRegistrationController::class,
+        'show',
+    ]
+)->name(
+    'public.events.register'
+);
 
 Route::post(
     '/events/{event:slug}/register',
-    [PublicRegistrationController::class, 'store']
-)->name('public.events.register.store');
+    [
+        PublicRegistrationController::class,
+        'store',
+    ]
+)->name(
+    'public.events.register.store'
+);
 
 Route::get(
     '/events/{event:slug}/register/success/{attendee}',
-    [PublicRegistrationController::class, 'success']
-)->name('public.events.register.success');
+    [
+        PublicRegistrationController::class,
+        'success',
+    ]
+)->name(
+    'public.events.register.success'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -322,8 +459,13 @@ Route::get(
 
 Route::get(
     '/verify/{token}',
-    [QrVerificationController::class, 'show']
-)->name('qr.verify');
+    [
+        QrVerificationController::class,
+        'show',
+    ]
+)->name(
+    'qr.verify'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -339,8 +481,13 @@ Route::get(
 
 Route::get(
     '/check-in/{token}',
-    [CheckInController::class, 'show']
-)->name('qr.check-in');
+    [
+        CheckInController::class,
+        'show',
+    ]
+)->name(
+    'qr.check-in'
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -355,5 +502,9 @@ Route::get(
     '/admin/badges/print',
     BadgePrintController::class
 )
-    ->middleware(['auth'])
-    ->name('badges.print');
+    ->middleware([
+        'auth',
+    ])
+    ->name(
+        'badges.print'
+    );
