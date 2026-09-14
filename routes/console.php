@@ -109,3 +109,36 @@ Schedule::command(
 )
     ->everyMinute()
     ->withoutOverlapping();
+/*
+|--------------------------------------------------------------------------
+| Backup Tasks
+|--------------------------------------------------------------------------
+|
+| All backup schedules use the application timezone.
+|
+| 02:00 - Create database + storage backup
+| 03:00 - Apply retention cleanup
+| 04:00 - Check backup health
+|
+*/
+
+Schedule::command(
+    'backup:run'
+)
+    ->dailyAt('02:00')
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping();
+
+Schedule::command(
+    'backup:clean'
+)
+    ->dailyAt('03:00')
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping();
+
+Schedule::command(
+    'backup:monitor'
+)
+    ->dailyAt('04:00')
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping();

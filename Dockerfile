@@ -5,26 +5,55 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /var/www/html
 
 # ---------------------------------------------------------
+# PostgreSQL PGDG Repository
+# Required so pg_dump matches PostgreSQL 16 server
+# ---------------------------------------------------------
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gnupg \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl \
+        --fail \
+        --silent \
+        --show-error \
+        --location \
+        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+        https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && . /etc/os-release \
+    && printf '%s\n' \
+        "Types: deb" \
+        "URIs: https://apt.postgresql.org/pub/repos/apt" \
+        "Suites: ${VERSION_CODENAME}-pgdg" \
+        "Components: main" \
+        "Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc" \
+        > /etc/apt/sources.list.d/pgdg.sources
+
+# ---------------------------------------------------------
 # System Dependencies + PHP Extensions
 # ---------------------------------------------------------
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    zip \
-    unzip \
-    libpq-dev \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libzip-dev \
-    libonig-dev \
-    libxml2-dev \
-    libicu-dev \
-    imagemagick \
-    libmagickwand-dev \
-    librsvg2-bin \
-    pkg-config \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        zip \
+        unzip \
+        postgresql-client-16 \
+        libpq-dev \
+        libpng-dev \
+        libjpeg-dev \
+        libfreetype6-dev \
+        libzip-dev \
+        libonig-dev \
+        libxml2-dev \
+        libicu-dev \
+        imagemagick \
+        libmagickwand-dev \
+        librsvg2-bin \
+        pkg-config \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j2 \
         pdo_pgsql \
@@ -87,6 +116,8 @@ COPY . .
 RUN composer dump-autoload --optimize \
     && mkdir -p \
         storage/app/public \
+        storage/app/backups \
+        storage/app/backup-temp \
         storage/framework/cache/data \
         storage/framework/sessions \
         storage/framework/testing \
