@@ -66,9 +66,12 @@ class TicketIssuanceService
                 }
 
                 /*
-                 * Partial issuance should never be silently
-                 * continued because that could hide a previous
-                 * failed fulfillment.
+                 * Partial issuance must never be silently
+                 * continued.
+                 *
+                 * This could hide a failed previous
+                 * fulfillment and create inconsistent
+                 * ticket quantities.
                  */
                 if ($existingTickets->isNotEmpty()) {
                     throw new RuntimeException(
@@ -92,9 +95,29 @@ class TicketIssuanceService
                         $position <= (int) $item->quantity;
                         $position++
                     ) {
+                        /*
+                         * This is the actual gate-entry
+                         * credential.
+                         *
+                         * A different random value is generated
+                         * for every issued ticket.
+                         */
                         $rawQrToken =
                             Str::random(64);
 
+                        /*
+                         * Store:
+                         *
+                         * 1. encrypted raw token
+                         *    -> allows QR regeneration later
+                         *
+                         * 2. SHA-256 hash
+                         *    -> scanner/database lookup
+                         *
+                         * The encrypted model cast on Ticket
+                         * ensures qr_token_encrypted is never
+                         * stored as plaintext.
+                         */
                         $ticket =
                             Ticket::query()->create([
                                 'event_id' =>
@@ -119,11 +142,32 @@ class TicketIssuanceService
                                         $position
                                     ),
 
+                                /*
+                                 * Public page identifier.
+                                 *
+                                 * This is deliberately separate
+                                 * from the QR scan credential.
+                                 */
                                 'public_token' =>
-                                    Str::random(40),
+                                    $this->generatePublicToken(),
 
                                 /*
-                                 * Never store the raw QR secret.
+                                 * Laravel encrypts this value
+                                 * automatically through the
+                                 * Ticket model encrypted cast.
+                                 *
+                                 * This lets eLive regenerate
+                                 * the QR code later.
+                                 */
+                                'qr_token_encrypted' =>
+                                    $rawQrToken,
+
+                                /*
+                                 * Scanner lookup uses a one-way
+                                 * SHA-256 hash.
+                                 *
+                                 * Never scan against the
+                                 * public_token.
                                  */
                                 'qr_token_hash' =>
                                     hash(
@@ -145,7 +189,8 @@ class TicketIssuanceService
 
                                 'currency' =>
                                     strtoupper(
-                                        (string) $lockedOrder->currency
+                                        (string)
+                                        $lockedOrder->currency
                                     ),
 
                                 'status' =>
@@ -162,10 +207,11 @@ class TicketIssuanceService
                                         $position,
 
                                     /*
-                                     * Temporary source token for later
-                                     * QR rendering/delivery design.
+                                     * This only records that a
+                                     * QR credential was generated.
                                      *
-                                     * Do not persist raw token here.
+                                     * The raw QR credential is
+                                     * never stored inside metadata.
                                      */
                                     'qr_token_generated' =>
                                         true,
@@ -173,17 +219,18 @@ class TicketIssuanceService
                             ]);
 
                         /*
-                         * Keep raw QR token only in memory.
+                         * Do NOT attach the raw QR token as a
+                         * normal Eloquent attribute.
                          *
-                         * Later, when we build ticket rendering,
-                         * this value can be passed directly to the
-                         * QR generator before being discarded.
+                         * A custom attribute such as
+                         * raw_qr_token would become dirty and
+                         * Eloquent could later try to persist it
+                         * to the tickets table.
+                         *
+                         * The recoverable credential is already
+                         * safely available through the encrypted
+                         * qr_token_encrypted attribute.
                          */
-                        $ticket->setAttribute(
-                            'raw_qr_token',
-                            $rawQrToken
-                        );
-
                         $issuedTickets->push(
                             $ticket
                         );
@@ -205,6 +252,34 @@ class TicketIssuanceService
         );
     }
 
+    /**
+     * Generate a unique public token for a ticket.
+     *
+     * This token is used only for secure public
+     * ticket-page access.
+     *
+     * It is NOT the gate-entry QR credential.
+     */
+    private function generatePublicToken(): string
+    {
+        do {
+            $token =
+                Str::random(40);
+        } while (
+            Ticket::query()
+                ->where(
+                    'public_token',
+                    $token
+                )
+                ->exists()
+        );
+
+        return $token;
+    }
+
+    /**
+     * Generate a unique human-readable ticket number.
+     */
     private function generateTicketNumber(
         TicketOrder $order,
         TicketOrderItem $item,
@@ -219,15 +294,16 @@ class TicketIssuanceService
             );
 
         do {
-            $number = sprintf(
-                'ELV-%s-%s-%02d-%s',
-                $typeCode,
-                $order->getKey(),
-                $position,
-                Str::upper(
-                    Str::random(6)
-                )
-            );
+            $number =
+                sprintf(
+                    'ELV-%s-%s-%02d-%s',
+                    $typeCode,
+                    $order->getKey(),
+                    $position,
+                    Str::upper(
+                        Str::random(6)
+                    )
+                );
         } while (
             Ticket::query()
                 ->where(

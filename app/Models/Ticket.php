@@ -23,6 +23,7 @@ class Ticket extends Model
         'attendee_id',
         'ticket_number',
         'public_token',
+        'qr_token_encrypted',
         'qr_token_hash',
         'holder_name',
         'holder_phone',
@@ -38,6 +39,7 @@ class Ticket extends Model
     ];
 
     protected $hidden = [
+        'qr_token_encrypted',
         'qr_token_hash',
     ];
 
@@ -45,6 +47,14 @@ class Ticket extends Model
     {
         return [
             'price' => 'decimal:2',
+
+            /*
+             * Laravel transparently encrypts this before
+             * storing it and decrypts it when accessed.
+             */
+            'qr_token_encrypted' =>
+                'encrypted',
+
             'issued_at' => 'datetime',
             'used_at' => 'datetime',
             'cancelled_at' => 'datetime',
@@ -55,7 +65,9 @@ class Ticket extends Model
 
     public function event(): BelongsTo
     {
-        return $this->belongsTo(Event::class);
+        return $this->belongsTo(
+            Event::class
+        );
     }
 
     public function order(): BelongsTo
@@ -76,31 +88,39 @@ class Ticket extends Model
 
     public function ticketType(): BelongsTo
     {
-        return $this->belongsTo(TicketType::class);
+        return $this->belongsTo(
+            TicketType::class
+        );
     }
 
     public function attendee(): BelongsTo
     {
-        return $this->belongsTo(Attendee::class);
+        return $this->belongsTo(
+            Attendee::class
+        );
     }
 
     public function isUsable(): bool
     {
-        return $this->status === self::STATUS_ISSUED;
+        return $this->status
+            === self::STATUS_ISSUED;
     }
 
     public function isUsed(): bool
     {
-        return $this->status === self::STATUS_USED;
+        return $this->status
+            === self::STATUS_USED;
     }
 
     public function isCancelled(): bool
     {
-        return $this->status === self::STATUS_CANCELLED;
+        return $this->status
+            === self::STATUS_CANCELLED;
     }
 
     public function isRefunded(): bool
     {
-        return $this->status === self::STATUS_REFUNDED;
+        return $this->status
+            === self::STATUS_REFUNDED;
     }
 }

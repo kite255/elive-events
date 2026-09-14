@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class TicketOrder extends Model
 {
@@ -18,12 +19,14 @@ class TicketOrder extends Model
     public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_EXPIRED = 'expired';
     public const STATUS_REFUNDED = 'refunded';
-    public const STATUS_PARTIALLY_REFUNDED = 'partially_refunded';
+    public const STATUS_PARTIALLY_REFUNDED =
+        'partially_refunded';
 
     protected $fillable = [
         'event_id',
         'attendee_id',
         'order_number',
+        'public_token',
         'buyer_name',
         'buyer_phone',
         'buyer_email',
@@ -37,6 +40,18 @@ class TicketOrder extends Model
         'expires_at',
         'metadata',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(
+            function (TicketOrder $order): void {
+                if (blank($order->public_token)) {
+                    $order->public_token =
+                        self::generatePublicToken();
+                }
+            }
+        );
+    }
 
     protected function casts(): array
     {
@@ -53,12 +68,16 @@ class TicketOrder extends Model
 
     public function event(): BelongsTo
     {
-        return $this->belongsTo(Event::class);
+        return $this->belongsTo(
+            Event::class
+        );
     }
 
     public function attendee(): BelongsTo
     {
-        return $this->belongsTo(Attendee::class);
+        return $this->belongsTo(
+            Attendee::class
+        );
     }
 
     public function items(): HasMany
@@ -122,5 +141,22 @@ class TicketOrder extends Model
     public function canIssueTickets(): bool
     {
         return $this->isPaid();
+    }
+
+    private static function generatePublicToken(): string
+    {
+        do {
+            $token =
+                Str::random(48);
+        } while (
+            self::query()
+                ->where(
+                    'public_token',
+                    $token
+                )
+                ->exists()
+        );
+
+        return $token;
     }
 }

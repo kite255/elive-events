@@ -10,6 +10,8 @@ use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicTicketController;
+use App\Http\Controllers\PublicTicketOrderController;
+use App\Http\Controllers\PublicTicketViewController;
 use App\Http\Controllers\QrVerificationController;
 use App\Models\Event;
 use Illuminate\Support\Facades\Route;
@@ -141,6 +143,89 @@ Route::post(
     )
     ->name(
         'public.tickets.store'
+    );
+
+/*
+|--------------------------------------------------------------------------
+| Public Ticket Order / My Tickets
+|--------------------------------------------------------------------------
+|
+| Secure ticket-buyer access page.
+|
+| Example:
+| /events/tickets/order/AbCdEf123456...
+|
+| The URL uses TicketOrder.public_token instead of the numeric database ID.
+|
+| Only PAID ticket orders are exposed by the controller.
+|
+| The page shows:
+| - event details
+| - order number
+| - buyer details
+| - total paid
+| - issued tickets
+|
+| QR secrets and QR hashes must never be exposed on this page.
+|
+| This route MUST stay above the generic /events/{event:slug} route.
+|
+*/
+
+Route::get(
+    '/events/tickets/order/{token}',
+    [
+        PublicTicketOrderController::class,
+        'show',
+    ]
+)
+    ->middleware(
+        'throttle:120,1'
+    )
+    ->name(
+        'public.ticket-orders.show'
+    );
+
+/*
+|--------------------------------------------------------------------------
+| Public Individual Ticket
+|--------------------------------------------------------------------------
+|
+| Secure individual public ticket page.
+|
+| Example:
+| /tickets/AbCdEf123456...
+|
+| The URL uses Ticket.public_token instead of the numeric database ID.
+|
+| The controller:
+| - loads the ticket using its public token
+| - verifies the ticket is not cancelled or refunded
+| - verifies the parent order is paid
+| - decrypts qr_token_encrypted
+| - renders the secure QR code
+|
+| The QR payload itself contains only the secure raw scan credential.
+|
+| It must never contain:
+| - ticket database ID
+| - Ticket.public_token
+| - qr_token_hash
+|
+*/
+
+Route::get(
+    '/tickets/{token}',
+    [
+        PublicTicketViewController::class,
+        'show',
+    ]
+)
+    ->middleware(
+        'throttle:120,1'
+    )
+    ->name(
+        'public.tickets.show'
     );
 
 /*
