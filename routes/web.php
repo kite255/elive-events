@@ -14,6 +14,7 @@ use App\Http\Controllers\PublicTicketOrderController;
 use App\Http\Controllers\PublicTicketRecoveryController;
 use App\Http\Controllers\PublicTicketViewController;
 use App\Http\Controllers\QrVerificationController;
+use App\Http\Controllers\TicketScannerController;
 use App\Models\Event;
 use Illuminate\Support\Facades\Route;
 
@@ -227,6 +228,37 @@ Route::get(
     )
     ->name(
         'public.tickets.show'
+    );
+
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated Ticket Scanner
+|--------------------------------------------------------------------------
+|
+| Secure ticket QR scanning endpoint used by the admin scanner interface.
+|
+| Example:
+| POST /admin/ticket-scanner/scan
+|
+| Authentication is required. The controller passes the raw QR credential
+| to TicketCheckInService, which validates and records ticket entry.
+|
+*/
+
+Route::post(
+    '/admin/ticket-scanner/scan',
+    [
+        TicketScannerController::class,
+        'scan',
+    ]
+)
+    ->middleware([
+        'auth',
+        'throttle:120,1',
+    ])
+    ->name(
+        'admin.ticket-scanner.scan'
     );
 
 /*
