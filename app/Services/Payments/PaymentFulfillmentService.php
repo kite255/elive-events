@@ -2,14 +2,17 @@
 
 namespace App\Services\Payments;
 
+use App\Jobs\SendTicketAccessLinkJob;
 use App\Models\Payment;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Services\AutomaticCommunicationService;
 use App\Services\BadgeGenerationService;
+use App\Services\PhoneNumberService;
 use App\Services\Tickets\TicketAvailabilityService;
 use App\Services\Tickets\TicketIssuanceService;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
@@ -20,6 +23,7 @@ class PaymentFulfillmentService
         protected AutomaticCommunicationService $communicationService,
         protected TicketIssuanceService $ticketIssuanceService,
         protected TicketAvailabilityService $ticketAvailabilityService,
+        protected PhoneNumberService $phoneNumberService,
     ) {
     }
 
@@ -56,6 +60,14 @@ class PaymentFulfillmentService
             }
         );
 
+        /*
+         * Payment fulfillment is idempotent.
+         *
+         * A payment that already has fulfilled_at set must not:
+         * - issue duplicate tickets
+         * - regenerate badges
+         * - resend My Tickets delivery
+         */
         if ($payment->fulfilled_at) {
             return $payment->fresh();
         }
@@ -67,6 +79,22 @@ class PaymentFulfillmentService
                 );
 
                 $this->markPaymentFulfilled(
+                    $payment
+                );
+
+                /*
+                 * Queue the buyer's secure My Tickets access only after:
+                 *
+                 * 1. payment is completed,
+                 * 2. order is marked PAID,
+                 * 3. tickets have been issued,
+                 * 4. payment fulfillment has been finalized.
+                 *
+                 * Because fulfilled_at is checked at the beginning of this
+                 * method, reconciliation/IPN retries will not enqueue a
+                 * second access message.
+                 */
+                $this->queueTicketAccessLink(
                     $payment
                 );
 
@@ -251,8 +279,7 @@ class PaymentFulfillmentService
                 /*
                  * Inventory is now either:
                  *
-                 * 1. still protected by the original reservation,
-                 * or
+                 * 1. still protected by the original reservation, or
                  * 2. successfully reacquired after expiry.
                  */
                 if (! $lockedOrder->isPaid()) {
@@ -287,6 +314,81 @@ class PaymentFulfillmentService
                     );
             },
             attempts: 3
+        );
+    }
+
+    /**
+     * Queue the secure My Tickets link after successful
+     * ticket payment fulfillment.
+     *
+     * Delivery preference:
+     *
+     * 1. Email, when available.
+     * 2. SMS, only when email is unavailable.
+     */
+    private function queueTicketAccessLink(
+        Payment $payment
+    ): void {
+        $order =
+            TicketOrder::query()
+                ->find(
+                    $payment->ticket_order_id
+                );
+
+        if (
+            ! $order
+            || ! $order->isPaid()
+        ) {
+            return;
+        }
+
+        if (filled($order->buyer_email)) {
+            $email =
+                mb_strtolower(
+                    trim(
+                        (string) $order->buyer_email
+                    )
+                );
+
+            if (
+                filter_var(
+                    $email,
+                    FILTER_VALIDATE_EMAIL
+                )
+            ) {
+                SendTicketAccessLinkJob::dispatch(
+                    $order->id,
+                    'email',
+                    $email
+                );
+
+                return;
+            }
+        }
+
+        if (blank($order->buyer_phone)) {
+            return;
+        }
+
+        try {
+            $phone =
+                $this
+                    ->phoneNumberService
+                    ->normalize(
+                        $order->buyer_phone
+                    );
+        } catch (InvalidArgumentException) {
+            return;
+        }
+
+        if (blank($phone)) {
+            return;
+        }
+
+        SendTicketAccessLinkJob::dispatch(
+            $order->id,
+            'sms',
+            $phone
         );
     }
 

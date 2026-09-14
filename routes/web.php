@@ -11,6 +11,7 @@ use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicTicketController;
 use App\Http\Controllers\PublicTicketOrderController;
+use App\Http\Controllers\PublicTicketRecoveryController;
 use App\Http\Controllers\PublicTicketViewController;
 use App\Http\Controllers\QrVerificationController;
 use App\Models\Event;
@@ -374,6 +375,51 @@ Route::match(
 )->name(
     'payments.pesapal.ipn'
 );
+
+/*
+|--------------------------------------------------------------------------
+| Public Ticket Recovery / Find My Tickets
+|--------------------------------------------------------------------------
+|
+| Allows a paid ticket buyer to request their existing secure My Tickets
+| link using the order number plus the email address or phone number used
+| during checkout.
+|
+| IMPORTANT:
+| These routes MUST stay above the generic /events/{event:slug} route.
+|
+| The POST endpoint always returns a generic response to prevent attackers
+| from discovering whether a ticket order or buyer contact exists.
+|
+*/
+
+Route::get(
+    '/events/tickets/find',
+    [
+        PublicTicketRecoveryController::class,
+        'show',
+    ]
+)
+    ->middleware(
+        'throttle:30,10'
+    )
+    ->name(
+        'public.ticket-recovery.show'
+    );
+
+Route::post(
+    '/events/tickets/find',
+    [
+        PublicTicketRecoveryController::class,
+        'store',
+    ]
+)
+    ->middleware(
+        'throttle:5,10'
+    )
+    ->name(
+        'public.ticket-recovery.store'
+    );
 
 /*
 |--------------------------------------------------------------------------
