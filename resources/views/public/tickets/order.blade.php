@@ -1,5 +1,6 @@
 @php
     use Illuminate\Support\Carbon;
+    use Illuminate\Support\Facades\Storage;
 
     $eventStart =
         $event?->starts_at
@@ -130,10 +131,25 @@
             display: inline-flex;
             align-items: center;
 
+            gap: 10px;
+
             color: var(--elive-navy);
 
             font-size: 22px;
             font-weight: 900;
+        }
+
+        .brand-logo {
+            display: block;
+
+            width: 42px;
+            height: 42px;
+
+            object-fit: contain;
+
+            border-radius: 10px;
+
+            background: #FFFFFF;
         }
 
         .event-link {
@@ -248,6 +264,27 @@
             position: relative;
 
             z-index: 2;
+        }
+
+        .hero-logo {
+            display: block;
+
+            width: 76px;
+            height: 76px;
+
+            margin-bottom: 18px;
+
+            object-fit: contain;
+
+            border-radius: 16px;
+
+            background: #FFFFFF;
+
+            padding: 8px;
+
+            box-shadow:
+                0 10px 28px
+                rgba(0, 0, 0, .12);
         }
 
         .eyebrow {
@@ -588,6 +625,59 @@
             font-weight: 900;
         }
 
+        .view-ticket-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            min-height: 40px;
+
+            padding:
+                9px
+                15px;
+
+            margin-top: 4px;
+
+            border:
+                1px solid
+                var(--elive-blue);
+
+            border-radius: 10px;
+
+            background:
+                var(--elive-blue);
+
+            color: #FFFFFF;
+
+            font-size: 13px;
+            font-weight: 900;
+
+            white-space: nowrap;
+
+            transition:
+                transform .15s ease,
+                box-shadow .15s ease,
+                background .15s ease;
+        }
+
+        .view-ticket-button:hover {
+            transform: translateY(-1px);
+
+            background: #006C9E;
+
+            box-shadow:
+                0 8px 20px
+                rgba(0, 122, 178, .20);
+        }
+
+        .view-ticket-button:focus-visible {
+            outline:
+                3px solid
+                rgba(0, 122, 178, .22);
+
+            outline-offset: 3px;
+        }
+
         /*
         |--------------------------------------------------------------------------
         | Notice
@@ -674,6 +764,16 @@
                 font-size: 19px;
             }
 
+            .brand-logo {
+                width: 36px;
+                height: 36px;
+            }
+
+            .hero-logo {
+                width: 64px;
+                height: 64px;
+            }
+
             .event-link {
                 padding:
                     7px
@@ -713,6 +813,10 @@
             .ticket-side {
                 align-items: flex-start;
             }
+
+            .view-ticket-button {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -725,8 +829,28 @@
         <a
             href="{{ route('home') }}"
             class="brand"
+            aria-label="eLive Events"
         >
-            eLive Events
+            @if (
+                $event
+                && filled(
+                    $event->registration_logo_path
+                )
+            )
+                <img
+                    src="{{
+                        Storage::disk('public')->url(
+                            $event->registration_logo_path
+                        )
+                    }}"
+                    alt="{{ $event->name }} logo"
+                    class="brand-logo"
+                >
+            @else
+                <span>
+                    eLive Events
+                </span>
+            @endif
         </a>
 
         @if (
@@ -760,6 +884,23 @@
             <div class="hero-card">
 
                 <div class="hero-content">
+
+                    @if (
+                        $event
+                        && filled(
+                            $event->registration_logo_path
+                        )
+                    )
+                        <img
+                            src="{{
+                                Storage::disk('public')->url(
+                                    $event->registration_logo_path
+                                )
+                            }}"
+                            alt="{{ $event->name }} logo"
+                            class="hero-logo"
+                        >
+                    @endif
 
                     <p class="eyebrow">
                         Your Purchase
@@ -1049,6 +1190,28 @@
                                         )
                                     }}
                                 </span>
+
+                                @if (
+                                    filled(
+                                        $ticket->public_token
+                                    )
+                                )
+                                    <a
+                                        href="{{
+                                            route(
+                                                'public.tickets.show',
+                                                [
+                                                    'token' =>
+                                                        $ticket
+                                                            ->public_token,
+                                                ]
+                                            )
+                                        }}"
+                                        class="view-ticket-button"
+                                    >
+                                        View Ticket
+                                    </a>
+                                @endif
 
                             </div>
 
