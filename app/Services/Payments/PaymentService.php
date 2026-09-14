@@ -8,6 +8,7 @@ use App\Models\Attendee;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Models\PaymentTransaction;
+use App\Models\TicketOrder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
@@ -111,6 +112,9 @@ class PaymentService
                     'attendee_id' =>
                         $attendee->getKey(),
 
+                    'ticket_order_id' =>
+                        null,
+
                     'payment_gateway_id' =>
                         $gateway->getKey(),
 
@@ -144,6 +148,189 @@ class PaymentService
     }
 
     /**
+     * Create one pending payment for a ticket order.
+     */
+    public function createForTicketOrder(
+        TicketOrder $order
+    ): Payment {
+        $order->loadMissing([
+            'event.organization',
+        ]);
+
+        $event = $order->event;
+
+        if (! $event) {
+            throw new RuntimeException(
+                'Ticket order is not linked to an event.'
+            );
+        }
+
+        if ($order->isPaid()) {
+            throw new RuntimeException(
+                'This ticket order is already paid.'
+            );
+        }
+
+        if ($order->isCancelled()) {
+            throw new RuntimeException(
+                'This ticket order has been cancelled.'
+            );
+        }
+
+        if ($order->isExpired()) {
+            throw new RuntimeException(
+                'This ticket order has expired.'
+            );
+        }
+
+        if (
+            $order->expires_at !== null
+            && $order->expires_at->isPast()
+        ) {
+            throw new RuntimeException(
+                'This ticket reservation has expired.'
+            );
+        }
+
+        $amount =
+            (float) $order->total;
+
+        if ($amount <= 0) {
+            throw new RuntimeException(
+                'The ticket order total must be greater than zero.'
+            );
+        }
+
+        $gateway =
+            $this->defaultGatewayForOrganization(
+                (int) $event->organization_id
+            );
+
+        return DB::transaction(
+            function () use (
+                $order,
+                $event,
+                $gateway,
+                $amount
+            ): Payment {
+                $lockedOrder =
+                    TicketOrder::query()
+                        ->lockForUpdate()
+                        ->findOrFail(
+                            $order->getKey()
+                        );
+
+                if ($lockedOrder->isPaid()) {
+                    throw new RuntimeException(
+                        'This ticket order is already paid.'
+                    );
+                }
+
+                if ($lockedOrder->isCancelled()) {
+                    throw new RuntimeException(
+                        'This ticket order has been cancelled.'
+                    );
+                }
+
+                if ($lockedOrder->isExpired()) {
+                    throw new RuntimeException(
+                        'This ticket order has expired.'
+                    );
+                }
+
+                if (
+                    $lockedOrder->expires_at !== null
+                    && $lockedOrder->expires_at->isPast()
+                ) {
+                    throw new RuntimeException(
+                        'This ticket reservation has expired.'
+                    );
+                }
+
+                /*
+                 * Reuse an unresolved ticket payment when the
+                 * customer retries checkout.
+                 */
+                $existing =
+                    Payment::query()
+                        ->where(
+                            'ticket_order_id',
+                            $lockedOrder->getKey()
+                        )
+                        ->where(
+                            'event_id',
+                            $event->getKey()
+                        )
+                        ->whereIn(
+                            'status',
+                            [
+                                Payment::STATUS_PENDING,
+                                Payment::STATUS_PROCESSING,
+                            ]
+                        )
+                        ->latest('id')
+                        ->first();
+
+                if ($existing) {
+                    return $existing;
+                }
+
+                return Payment::create([
+                    'organization_id' =>
+                        $event->organization_id,
+
+                    'event_id' =>
+                        $event->getKey(),
+
+                    'attendee_id' =>
+                        null,
+
+                    'ticket_order_id' =>
+                        $lockedOrder->getKey(),
+
+                    'payment_gateway_id' =>
+                        $gateway->getKey(),
+
+                    'reference' =>
+                        $this->referenceService
+                            ->generate($event),
+
+                    'amount' =>
+                        $amount,
+
+                    'currency' =>
+                        strtoupper(
+                            (string) (
+                                $lockedOrder->currency
+                                ?: 'TZS'
+                            )
+                        ),
+
+                    'status' =>
+                        Payment::STATUS_PENDING,
+
+                    'description' =>
+                        'Ticket payment for '
+                        . $event->name
+                        . ' - '
+                        . $lockedOrder->order_number,
+
+                    'initiated_at' =>
+                        now(),
+
+                    'metadata' => [
+                        'payment_purpose' =>
+                            'ticket_order',
+
+                        'ticket_order_number' =>
+                            $lockedOrder->order_number,
+                    ],
+                ]);
+            }
+        );
+    }
+
+    /**
      * Submit the local payment to its configured gateway.
      */
     public function start(
@@ -153,6 +340,49 @@ class PaymentService
             throw new RuntimeException(
                 'This payment is already completed.'
             );
+        }
+
+        /*
+         * Do not start Pesapal checkout for an expired
+         * ticket reservation.
+         */
+        if ($payment->ticket_order_id) {
+            $payment->loadMissing(
+                'ticketOrder'
+            );
+
+            $ticketOrder =
+                $payment->ticketOrder;
+
+            if (! $ticketOrder) {
+                throw new RuntimeException(
+                    'Ticket order linked to this payment is missing.'
+                );
+            }
+
+            if ($ticketOrder->isPaid()) {
+                throw new RuntimeException(
+                    'This ticket order is already paid.'
+                );
+            }
+
+            if ($ticketOrder->isCancelled()) {
+                throw new RuntimeException(
+                    'This ticket order has been cancelled.'
+                );
+            }
+
+            if (
+                $ticketOrder->isExpired()
+                || (
+                    $ticketOrder->expires_at !== null
+                    && $ticketOrder->expires_at->isPast()
+                )
+            ) {
+                throw new RuntimeException(
+                    'This ticket reservation has expired.'
+                );
+            }
         }
 
         $payment->loadMissing(
@@ -185,10 +415,6 @@ class PaymentService
                     $payment
                 );
 
-            /*
-             * Verify merchant reference returned during
-             * SubmitOrderRequest.
-             */
             $returnedReference =
                 trim(
                     (string) data_get(
@@ -210,9 +436,6 @@ class PaymentService
                 );
             }
 
-            /*
-             * Pesapal must return an order tracking ID.
-             */
             $trackingId =
                 trim(
                     (string) data_get(
@@ -228,9 +451,6 @@ class PaymentService
                 );
             }
 
-            /*
-             * Pesapal must return a checkout URL.
-             */
             $redirectUrl =
                 trim(
                     (string) data_get(
@@ -261,10 +481,6 @@ class PaymentService
                                 $payment->getKey()
                             );
 
-                    /*
-                     * Do not accidentally restart an already
-                     * completed transaction.
-                     */
                     if ($lockedPayment->isCompleted()) {
                         throw new RuntimeException(
                             'This payment is already completed.'
@@ -292,6 +508,27 @@ class PaymentService
                             ),
                     ]);
 
+                    /*
+                     * TicketOrder mirrors checkout state only.
+                     *
+                     * Do NOT mark it paid here.
+                     */
+                    if ($lockedPayment->ticket_order_id) {
+                        TicketOrder::query()
+                            ->whereKey(
+                                $lockedPayment
+                                    ->ticket_order_id
+                            )
+                            ->where(
+                                'status',
+                                TicketOrder::STATUS_PENDING
+                            )
+                            ->update([
+                                'status' =>
+                                    TicketOrder::STATUS_PROCESSING,
+                            ]);
+                    }
+
                     $lockedPayment
                         ->transactions()
                         ->create([
@@ -312,10 +549,6 @@ class PaymentService
 
             return $response;
         } catch (Throwable $exception) {
-            /*
-             * Record order creation failure for troubleshooting
-             * and reconciliation.
-             */
             try {
                 $payment
                     ->transactions()
@@ -384,19 +617,11 @@ class PaymentService
                 $gatewayModel
             );
 
-        /*
-         * Always ask the gateway for the authoritative
-         * transaction state.
-         */
         $response =
             $gateway->getPaymentStatus(
                 $trackingId
             );
 
-        /*
-         * Never change local payment state before verifying
-         * that the response belongs to this exact payment.
-         */
         $this->verifyGatewayResponse(
             $payment,
             $trackingId,
@@ -431,14 +656,38 @@ class PaymentService
             };
 
         /*
-         * This value is returned from inside the row lock.
+         * Pesapal may continue returning PENDING for an abandoned
+         * checkout even after the local ticket reservation has expired.
          *
-         * Only the process that actually changes:
-         *
-         * processing -> completed
-         *
-         * should dispatch fulfillment.
+         * In that case, expire the local payment without pretending
+         * that Pesapal reported a failed payment.
          */
+        if (
+            $gatewayStatus === 'PENDING'
+            && $payment->ticket_order_id
+        ) {
+            $payment->loadMissing(
+                'ticketOrder'
+            );
+
+            $ticketOrder =
+                $payment->ticketOrder;
+
+            if (
+                $ticketOrder
+                && (
+                    $ticketOrder->isExpired()
+                    || (
+                        $ticketOrder->expires_at !== null
+                        && $ticketOrder->expires_at->isPast()
+                    )
+                )
+            ) {
+                $localStatus =
+                    Payment::STATUS_EXPIRED;
+            }
+        }
+
         $transitionedToCompleted =
             DB::transaction(
                 function () use (
@@ -448,10 +697,6 @@ class PaymentService
                     $gatewayStatus,
                     $localStatus
                 ): bool {
-                    /*
-                     * Callback and IPN may arrive at nearly the
-                     * same time. Lock the payment row.
-                     */
                     $lockedPayment =
                         Payment::query()
                             ->lockForUpdate()
@@ -465,14 +710,6 @@ class PaymentService
                     /*
                      * Never downgrade a payment that has already
                      * been completed.
-                     *
-                     * Example:
-                     *
-                     * COMPLETED
-                     *     ↓
-                     * stale PENDING response
-                     *
-                     * must remain COMPLETED.
                      */
                     if (
                         $previousStatus
@@ -530,13 +767,6 @@ class PaymentService
                         'provider_tracking_id' =>
                             $trackingId,
 
-                        /*
-                         * provider_reference remains the merchant
-                         * reference generated by eLive.
-                         *
-                         * Pesapal confirmation code is stored
-                         * separately in metadata.
-                         */
                         'provider_reference' =>
                             $lockedPayment
                                 ->provider_reference,
@@ -598,6 +828,61 @@ class PaymentService
                         $attributes
                     );
 
+                    /*
+                     * IMPORTANT:
+                     *
+                     * Do NOT mark TicketOrder as PAID when
+                     * Pesapal merely reports COMPLETED.
+                     *
+                     * A completed payment may arrive after the
+                     * original reservation has expired.
+                     *
+                     * PaymentFulfillmentService must first:
+                     *
+                     * - verify whether reservation is still valid
+                     * - reacquire inventory when necessary
+                     * - reject overselling if capacity is gone
+                     * - mark order paid
+                     * - issue tickets
+                     */
+                    if (
+                        $lockedPayment->ticket_order_id
+                        && $localStatus
+                            === Payment::STATUS_FAILED
+                    ) {
+                        $ticketOrder =
+                            TicketOrder::query()
+                                ->lockForUpdate()
+                                ->find(
+                                    $lockedPayment
+                                        ->ticket_order_id
+                                );
+
+                        if (
+                            $ticketOrder
+                            && ! $ticketOrder->isPaid()
+                            && ! $ticketOrder->isCancelled()
+                            && ! $ticketOrder->isExpired()
+                            && (
+                                $ticketOrder->expires_at
+                                    === null
+                                || $ticketOrder
+                                    ->expires_at
+                                    ->isFuture()
+                            )
+                        ) {
+                            /*
+                             * Failed gateway attempt:
+                             * allow retry while the original
+                             * reservation remains valid.
+                             */
+                            $ticketOrder->update([
+                                'status' =>
+                                    TicketOrder::STATUS_PENDING,
+                            ]);
+                        }
+                    }
+
                     $lockedPayment
                         ->transactions()
                         ->create([
@@ -614,10 +899,6 @@ class PaymentService
                                 $localStatus,
                         ]);
 
-                    /*
-                     * True only when THIS transaction performed
-                     * the first transition into completed.
-                     */
                     return (
                         $previousStatus
                         !== Payment::STATUS_COMPLETED
@@ -631,12 +912,8 @@ class PaymentService
             $payment->fresh();
 
         /*
-         * Dispatch fulfillment only after the database
-         * transaction has committed successfully.
-         *
-         * Duplicate callback/IPN requests will not dispatch
-         * another job because only the first request performs
-         * the transition to completed.
+         * Only the first verified transition into COMPLETED
+         * dispatches fulfillment.
          */
         if (
             $transitionedToCompleted
@@ -710,10 +987,6 @@ class PaymentService
             );
         }
 
-        /*
-         * If this local payment already has a provider tracking
-         * ID, the incoming tracking ID must match it.
-         */
         if (
             filled(
                 $payment->provider_tracking_id
@@ -777,10 +1050,6 @@ class PaymentService
             );
         }
 
-        /*
-         * Normalize both values to exactly two decimal places
-         * before comparing with BCMath.
-         */
         $normalizedGatewayAmount =
             number_format(
                 (float) $gatewayAmount,

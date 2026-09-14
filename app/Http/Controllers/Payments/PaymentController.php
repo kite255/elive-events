@@ -59,7 +59,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Public attendee-facing payment status page.
+     * Public attendee / ticket-buyer payment status page.
      */
     public function status(
         Payment $payment
@@ -68,6 +68,7 @@ class PaymentController extends Controller
             'event',
             'attendee',
             'gateway',
+            'ticketOrder',
         ]);
 
         /*
@@ -94,6 +95,7 @@ class PaymentController extends Controller
                     'event',
                     'attendee',
                     'gateway',
+                    'ticketOrder',
                 ]);
             } catch (Throwable $exception) {
                 /*
@@ -101,13 +103,16 @@ class PaymentController extends Controller
                  * unavailable just because Pesapal cannot be
                  * reached temporarily.
                  */
-                report($exception);
+                report(
+                    $exception
+                );
 
                 $payment =
                     $payment->fresh([
                         'event',
                         'attendee',
                         'gateway',
+                        'ticketOrder',
                     ]);
             }
         }
@@ -115,7 +120,8 @@ class PaymentController extends Controller
         return view(
             'public.payments.status',
             [
-                'payment' => $payment,
+                'payment' =>
+                    $payment,
             ]
         );
     }

@@ -1,0 +1,102 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+/*
+|--------------------------------------------------------------------------
+| eLive Events Filament Admin Theme
+|--------------------------------------------------------------------------
+*/
+
+:root {
+    --elive-navy: #161943;
+    --elive-blue: #007AB2;
+    --elive-orange: #FF9800;
+    --elive-bg: #f5f8fc;
+    --elive-surface: #ffffff;
+    --elive-border: #e6ebf2;
+    --elive-muted: #64748b;
+}
+
+.fi-body,
+.fi-main {
+    background:
+        linear-gradient(
+            180deg,
+            #eef4fb 0%,
+            #f7f9fc 42%,
+            #f8fafc 100%
+        );
+}
+
+.fi-page {
+    max-width: 1560px;
+    margin-inline: auto;
+}
+
+.fi-section,
+.fi-wi-stats-overview-stat,
+.fi-ta-ctn {
+    border-radius: 18px;
+    border: 1px solid var(--elive-border);
+    box-shadow:
+        0 8px 24px rgba(22, 25, 67, 0.05);
+}
+
+.fi-sidebar {
+    border-right: 1px solid var(--elive-border);
+}
+
+.fi-sidebar-nav {
+    padding-inline: 0.75rem;
+}
+
+.fi-topbar nav {
+    border-bottom: 1px solid var(--elive-border);
+}
+
+.fi-sidebar-item-button {
+    border-radius: 12px;
+}
+
+.fi-sidebar-item-active .fi-sidebar-item-button {
+    background: rgba(22, 25, 67, 0.08);
+}
+
+.fi-ta-header-cell {
+    font-weight: 700;
+}
+
+.fi-input-wrp {
+    border-radius: 12px;
+}
+
+.elive-dashboard-card {
+    border: 1px solid var(--elive-border);
+    border-radius: 20px;
+    background: var(--elive-surface);
+    box-shadow:
+        0 10px 28px rgba(15, 23, 42, 0.07);
+}
+
+.elive-dashboard-card:hover {
+    box-shadow:
+        0 16px 35px rgba(15, 23, 42, 0.10);
+}
+
+.elive-dashboard-muted {
+    color: var(--elive-muted);
+}
+
+.elive-dashboard-navy {
+    color: var(--elive-navy);
+}
+
+.elive-dashboard-blue {
+    color: var(--elive-blue);
+}
+
+.elive-dashboard-orange {
+    color: var(--elive-orange);
+}

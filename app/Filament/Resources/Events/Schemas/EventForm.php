@@ -7,6 +7,7 @@ use App\Services\EventPresetService;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -19,6 +20,68 @@ use Illuminate\Support\Str;
 
 class EventForm
 {
+    private static function eventType(Get $get): ?string
+    {
+        $value = $get('event_type');
+
+        return filled($value)
+            ? (string) $value
+            : null;
+    }
+
+    private static function advanced(Get $get): bool
+    {
+        return (bool) $get('show_advanced_features');
+    }
+
+    private static function showTicketing(Get $get): bool
+    {
+        return self::advanced($get)
+            || EventPresetService::usesTicketing(
+                self::eventType($get)
+            );
+    }
+
+    private static function showRegistration(Get $get): bool
+    {
+        return self::advanced($get)
+            || EventPresetService::usesRegistration(
+                self::eventType($get)
+            );
+    }
+
+    private static function showSessions(Get $get): bool
+    {
+        return self::advanced($get)
+            || EventPresetService::usesSessions(
+                self::eventType($get)
+            );
+    }
+
+    private static function showProfessionalFields(Get $get): bool
+    {
+        return self::advanced($get)
+            || EventPresetService::usesProfessionalFields(
+                self::eventType($get)
+            );
+    }
+
+    private static function showBadges(Get $get): bool
+    {
+        return self::advanced($get)
+            || EventPresetService::usesBadges(
+                self::eventType($get)
+            );
+    }
+
+    private static function showGuestRsvp(Get $get): bool
+    {
+        return self::advanced($get)
+            || EventPresetService::usesGuestRsvp(
+                self::eventType($get)
+            );
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -31,7 +94,7 @@ class EventForm
 
                 Section::make('Event Information')
                     ->description(
-                        'Basic event details and organization ownership.'
+                        'Create the event and select its type. eLive Events automatically shows the modules relevant to that event type.'
                     )
                     ->schema([
                         Select::make('organization_id')
@@ -49,10 +112,6 @@ class EventForm
                                     $state,
                                     Set $set
                                 ): void {
-                                    /*
-                                     * A template from a previous organization
-                                     * must never remain selected.
-                                     */
                                     $set(
                                         'registration_sms_template_id',
                                         null
@@ -108,7 +167,7 @@ class EventForm
                         TextInput::make('event_code')
                             ->label('Event Code')
                             ->helperText(
-                                'Used for badge numbers. Example: LC26 gives ELV-LC26-000001.'
+                                'Used for operational numbering and badges. Example: LC26 gives ELV-LC26-000001.'
                             )
                             ->placeholder('LC26')
                             ->maxLength(20)
@@ -157,7 +216,7 @@ class EventForm
                                 }
                             )
                             ->helperText(
-                                'Event type provides recommended registration defaults. You can still customize every setting below.'
+                                'The selected type controls recommended defaults and which setup modules are displayed.'
                             ),
 
                         TextInput::make(
@@ -182,7 +241,7 @@ class EventForm
                         TextInput::make('venue')
                             ->label('Main Venue')
                             ->helperText(
-                                'General event venue. Individual event days and sessions can use different venues.'
+                                'General event venue. Individual event days and sessions may use different venues.'
                             )
                             ->maxLength(255),
 
@@ -195,13 +254,98 @@ class EventForm
 
                 /*
                 |--------------------------------------------------------------------------
+                | Event Profile
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make('Event Setup Profile')
+                    ->description(
+                        'The form adapts automatically to the selected event type.'
+                    )
+                    ->schema([
+                        Placeholder::make(
+                            'event_profile_information'
+                        )
+                            ->label('Recommended Setup')
+                            ->content(
+                                function (
+                                    Get $get
+                                ): string {
+                                    return match (
+                                        $get('event_type')
+                                    ) {
+                                        'concert' =>
+                                            'Concert mode focuses on ticket sales, ticket types, payments, digital QR tickets, and ticket check-in. Public attendee registration is hidden by default.',
+
+                                        'conference' =>
+                                            'Conference mode focuses on registration, attendee information, badges, sessions, communication, payments, and attendance.',
+
+                                        'seminar' =>
+                                            'Seminar mode focuses on participant registration, communication, badges, and session attendance.',
+
+                                        'workshop' =>
+                                            'Workshop mode focuses on capacity, participant registration, sessions, payments where required, and attendance.',
+
+                                        'training' =>
+                                            'Training mode focuses on participant registration, professional information, sessions, attendance, payments, and badges.',
+
+                                        'wedding',
+                                        'send_off',
+                                        'engagement',
+                                        'birthday' =>
+                                            'Guest-event mode focuses on guest registration, RSVP-style information, communication, and optional payment instructions.',
+
+                                        'exhibition',
+                                        'expo',
+                                        'trade_fair' =>
+                                            'Exhibition mode can combine public registration, professional attendee information, ticket sales, sessions, badges, and payments.',
+
+                                        'festival',
+                                        'cultural_event' =>
+                                            'Festival mode focuses on ticketing and performances or activities. Registration can be enabled through Advanced Features when required.',
+
+                                        'church_event',
+                                        'community_event',
+                                        'charity_event' =>
+                                            'Community mode focuses on participant registration, multi-day attendance, programs or sessions, communication, and badges.',
+
+                                        'bonanza',
+                                        'sports_event',
+                                        'tournament' =>
+                                            'Sports mode focuses on participant registration, teams/categories, games or activities, badges, and attendance.',
+
+                                        default =>
+                                            'Select the event type to receive recommended defaults and a simplified setup form.',
+                                    };
+                                }
+                            )
+                            ->columnSpanFull(),
+
+                        Toggle::make(
+                            'show_advanced_features'
+                        )
+                            ->label(
+                                'Show Advanced / Optional Features'
+                            )
+                            ->helperText(
+                                'Temporarily reveal modules that are normally hidden for this event type.'
+                            )
+                            ->default(false)
+                            ->live()
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
                 | Schedule and Capacity
                 |--------------------------------------------------------------------------
                 */
 
                 Section::make('Schedule and Capacity')
                     ->description(
-                        'Set the overall event period, capacity, and publishing status.'
+                        'Set the overall event dates, capacity, and publishing status.'
                     )
                     ->schema([
                         DateTimePicker::make('starts_at')
@@ -216,7 +360,7 @@ class EventForm
                         TextInput::make('capacity')
                             ->label('Overall Capacity')
                             ->helperText(
-                                'Leave empty if the event has no strict overall capacity limit. Event days and sessions may also have their own capacities.'
+                                'Leave empty when there is no strict overall capacity. Ticket types and sessions may have their own capacity limits.'
                             )
                             ->numeric()
                             ->minValue(1),
@@ -224,36 +368,193 @@ class EventForm
                         Select::make('status')
                             ->label('Status')
                             ->options([
-                                'draft' =>
-                                    'Draft',
-
-                                'active' =>
-                                    'Active',
-
-                                'completed' =>
-                                    'Completed',
-
-                                'cancelled' =>
-                                    'Cancelled',
+                                'draft' => 'Draft',
+                                'active' => 'Active',
+                                'completed' => 'Completed',
+                                'cancelled' => 'Cancelled',
                             ])
-                            ->helperText(
-                                'Use Active when the event is ready for attendee registration and operations.'
-                            )
                             ->default('draft')
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->helperText(
+                                'Use Active when the event is ready for public operations.'
+                            ),
                     ])
                     ->columns(2),
 
                 /*
                 |--------------------------------------------------------------------------
-                | Event Structure
+                | Ticket Sales
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make('Ticket Sales')
+                    ->description(
+                        'Configure public admission ticket sales, checkout limits, reservation time, and ticket sales dates.'
+                    )
+                    ->relationship('ticketSetting')
+                    ->schema([
+                        Toggle::make(
+                            'ticket_sales_enabled'
+                        )
+                            ->label('Enable Ticket Sales')
+                            ->helperText(
+                                'Allow customers to purchase admission tickets.'
+                            )
+                            ->default(false)
+                            ->live(),
+
+                        Placeholder::make(
+                            'ticket_types_information'
+                        )
+                            ->label('Ticket Types')
+                            ->content(
+                                'After saving the event, create ticket types such as VIP, VVIP, Regular, Student, Early Bird, Sponsor, or another admission category.'
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            )
+                            ->columnSpanFull(),
+
+                        Select::make(
+                            'reservation_minutes'
+                        )
+                            ->label(
+                                'Ticket Reservation Time'
+                            )
+                            ->options([
+                                5 => '5 minutes',
+                                10 => '10 minutes',
+                                15 => '15 minutes',
+                                20 => '20 minutes',
+                                30 => '30 minutes',
+                            ])
+                            ->default(15)
+                            ->required(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            )
+                            ->native(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            )
+                            ->helperText(
+                                'How long unpaid checkout temporarily reserves inventory.'
+                            ),
+
+                        TextInput::make(
+                            'max_tickets_per_order'
+                        )
+                            ->label(
+                                'Maximum Tickets Per Order'
+                            )
+                            ->numeric()
+                            ->integer()
+                            ->minValue(1)
+                            ->maxValue(100)
+                            ->default(10)
+                            ->required(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            ),
+
+                        Toggle::make(
+                            'allow_guest_checkout'
+                        )
+                            ->label(
+                                'Allow Guest Checkout'
+                            )
+                            ->helperText(
+                                'Allow customers to purchase tickets without creating an account.'
+                            )
+                            ->default(true)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            ),
+
+                        DateTimePicker::make(
+                            'sales_start_at'
+                        )
+                            ->label('Ticket Sales Start')
+                            ->seconds(false)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            )
+                            ->helperText(
+                                'Optional. Leave empty to allow ticket sales immediately.'
+                            ),
+
+                        DateTimePicker::make(
+                            'sales_end_at'
+                        )
+                            ->label('Ticket Sales End')
+                            ->seconds(false)
+                            ->afterOrEqual(
+                                'sales_start_at'
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            )
+                            ->helperText(
+                                'Optional. Leave empty to keep sales open until manually disabled.'
+                            ),
+
+                        Placeholder::make(
+                            'public_ticket_flow_information'
+                        )
+                            ->label('Public Ticket Flow')
+                            ->content(
+                                'Buyer selects ticket type → reservation → payment → payment verification → ticket issuance → My Tickets → secure QR ticket.'
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    (bool) $get(
+                                        'ticket_sales_enabled'
+                                    )
+                            )
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showTicketing($get)
+                    )
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Event Structure / Sessions
                 |--------------------------------------------------------------------------
                 */
 
                 Section::make('Event Structure')
                     ->description(
-                        'Define whether this is a simple event or a multi-day event with sessions and activities. Event days and sessions are configured after the event is created.'
+                        'Configure multi-day events, sessions, activities, programs, games, workshops, or performances.'
                     )
                     ->schema([
                         Select::make('schedule_mode')
@@ -268,10 +569,7 @@ class EventForm
                             ->default('single_day')
                             ->required()
                             ->live()
-                            ->native(false)
-                            ->helperText(
-                                'Choose Multi-day for conferences, exhibitions, bonanzas, festivals, trainings, or events running across several days.'
-                            ),
+                            ->native(false),
 
                         Toggle::make(
                             'registration_allow_day_selection'
@@ -279,16 +577,13 @@ class EventForm
                             ->label(
                                 'Allow Attendees to Select Event Days'
                             )
-                            ->helperText(
-                                'When event days exist, attendees can choose which days they plan to attend.'
-                            )
                             ->default(true)
+                            ->live()
                             ->visible(
                                 fn (Get $get): bool =>
                                     $get('schedule_mode')
                                     === 'multi_day'
                             )
-                            ->live()
                             ->afterStateUpdated(
                                 function (
                                     bool $state,
@@ -309,9 +604,6 @@ class EventForm
                             ->label(
                                 'Allow "All Event Days" Selection'
                             )
-                            ->helperText(
-                                'Adds a single option that registers the attendee for every available event day.'
-                            )
                             ->default(true)
                             ->visible(
                                 fn (Get $get): bool =>
@@ -326,19 +618,14 @@ class EventForm
                             ->label(
                                 'Enable Sessions / Activities'
                             )
-                            ->helperText(
-                                'Use sessions for workshops, keynotes, panels, matches, games, performances, ceremonies, networking, and other activities.'
-                            )
-                            ->default(true),
+                            ->default(true)
+                            ->live(),
 
                         Toggle::make(
                             'session_registration_enabled'
                         )
                             ->label(
                                 'Allow Public Session Selection'
-                            )
-                            ->helperText(
-                                'Attendees can select registration-required sessions on the public registration form.'
                             )
                             ->default(true)
                             ->visible(
@@ -354,9 +641,6 @@ class EventForm
                             ->label(
                                 'Enable Session-level Check-in'
                             )
-                            ->helperText(
-                                'Allows separate attendance tracking for individual workshops, keynotes, matches, and other activities.'
-                            )
                             ->default(true)
                             ->visible(
                                 fn (Get $get): bool =>
@@ -365,7 +649,12 @@ class EventForm
                                     )
                             ),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showSessions($get)
+                    )
+                    ->collapsible(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -375,90 +664,76 @@ class EventForm
 
                 Section::make('Public Registration')
                     ->description(
-                        'Control whether attendees can register publicly for this event.'
+                        fn (Get $get): string =>
+                            self::showGuestRsvp($get)
+                                ? 'Configure guest registration and RSVP-related behavior.'
+                                : 'Control public attendee registration for this event.'
                     )
                     ->schema([
                         Toggle::make(
                             'registration_is_open'
                         )
                             ->label('Registration Open')
-                            ->helperText(
-                                'Enable this to allow public registration for this event.'
-                            )
                             ->default(false),
 
                         Toggle::make(
                             'registration_requires_approval'
                         )
                             ->label('Requires Approval')
-                            ->helperText(
-                                'If enabled, public registrations will be marked as pending approval.'
-                            )
                             ->default(false),
 
                         Toggle::make(
                             'registration_auto_generate_badge'
                         )
-                            ->label(
-                                'Auto-generate Badge'
-                            )
-                            ->helperText(
-                                'Automatically generate a badge after public registration when the attendee is registered.'
-                            )
-                            ->default(true),
+                            ->label('Auto-generate Badge')
+                            ->default(true)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showBadges($get)
+                            ),
 
                         Toggle::make(
                             'registration_waitlist_enabled'
                         )
-                            ->label(
-                                'Enable Waitlist'
-                            )
-                            ->helperText(
-                                'Allow attendees to join the waitlist when the event reaches capacity.'
-                            )
+                            ->label('Enable Waitlist')
                             ->default(false),
 
                         TextInput::make(
                             'registration_welcome_title'
                         )
-                            ->label(
-                                'Welcome Title'
-                            )
+                            ->label('Welcome Title')
                             ->maxLength(255)
                             ->placeholder(
-                                'Register for this event'
+                                fn (Get $get): string =>
+                                    self::showGuestRsvp($get)
+                                        ? 'RSVP for this event'
+                                        : 'Register for this event'
                             ),
 
                         Textarea::make(
                             'registration_welcome_message'
                         )
-                            ->label(
-                                'Welcome Message'
-                            )
+                            ->label('Welcome Message')
                             ->rows(3)
                             ->placeholder(
-                                'Complete the form below to register for this event.'
+                                'Complete the form below.'
                             )
                             ->columnSpanFull(),
 
                         Textarea::make(
                             'registration_success_message'
                         )
-                            ->label(
-                                'Success Message'
-                            )
+                            ->label('Success Message')
                             ->rows(3)
                             ->placeholder(
-                                'Thank you. Your registration has been received.'
+                                'Thank you. Your response has been received.'
                             )
                             ->columnSpanFull(),
 
                         Textarea::make(
                             'registration_waitlist_message'
                         )
-                            ->label(
-                                'Waitlist Message'
-                            )
+                            ->label('Waitlist Message')
                             ->rows(3)
                             ->placeholder(
                                 'This event is currently full. You have been added to the waitlist.'
@@ -466,19 +741,23 @@ class EventForm
                             ->columnSpanFull(),
                     ])
                     ->columns(3)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showRegistration($get)
+                    )
                     ->collapsible(),
 
                 /*
                 |--------------------------------------------------------------------------
-                | Automatic Registration Communication
+                | Registration Communication
                 |--------------------------------------------------------------------------
                 */
 
                 Section::make(
-                    'Automatic Registration Communication'
+                    'Registration Communication'
                 )
                     ->description(
-                        'Choose which channels eLive Events should use to automatically confirm a successful attendee registration.'
+                        'Configure automatic confirmation messages for attendee or guest registration.'
                     )
                     ->schema([
                         Toggle::make(
@@ -486,9 +765,6 @@ class EventForm
                         )
                             ->label(
                                 'Send Registration SMS'
-                            )
-                            ->helperText(
-                                'Send an SMS confirmation immediately after successful registration.'
                             )
                             ->default(false)
                             ->live()
@@ -498,9 +774,6 @@ class EventForm
                                     Set $set
                                 ): void {
                                     if ($state) {
-                                        /*
-                                         * SMS requires a phone number.
-                                         */
                                         $set(
                                             'registration_show_phone',
                                             true
@@ -527,9 +800,6 @@ class EventForm
                             ->label(
                                 'Send Registration Email'
                             )
-                            ->helperText(
-                                'Send the branded eLive Events registration confirmation email.'
-                            )
                             ->default(true)
                             ->live()
                             ->afterStateUpdated(
@@ -537,23 +807,17 @@ class EventForm
                                     bool $state,
                                     Set $set
                                 ): void {
-                                    if (! $state) {
-                                        return;
+                                    if ($state) {
+                                        $set(
+                                            'registration_show_email',
+                                            true
+                                        );
+
+                                        $set(
+                                            'registration_require_email',
+                                            true
+                                        );
                                     }
-
-                                    /*
-                                     * Automatic email requires an email
-                                     * address from every registrant.
-                                     */
-                                    $set(
-                                        'registration_show_email',
-                                        true
-                                    );
-
-                                    $set(
-                                        'registration_require_email',
-                                        true
-                                    );
                                 }
                             ),
 
@@ -563,9 +827,6 @@ class EventForm
                             ->label(
                                 'Send Registration WhatsApp'
                             )
-                            ->helperText(
-                                'Send the approved WhatsApp registration confirmation after the attendee badge is ready.'
-                            )
                             ->default(false)
                             ->live()
                             ->afterStateUpdated(
@@ -573,22 +834,17 @@ class EventForm
                                     bool $state,
                                     Set $set
                                 ): void {
-                                    if (! $state) {
-                                        return;
+                                    if ($state) {
+                                        $set(
+                                            'registration_show_phone',
+                                            true
+                                        );
+
+                                        $set(
+                                            'registration_require_phone',
+                                            true
+                                        );
                                     }
-
-                                    /*
-                                     * WhatsApp requires a valid phone number.
-                                     */
-                                    $set(
-                                        'registration_show_phone',
-                                        true
-                                    );
-
-                                    $set(
-                                        'registration_require_phone',
-                                        true
-                                    );
                                 }
                             ),
 
@@ -631,9 +887,7 @@ class EventForm
                                             'is_active',
                                             true
                                         )
-                                        ->orderBy(
-                                            'name'
-                                        )
+                                        ->orderBy('name')
                                         ->pluck(
                                             'name',
                                             'id'
@@ -644,7 +898,6 @@ class EventForm
                             ->searchable()
                             ->preload()
                             ->native(false)
-                            ->live()
                             ->visible(
                                 fn (Get $get): bool =>
                                     (bool) $get(
@@ -656,58 +909,41 @@ class EventForm
                                     (bool) $get(
                                         'registration_sms_enabled'
                                     )
-                            )
-                            ->helperText(
-                                'Only active SMS templates belonging to this event organization are available.'
                             ),
 
-                        \Filament\Forms\Components\Placeholder::make(
+                        Placeholder::make(
                             'registration_channels_information'
                         )
-                            ->label(
-                                'How it works'
-                            )
+                            ->label('How it works')
                             ->content(
-                                'After a successful registration, eLive Events creates the attendee and queues confirmation messages only for the channels enabled above. Email and SMS can be sent immediately. WhatsApp confirmation is sent when the digital badge is ready.'
-                            )
-                            ->columnSpanFull(),
-
-                        \Filament\Forms\Components\Placeholder::make(
-                            'registration_channels_status_information'
-                        )
-                            ->label(
-                                'Registration Status'
-                            )
-                            ->content(
-                                'Automatic registration confirmation is sent only to approved or registered attendees. Pending approval and waitlisted attendees will use separate communication templates later.'
+                                'eLive Events queues only the communication channels enabled for this event.'
                             )
                             ->columnSpanFull(),
                     ])
                     ->columns(3)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showRegistration($get)
+                    )
                     ->collapsible(),
 
                 /*
                 |--------------------------------------------------------------------------
-                | Public Registration Fields
+                | Registration Fields
                 |--------------------------------------------------------------------------
                 */
 
                 Section::make(
-                    'Public Registration Fields'
+                    'Registration Fields'
                 )
                     ->description(
-                        'Choose which standard attendee fields appear on the public form and whether they are optional or required.'
+                        'Choose the information collected from attendees or guests.'
                     )
                     ->schema([
                         Toggle::make(
                             'registration_show_phone'
                         )
-                            ->label(
-                                'Show Phone Number'
-                            )
-                            ->helperText(
-                                'Display the phone number field in Personal Details.'
-                            )
+                            ->label('Show Phone Number')
                             ->default(true)
                             ->live()
                             ->afterStateUpdated(
@@ -721,11 +957,6 @@ class EventForm
                                             false
                                         );
 
-                                        /*
-                                         * Automatic SMS cannot remain
-                                         * enabled if the registration form
-                                         * no longer collects a phone number.
-                                         */
                                         $set(
                                             'registration_sms_enabled',
                                             false
@@ -747,12 +978,7 @@ class EventForm
                         Toggle::make(
                             'registration_require_phone'
                         )
-                            ->label(
-                                'Require Phone Number'
-                            )
-                            ->helperText(
-                                'Attendees must provide a phone number.'
-                            )
+                            ->label('Require Phone Number')
                             ->default(true)
                             ->visible(
                                 fn (Get $get): bool =>
@@ -764,12 +990,7 @@ class EventForm
                         Toggle::make(
                             'registration_show_email'
                         )
-                            ->label(
-                                'Show Email Address'
-                            )
-                            ->helperText(
-                                'Display the email address field in Personal Details.'
-                            )
+                            ->label('Show Email Address')
                             ->default(true)
                             ->live()
                             ->afterStateUpdated(
@@ -794,12 +1015,7 @@ class EventForm
                         Toggle::make(
                             'registration_require_email'
                         )
-                            ->label(
-                                'Require Email Address'
-                            )
-                            ->helperText(
-                                'Attendees must provide a valid email address.'
-                            )
+                            ->label('Require Email Address')
                             ->default(false)
                             ->visible(
                                 fn (Get $get): bool =>
@@ -814,11 +1030,14 @@ class EventForm
                             ->label(
                                 'Show Organization / Company'
                             )
-                            ->helperText(
-                                'Display Organization / Company in the event-specific registration details section.'
-                            )
                             ->default(false)
                             ->live()
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showProfessionalFields(
+                                        $get
+                                    )
+                            )
                             ->afterStateUpdated(
                                 function (
                                     bool $state,
@@ -839,13 +1058,13 @@ class EventForm
                             ->label(
                                 'Require Organization / Company'
                             )
-                            ->helperText(
-                                'Attendees must provide their organization or company.'
-                            )
                             ->default(false)
                             ->visible(
                                 fn (Get $get): bool =>
-                                    (bool) $get(
+                                    self::showProfessionalFields(
+                                        $get
+                                    )
+                                    && (bool) $get(
                                         'registration_show_organization'
                                     )
                             ),
@@ -856,11 +1075,14 @@ class EventForm
                             ->label(
                                 'Show Position / Title'
                             )
-                            ->helperText(
-                                'Display Position / Title in the event-specific registration details section.'
-                            )
                             ->default(false)
                             ->live()
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showProfessionalFields(
+                                        $get
+                                    )
+                            )
                             ->afterStateUpdated(
                                 function (
                                     bool $state,
@@ -881,13 +1103,13 @@ class EventForm
                             ->label(
                                 'Require Position / Title'
                             )
-                            ->helperText(
-                                'Attendees must provide their position or title.'
-                            )
                             ->default(false)
                             ->visible(
                                 fn (Get $get): bool =>
-                                    (bool) $get(
+                                    self::showProfessionalFields(
+                                        $get
+                                    )
+                                    && (bool) $get(
                                         'registration_show_position'
                                     )
                             ),
@@ -898,33 +1120,14 @@ class EventForm
                             ->label(
                                 'Show Attendee Category'
                             )
-                            ->helperText(
-                                'Allow attendees to select an event category.'
-                            )
                             ->default(false)
-                            ->live()
-                            ->afterStateUpdated(
-                                function (
-                                    bool $state,
-                                    Set $set
-                                ): void {
-                                    if (! $state) {
-                                        $set(
-                                            'registration_require_category',
-                                            false
-                                        );
-                                    }
-                                }
-                            ),
+                            ->live(),
 
                         Toggle::make(
                             'registration_require_category'
                         )
                             ->label(
                                 'Require Attendee Category'
-                            )
-                            ->helperText(
-                                'Attendees must select a category.'
                             )
                             ->default(false)
                             ->visible(
@@ -937,14 +1140,13 @@ class EventForm
                         Toggle::make(
                             'registration_show_badge_type'
                         )
-                            ->label(
-                                'Show Badge Type'
-                            )
-                            ->helperText(
-                                'Allow attendees to select an active badge type.'
-                            )
+                            ->label('Show Badge Type')
                             ->default(false)
                             ->live()
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showBadges($get)
+                            )
                             ->afterStateUpdated(
                                 function (
                                     bool $state,
@@ -962,62 +1164,65 @@ class EventForm
                         Toggle::make(
                             'registration_require_badge_type'
                         )
-                            ->label(
-                                'Require Badge Type'
-                            )
-                            ->helperText(
-                                'Attendees must select a badge type.'
-                            )
+                            ->label('Require Badge Type')
                             ->default(false)
                             ->visible(
                                 fn (Get $get): bool =>
-                                    (bool) $get(
+                                    self::showBadges($get)
+                                    && (bool) $get(
                                         'registration_show_badge_type'
                                     )
                             ),
                     ])
                     ->columns(2)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showRegistration($get)
+                    )
                     ->collapsible(),
 
                 /*
                 |--------------------------------------------------------------------------
-                | Online Payment Settings
+                | Registration Payments
                 |--------------------------------------------------------------------------
-                |
-                | Stored in the event_payment_settings table through the
-                | Event::paymentSetting() HasOne relationship.
-                |
                 */
 
                 Section::make(
-                    'Online Payment Settings'
+                    'Registration Payment Settings'
                 )
                     ->description(
-                        'Configure whether this event accepts online registration payments and when payment is required.'
+                        'Configure payment for attendee registration. Ticket admission prices are configured separately in Ticket Types.'
                     )
-                    ->relationship(
-                        'paymentSetting'
-                    )
+                    ->relationship('paymentSetting')
                     ->schema([
                         Toggle::make(
                             'payments_enabled'
                         )
                             ->label(
-                                'Enable Online Payments'
-                            )
-                            ->helperText(
-                                'Enable this when attendees must be able to pay online for this event.'
+                                'Enable Registration Payments'
                             )
                             ->default(false)
                             ->live(),
 
-                        Select::make(
-                            'currency'
+                        Placeholder::make(
+                            'registration_ticket_payment_note'
                         )
+                            ->label(
+                                'Registration vs Ticket Payment'
+                            )
+                            ->content(
+                                'Use this section for paid attendee registration. Ticketed admission uses Ticket Types and Ticket Orders.'
+                            )
+                            ->columnSpanFull(),
+
+                        Select::make('currency')
                             ->label('Currency')
                             ->options([
-                                'TZS' => 'TZS - Tanzanian Shilling',
-                                'USD' => 'USD - US Dollar',
+                                'TZS' =>
+                                    'TZS - Tanzanian Shilling',
+
+                                'USD' =>
+                                    'USD - US Dollar',
                             ])
                             ->default('TZS')
                             ->required(
@@ -1037,9 +1242,7 @@ class EventForm
                         TextInput::make(
                             'registration_fee'
                         )
-                            ->label(
-                                'Registration Fee'
-                            )
+                            ->label('Registration Fee')
                             ->prefix(
                                 fn (Get $get): string =>
                                     (string) (
@@ -1062,9 +1265,6 @@ class EventForm
                                     (bool) $get(
                                         'payments_enabled'
                                     )
-                            )
-                            ->helperText(
-                                'The base registration amount charged to one attendee for this event.'
                             ),
 
                         Toggle::make(
@@ -1072,9 +1272,6 @@ class EventForm
                         )
                             ->label(
                                 'Require Payment Before Confirmation'
-                            )
-                            ->helperText(
-                                'Keep paid-event registrations pending until payment is verified successfully.'
                             )
                             ->default(true)
                             ->visible(
@@ -1090,14 +1287,14 @@ class EventForm
                             ->label(
                                 'Require Payment Before Badge Release'
                             )
-                            ->helperText(
-                                'Do not release or automatically generate the attendee badge until payment is completed.'
-                            )
                             ->default(true)
                             ->visible(
                                 fn (Get $get): bool =>
                                     (bool) $get(
                                         'payments_enabled'
+                                    )
+                                    && self::showBadges(
+                                        $get
                                     )
                             ),
 
@@ -1106,9 +1303,6 @@ class EventForm
                         )
                             ->label(
                                 'Block Check-in When Unpaid'
-                            )
-                            ->helperText(
-                                'Prevent an attendee from completing event check-in when payment is still outstanding.'
                             )
                             ->default(false)
                             ->visible(
@@ -1124,9 +1318,6 @@ class EventForm
                             ->label(
                                 'Allow Manual Payment Confirmation'
                             )
-                            ->helperText(
-                                'Allow authorized event or finance administrators to confirm cash, bank transfer, or other offline payments.'
-                            )
                             ->default(false)
                             ->visible(
                                 fn (Get $get): bool =>
@@ -1134,28 +1325,17 @@ class EventForm
                                         'payments_enabled'
                                     )
                             ),
-
-                        \Filament\Forms\Components\Placeholder::make(
-                            'online_payment_status_information'
-                        )
-                            ->label('Payment Gateway')
-                            ->content(
-                                'Online payment settings are ready. Pesapal checkout, callback, IPN verification, and transaction processing will be connected in the next implementation step.'
-                            )
-                            ->visible(
-                                fn (Get $get): bool =>
-                                    (bool) $get(
-                                        'payments_enabled'
-                                    )
-                            )
-                            ->columnSpanFull(),
                     ])
                     ->columns(2)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showRegistration($get)
+                    )
                     ->collapsible(),
 
                 /*
                 |--------------------------------------------------------------------------
-                | Manual / Offline Payment Instructions
+                | Manual Payment Instructions
                 |--------------------------------------------------------------------------
                 */
 
@@ -1163,31 +1343,23 @@ class EventForm
                     'Manual / Offline Payment Instructions'
                 )
                     ->description(
-                        'Optional payment instructions for bank transfer, mobile money, cash, merchandise, or other offline payment methods.'
+                        'Optional instructions for mobile money, bank transfer, contributions, or other offline payments.'
                     )
                     ->schema([
                         TextInput::make(
                             'payment_method'
                         )
-                            ->label(
-                                'Payment Method'
-                            )
+                            ->label('Payment Method')
                             ->placeholder(
                                 'Example: Vodacom M-Pesa'
                             )
-                            ->maxLength(255)
-                            ->helperText(
-                                'Example: Vodacom M-Pesa, Airtel Money, Mixx by Yas, Bank Transfer.'
-                            ),
+                            ->maxLength(255),
 
                         TextInput::make(
                             'payment_account_name'
                         )
                             ->label(
                                 'Payment Account Name'
-                            )
-                            ->placeholder(
-                                'Example: Sadaka Dar Es Salaam Central SDA Church'
                             )
                             ->maxLength(255),
 
@@ -1196,9 +1368,6 @@ class EventForm
                         )
                             ->label(
                                 'Payment Account Number'
-                            )
-                            ->placeholder(
-                                'Example: 58192223'
                             )
                             ->maxLength(255),
 
@@ -1209,106 +1378,114 @@ class EventForm
                                 'Payment Instructions'
                             )
                             ->rows(4)
-                            ->placeholder(
-                                'Example: Please complete payment after registration and keep your payment confirmation for verification.'
-                            )
-                            ->helperText(
-                                'Shown to attendees when an offline or manual payment method is used.'
-                            )
                             ->columnSpanFull(),
                     ])
                     ->columns(2)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showRegistration($get)
+                            || self::showGuestRsvp($get)
+                    )
                     ->collapsible()
                     ->collapsed(),
 
                 /*
                 |--------------------------------------------------------------------------
-                | Registration Branding
+                | Event Media
                 |--------------------------------------------------------------------------
+                |
+                | Available for every event type, including concerts.
+                | We currently reuse the existing registration media columns
+                | so this improvement does not require a database migration.
+                |
                 */
 
-                Section::make(
-                    'Registration Branding'
-                )
+                Section::make('Event Media')
                     ->description(
-                        'Optional event-level branding for the public registration page. If left empty, organization branding or eLive defaults will be used.'
+                        'Upload the main public-facing images for this event. These images can be used on event listings, event details, ticket pages, and registration pages.'
                     )
                     ->schema([
                         FileUpload::make(
-                            'registration_logo_path'
-                        )
-                            ->label(
-                                'Registration Logo'
-                            )
-                            ->disk('public')
-                            ->directory(
-                                'event-registration/logos'
-                            )
-                            ->image()
-                            ->imageEditor()
-                            ->imagePreviewHeight(
-                                '120'
-                            )
-                            ->downloadable()
-                            ->openable()
-                            ->maxSize(2048)
-                            ->helperText(
-                                'Optional event-specific logo shown on the public registration page.'
-                            ),
-
-                        FileUpload::make(
                             'registration_banner_image_path'
                         )
-                            ->label(
-                                'Banner Image'
-                            )
+                            ->label('Event Cover Image')
                             ->disk('public')
                             ->directory(
                                 'event-registration/banners'
                             )
                             ->image()
                             ->imageEditor()
-                            ->imagePreviewHeight(
-                                '180'
-                            )
+                            ->imagePreviewHeight('220')
                             ->downloadable()
                             ->openable()
                             ->maxSize(4096)
                             ->helperText(
-                                'Optional banner image shown at the top of the registration page.'
-                            ),
+                                'Recommended: a wide 16:9 image such as 1600 × 900 px. Used as the main event or ticket-page cover image.'
+                            )
+                            ->columnSpanFull(),
 
+                        FileUpload::make(
+                            'registration_logo_path'
+                        )
+                            ->label('Event Logo')
+                            ->disk('public')
+                            ->directory(
+                                'event-registration/logos'
+                            )
+                            ->image()
+                            ->imageEditor()
+                            ->imagePreviewHeight('140')
+                            ->downloadable()
+                            ->openable()
+                            ->maxSize(2048)
+                            ->helperText(
+                                'Optional event-specific logo. PNG with a transparent background is recommended.'
+                            ),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Registration Branding
+                |--------------------------------------------------------------------------
+                |
+                | Registration-specific visual styling stays separate from
+                | the event media shared by all event types.
+                |
+                */
+
+                Section::make('Registration Branding')
+                    ->description(
+                        'Customize colors used on the public attendee or guest registration experience.'
+                    )
+                    ->schema([
                         ColorPicker::make(
                             'registration_primary_color'
                         )
-                            ->label(
-                                'Primary Color'
-                            )
-                            ->default(
-                                '#161943'
-                            ),
+                            ->label('Primary Color')
+                            ->default('#161943'),
 
                         ColorPicker::make(
                             'registration_background_color'
                         )
-                            ->label(
-                                'Background Color'
-                            )
-                            ->default(
-                                '#F8FAFC'
-                            ),
+                            ->label('Background Color')
+                            ->default('#F8FAFC'),
 
                         ColorPicker::make(
                             'registration_button_color'
                         )
-                            ->label(
-                                'Button Color'
-                            )
-                            ->default(
-                                '#161943'
-                            ),
+                            ->label('Button Color')
+                            ->default('#161943'),
                     ])
-                    ->columns(2)
+                    ->columns(3)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            EventPresetService::usesRegistration(
+                                self::eventType($get)
+                            )
+                            || self::advanced($get)
+                    )
                     ->collapsible()
                     ->collapsed(),
             ]);

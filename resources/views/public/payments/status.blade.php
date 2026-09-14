@@ -296,6 +296,9 @@
         .button-success {
             background: var(--success);
             color: #ffffff;
+
+            box-shadow:
+                0 8px 20px rgba(21, 128, 61, 0.16);
         }
 
         .notice {
@@ -412,11 +415,23 @@
                 Payment Successful
             </h1>
 
-            <p class="status-message">
-                Your payment has been received successfully.
-                Your event registration is being finalized and any
-                eligible badge or confirmation will be prepared automatically.
-            </p>
+            @if ($payment->ticketOrder)
+
+                <p class="status-message">
+                    Your ticket payment has been received successfully.
+                    Your order is confirmed and your event tickets are
+                    available below.
+                </p>
+
+            @else
+
+                <p class="status-message">
+                    Your payment has been received successfully.
+                    Your event registration is being finalized and any
+                    eligible badge or confirmation will be prepared automatically.
+                </p>
+
+            @endif
 
         @elseif (
             $payment->isPending()
@@ -518,19 +533,70 @@
             </div>
 
 
-            <div class="detail-row">
-                <div class="detail-label">
-                    Attendee
+            @if ($payment->ticketOrder)
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        Buyer
+                    </div>
+
+                    <div class="detail-value">
+                        {{
+                            $payment
+                                ->ticketOrder
+                                ->buyer_name
+                            ?? 'Ticket Buyer'
+                        }}
+                    </div>
                 </div>
 
-                <div class="detail-value">
-                    {{
-                        $payment->attendee?->full_name
-                        ?? $payment->attendee?->name
-                        ?? 'Attendee'
-                    }}
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        Order Number
+                    </div>
+
+                    <div class="detail-value">
+                        {{
+                            $payment
+                                ->ticketOrder
+                                ->order_number
+                        }}
+                    </div>
                 </div>
-            </div>
+
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        Tickets
+                    </div>
+
+                    <div class="detail-value">
+                        {{
+                            $payment
+                                ->ticketOrder
+                                ->quantity
+                        }}
+                    </div>
+                </div>
+
+            @else
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        Attendee
+                    </div>
+
+                    <div class="detail-value">
+                        {{
+                            $payment->attendee?->full_name
+                            ?? $payment->attendee?->name
+                            ?? 'Attendee'
+                        }}
+                    </div>
+                </div>
+
+            @endif
 
 
             <div class="detail-row">
@@ -674,6 +740,37 @@
 
             @if (
                 $payment->isCompleted()
+                && $payment->ticketOrder
+                && $payment->ticketOrder->isPaid()
+                && filled(
+                    $payment
+                        ->ticketOrder
+                        ->public_token
+                )
+            )
+
+                <a
+                    href="{{
+                        route(
+                            'public.ticket-orders.show',
+                            [
+                                'token' =>
+                                    $payment
+                                        ->ticketOrder
+                                        ->public_token,
+                            ]
+                        )
+                    }}"
+                    class="button button-success"
+                >
+                    View My Tickets
+                </a>
+
+            @endif
+
+
+            @if (
+                $payment->isCompleted()
                 && $payment->attendee
                 && filled(
                     $payment->attendee->public_token
@@ -681,10 +778,17 @@
             )
 
                 <a
-                    href="{{ route(
-                        'public.attendees.show',
-                        $payment->attendee->public_token
-                    ) }}"
+                    href="{{
+                        route(
+                            'public.attendees.show',
+                            [
+                                'token' =>
+                                    $payment
+                                        ->attendee
+                                        ->public_token,
+                            ]
+                        )
+                    }}"
                     class="button button-success"
                 >
                     View Registration
@@ -696,10 +800,15 @@
             @if ($payment->event)
 
                 <a
-                    href="{{ route(
-                        'public.events.show',
-                        $payment->event
-                    ) }}"
+                    href="{{
+                        route(
+                            'public.events.show',
+                            [
+                                'event' =>
+                                    $payment->event,
+                            ]
+                        )
+                    }}"
                     class="button button-secondary"
                 >
                     Back to Event
@@ -720,6 +829,17 @@
                 on the payment method. You can safely use
                 <strong>Check Again</strong>
                 to refresh the status.
+            </div>
+
+        @elseif (
+            $payment->isCompleted()
+            && $payment->ticketOrder
+        )
+
+            <div class="notice">
+                Your ticket order has been confirmed.
+                Use <strong>View My Tickets</strong> to access
+                each issued ticket and its secure QR code.
             </div>
 
         @endif

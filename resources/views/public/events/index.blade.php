@@ -1250,21 +1250,62 @@
                                         View Event
                                     </a>
 
-                                    @if ($event->registration_is_open && ! $isPast)
+                                    @php
+                                        $ticketSettings = $event->ticketSetting;
+
+                                        $ticketSalesOpen =
+                                            $ticketSettings
+                                            && $ticketSettings->salesAreOpen()
+                                            && $event->ticketTypes()
+                                                ->onSale()
+                                                ->exists();
+
+                                        $ticketSalesEnabled =
+                                            $ticketSettings
+                                            && $ticketSettings->ticket_sales_enabled;
+
+                                        $ticketUrl = route(
+                                            'public.tickets.buy',
+                                            ['event' => $event->slug]
+                                        );
+                                    @endphp
+
+                                    @if ($isPast)
+
+                                        <span class="ended-label">
+                                            Event Ended
+                                        </span>
+
+                                    @elseif ($ticketSalesOpen)
+
+                                        <a
+                                            href="{{ $ticketUrl }}"
+                                            class="register-btn"
+                                        >
+                                            Buy Tickets
+                                        </a>
+
+                                    @elseif ($event->registration_is_open)
+
                                         <a
                                             href="{{ $eventRegisterUrl }}"
                                             class="register-btn"
                                         >
                                             Register Now
                                         </a>
-                                    @elseif ($isPast)
+
+                                    @elseif ($ticketSalesEnabled)
+
                                         <span class="ended-label">
-                                            Event Ended
+                                            Tickets Closed
                                         </span>
+
                                     @else
+
                                         <span class="ended-label">
                                             Registration Closed
                                         </span>
+
                                     @endif
 
                                 </div>

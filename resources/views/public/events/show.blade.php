@@ -1219,21 +1219,62 @@
 
                 <hr class="info-divider">
 
-                @if ($event->registration_is_open && ! $isPast)
+                @php
+                    $ticketSettings = $event->ticketSetting;
+
+                    $ticketSalesOpen =
+                        $ticketSettings
+                        && $ticketSettings->salesAreOpen()
+                        && $event->ticketTypes()
+                            ->onSale()
+                            ->exists();
+
+                    $ticketSalesEnabled =
+                        $ticketSettings
+                        && $ticketSettings->ticket_sales_enabled;
+
+                    $ticketUrl = route(
+                        'public.tickets.buy',
+                        ['event' => $event->slug]
+                    );
+                @endphp
+
+                @if ($isPast)
+
+                    <div class="registration-state">
+                        Event Ended
+                    </div>
+
+                @elseif ($ticketSalesOpen)
+
+                    <a
+                        href="{{ $ticketUrl }}"
+                        class="register-btn"
+                    >
+                        Buy Tickets
+                    </a>
+
+                @elseif ($event->registration_is_open)
+
                     <a
                         href="{{ $registerUrl }}"
                         class="register-btn"
                     >
                         Register for Event
                     </a>
-                @elseif ($isPast)
+
+                @elseif ($ticketSalesEnabled)
+
                     <div class="registration-state">
-                        Event Ended
+                        Tickets Closed
                     </div>
+
                 @else
+
                     <div class="registration-state">
                         Registration Closed
                     </div>
+
                 @endif
 
             </aside>
