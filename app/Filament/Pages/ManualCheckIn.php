@@ -13,23 +13,29 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class ManualCheckIn extends Page implements Forms\Contracts\HasForms
 {
     use Forms\Concerns\InteractsWithForms;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-user-plus';
+    protected static string|BackedEnum|null $navigationIcon =
+        'heroicon-o-user-plus';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Check-in Management';
+    protected static string|UnitEnum|null $navigationGroup =
+        'Check-in Management';
 
     protected static ?int $navigationSort = 2;
 
-    protected static ?string $navigationLabel = 'Manual Check-in';
+    protected static ?string $navigationLabel =
+        'Manual Check-in';
 
-    protected static ?string $title = 'Manual Check-in';
+    protected static ?string $title =
+        'Manual Check-in';
 
-    protected string $view = 'filament.pages.manual-check-in';
+    protected string $view =
+        'filament.pages.manual-check-in';
 
     public ?array $data = [];
 
@@ -37,9 +43,36 @@ class ManualCheckIn extends Page implements Forms\Contracts\HasForms
 
     public bool $alreadyCheckedIn = false;
 
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
     public function mount(): void
     {
-        $eventId = request()->integer('event_id') ?: null;
+        abort_unless(
+            static::canAccess(),
+            403
+        );
+
+        $eventId =
+            request()->integer('event_id')
+            ?: null;
 
         $this->form->fill([
             'event_id' => $eventId,
@@ -52,99 +85,227 @@ class ManualCheckIn extends Page implements Forms\Contracts\HasForms
     {
         return $schema
             ->components([
-                Section::make('Manual Check-in Search')
-                    ->description('Search attendee by full name, phone, email, or badge number.')
+                Section::make(
+                    'Manual Check-in Search'
+                )
+                    ->description(
+                        'Search attendee by full name, phone, email, or badge number.'
+                    )
                     ->schema([
-                        Forms\Components\Select::make('event_id')
+                        Forms\Components\Select::make(
+                            'event_id'
+                        )
                             ->label('Event')
-                            ->options(fn () => Event::query()
-                                ->latest()
-                                ->pluck('name', 'id')
-                                ->toArray()
+                            ->options(
+                                fn () =>
+                                    Event::query()
+                                        ->latest()
+                                        ->pluck(
+                                            'name',
+                                            'id'
+                                        )
+                                        ->toArray()
                             )
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->default(fn () => request()->integer('event_id') ?: null)
-                            ->disabled(fn () => request()->filled('event_id'))
+                            ->default(
+                                fn () =>
+                                    request()
+                                        ->integer(
+                                            'event_id'
+                                        )
+                                    ?: null
+                            )
+                            ->disabled(
+                                fn () =>
+                                    request()
+                                        ->filled(
+                                            'event_id'
+                                        )
+                            )
                             ->dehydrated()
                             ->live(),
 
-                        Forms\Components\Select::make('check_in_point_id')
-                            ->label('Check-in Point')
-                            ->options(function (Get $get) {
-                                $eventId = $get('event_id') ?: request()->integer('event_id');
+                        Forms\Components\Select::make(
+                            'check_in_point_id'
+                        )
+                            ->label(
+                                'Check-in Point'
+                            )
+                            ->options(
+                                function (
+                                    Get $get
+                                ) {
+                                    $eventId =
+                                        $get(
+                                            'event_id'
+                                        )
+                                        ?: request()
+                                            ->integer(
+                                                'event_id'
+                                            );
 
-                                return CheckInPoint::query()
-                                    ->when($eventId, fn ($query) => $query->where('event_id', $eventId))
-                                    ->where('is_active', true)
-                                    ->orderBy('name')
-                                    ->pluck('name', 'id')
-                                    ->toArray();
-                            })
+                                    return CheckInPoint::query()
+                                        ->when(
+                                            $eventId,
+                                            fn ($query) =>
+                                                $query->where(
+                                                    'event_id',
+                                                    $eventId
+                                                )
+                                        )
+                                        ->where(
+                                            'is_active',
+                                            true
+                                        )
+                                        ->orderBy(
+                                            'name'
+                                        )
+                                        ->pluck(
+                                            'name',
+                                            'id'
+                                        )
+                                        ->toArray();
+                                }
+                            )
                             ->searchable()
                             ->preload()
                             ->nullable()
-                            ->helperText('Only active check-in points for the selected event will appear.'),
+                            ->helperText(
+                                'Only active check-in points for the selected event will appear.'
+                            ),
 
-                        Forms\Components\TextInput::make('search')
-                            ->label('Attendee Search')
-                            ->placeholder('Full name, phone, email, or badge number')
+                        Forms\Components\TextInput::make(
+                            'search'
+                        )
+                            ->label(
+                                'Attendee Search'
+                            )
+                            ->placeholder(
+                                'Full name, phone, email, or badge number'
+                            )
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(
+                                255
+                            ),
                     ])
                     ->columns(2),
             ])
-            ->statePath('data');
+            ->statePath(
+                'data'
+            );
     }
 
     public function searchAttendee(): void
     {
-        $data = $this->form->getState();
+        $data =
+            $this->form
+                ->getState();
 
-        $eventId = $data['event_id'] ?? request()->integer('event_id');
-        $search = trim($data['search'] ?? '');
+        $eventId =
+            $data['event_id']
+            ?? request()
+                ->integer(
+                    'event_id'
+                );
 
-        $this->attendee = null;
-        $this->alreadyCheckedIn = false;
+        $search =
+            trim(
+                $data['search']
+                ?? ''
+            );
 
-        if (! $eventId || $search === '') {
+        $this->attendee =
+            null;
+
+        $this->alreadyCheckedIn =
+            false;
+
+        if (
+            ! $eventId
+            || $search === ''
+        ) {
             Notification::make()
-                ->title('Missing information')
-                ->body('Please select an event and enter attendee search value.')
+                ->title(
+                    'Missing information'
+                )
+                ->body(
+                    'Please select an event and enter attendee search value.'
+                )
                 ->danger()
                 ->send();
 
             return;
         }
 
-        $this->attendee = Attendee::query()
-            ->where('event_id', $eventId)
-            ->where(function ($query) use ($search) {
-                $query->where('full_name', 'ilike', "%{$search}%")
-                    ->orWhere('email', 'ilike', "%{$search}%")
-                    ->orWhere('phone', 'ilike', "%{$search}%")
-                    ->orWhere('badge_number', 'ilike', "%{$search}%");
-            })
-            ->first();
+        $this->attendee =
+            Attendee::query()
+                ->where(
+                    'event_id',
+                    $eventId
+                )
+                ->where(
+                    function (
+                        $query
+                    ) use (
+                        $search
+                    ) {
+                        $query
+                            ->where(
+                                'full_name',
+                                'ilike',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'email',
+                                'ilike',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'phone',
+                                'ilike',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'badge_number',
+                                'ilike',
+                                "%{$search}%"
+                            );
+                    }
+                )
+                ->first();
 
         if (! $this->attendee) {
             Notification::make()
-                ->title('Attendee not found')
-                ->body('No attendee matches the search value for this event.')
+                ->title(
+                    'Attendee not found'
+                )
+                ->body(
+                    'No attendee matches the search value for this event.'
+                )
                 ->danger()
                 ->send();
 
             return;
         }
 
-        $this->alreadyCheckedIn = app(CheckInService::class)
-            ->hasCheckedIn($this->attendee);
+        $this->alreadyCheckedIn =
+            app(
+                CheckInService::class
+            )->hasCheckedIn(
+                $this->attendee
+            );
 
         if ($this->alreadyCheckedIn) {
             Notification::make()
-                ->title('Already checked in')
-                ->body($this->attendee->full_name . ' has already checked in.')
+                ->title(
+                    'Already checked in'
+                )
+                ->body(
+                    $this->attendee->full_name
+                    . ' has already checked in.'
+                )
                 ->warning()
                 ->send();
 
@@ -152,40 +313,71 @@ class ManualCheckIn extends Page implements Forms\Contracts\HasForms
         }
 
         Notification::make()
-            ->title('Attendee found')
-            ->body($this->attendee->full_name . ' is ready for check-in.')
+            ->title(
+                'Attendee found'
+            )
+            ->body(
+                $this->attendee->full_name
+                . ' is ready for check-in.'
+            )
             ->success()
             ->send();
     }
 
     public function confirmCheckIn(): void
     {
-        $data = $this->form->getState();
+        $data =
+            $this->form
+                ->getState();
 
         if (! $this->attendee) {
             Notification::make()
-                ->title('No attendee selected')
-                ->body('Search and select an attendee first.')
+                ->title(
+                    'No attendee selected'
+                )
+                ->body(
+                    'Search and select an attendee first.'
+                )
                 ->danger()
                 ->send();
 
             return;
         }
 
-        $result = app(CheckInService::class)->checkIn(
-            attendee: $this->attendee,
-            checkInPointId: $data['check_in_point_id'] ?? null,
-            method: 'manual',
-            note: 'Checked in manually from admin panel.'
-        );
+        $result =
+            app(
+                CheckInService::class
+            )->checkIn(
+                attendee:
+                    $this->attendee,
 
-        $this->attendee = $result['attendee'];
-        $this->alreadyCheckedIn = true;
+                checkInPointId:
+                    $data[
+                        'check_in_point_id'
+                    ]
+                    ?? null,
+
+                method:
+                    'manual',
+
+                note:
+                    'Checked in manually from admin panel.'
+            );
+
+        $this->attendee =
+            $result['attendee'];
+
+        $this->alreadyCheckedIn =
+            true;
 
         if (! $result['success']) {
             Notification::make()
-                ->title('Duplicate check-in blocked')
-                ->body($result['message'])
+                ->title(
+                    'Duplicate check-in blocked'
+                )
+                ->body(
+                    $result['message']
+                )
                 ->danger()
                 ->send();
 
@@ -193,24 +385,47 @@ class ManualCheckIn extends Page implements Forms\Contracts\HasForms
         }
 
         Notification::make()
-            ->title('Check-in successful')
-            ->body($result['message'])
+            ->title(
+                'Check-in successful'
+            )
+            ->body(
+                $result['message']
+            )
             ->success()
             ->send();
     }
 
     public function resetSearch(): void
     {
-        $eventId = $this->data['event_id'] ?? request()->integer('event_id') ?: null;
-        $checkInPointId = $this->data['check_in_point_id'] ?? null;
+        $eventId =
+            $this->data['event_id']
+            ?? request()
+                ->integer(
+                    'event_id'
+                )
+            ?: null;
 
-        $this->attendee = null;
-        $this->alreadyCheckedIn = false;
+        $checkInPointId =
+            $this->data[
+                'check_in_point_id'
+            ]
+            ?? null;
+
+        $this->attendee =
+            null;
+
+        $this->alreadyCheckedIn =
+            false;
 
         $this->form->fill([
-            'event_id' => $eventId,
-            'check_in_point_id' => $checkInPointId,
-            'search' => null,
+            'event_id' =>
+                $eventId,
+
+            'check_in_point_id' =>
+                $checkInPointId,
+
+            'search' =>
+                null,
         ]);
     }
 }

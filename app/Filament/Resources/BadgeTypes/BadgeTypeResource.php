@@ -13,34 +13,142 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class BadgeTypeResource extends Resource
 {
-    protected static ?string $model = BadgeType::class;
+    protected static ?string $model =
+        BadgeType::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedIdentification;
+    protected static string|BackedEnum|null $navigationIcon =
+        Heroicon::OutlinedIdentification;
 
-    protected static ?string $recordTitleAttribute = 'name';
+    protected static ?string $recordTitleAttribute =
+        'name';
 
-    protected static ?string $navigationLabel = 'Badge Types';
+    protected static ?string $navigationLabel =
+        'Badge Types';
 
-    protected static ?string $modelLabel = 'Badge Type';
+    protected static ?string $modelLabel =
+        'Badge Type';
 
-    protected static ?string $pluralModelLabel = 'Badge Types';
+    protected static ?string $pluralModelLabel =
+        'Badge Types';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Event Management';
+    protected static string|UnitEnum|null $navigationGroup =
+        'Event Management';
 
     protected static ?int $navigationSort = 5;
 
     public static function form(Schema $schema): Schema
     {
-        return BadgeTypeForm::configure($schema);
+        return BadgeTypeForm::configure(
+            $schema
+        );
     }
 
     public static function table(Table $table): Table
     {
-        return BadgeTypesTable::configure($table);
+        return BadgeTypesTable::configure(
+            $table
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::shouldRegisterNavigation();
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canViewAny();
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canCreate();
+    }
+
+    public static function canEdit(
+        $record
+    ): bool {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canEdit(
+            $record
+        );
+    }
+
+    public static function canDelete(
+        $record
+    ): bool {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDelete(
+            $record
+        );
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDeleteAny();
     }
 
     public static function getRelations(): array
@@ -53,9 +161,16 @@ class BadgeTypeResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListBadgeTypes::route('/'),
-            'create' => CreateBadgeType::route('/create'),
-            'edit' => EditBadgeType::route('/{record}/edit'),
+            'index' =>
+                ListBadgeTypes::route('/'),
+
+            'create' =>
+                CreateBadgeType::route('/create'),
+
+            'edit' =>
+                EditBadgeType::route(
+                    '/{record}/edit'
+                ),
         ];
     }
 }

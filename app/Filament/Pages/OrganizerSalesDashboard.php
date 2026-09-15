@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Event;
+use App\Models\User;
 use App\Services\Tickets\OrganizerSalesMetricsService;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -13,13 +14,17 @@ class OrganizerSalesDashboard extends Page
 {
     protected static ?string $navigationLabel = 'Sales Dashboard';
 
-    protected static string | UnitEnum | null $navigationGroup = 'Ticketing';
+    protected static string|UnitEnum|null $navigationGroup =
+        'Ticketing';
 
-    protected static ?string $title = 'Organizer Sales Dashboard';
+    protected static ?string $title =
+        'Organizer Sales Dashboard';
 
-    protected static ?string $slug = 'organizer-sales-dashboard';
+    protected static ?string $slug =
+        'organizer-sales-dashboard';
 
-    protected string $view = 'filament.pages.organizer-sales-dashboard';
+    protected string $view =
+        'filament.pages.organizer-sales-dashboard';
 
     public ?int $selectedEventId = null;
 
@@ -31,7 +36,8 @@ class OrganizerSalesDashboard extends Page
             $this->selectedEventId === null
             && count($events) > 0
         ) {
-            $this->selectedEventId = (int) array_key_first($events);
+            $this->selectedEventId =
+                (int) array_key_first($events);
         }
     }
 
@@ -39,13 +45,9 @@ class OrganizerSalesDashboard extends Page
     |--------------------------------------------------------------------------
     | Page Heading
     |--------------------------------------------------------------------------
-    |
-    | The dashboard Blade already contains its own polished page heading.
-    | Returning null prevents Filament from rendering a duplicate heading.
-    |
     */
 
-    public function getHeading(): string | Htmlable | null
+    public function getHeading(): string|Htmlable|null
     {
         return null;
     }
@@ -60,35 +62,48 @@ class OrganizerSalesDashboard extends Page
     {
         $user = Auth::user();
 
-        if (! $user) {
+        if (! $user instanceof User) {
             return [];
+        }
+
+        if ($user->isSuperAdmin()) {
+            return Event::query()
+                ->orderByDesc('starts_at')
+                ->pluck('name', 'id')
+                ->mapWithKeys(
+                    fn ($name, $id) => [
+                        (int) $id => $name,
+                    ]
+                )
+                ->toArray();
+        }
+
+        if ($user->isTicketOrganizer()) {
+            $organizationIds = $user
+                ->ticketOrganizerOrganizations()
+                ->pluck('organizations.id');
+
+            return Event::query()
+                ->whereIn(
+                    'organization_id',
+                    $organizationIds
+                )
+                ->orderByDesc('starts_at')
+                ->pluck('name', 'id')
+                ->mapWithKeys(
+                    fn ($name, $id) => [
+                        (int) $id => $name,
+                    ]
+                )
+                ->toArray();
         }
 
         return Event::query()
             ->orderByDesc('starts_at')
             ->get()
             ->filter(
-                function (Event $event) use ($user): bool {
-                    if (
-                        method_exists($user, 'isSuperAdmin')
-                        && $user->isSuperAdmin()
-                    ) {
-                        return true;
-                    }
-
-                    if (
-                        method_exists(
-                            $user,
-                            'canViewEventReports'
-                        )
-                    ) {
-                        return $user->canViewEventReports(
-                            $event
-                        );
-                    }
-
-                    return false;
-                }
+                fn (Event $event): bool =>
+                    $user->canViewEventReports($event)
             )
             ->pluck('name', 'id')
             ->mapWithKeys(
@@ -120,47 +135,46 @@ class OrganizerSalesDashboard extends Page
 
         $user = Auth::user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Authorization
-        |--------------------------------------------------------------------------
-        |
-        | In normal Filament usage, an authenticated user is available and
-        | event-report permissions are enforced.
-        |
-        | When this page class is instantiated directly in tests without an
-        | authenticated user, allow the metrics service to run so the page
-        | logic remains testable.
-        |
-        */
-
-        if ($user) {
-            $allowed = false;
-
-            if (
-                method_exists($user, 'isSuperAdmin')
-                && $user->isSuperAdmin()
-            ) {
-                $allowed = true;
-            } elseif (
-                method_exists(
-                    $user,
-                    'canViewEventReports'
-                )
-            ) {
-                $allowed = $user->canViewEventReports(
-                    $event
-                );
-            }
-
-            if (! $allowed) {
-                return $this->emptyMetrics();
-            }
+        if (
+            $user instanceof User
+            && ! $this->canUserViewEvent(
+                $user,
+                $event
+            )
+        ) {
+            return $this->emptyMetrics();
         }
 
         return app(
             OrganizerSalesMetricsService::class
         )->forEvent($event);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization
+    |--------------------------------------------------------------------------
+    */
+
+    protected function canUserViewEvent(
+        User $user,
+        Event $event
+    ): bool {
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return $user
+                ->ticketOrganizerOrganizations()
+                ->where(
+                    'organizations.id',
+                    $event->organization_id
+                )
+                ->exists();
+        }
+
+        return $user->canViewEventReports($event);
     }
 
     /*

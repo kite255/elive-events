@@ -31,7 +31,8 @@ class PaymentResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Payments';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Finance';
+    protected static string|UnitEnum|null $navigationGroup =
+        'Finance';
 
     protected static ?int $navigationSort = 1;
 
@@ -39,6 +40,12 @@ class PaymentResource extends Resource
     {
         return PaymentsTable::configure($table);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query scoping
+    |--------------------------------------------------------------------------
+    */
 
     public static function getEloquentQuery(): Builder
     {
@@ -60,12 +67,33 @@ class PaymentResource extends Resource
             return $query;
         }
 
+        if ($user->isTicketOrganizer()) {
+            $organizationIds = $user
+                ->ticketOrganizerOrganizations()
+                ->pluck('organizations.id');
+
+            return $query->whereHas(
+                'event',
+                fn (Builder $eventQuery): Builder =>
+                    $eventQuery->whereIn(
+                        'organization_id',
+                        $organizationIds
+                    )
+            );
+        }
+
         return $query->whereHas(
             'event',
             fn (Builder $eventQuery): Builder =>
                 $eventQuery->accessibleBy($user)
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization
+    |--------------------------------------------------------------------------
+    */
 
     public static function canViewAny(): bool
     {
@@ -77,6 +105,12 @@ class PaymentResource extends Resource
 
         if ($user->isSuperAdmin()) {
             return true;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return $user
+                ->ticketOrganizerOrganizations()
+                ->exists();
         }
 
         return Event::query()
@@ -97,6 +131,20 @@ class PaymentResource extends Resource
 
         if ($user->isSuperAdmin()) {
             return true;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            if ($record->event === null) {
+                return false;
+            }
+
+            $organizationIds = $user
+                ->ticketOrganizerOrganizations()
+                ->pluck('organizations.id');
+
+            return $organizationIds->contains(
+                $record->event->organization_id
+            );
         }
 
         return $record->event?->isAccessibleBy($user) ?? false;
@@ -121,6 +169,12 @@ class PaymentResource extends Resource
     {
         return false;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Navigation
+    |--------------------------------------------------------------------------
+    */
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -152,11 +206,20 @@ class PaymentResource extends Resource
             : null;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pages
+    |--------------------------------------------------------------------------
+    */
+
     public static function getPages(): array
     {
         return [
-            'index' => ListPayments::route('/'),
-            'view' => ViewPayment::route('/{record}'),
+            'index' =>
+                ListPayments::route('/'),
+
+            'view' =>
+                ViewPayment::route('/{record}'),
         ];
     }
 }

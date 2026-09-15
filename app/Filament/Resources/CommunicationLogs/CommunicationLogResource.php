@@ -16,7 +16,8 @@ use UnitEnum;
 
 class CommunicationLogResource extends Resource
 {
-    protected static ?string $model = CommunicationLog::class;
+    protected static ?string $model =
+        CommunicationLog::class;
 
     protected static string|BackedEnum|null $navigationIcon =
         'heroicon-o-chat-bubble-left-right';
@@ -35,15 +36,85 @@ class CommunicationLogResource extends Resource
 
     protected static ?int $navigationSort = 30;
 
-    public static function form(Schema $schema): Schema
+    /*
+    |--------------------------------------------------------------------------
+    | Ticket Organizer Access
+    |--------------------------------------------------------------------------
+    */
+
+    public static function shouldRegisterNavigation(): bool
     {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::shouldRegisterNavigation();
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canViewAny();
+    }
+
+    public static function canView(
+        Model $record
+    ): bool {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canView(
+            $record
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Form / Table
+    |--------------------------------------------------------------------------
+    */
+
+    public static function form(
+        Schema $schema
+    ): Schema {
         return $schema->components([]);
     }
 
-    public static function table(Table $table): Table
-    {
-        return CommunicationLogsTable::configure($table);
+    public static function table(
+        Table $table
+    ): Table {
+        return CommunicationLogsTable::configure(
+            $table
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query
+    |--------------------------------------------------------------------------
+    */
 
     public static function getEloquentQuery(): Builder
     {
@@ -57,14 +128,31 @@ class CommunicationLogResource extends Resource
         $user = auth()->user();
 
         if (! $user) {
-            return $query->whereRaw('1 = 0');
+            return $query->whereRaw(
+                '1 = 0'
+            );
         }
 
         if (
-            method_exists($user, 'hasRole')
-            && $user->hasRole('super_admin')
+            method_exists(
+                $user,
+                'hasRole'
+            )
+            && $user->hasRole(
+                'super_admin'
+            )
         ) {
             return $query;
+        }
+
+        /*
+         * Ticket Organizers must never retrieve
+         * communication log records.
+         */
+        if ($user->isTicketOrganizer()) {
+            return $query->whereRaw(
+                '1 = 0'
+            );
         }
 
         /*
@@ -73,18 +161,27 @@ class CommunicationLogResource extends Resource
         |--------------------------------------------------------------------------
         |
         | Keep communication logs inside organizations accessible to the user.
-        | This assumes the existing user <-> organizations relationship already
-        | used elsewhere in the project.
+        | This preserves the existing organization-scoping behavior.
         |
         */
 
-        if (method_exists($user, 'organizations')) {
-            $organizationIds = $user->organizations()
-                ->pluck('organizations.id');
+        if (
+            method_exists(
+                $user,
+                'organizations'
+            )
+        ) {
+            $organizationIds =
+                $user->organizations()
+                    ->pluck(
+                        'organizations.id'
+                    );
 
             return $query->whereHas(
                 'event',
-                fn (Builder $eventQuery) =>
+                fn (
+                    Builder $eventQuery
+                ) =>
                     $eventQuery->whereIn(
                         'organization_id',
                         $organizationIds
@@ -92,21 +189,31 @@ class CommunicationLogResource extends Resource
             );
         }
 
-        return $query->whereRaw('1 = 0');
+        return $query->whereRaw(
+            '1 = 0'
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Permissions
+    |--------------------------------------------------------------------------
+    */
 
     public static function canCreate(): bool
     {
         return false;
     }
 
-    public static function canEdit(Model $record): bool
-    {
+    public static function canEdit(
+        Model $record
+    ): bool {
         return false;
     }
 
-    public static function canDelete(Model $record): bool
-    {
+    public static function canDelete(
+        Model $record
+    ): bool {
         return false;
     }
 
@@ -115,8 +222,9 @@ class CommunicationLogResource extends Resource
         return false;
     }
 
-    public static function canForceDelete(Model $record): bool
-    {
+    public static function canForceDelete(
+        Model $record
+    ): bool {
         return false;
     }
 
@@ -125,8 +233,9 @@ class CommunicationLogResource extends Resource
         return false;
     }
 
-    public static function canRestore(Model $record): bool
-    {
+    public static function canRestore(
+        Model $record
+    ): bool {
         return false;
     }
 
@@ -135,14 +244,24 @@ class CommunicationLogResource extends Resource
         return false;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pages
+    |--------------------------------------------------------------------------
+    */
+
     public static function getPages(): array
     {
         return [
             'index' =>
-                ListCommunicationLogs::route('/'),
+                ListCommunicationLogs::route(
+                    '/'
+                ),
 
             'view' =>
-                ViewCommunicationLog::route('/{record}'),
+                ViewCommunicationLog::route(
+                    '/{record}'
+                ),
         ];
     }
 }

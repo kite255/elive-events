@@ -48,6 +48,60 @@ class CommunicationCampaignResource extends Resource
 
     /*
     |--------------------------------------------------------------------------
+    | Ticket Organizer Access
+    |--------------------------------------------------------------------------
+    */
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::shouldRegisterNavigation();
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canViewAny();
+    }
+
+    public static function canView(
+        $record
+    ): bool {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canView(
+            $record
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Permissions
     |--------------------------------------------------------------------------
     */
@@ -98,6 +152,16 @@ class CommunicationCampaignResource extends Resource
 
         if ($user->isSuperAdmin()) {
             return $query;
+        }
+
+        /*
+         * Ticket Organizers must never retrieve
+         * communication campaign records.
+         */
+        if ($user->isTicketOrganizer()) {
+            return $query->whereRaw(
+                '1 = 0'
+            );
         }
 
         $eventIds = Event::query()
@@ -891,9 +955,6 @@ class CommunicationCampaignResource extends Resource
                 $template->name
             )
         ) {
-            /*
-             * New templates store a friendly name directly.
-             */
             if (
                 ! str_contains(
                     (string) $template->name,
@@ -903,9 +964,6 @@ class CommunicationCampaignResource extends Resource
                 return (string) $template->name;
             }
 
-            /*
-             * Backward compatibility for older machine-style names.
-             */
             $friendlyName =
                 CommunicationTemplate::friendlyNameForKey(
                     $template->key

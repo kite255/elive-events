@@ -13,6 +13,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class TicketTypeResource extends Resource
@@ -54,6 +56,88 @@ class TicketTypeResource extends Resource
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canCreate();
+    }
+
+    public static function canEdit(
+        Model $record
+    ): bool {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canEdit($record);
+    }
+
+    public static function canDelete(
+        Model $record
+    ): bool {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDelete($record);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDeleteAny();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query scoping
+    |--------------------------------------------------------------------------
+    */
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = auth()->user();
+
+        if (! $user?->isTicketOrganizer()) {
+            return $query;
+        }
+
+        $organizationIds = $user
+            ->ticketOrganizerOrganizations()
+            ->pluck('organizations.id');
+
+        return $query->whereHas(
+            'event',
+            fn (Builder $eventQuery) =>
+                $eventQuery->whereIn(
+                    'organization_id',
+                    $organizationIds
+                )
+        );
+    }
+
     public static function getRelations(): array
     {
         return [];
@@ -66,9 +150,7 @@ class TicketTypeResource extends Resource
                 ListTicketTypes::route('/'),
 
             'create' =>
-                CreateTicketType::route(
-                    '/create'
-                ),
+                CreateTicketType::route('/create'),
 
             'edit' =>
                 EditTicketType::route(

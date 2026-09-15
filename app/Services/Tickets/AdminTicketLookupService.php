@@ -23,7 +23,7 @@ class AdminTicketLookupService
 
         return Ticket::query()
             ->with([
-                'event:id,name',
+                'event:id,organization_id,name',
 
                 'order:id,event_id,order_number,public_token,buyer_name,buyer_phone,buyer_email,total,currency,status,paid_at',
 
@@ -92,9 +92,7 @@ class AdminTicketLookupService
         User $user,
         Ticket $ticket
     ): bool {
-        if (
-            $user->isSuperAdmin()
-        ) {
+        if ($user->isSuperAdmin()) {
             return true;
         }
 
@@ -102,6 +100,16 @@ class AdminTicketLookupService
 
         if (! $event) {
             return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return $user
+                ->ticketOrganizerOrganizations()
+                ->where(
+                    'organizations.id',
+                    $event->organization_id
+                )
+                ->exists();
         }
 
         return $user

@@ -13,6 +13,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class TicketOrderResource extends Resource
@@ -53,6 +55,88 @@ class TicketOrderResource extends Resource
     ): Table {
         return TicketOrdersTable::configure(
             $table
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canCreate();
+    }
+
+    public static function canEdit(
+        Model $record
+    ): bool {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canEdit($record);
+    }
+
+    public static function canDelete(
+        Model $record
+    ): bool {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDelete($record);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = auth()->user();
+
+        if ($user?->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDeleteAny();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Query scoping
+    |--------------------------------------------------------------------------
+    */
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = auth()->user();
+
+        if (! $user?->isTicketOrganizer()) {
+            return $query;
+        }
+
+        $organizationIds = $user
+            ->ticketOrganizerOrganizations()
+            ->pluck('organizations.id');
+
+        return $query->whereHas(
+            'event',
+            fn (Builder $eventQuery) =>
+                $eventQuery->whereIn(
+                    'organization_id',
+                    $organizationIds
+                )
         );
     }
 

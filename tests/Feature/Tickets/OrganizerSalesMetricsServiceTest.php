@@ -41,6 +41,8 @@ class OrganizerSalesMetricsServiceTest extends TestCase
             status: TicketOrder::STATUS_PAID,
             quantity: 2,
             total: 30000,
+            totalCharges: 3000,
+            organizerNetAmount: 27000,
         );
 
         $this->createOrder(
@@ -48,6 +50,8 @@ class OrganizerSalesMetricsServiceTest extends TestCase
             status: TicketOrder::STATUS_PAID,
             quantity: 1,
             total: 20000,
+            totalCharges: 2000,
+            organizerNetAmount: 18000,
         );
 
         $this->createOrder(
@@ -76,18 +80,63 @@ class OrganizerSalesMetricsServiceTest extends TestCase
             status: TicketOrder::STATUS_PAID,
             quantity: 10,
             total: 999999,
+            totalCharges: 99999,
+            organizerNetAmount: 900000,
         );
 
         $metrics = app(
             OrganizerSalesMetricsService::class
         )->forEvent($event);
 
-        $this->assertSame(50000.0, $metrics['gross_sales']);
-        $this->assertSame(2, $metrics['paid_orders']);
-        $this->assertSame(2, $metrics['pending_orders']);
-        $this->assertSame(1, $metrics['expired_orders']);
-        $this->assertSame(3, $metrics['tickets_sold']);
-        $this->assertSame('TZS', $metrics['currency']);
+        $this->assertSame(
+            50000.0,
+            (float) $metrics['gross_sales']
+        );
+
+        $this->assertSame(
+            2,
+            $metrics['paid_orders']
+        );
+
+        $this->assertSame(
+            2,
+            $metrics['pending_orders']
+        );
+
+        $this->assertSame(
+            1,
+            $metrics['expired_orders']
+        );
+
+        $this->assertSame(
+            3,
+            $metrics['tickets_sold']
+        );
+
+        $this->assertSame(
+            'TZS',
+            $metrics['currency']
+        );
+
+        $this->assertArrayHasKey(
+            'total_charges',
+            $metrics
+        );
+
+        $this->assertArrayHasKey(
+            'net_payable',
+            $metrics
+        );
+
+        $this->assertSame(
+            5000.0,
+            (float) $metrics['total_charges']
+        );
+
+        $this->assertSame(
+            45000.0,
+            (float) $metrics['net_payable']
+        );
     }
 
     public function test_it_returns_sales_by_ticket_type_and_recent_orders(): void
@@ -135,6 +184,8 @@ class OrganizerSalesMetricsServiceTest extends TestCase
             status: TicketOrder::STATUS_PAID,
             quantity: 3,
             total: 40000,
+            totalCharges: 4000,
+            organizerNetAmount: 36000,
         );
 
         TicketOrderItem::query()->create([
@@ -178,14 +229,20 @@ class OrganizerSalesMetricsServiceTest extends TestCase
 
         $this->assertSame(
             3,
-            collect($metrics['sales_by_ticket_type'])
-                ->sum('quantity')
+            (int) collect(
+                $metrics['sales_by_ticket_type']
+            )->sum('quantity')
         );
 
         $this->assertSame(
             40000.0,
-            (float) collect($metrics['sales_by_ticket_type'])
-                ->sum('revenue')
+            (float) collect(
+                $metrics['sales_by_ticket_type']
+            )->sum('revenue')
+        );
+
+        $this->assertNotEmpty(
+            $metrics['recent_orders']
         );
 
         $this->assertSame(
@@ -194,8 +251,138 @@ class OrganizerSalesMetricsServiceTest extends TestCase
         );
 
         $this->assertSame(
-            'paid',
+            TicketOrder::STATUS_PAID,
             $metrics['recent_orders'][0]['status']
+        );
+    }
+
+    public function test_financial_metrics_only_include_paid_orders(): void
+    {
+        $organization = Organization::query()->create([
+            'name' => 'Financial Metrics Organization',
+            'slug' => 'financial-metrics-' . uniqid(),
+        ]);
+
+        $event = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Financial Metrics Event',
+            'slug' => 'financial-metrics-event-' . uniqid(),
+            'status' => Event::STATUS_ACTIVE,
+        ]);
+
+        $this->createOrder(
+            event: $event,
+            status: TicketOrder::STATUS_PAID,
+            quantity: 2,
+            total: 100000,
+            totalCharges: 10000,
+            organizerNetAmount: 90000,
+        );
+
+        $this->createOrder(
+            event: $event,
+            status: TicketOrder::STATUS_PENDING,
+            quantity: 1,
+            total: 50000,
+            totalCharges: 5000,
+            organizerNetAmount: 45000,
+        );
+
+        $this->createOrder(
+            event: $event,
+            status: TicketOrder::STATUS_EXPIRED,
+            quantity: 1,
+            total: 25000,
+            totalCharges: 2500,
+            organizerNetAmount: 22500,
+        );
+
+        $metrics = app(
+            OrganizerSalesMetricsService::class
+        )->forEvent($event);
+
+        $this->assertSame(
+            100000.0,
+            (float) $metrics['gross_sales']
+        );
+
+        $this->assertSame(
+            10000.0,
+            (float) $metrics['total_charges']
+        );
+
+        $this->assertSame(
+            90000.0,
+            (float) $metrics['net_payable']
+        );
+
+        $this->assertSame(
+            1,
+            $metrics['paid_orders']
+        );
+    }
+
+    public function test_event_metrics_do_not_include_orders_from_other_events(): void
+    {
+        $organization = Organization::query()->create([
+            'name' => 'Event Isolation Organization',
+            'slug' => 'event-isolation-' . uniqid(),
+        ]);
+
+        $eventA = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Event A',
+            'slug' => 'event-a-' . uniqid(),
+            'status' => Event::STATUS_ACTIVE,
+        ]);
+
+        $eventB = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Event B',
+            'slug' => 'event-b-' . uniqid(),
+            'status' => Event::STATUS_ACTIVE,
+        ]);
+
+        $this->createOrder(
+            event: $eventA,
+            status: TicketOrder::STATUS_PAID,
+            quantity: 1,
+            total: 20000,
+            totalCharges: 2000,
+            organizerNetAmount: 18000,
+        );
+
+        $this->createOrder(
+            event: $eventB,
+            status: TicketOrder::STATUS_PAID,
+            quantity: 10,
+            total: 500000,
+            totalCharges: 50000,
+            organizerNetAmount: 450000,
+        );
+
+        $metrics = app(
+            OrganizerSalesMetricsService::class
+        )->forEvent($eventA);
+
+        $this->assertSame(
+            20000.0,
+            (float) $metrics['gross_sales']
+        );
+
+        $this->assertSame(
+            2000.0,
+            (float) $metrics['total_charges']
+        );
+
+        $this->assertSame(
+            18000.0,
+            (float) $metrics['net_payable']
+        );
+
+        $this->assertSame(
+            1,
+            $metrics['paid_orders']
         );
     }
 
@@ -204,23 +391,82 @@ class OrganizerSalesMetricsServiceTest extends TestCase
         string $status,
         int $quantity,
         int $total,
+        int $totalCharges = 0,
+        ?int $organizerNetAmount = null,
     ): TicketOrder {
+        $organizerNetAmount ??=
+            $total - $totalCharges;
+
+        $isPaid =
+            $status === TicketOrder::STATUS_PAID;
+
         return TicketOrder::query()->create([
-            'event_id' => $event->id,
-            'order_number' => 'ORD-' . strtoupper(uniqid()),
-            'buyer_name' => 'Sales Test Buyer',
-            'buyer_phone' => '255700000001',
-            'buyer_email' => 'buyer@example.com',
-            'quantity' => $quantity,
-            'subtotal' => $total,
-            'discount_amount' => 0,
-            'total' => $total,
-            'currency' => 'TZS',
-            'status' => $status,
-            'paid_at' => $status === TicketOrder::STATUS_PAID
-                ? now()
-                : null,
-            'expires_at' => now()->addMinutes(20),
+            'event_id' =>
+                $event->id,
+
+            'order_number' =>
+                'ORD-' . strtoupper(uniqid()),
+
+            'buyer_name' =>
+                'Sales Test Buyer',
+
+            'buyer_phone' =>
+                '255700000001',
+
+            'buyer_email' =>
+                'buyer@example.com',
+
+            'quantity' =>
+                $quantity,
+
+            'subtotal' =>
+                $total,
+
+            'discount_amount' =>
+                0,
+
+            'total' =>
+                $total,
+
+            'gross_amount' =>
+                $total,
+
+            'platform_commission_rate' =>
+                0,
+
+            'platform_commission_amount' =>
+                $totalCharges,
+
+            'gateway_fee_rate' =>
+                0,
+
+            'gateway_fee_amount' =>
+                0,
+
+            'total_charges' =>
+                $totalCharges,
+
+            'organizer_net_amount' =>
+                $organizerNetAmount,
+
+            'financial_snapshot_at' =>
+                $isPaid
+                    ? now()
+                    : null,
+
+            'currency' =>
+                'TZS',
+
+            'status' =>
+                $status,
+
+            'paid_at' =>
+                $isPaid
+                    ? now()
+                    : null,
+
+            'expires_at' =>
+                now()->addMinutes(20),
         ]);
     }
 }
