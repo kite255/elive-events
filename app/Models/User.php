@@ -36,6 +36,9 @@ class User extends Authenticatable implements FilamentUser
 
     public const ORGANIZATION_ROLE_ADMIN = 'organization_admin';
 
+    public const ORGANIZATION_ROLE_TICKET_ORGANIZER =
+        'ticket_organizer';
+
     public const ORGANIZATION_ROLE_EVENT_MANAGER = 'event_manager';
 
     public const ORGANIZATION_ROLE_REGISTRATION_OFFICER =
@@ -152,6 +155,28 @@ class User extends Authenticatable implements FilamentUser
                 self::ORGANIZATION_ROLE_OWNER,
                 self::ORGANIZATION_ROLE_ADMIN,
             ]);
+    }
+
+    public function ticketOrganizerOrganizations(): BelongsToMany
+    {
+        return $this->organizations()
+            ->wherePivot(
+                'status',
+                self::ORGANIZATION_STATUS_ACTIVE
+            )
+            ->wherePivot(
+                'role',
+                self::ORGANIZATION_ROLE_TICKET_ORGANIZER
+            );
+    }
+
+    public function isTicketOrganizer(): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return false;
+        }
+
+        return $this->ticketOrganizerOrganizations()->exists();
     }
 
     /*
