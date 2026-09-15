@@ -1,4 +1,8 @@
-FROM php:8.3-fpm
+# =========================================================
+# Stage 1: Laravel / PHP application
+# =========================================================
+
+FROM php:8.3-fpm AS app-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -104,7 +108,7 @@ RUN composer install \
     --no-scripts
 
 # ---------------------------------------------------------
-# Application
+# Application Source
 # ---------------------------------------------------------
 
 COPY . .
@@ -128,6 +132,45 @@ RUN composer dump-autoload --optimize \
     && chown -R www-data:www-data storage bootstrap/cache public \
     && chmod -R 775 storage bootstrap/cache
 
-EXPOSE 9000
 
+# =========================================================
+# Stage 2: Frontend / Vite Build
+# =========================================================
+
+FROM node:22-bookworm-slim AS frontend-builder
+
+WORKDIR /app
+
+# Install JS dependencies first for Docker layer caching.
+COPY package.json package-lock.json ./
+
+RUN npm ci
+
+# Copy application source.
+COPY . .
+
+# Filament theme imports CSS from vendor/filament,
+# so vendor must also exist in the frontend build stage.
+COPY --from=app-base /var/www/html/vendor ./vendor
+
+# Build Vite assets, including:
+# resources/css/filament/admin/theme.css
+RUN npm run build
+
+
+# =========================================================
+# Stage 3: Final Runtime Image
+# =========================================================
+
+FROM app-base AS runtime
+
+WORKDIR /var/www/html
+
+# Copy the freshly generated Vite build into the runtime image.
+COPY --chown=www-data:www-data \
+    --from=frontend-builder \
+    /app/public/build \
+    /var/www/html/public/build
+
+EXPOSE 9000
 CMD ["php-fpm"]
