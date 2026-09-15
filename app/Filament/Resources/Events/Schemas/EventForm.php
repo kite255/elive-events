@@ -496,6 +496,7 @@ class EventForm
                         )
                             ->label('Ticket Sales Start')
                             ->seconds(false)
+                            ->timezone(config('app.timezone'))
                             ->visible(
                                 fn (Get $get): bool =>
                                     (bool) $get(
@@ -503,7 +504,7 @@ class EventForm
                                     )
                             )
                             ->helperText(
-                                'Optional. Leave empty to allow ticket sales immediately.'
+                                'Optional. Times are entered in Tanzania local time. Leave empty to allow ticket sales immediately.'
                             ),
 
                         DateTimePicker::make(
@@ -511,6 +512,7 @@ class EventForm
                         )
                             ->label('Ticket Sales End')
                             ->seconds(false)
+                            ->timezone(config('app.timezone'))
                             ->afterOrEqual(
                                 'sales_start_at'
                             )
@@ -521,7 +523,7 @@ class EventForm
                                     )
                             )
                             ->helperText(
-                                'Optional. Leave empty to keep sales open until manually disabled.'
+                                'Optional. Times are entered in Tanzania local time. Leave empty to keep sales open until manually disabled.'
                             ),
 
                         Placeholder::make(

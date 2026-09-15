@@ -113,11 +113,20 @@ class TicketTypeForm
                     ->schema([
                         DateTimePicker::make('sales_start_at')
                             ->label('Sales Start')
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->timezone(config('app.timezone'))
+                            ->helperText(
+                                'Enter the ticket sales start time in Tanzania local time.'
+                            ),
 
                         DateTimePicker::make('sales_end_at')
                             ->label('Sales End')
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->timezone(config('app.timezone'))
+                            ->afterOrEqual('sales_start_at')
+                            ->helperText(
+                                'Enter the ticket sales end time in Tanzania local time.'
+                            ),
                     ])
                     ->columns(2),
 

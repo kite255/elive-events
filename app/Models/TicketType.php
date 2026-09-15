@@ -73,18 +73,28 @@ class TicketType extends Model
 
     public function scopeOnSale(Builder $query): Builder
     {
+        $now = now()->utc();
+
         return $query
             ->where('is_active', true)
             ->where('is_public', true)
-            ->where(function (Builder $query): void {
+            ->where(function (Builder $query) use ($now): void {
                 $query
                     ->whereNull('sales_start_at')
-                    ->orWhere('sales_start_at', '<=', now());
+                    ->orWhere(
+                        'sales_start_at',
+                        '<=',
+                        $now
+                    );
             })
-            ->where(function (Builder $query): void {
+            ->where(function (Builder $query) use ($now): void {
                 $query
                     ->whereNull('sales_end_at')
-                    ->orWhere('sales_end_at', '>=', now());
+                    ->orWhere(
+                        'sales_end_at',
+                        '>=',
+                        $now
+                    );
             });
     }
 
