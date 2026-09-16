@@ -629,6 +629,326 @@ public function test_delete_with_unknown_selection_does_not_remove_elements(): v
 }
 
 
+
+    public function test_move_selected_element_updates_coordinates(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText');
+
+        $elementId =
+            $component->get('elements')[0]['id'];
+
+        $component
+            ->call(
+                'moveSelectedElement',
+                250,
+                375
+            )
+            ->assertSet(
+                'elements.0.x',
+                250
+            )
+            ->assertSet(
+                'elements.0.y',
+                375
+            )
+            ->assertSet(
+                'selectedElementId',
+                $elementId
+            )
+            ->assertSet(
+                'isDirty',
+                true
+            );
+    }
+
+    public function test_resize_selected_element_updates_dimensions(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->call(
+                'resizeSelectedElement',
+                640,
+                140
+            )
+            ->assertSet(
+                'elements.0.width',
+                640
+            )
+            ->assertSet(
+                'elements.0.height',
+                140
+            );
+    }
+
+    public function test_invalid_resize_does_not_change_element(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText');
+
+        $before = $component->get(
+            'elements'
+        );
+
+        $component->call(
+            'resizeSelectedElement',
+            -10,
+            0
+        );
+
+        $this->assertSame(
+            $before,
+            $component->get('elements')
+        );
+    }
+
+    public function test_update_selected_element_can_change_allowed_properties(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->call(
+                'updateSelectedElement',
+                [
+                    'rotation' => 15,
+                    'binding' => 'event_name',
+                ]
+            )
+            ->assertSet(
+                'elements.0.rotation',
+                15
+            )
+            ->assertSet(
+                'elements.0.binding',
+                'event_name'
+            );
+    }
+
+    public function test_update_selected_element_cannot_change_id_or_type(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText');
+
+        $original =
+            $component->get('elements')[0];
+
+        $component->call(
+            'updateSelectedElement',
+            [
+                'id' => 'forged_id',
+                'type' => 'qr',
+            ]
+        );
+
+        $element =
+            $component->get('elements')[0];
+
+        $this->assertSame(
+            $original['id'],
+            $element['id']
+        );
+
+        $this->assertSame(
+            'text',
+            $element['type']
+        );
+    }
+
+    public function test_qr_binding_cannot_be_changed(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addQr')
+            ->call(
+                'updateSelectedElement',
+                [
+                    'binding' => 'holder_name',
+                ]
+            )
+            ->assertSet(
+                'elements.0.binding',
+                'ticket_qr'
+            );
+    }
+
+    public function test_move_layer_forward_changes_element_order(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->call('addQr');
+
+        $elements =
+            $component->get('elements');
+
+        $textId = $elements[0]['id'];
+
+        $component
+            ->call(
+                'selectElement',
+                $textId
+            )
+            ->call(
+                'moveLayerForward'
+            );
+
+        $after =
+            $component->get('elements');
+
+        $this->assertSame(
+            $textId,
+            $after[1]['id']
+        );
+    }
+
+    public function test_move_layer_backward_changes_element_order(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->call('addQr');
+
+        $elements =
+            $component->get('elements');
+
+        $qrId = $elements[1]['id'];
+
+        $component
+            ->call(
+                'selectElement',
+                $qrId
+            )
+            ->call(
+                'moveLayerBackward'
+            );
+
+        $after =
+            $component->get('elements');
+
+        $this->assertSame(
+            $qrId,
+            $after[0]['id']
+        );
+    }
+
+    public function test_layer_boundaries_do_not_reorder_elements(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->call('addQr');
+
+        $initial =
+            $component->get('elements');
+
+        $firstId = $initial[0]['id'];
+        $lastId = $initial[1]['id'];
+
+        $component
+            ->call(
+                'selectElement',
+                $firstId
+            )
+            ->call(
+                'moveLayerBackward'
+            );
+
+        $this->assertSame(
+            $initial,
+            $component->get('elements')
+        );
+
+        $component
+            ->call(
+                'selectElement',
+                $lastId
+            )
+            ->call(
+                'moveLayerForward'
+            );
+
+        $this->assertSame(
+            $initial,
+            $component->get('elements')
+        );
+    }
+
     private function makeOrganizationTemplateContext(): array
     {
         $organization = Organization::query()->create([

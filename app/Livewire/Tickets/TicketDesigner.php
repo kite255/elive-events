@@ -232,6 +232,161 @@ class TicketDesigner extends Component
         );
     }
 
+    public function moveSelectedElement(
+        int|float $x,
+        int|float $y
+    ): void {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            return;
+        }
+
+        $this->elements[$index]['x'] = $x;
+        $this->elements[$index]['y'] = $y;
+
+        $this->isDirty = true;
+    }
+
+    public function resizeSelectedElement(
+        int|float $width,
+        int|float $height
+    ): void {
+        if ($width <= 0 || $height <= 0) {
+            return;
+        }
+
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            return;
+        }
+
+        $this->elements[$index]['width'] =
+            $width;
+
+        $this->elements[$index]['height'] =
+            $height;
+
+        $this->isDirty = true;
+    }
+
+    public function updateSelectedElement(
+        array $properties
+    ): void {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            return;
+        }
+
+        $element =
+            $this->elements[$index];
+
+        $allowedProperties = [
+            'x',
+            'y',
+            'width',
+            'height',
+            'rotation',
+            'binding',
+            'style',
+            'asset_id',
+            'asset_path',
+            'label',
+        ];
+
+        foreach ($properties as $key => $value) {
+            if (! in_array(
+                $key,
+                $allowedProperties,
+                true
+            )) {
+                continue;
+            }
+
+            if (
+                $key === 'binding'
+                && ($element['type'] ?? null)
+                    === 'qr'
+            ) {
+                continue;
+            }
+
+            $element[$key] = $value;
+        }
+
+        if (
+            ($element['type'] ?? null)
+                === 'qr'
+        ) {
+            $element['binding'] =
+                'ticket_qr';
+        }
+
+        $this->elements[$index] =
+            $element;
+
+        $this->isDirty = true;
+    }
+
+    public function moveLayerForward(): void
+    {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            return;
+        }
+
+        $lastIndex =
+            count($this->elements) - 1;
+
+        if ($index >= $lastIndex) {
+            return;
+        }
+
+        $current =
+            $this->elements[$index];
+
+        $next =
+            $this->elements[$index + 1];
+
+        $this->elements[$index] =
+            $next;
+
+        $this->elements[$index + 1] =
+            $current;
+
+        $this->isDirty = true;
+    }
+
+    public function moveLayerBackward(): void
+    {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            return;
+        }
+
+        if ($index <= 0) {
+            return;
+        }
+
+        $current =
+            $this->elements[$index];
+
+        $previous =
+            $this->elements[$index - 1];
+
+        $this->elements[$index] =
+            $previous;
+
+        $this->elements[$index - 1] =
+            $current;
+
+        $this->isDirty = true;
+    }
+
     public function deleteSelectedElement(): void
     {
         if ($this->selectedElementId === null) {
@@ -302,6 +457,27 @@ class TicketDesigner extends Component
         } while ($exists);
 
         return $id;
+    }
+
+    protected function selectedElementIndex(): ?int
+    {
+        if ($this->selectedElementId === null) {
+            return null;
+        }
+
+        foreach (
+            $this->elements
+            as $index => $element
+        ) {
+            if (
+                ($element['id'] ?? null)
+                    === $this->selectedElementId
+            ) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     protected function reloadPages(): void
