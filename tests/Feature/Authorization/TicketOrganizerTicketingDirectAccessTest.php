@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Authorization;
 
+use App\Filament\Resources\TicketOrders\Pages\ListTicketOrders;
 use App\Filament\Resources\TicketOrders\TicketOrderResource;
 use App\Filament\Resources\TicketTypes\TicketTypeResource;
 use App\Models\Event;
@@ -10,6 +11,7 @@ use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class TicketOrganizerTicketingDirectAccessTest extends TestCase
@@ -171,6 +173,31 @@ class TicketOrganizerTicketingDirectAccessTest extends TestCase
             ],
             'Ticket Organizer must not directly access the Ticket Order edit page.'
         );
+    }
+
+    public function test_ticketing_manager_does_not_see_new_ticket_order_action(): void
+    {
+        [$organizer] = $this->createTicketOrganizerContext();
+
+        $this->actingAs($organizer);
+
+        Livewire::test(ListTicketOrders::class)
+            ->assertActionHidden('create');
+    }
+
+    public function test_super_admin_still_sees_new_ticket_order_action(): void
+    {
+        $superAdmin = User::query()->create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin.ticket-orders@example.com',
+            'password' => 'password',
+            'is_super_admin' => true,
+        ]);
+
+        $this->actingAs($superAdmin);
+
+        Livewire::test(ListTicketOrders::class)
+            ->assertActionVisible('create');
     }
 
     private function createTicketOrganizerContext(): array

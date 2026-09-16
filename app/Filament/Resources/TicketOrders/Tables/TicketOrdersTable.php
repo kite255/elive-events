@@ -192,7 +192,11 @@ class TicketOrdersTable
                 'desc'
             )
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->visible(
+                        fn (): bool =>
+                            ! auth()->user()?->isTicketOrganizer()
+                    ),
             ]);
     }
 }
