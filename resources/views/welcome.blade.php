@@ -27,14 +27,14 @@
                 });
         })
         ->orderBy('starts_at')
-        ->limit(2)
+        ->limit(6)
         ->get();
 
     $upcomingEvents = \App\Models\Event::query()
         ->whereNotIn('status', ['draft', 'cancelled'])
         ->where('starts_at', '>', now())
         ->orderBy('starts_at')
-        ->limit(4)
+        ->limit(6)
         ->get();
 
     $pastEvents = \App\Models\Event::query()
@@ -49,7 +49,7 @@
                 });
         })
         ->orderByDesc('starts_at')
-        ->limit(2)
+        ->limit(6)
         ->get();
 
     /*
@@ -207,6 +207,14 @@
             box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
             transition: transform .2s ease, box-shadow .2s ease;
             scroll-snap-align: start;
+        }
+
+        .home-events-track[data-card-count="1"] .home-event-card {
+            flex-basis: min(100%, 520px);
+        }
+
+        .home-events-track[data-card-count="2"] .home-event-card {
+            flex-basis: calc((100% - 24px) / 2);
         }
 
         .home-event-card:hover {
@@ -375,6 +383,10 @@
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .home-carousel-controls.is-hidden {
+            display: none;
         }
 
         .home-carousel-btn {
@@ -776,8 +788,8 @@
 
                             </div>
 
-                            <div class="home-events-carousel" data-event-carousel>
-                                <div class="home-events-track" data-carousel-track>
+                            <div class="home-events-carousel" data-event-carousel data-autoplay="true" data-autoplay-interval="4000">
+                                <div class="home-events-track" data-carousel-track data-card-count="{{ $happeningNowEvents->count() }}">
 
                                 @foreach ($happeningNowEvents as $event)
 
@@ -1043,8 +1055,8 @@
 
                         @if ($upcomingEvents->isNotEmpty())
 
-                            <div class="home-events-carousel" data-event-carousel>
-                                <div class="home-events-track" data-carousel-track>
+                            <div class="home-events-carousel" data-event-carousel data-autoplay="true" data-autoplay-interval="4000">
+                                <div class="home-events-track" data-carousel-track data-card-count="{{ $upcomingEvents->count() }}">
 
                                 @foreach ($upcomingEvents as $event)
 
@@ -1322,8 +1334,8 @@
 
                             </div>
 
-                            <div class="home-events-carousel" data-event-carousel>
-                                <div class="home-events-track" data-carousel-track>
+                            <div class="home-events-carousel" data-event-carousel data-autoplay="true" data-autoplay-interval="4000">
+                                <div class="home-events-track" data-carousel-track data-card-count="{{ $pastEvents->count() }}">
 
                                 @foreach ($pastEvents as $event)
 
@@ -2117,6 +2129,21 @@
                     return;
                 }
 
+                const autoplayEnabled =
+                    carousel.dataset.autoplay === 'true';
+
+                const autoplayInterval = Number.parseInt(
+                    carousel.dataset.autoplayInterval || '4000',
+                    10
+                );
+
+                const reduceMotion = window.matchMedia(
+                    '(prefers-reduced-motion: reduce)'
+                );
+
+                let autoplayTimer = null;
+                let userInteracting = false;
+
                 function getScrollAmount() {
                     const card = track.querySelector('.home-event-card');
 
@@ -2130,31 +2157,171 @@
                     return card.getBoundingClientRect().width + gap;
                 }
 
-                function updateButtons() {
-                    const max = track.scrollWidth - track.clientWidth - 2;
+                function getMaxScroll() {
+                    return Math.max(
+                        0,
+                        track.scrollWidth - track.clientWidth
+                    );
+                }
 
-                    prev.disabled = track.scrollLeft <= 2;
-                    next.disabled = track.scrollLeft >= max;
+                function hasOverflow() {
+                    return getMaxScroll() > 2;
+                }
+
+                function updateButtons() {
+                    const max = getMaxScroll();
+                    const canScroll = max > 2;
+
+                    const controls = section.querySelector(
+                        '.home-carousel-controls'
+                    );
+
+                    if (controls) {
+                        controls.classList.toggle(
+                            'is-hidden',
+                            !canScroll
+                        );
+                    }
+
+                    prev.disabled =
+                        !canScroll
+                        || track.scrollLeft <= 2;
+
+                    next.disabled =
+                        !canScroll
+                        || track.scrollLeft >= max - 2;
+                }
+
+                function stopAutoplay() {
+                    if (autoplayTimer !== null) {
+                        window.clearInterval(autoplayTimer);
+                        autoplayTimer = null;
+                    }
+                }
+
+                function advanceCarousel() {
+                    if (
+                        userInteracting
+                        || reduceMotion.matches
+                        || !hasOverflow()
+                    ) {
+                        return;
+                    }
+
+                    const max = getMaxScroll();
+                    const amount = getScrollAmount();
+
+                    if (track.scrollLeft >= max - 2) {
+                        track.scrollTo({
+                            left: 0,
+                            behavior: 'smooth'
+                        });
+
+                        return;
+                    }
+
+                    track.scrollBy({
+                        left: amount,
+                        behavior: 'smooth'
+                    });
+                }
+
+                function startAutoplay() {
+                    stopAutoplay();
+
+                    if (
+                        !autoplayEnabled
+                        || reduceMotion.matches
+                        || !hasOverflow()
+                    ) {
+                        return;
+                    }
+
+                    autoplayTimer = window.setInterval(
+                        advanceCarousel,
+                        Number.isFinite(autoplayInterval) && autoplayInterval > 0
+                            ? autoplayInterval
+                            : 4000
+                    );
+                }
+
+                function pauseForInteraction() {
+                    userInteracting = true;
+                    stopAutoplay();
+                }
+
+                function resumeAfterInteraction() {
+                    userInteracting = false;
+                    startAutoplay();
                 }
 
                 prev.addEventListener('click', function () {
+                    pauseForInteraction();
+
                     track.scrollBy({
                         left: -getScrollAmount(),
                         behavior: 'smooth'
                     });
+
+                    window.setTimeout(resumeAfterInteraction, 1200);
                 });
 
                 next.addEventListener('click', function () {
+                    pauseForInteraction();
+
                     track.scrollBy({
                         left: getScrollAmount(),
                         behavior: 'smooth'
                     });
+
+                    window.setTimeout(resumeAfterInteraction, 1200);
                 });
 
-                track.addEventListener('scroll', updateButtons, { passive: true });
-                window.addEventListener('resize', updateButtons);
+                carousel.addEventListener('mouseenter', pauseForInteraction);
+                carousel.addEventListener('mouseleave', resumeAfterInteraction);
+
+                carousel.addEventListener('focusin', pauseForInteraction);
+                carousel.addEventListener('focusout', function (event) {
+                    if (!carousel.contains(event.relatedTarget)) {
+                        resumeAfterInteraction();
+                    }
+                });
+
+                carousel.addEventListener(
+                    'pointerdown',
+                    pauseForInteraction,
+                    { passive: true }
+                );
+
+                carousel.addEventListener(
+                    'pointerup',
+                    resumeAfterInteraction,
+                    { passive: true }
+                );
+
+                carousel.addEventListener(
+                    'touchend',
+                    resumeAfterInteraction,
+                    { passive: true }
+                );
+
+                track.addEventListener(
+                    'scroll',
+                    updateButtons,
+                    { passive: true }
+                );
+
+                window.addEventListener('resize', function () {
+                    updateButtons();
+                    startAutoplay();
+                });
+
+                if (typeof reduceMotion.addEventListener === 'function') {
+                    reduceMotion.addEventListener('change', startAutoplay);
+                }
 
                 updateButtons();
+                startAutoplay();
             });
         });
     </script>
