@@ -199,8 +199,16 @@ class TicketTypesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                    DeleteBulkAction::make()
+                        ->visible(
+                            fn (): bool =>
+                                ! auth()->user()?->isTicketOrganizer()
+                        ),
+                ])
+                    ->visible(
+                        fn (): bool =>
+                            ! auth()->user()?->isTicketOrganizer()
+                    ),
             ]);
     }
 }

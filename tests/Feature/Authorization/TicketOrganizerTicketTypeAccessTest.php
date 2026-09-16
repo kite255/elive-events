@@ -156,4 +156,94 @@ class TicketOrganizerTicketTypeAccessTest extends TestCase
                 $ticketType
             );
     }
+
+    public function test_ticketing_manager_does_not_see_create_or_bulk_delete_actions(): void
+    {
+        $organization = Organization::query()->create([
+            'name' => 'Ticket Events Ltd',
+            'email' => 'ticket-events-actions@example.com',
+        ]);
+
+        $organizer = User::query()->create([
+            'name' => 'Ticketing Manager',
+            'email' => 'ticketing.manager.actions@example.com',
+            'password' => 'password',
+            'is_super_admin' => false,
+        ]);
+
+        $organizer->organizations()->attach(
+            $organization->id,
+            [
+                'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+                'status' => User::ORGANIZATION_STATUS_ACTIVE,
+                'is_owner' => false,
+                'joined_at' => now(),
+            ]
+        );
+
+        $event = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Concert Event',
+            'venue' => 'Main Hall',
+            'starts_at' => now()->addDay(),
+            'status' => Event::STATUS_ACTIVE,
+            'registration_is_open' => true,
+        ]);
+
+        TicketType::query()->create([
+            'event_id' => $event->id,
+            'name' => 'VIP',
+            'code' => 'VIP-ACTIONS',
+            'price' => 50000,
+            'currency' => 'TZS',
+            'is_active' => true,
+            'is_public' => true,
+        ]);
+
+        $this->actingAs($organizer);
+
+        Livewire::test(ListTicketTypes::class)
+            ->assertActionHidden('create')
+            ->assertTableBulkActionHidden('delete');
+    }
+
+    public function test_super_admin_still_sees_create_and_bulk_delete_actions(): void
+    {
+        $organization = Organization::query()->create([
+            'name' => 'Admin Events Ltd',
+            'email' => 'admin-events@example.com',
+        ]);
+
+        $superAdmin = User::query()->create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin.actions@example.com',
+            'password' => 'password',
+            'is_super_admin' => true,
+        ]);
+
+        $event = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Admin Concert',
+            'venue' => 'Main Hall',
+            'starts_at' => now()->addDay(),
+            'status' => Event::STATUS_ACTIVE,
+            'registration_is_open' => true,
+        ]);
+
+        TicketType::query()->create([
+            'event_id' => $event->id,
+            'name' => 'Regular',
+            'code' => 'REG-ACTIONS',
+            'price' => 25000,
+            'currency' => 'TZS',
+            'is_active' => true,
+            'is_public' => true,
+        ]);
+
+        $this->actingAs($superAdmin);
+
+        Livewire::test(ListTicketTypes::class)
+            ->assertActionVisible('create')
+            ->assertTableBulkActionVisible('delete');
+    }
 }
