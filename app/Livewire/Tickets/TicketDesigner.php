@@ -4,6 +4,7 @@ namespace App\Livewire\Tickets;
 
 use App\Models\TicketTemplatePage;
 use App\Services\Tickets\TicketDesignerService;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class TicketDesigner extends Component
@@ -115,6 +116,192 @@ class TicketDesigner extends Component
             $exists
                 ? $elementId
                 : null;
+    }
+
+    public function addText(): void
+    {
+        $this->addElement(
+            'txt',
+            [
+                'type' => 'text',
+                'binding' => 'holder_name',
+                'x' => 100,
+                'y' => 100,
+                'width' => 500,
+                'height' => 100,
+                'rotation' => 0,
+                'style' => [
+                    'fontFamily' => 'Arial',
+                    'fontSize' => 48,
+                    'fontWeight' => 700,
+                    'textAlign' => 'center',
+                    'color' => '#161943',
+                ],
+            ]
+        );
+    }
+
+    public function addQr(): void
+    {
+        $this->addElement(
+            'qr',
+            [
+                'type' => 'qr',
+                'binding' => 'ticket_qr',
+                'x' => 100,
+                'y' => 250,
+                'width' => 300,
+                'height' => 300,
+                'rotation' => 0,
+            ]
+        );
+    }
+
+    public function addImage(): void
+    {
+        $this->addElement(
+            'img',
+            [
+                'type' => 'image',
+                'x' => 100,
+                'y' => 100,
+                'width' => 400,
+                'height' => 300,
+                'rotation' => 0,
+            ]
+        );
+    }
+
+    public function addLogo(): void
+    {
+        $this->addElement(
+            'logo',
+            [
+                'type' => 'logo',
+                'x' => 100,
+                'y' => 100,
+                'width' => 250,
+                'height' => 250,
+                'rotation' => 0,
+            ]
+        );
+    }
+
+    public function addSponsorLogo(): void
+    {
+        $this->addElement(
+            'sponsor',
+            [
+                'type' => 'sponsor_logo',
+                'x' => 100,
+                'y' => 100,
+                'width' => 250,
+                'height' => 150,
+                'rotation' => 0,
+            ]
+        );
+    }
+
+    public function addShape(): void
+    {
+        $this->addElement(
+            'shape',
+            [
+                'type' => 'shape',
+                'x' => 100,
+                'y' => 100,
+                'width' => 400,
+                'height' => 200,
+                'rotation' => 0,
+            ]
+        );
+    }
+
+    public function addLine(): void
+    {
+        $this->addElement(
+            'line',
+            [
+                'type' => 'line',
+                'x' => 100,
+                'y' => 100,
+                'width' => 400,
+                'height' => 4,
+                'rotation' => 0,
+            ]
+        );
+    }
+
+    public function deleteSelectedElement(): void
+    {
+        if ($this->selectedElementId === null) {
+            return;
+        }
+
+        $originalCount = count(
+            $this->elements
+        );
+
+        $this->elements = array_values(
+            array_filter(
+                $this->elements,
+                fn (array $element): bool =>
+                    ($element['id'] ?? null)
+                        !== $this->selectedElementId
+            )
+        );
+
+        $deleted =
+            count($this->elements)
+                !== $originalCount;
+
+        $this->selectedElementId = null;
+
+        if ($deleted) {
+            $this->isDirty = true;
+        }
+    }
+
+    protected function addElement(
+        string $prefix,
+        array $element
+    ): void {
+        $id = $this->generateElementId(
+            $prefix
+        );
+
+        $element = [
+            'id' => $id,
+            ...$element,
+        ];
+
+        $this->elements[] = $element;
+
+        $this->selectedElementId = $id;
+
+        $this->isDirty = true;
+    }
+
+    protected function generateElementId(
+        string $prefix
+    ): string {
+        do {
+            $id = Str::lower(
+                $prefix
+                . '_'
+                . Str::random(8)
+            );
+
+            $exists = collect(
+                $this->elements
+            )->contains(
+                fn (array $element): bool =>
+                    ($element['id'] ?? null)
+                        === $id
+            );
+        } while ($exists);
+
+        return $id;
     }
 
     protected function reloadPages(): void

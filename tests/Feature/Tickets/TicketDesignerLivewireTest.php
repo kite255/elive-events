@@ -412,4 +412,242 @@ class TicketDesignerLivewireTest extends TestCase
                 null
             );
     }
+
+public function test_add_text_creates_and_selects_text_element(): void
+{
+    [$templateType, $templateId] =
+        $this->makeOrganizationTemplateContext();
+
+    Livewire::test(
+        TicketDesigner::class,
+        [
+            'templateType' => $templateType,
+            'templateId' => $templateId,
+        ]
+    )
+        ->call('addText')
+        ->assertSet(
+            'elements.0.type',
+            'text'
+        )
+        ->assertSet(
+            'elements.0.binding',
+            'holder_name'
+        )
+        ->assertSet(
+            'selectedElementId',
+            fn ($value): bool =>
+                is_string($value)
+                && $value !== ''
+        )
+        ->assertSet(
+            'isDirty',
+            true
+        );
+}
+
+public function test_add_qr_creates_fixed_ticket_qr_binding(): void
+{
+    [$templateType, $templateId] =
+        $this->makeOrganizationTemplateContext();
+
+    Livewire::test(
+        TicketDesigner::class,
+        [
+            'templateType' => $templateType,
+            'templateId' => $templateId,
+        ]
+    )
+        ->call('addQr')
+        ->assertSet(
+            'elements.0.type',
+            'qr'
+        )
+        ->assertSet(
+            'elements.0.binding',
+            'ticket_qr'
+        )
+        ->assertSet(
+            'isDirty',
+            true
+        );
+}
+
+public function test_supported_element_methods_create_expected_types(): void
+{
+    [$templateType, $templateId] =
+        $this->makeOrganizationTemplateContext();
+
+    Livewire::test(
+        TicketDesigner::class,
+        [
+            'templateType' => $templateType,
+            'templateId' => $templateId,
+        ]
+    )
+        ->call('addImage')
+        ->call('addLogo')
+        ->call('addSponsorLogo')
+        ->call('addShape')
+        ->call('addLine')
+        ->assertSet(
+            'elements.0.type',
+            'image'
+        )
+        ->assertSet(
+            'elements.1.type',
+            'logo'
+        )
+        ->assertSet(
+            'elements.2.type',
+            'sponsor_logo'
+        )
+        ->assertSet(
+            'elements.3.type',
+            'shape'
+        )
+        ->assertSet(
+            'elements.4.type',
+            'line'
+        );
+}
+
+public function test_new_elements_receive_unique_ids(): void
+{
+    [$templateType, $templateId] =
+        $this->makeOrganizationTemplateContext();
+
+    $component = Livewire::test(
+        TicketDesigner::class,
+        [
+            'templateType' => $templateType,
+            'templateId' => $templateId,
+        ]
+    )
+        ->call('addText')
+        ->call('addText');
+
+    $elements = $component->get(
+        'elements'
+    );
+
+    $this->assertCount(
+        2,
+        $elements
+    );
+
+    $this->assertNotSame(
+        $elements[0]['id'],
+        $elements[1]['id']
+    );
+}
+
+public function test_delete_selected_element_removes_only_selected_element(): void
+{
+    [$templateType, $templateId] =
+        $this->makeOrganizationTemplateContext();
+
+    $component = Livewire::test(
+        TicketDesigner::class,
+        [
+            'templateType' => $templateType,
+            'templateId' => $templateId,
+        ]
+    )
+        ->call('addText')
+        ->call('addQr');
+
+    $elements = $component->get(
+        'elements'
+    );
+
+    $textId = $elements[0]['id'];
+    $qrId = $elements[1]['id'];
+
+    $component
+        ->call(
+            'selectElement',
+            $textId
+        )
+        ->call(
+            'deleteSelectedElement'
+        )
+        ->assertSet(
+            'selectedElementId',
+            null
+        )
+        ->assertSet(
+            'isDirty',
+            true
+        );
+
+    $remaining = $component->get(
+        'elements'
+    );
+
+    $this->assertCount(
+        1,
+        $remaining
+    );
+
+    $this->assertSame(
+        $qrId,
+        $remaining[0]['id']
+    );
+}
+
+public function test_delete_with_unknown_selection_does_not_remove_elements(): void
+{
+    [$templateType, $templateId] =
+        $this->makeOrganizationTemplateContext();
+
+    $component = Livewire::test(
+        TicketDesigner::class,
+        [
+            'templateType' => $templateType,
+            'templateId' => $templateId,
+        ]
+    )
+        ->call('addText');
+
+    $elementsBefore =
+        $component->get('elements');
+
+    $component
+        ->set(
+            'selectedElementId',
+            'not_real'
+        )
+        ->call(
+            'deleteSelectedElement'
+        );
+
+    $this->assertSame(
+        $elementsBefore,
+        $component->get('elements')
+    );
+}
+
+
+    private function makeOrganizationTemplateContext(): array
+    {
+        $organization = Organization::query()->create([
+            'name' => 'Organization A',
+        ]);
+
+        $template = OrganizationTicketTemplate::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Designer Template',
+            'width' => 1080,
+            'height' => 1350,
+            'is_active' => true,
+            'is_default' => false,
+        ]);
+
+        return [
+            TicketDesignerService::TYPE_ORGANIZATION,
+            $template->id,
+        ];
+    }
+
 }
