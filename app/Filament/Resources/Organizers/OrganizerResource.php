@@ -26,13 +26,13 @@ class OrganizerResource extends Resource
         Heroicon::OutlinedUserGroup;
 
     protected static ?string $navigationLabel =
-        'Ticket Organizers';
+        'Ticketing Managers';
 
     protected static ?string $modelLabel =
-        'Ticket Organizer';
+        'Ticketing Manager';
 
     protected static ?string $pluralModelLabel =
-        'Ticket Organizers';
+        'Ticketing Managers';
 
     protected static string|UnitEnum|null $navigationGroup =
         'Administration';
@@ -122,7 +122,7 @@ class OrganizerResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->label('Organizer')
+                    ->label('Ticketing Manager')
                     ->searchable()
                     ->sortable(),
 
