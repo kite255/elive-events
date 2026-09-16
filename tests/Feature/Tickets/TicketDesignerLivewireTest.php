@@ -949,6 +949,269 @@ public function test_delete_with_unknown_selection_does_not_remove_elements(): v
         );
     }
 
+
+    public function test_add_page_creates_and_activates_next_page(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call(
+                'addPage',
+                'Back Side'
+            );
+
+        $pages = $component->get('pages');
+
+        $this->assertCount(
+            2,
+            $pages
+        );
+
+        $this->assertSame(
+            1,
+            $pages[0]['page_number']
+        );
+
+        $this->assertSame(
+            2,
+            $pages[1]['page_number']
+        );
+
+        $this->assertSame(
+            'Back Side',
+            $pages[1]['name']
+        );
+
+        $component
+            ->assertSet(
+                'activePageId',
+                $pages[1]['id']
+            )
+            ->assertSet(
+                'elements',
+                []
+            )
+            ->assertSet(
+                'selectedElementId',
+                null
+            )
+            ->assertSet(
+                'isDirty',
+                false
+            );
+    }
+
+    public function test_rename_active_page_updates_component_and_database(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call(
+                'renameActivePage',
+                'Ticket Front'
+            )
+            ->assertSet(
+                'pages.0.name',
+                'Ticket Front'
+            );
+
+        $pageId =
+            $component->get('activePageId');
+
+        $this->assertDatabaseHas(
+            'ticket_template_pages',
+            [
+                'id' => $pageId,
+                'organization_ticket_template_id' =>
+                    $templateId,
+                'name' => 'Ticket Front',
+            ]
+        );
+    }
+
+    public function test_multiple_new_pages_receive_sequential_page_numbers(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call(
+                'addPage',
+                'Back'
+            )
+            ->call(
+                'addPage',
+                'Terms'
+            );
+
+        $pages =
+            $component->get('pages');
+
+        $this->assertSame(
+            [1, 2, 3],
+            array_column(
+                $pages,
+                'page_number'
+            )
+        );
+
+        $this->assertSame(
+            ['Page 1', 'Back', 'Terms'],
+            array_column(
+                $pages,
+                'name'
+            )
+        );
+    }
+
+    public function test_switching_pages_keeps_each_page_definition_independent(): void
+    {
+        $organization =
+            Organization::query()->create([
+                'name' => 'Organization A',
+            ]);
+
+        $template =
+            OrganizationTicketTemplate::query()->create([
+                'organization_id' =>
+                    $organization->id,
+                'name' => 'Multi Page Template',
+                'width' => 1080,
+                'height' => 1350,
+                'is_active' => true,
+                'is_default' => false,
+            ]);
+
+        $front =
+            TicketTemplatePage::query()->create([
+                'organization_ticket_template_id' =>
+                    $template->id,
+                'event_ticket_template_id' => null,
+                'page_number' => 1,
+                'name' => 'Front',
+                'definition' => [
+                    'version' => 1,
+                    'elements' => [
+                        [
+                            'id' => 'front_name',
+                            'type' => 'text',
+                            'binding' => 'holder_name',
+                        ],
+                    ],
+                ],
+            ]);
+
+        $back =
+            TicketTemplatePage::query()->create([
+                'organization_ticket_template_id' =>
+                    $template->id,
+                'event_ticket_template_id' => null,
+                'page_number' => 2,
+                'name' => 'Back',
+                'definition' => [
+                    'version' => 1,
+                    'elements' => [
+                        [
+                            'id' => 'back_qr',
+                            'type' => 'qr',
+                            'binding' => 'ticket_qr',
+                        ],
+                    ],
+                ],
+            ]);
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' =>
+                    TicketDesignerService::TYPE_ORGANIZATION,
+                'templateId' =>
+                    $template->id,
+            ]
+        );
+
+        $component
+            ->assertSet(
+                'activePageId',
+                $front->id
+            )
+            ->assertSet(
+                'elements.0.id',
+                'front_name'
+            )
+            ->call(
+                'switchPage',
+                $back->id
+            )
+            ->assertSet(
+                'activePageId',
+                $back->id
+            )
+            ->assertSet(
+                'elements.0.id',
+                'back_qr'
+            )
+            ->call(
+                'switchPage',
+                $front->id
+            )
+            ->assertSet(
+                'elements.0.id',
+                'front_name'
+            );
+    }
+
+    public function test_rename_rejects_empty_page_name(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        );
+
+        $before =
+            $component->get('pages');
+
+        $component
+            ->call(
+                'renameActivePage',
+                '   '
+            )
+            ->assertHasErrors(
+                'pageName'
+            );
+
+        $this->assertSame(
+            $before,
+            $component->get('pages')
+        );
+    }
+
     private function makeOrganizationTemplateContext(): array
     {
         $organization = Organization::query()->create([

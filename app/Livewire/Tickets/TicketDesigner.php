@@ -95,6 +95,93 @@ class TicketDesigner extends Component
         );
     }
 
+    public function addPage(
+        ?string $name = null
+    ): void {
+        $service = app(
+            TicketDesignerService::class
+        );
+
+        $normalizedName =
+            $name !== null
+                ? trim($name)
+                : null;
+
+        if ($normalizedName === '') {
+            $normalizedName = null;
+        }
+
+        $page = $service->createPage(
+            $this->templateType,
+            $this->templateId,
+            $normalizedName
+        );
+
+        $this->reloadPages();
+
+        $this->loadPage(
+            $page->id
+        );
+    }
+
+    public function renameActivePage(
+        string $name
+    ): void {
+        $normalizedName = trim($name);
+
+        if ($normalizedName === '') {
+            $this->addError(
+                'pageName',
+                'The page name is required.'
+            );
+
+            return;
+        }
+
+        if ($this->activePageId === null) {
+            $this->addError(
+                'pageName',
+                'No active page is selected.'
+            );
+
+            return;
+        }
+
+        $page = $this->findTemplatePage(
+            $this->activePageId
+        );
+
+        if ($page === null) {
+            $this->addError(
+                'pageName',
+                'The active page does not belong to this template.'
+            );
+
+            return;
+        }
+
+        $service = app(
+            TicketDesignerService::class
+        );
+
+        $service->renamePage(
+            $page,
+            $normalizedName
+        );
+
+        $this->resetErrorBag(
+            'pageName'
+        );
+
+        $activePageId =
+            $this->activePageId;
+
+        $this->reloadPages();
+
+        $this->activePageId =
+            $activePageId;
+    }
+
     public function selectElement(
         ?string $elementId
     ): void {
@@ -236,14 +323,18 @@ class TicketDesigner extends Component
         int|float $x,
         int|float $y
     ): void {
-        $index = $this->selectedElementIndex();
+        $index =
+            $this->selectedElementIndex();
 
         if ($index === null) {
             return;
         }
 
-        $this->elements[$index]['x'] = $x;
-        $this->elements[$index]['y'] = $y;
+        $this->elements[$index]['x'] =
+            $x;
+
+        $this->elements[$index]['y'] =
+            $y;
 
         $this->isDirty = true;
     }
@@ -252,11 +343,15 @@ class TicketDesigner extends Component
         int|float $width,
         int|float $height
     ): void {
-        if ($width <= 0 || $height <= 0) {
+        if (
+            $width <= 0
+            || $height <= 0
+        ) {
             return;
         }
 
-        $index = $this->selectedElementIndex();
+        $index =
+            $this->selectedElementIndex();
 
         if ($index === null) {
             return;
@@ -274,7 +369,8 @@ class TicketDesigner extends Component
     public function updateSelectedElement(
         array $properties
     ): void {
-        $index = $this->selectedElementIndex();
+        $index =
+            $this->selectedElementIndex();
 
         if ($index === null) {
             return;
@@ -296,7 +392,10 @@ class TicketDesigner extends Component
             'label',
         ];
 
-        foreach ($properties as $key => $value) {
+        foreach (
+            $properties
+            as $key => $value
+        ) {
             if (! in_array(
                 $key,
                 $allowedProperties,
@@ -332,7 +431,8 @@ class TicketDesigner extends Component
 
     public function moveLayerForward(): void
     {
-        $index = $this->selectedElementIndex();
+        $index =
+            $this->selectedElementIndex();
 
         if ($index === null) {
             return;
@@ -362,7 +462,8 @@ class TicketDesigner extends Component
 
     public function moveLayerBackward(): void
     {
-        $index = $this->selectedElementIndex();
+        $index =
+            $this->selectedElementIndex();
 
         if ($index === null) {
             return;
@@ -393,24 +494,27 @@ class TicketDesigner extends Component
             return;
         }
 
-        $originalCount = count(
-            $this->elements
-        );
+        $originalCount =
+            count($this->elements);
 
-        $this->elements = array_values(
-            array_filter(
-                $this->elements,
-                fn (array $element): bool =>
-                    ($element['id'] ?? null)
-                        !== $this->selectedElementId
-            )
-        );
+        $this->elements =
+            array_values(
+                array_filter(
+                    $this->elements,
+                    fn (
+                        array $element
+                    ): bool =>
+                        ($element['id'] ?? null)
+                            !== $this->selectedElementId
+                )
+            );
 
         $deleted =
             count($this->elements)
                 !== $originalCount;
 
-        $this->selectedElementId = null;
+        $this->selectedElementId =
+            null;
 
         if ($deleted) {
             $this->isDirty = true;
@@ -421,20 +525,24 @@ class TicketDesigner extends Component
         string $prefix,
         array $element
     ): void {
-        $id = $this->generateElementId(
-            $prefix
-        );
+        $id =
+            $this->generateElementId(
+                $prefix
+            );
 
         $element = [
             'id' => $id,
             ...$element,
         ];
 
-        $this->elements[] = $element;
+        $this->elements[] =
+            $element;
 
-        $this->selectedElementId = $id;
+        $this->selectedElementId =
+            $id;
 
-        $this->isDirty = true;
+        $this->isDirty =
+            true;
     }
 
     protected function generateElementId(
@@ -450,7 +558,9 @@ class TicketDesigner extends Component
             $exists = collect(
                 $this->elements
             )->contains(
-                fn (array $element): bool =>
+                fn (
+                    array $element
+                ): bool =>
                     ($element['id'] ?? null)
                         === $id
             );
@@ -461,7 +571,10 @@ class TicketDesigner extends Component
 
     protected function selectedElementIndex(): ?int
     {
-        if ($this->selectedElementId === null) {
+        if (
+            $this->selectedElementId
+                === null
+        ) {
             return null;
         }
 
@@ -480,32 +593,53 @@ class TicketDesigner extends Component
         return null;
     }
 
+    protected function findTemplatePage(
+        int $pageId
+    ): ?TicketTemplatePage {
+        $service = app(
+            TicketDesignerService::class
+        );
+
+        return $service->pages(
+            $this->templateType,
+            $this->templateId
+        )->first(
+            fn (
+                TicketTemplatePage $page
+            ): bool =>
+                $page->id === $pageId
+        );
+    }
+
     protected function reloadPages(): void
     {
         $service = app(
             TicketDesignerService::class
         );
 
-        $this->pages = $service->pages(
-            $this->templateType,
-            $this->templateId
-        )
-            ->map(
-                fn (
-                    TicketTemplatePage $page
-                ): array => [
-                    'id' => $page->id,
-                    'page_number' =>
-                        $page->page_number,
-                    'name' => $page->name,
-                    'background_image_path' =>
-                        $page->background_image_path,
-                    'definition' =>
-                        $page->definition,
-                ]
+        $this->pages =
+            $service->pages(
+                $this->templateType,
+                $this->templateId
             )
-            ->values()
-            ->all();
+                ->map(
+                    fn (
+                        TicketTemplatePage $page
+                    ): array => [
+                        'id' =>
+                            $page->id,
+                        'page_number' =>
+                            $page->page_number,
+                        'name' =>
+                            $page->name,
+                        'background_image_path' =>
+                            $page->background_image_path,
+                        'definition' =>
+                            $page->definition,
+                    ]
+                )
+                ->values()
+                ->all();
     }
 
     protected function loadPage(
@@ -514,7 +648,9 @@ class TicketDesigner extends Component
         $page = collect(
             $this->pages
         )->first(
-            fn (array $page): bool =>
+            fn (
+                array $page
+            ): bool =>
                 (int) $page['id']
                     === $pageId
         );
@@ -546,7 +682,8 @@ class TicketDesigner extends Component
         $this->selectedElementId =
             null;
 
-        $this->isDirty = false;
+        $this->isDirty =
+            false;
     }
 
     protected function pageBelongsToTemplate(
@@ -555,7 +692,9 @@ class TicketDesigner extends Component
         return collect(
             $this->pages
         )->contains(
-            fn (array $page): bool =>
+            fn (
+                array $page
+            ): bool =>
                 (int) $page['id']
                     === $pageId
         );
