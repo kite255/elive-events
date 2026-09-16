@@ -4,12 +4,16 @@ namespace App\Livewire\Tickets;
 
 use App\Models\TicketTemplatePage;
 use App\Services\Tickets\TicketDesignerService;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class TicketDesigner extends Component
 {
+    use WithFileUploads;
+
     public string $templateType;
 
     public int $templateId;
@@ -29,6 +33,10 @@ class TicketDesigner extends Component
     public ?string $selectedElementId = null;
 
     public bool $isDirty = false;
+
+    public $backgroundUpload = null;
+
+    public ?string $backgroundImagePath = null;
 
     public function mount(
         string $templateType,
@@ -70,6 +78,13 @@ class TicketDesigner extends Component
 
         $this->loadPage(
             (int) $firstPage['id']
+        );
+    }
+
+    public function updatedBackgroundUpload(): void
+    {
+        $this->resetErrorBag(
+            'backgroundUpload'
         );
     }
 
@@ -251,6 +266,131 @@ class TicketDesigner extends Component
 
         $activePageId =
             $savedPage->id;
+
+        $this->reloadPages();
+
+        $this->loadPage(
+            $activePageId
+        );
+    }
+
+    public function uploadBackground(): void
+    {
+        if ($this->activePageId === null) {
+            $this->addError(
+                'backgroundUpload',
+                'No active page is selected.'
+            );
+
+            return;
+        }
+
+        $page = $this->findTemplatePage(
+            $this->activePageId
+        );
+
+        if ($page === null) {
+            $this->addError(
+                'backgroundUpload',
+                'The active page does not belong to this template.'
+            );
+
+            return;
+        }
+
+        $this->validate([
+            'backgroundUpload' => [
+                'required',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:10240',
+                'dimensions:max_width=4000,max_height=4000',
+            ],
+        ]);
+
+        $oldPath =
+            $page->background_image_path;
+
+        $newPath =
+            $this->backgroundUpload->store(
+                'ticket-template-backgrounds',
+                'public'
+            );
+
+        $page->forceFill([
+            'background_image_path' =>
+                $newPath,
+        ])->save();
+
+        if (
+            filled($oldPath)
+            && $oldPath !== $newPath
+        ) {
+            Storage::disk('public')->delete(
+                $oldPath
+            );
+        }
+
+        $this->backgroundImagePath =
+            $newPath;
+
+        $this->backgroundUpload =
+            null;
+
+        $this->resetErrorBag(
+            'backgroundUpload'
+        );
+
+        $activePageId =
+            $page->id;
+
+        $this->reloadPages();
+
+        $this->loadPage(
+            $activePageId
+        );
+    }
+
+    public function removeBackground(): void
+    {
+        if ($this->activePageId === null) {
+            return;
+        }
+
+        $page = $this->findTemplatePage(
+            $this->activePageId
+        );
+
+        if ($page === null) {
+            return;
+        }
+
+        $oldPath =
+            $page->background_image_path;
+
+        $page->forceFill([
+            'background_image_path' =>
+                null,
+        ])->save();
+
+        if (filled($oldPath)) {
+            Storage::disk('public')->delete(
+                $oldPath
+            );
+        }
+
+        $this->backgroundImagePath =
+            null;
+
+        $this->backgroundUpload =
+            null;
+
+        $this->resetErrorBag(
+            'backgroundUpload'
+        );
+
+        $activePageId =
+            $page->id;
 
         $this->reloadPages();
 
@@ -599,6 +739,46 @@ class TicketDesigner extends Component
         }
     }
 
+    public function backgroundUploadName(): ?string
+    {
+        if ($this->backgroundUpload === null) {
+            return null;
+        }
+
+        return $this->backgroundUpload
+            ->getClientOriginalName();
+    }
+
+    public function backgroundUploadPreviewUrl(): ?string
+    {
+        if ($this->backgroundUpload === null) {
+            return null;
+        }
+
+        try {
+            $mimeType =
+                $this->backgroundUpload
+                    ->getMimeType();
+
+            if (! in_array(
+                $mimeType,
+                [
+                    'image/jpeg',
+                    'image/png',
+                    'image/webp',
+                ],
+                true
+            )) {
+                return null;
+            }
+
+            return $this->backgroundUpload
+                ->temporaryUrl();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     protected function addElement(
         string $prefix,
         array $element
@@ -706,12 +886,16 @@ class TicketDesigner extends Component
                     ): array => [
                         'id' =>
                             $page->id,
+
                         'page_number' =>
                             $page->page_number,
+
                         'name' =>
                             $page->name,
+
                         'background_image_path' =>
                             $page->background_image_path,
+
                         'definition' =>
                             $page->definition,
                     ]
@@ -739,6 +923,23 @@ class TicketDesigner extends Component
 
         $this->activePageId =
             (int) $page['id'];
+
+        $this->backgroundImagePath =
+            filled(
+                $page['background_image_path']
+                    ?? null
+            )
+                ? (string) $page[
+                    'background_image_path'
+                ]
+                : null;
+
+        $this->backgroundUpload =
+            null;
+
+        $this->resetErrorBag(
+            'backgroundUpload'
+        );
 
         $definition =
             is_array(

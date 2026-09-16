@@ -96,7 +96,7 @@
             transition: .15s ease;
         }
 
-        .elive-ticket-designer .designer-button:hover {
+        .elive-ticket-designer .designer-button:hover:not(:disabled) {
             background: #f8fafc;
         }
 
@@ -104,6 +104,15 @@
             border-color: var(--elive-blue);
             background: var(--elive-blue);
             color: #fff;
+        }
+
+        .elive-ticket-designer .designer-button.primary:hover:not(:disabled) {
+            background: #00699a;
+        }
+
+        .elive-ticket-designer .designer-button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
         }
 
         .elive-ticket-designer .designer-button.danger {
@@ -132,6 +141,104 @@
             color: #475569;
         }
 
+        .elive-ticket-designer .background-section {
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--elive-border);
+        }
+
+        .elive-ticket-designer .background-current-label,
+        .elive-ticket-designer .background-selected-label {
+            margin-bottom: .4rem;
+            font-size: .68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #64748b;
+        }
+
+        .elive-ticket-designer .background-upload {
+            display: block;
+            width: 100%;
+            margin-bottom: .55rem;
+            font-size: .72rem;
+            color: #475569;
+        }
+
+        .elive-ticket-designer .background-preview {
+            display: block;
+            width: 100%;
+            max-height: 150px;
+            margin-bottom: .65rem;
+            object-fit: contain;
+            border: 1px solid var(--elive-border);
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .elive-ticket-designer .background-selected-file {
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            padding: .55rem .65rem;
+            margin-bottom: .65rem;
+            border: 1px solid #bae6fd;
+            border-radius: 9px;
+            background: #f0f9ff;
+            color: #075985;
+            font-size: .72rem;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .elive-ticket-designer .background-selected-file::before {
+            content: "✓";
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: #0284c7;
+            color: #fff;
+            font-size: .65rem;
+            font-weight: 800;
+        }
+
+        .elive-ticket-designer .background-empty {
+            margin-bottom: .65rem;
+            padding: .55rem .65rem;
+            border: 1px dashed #cbd5e1;
+            border-radius: 9px;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: .7rem;
+            text-align: center;
+        }
+
+        .elive-ticket-designer .background-actions {
+            display: grid;
+            gap: .5rem;
+        }
+
+        .elive-ticket-designer .background-help {
+            margin-top: .55rem;
+            font-size: .68rem;
+            line-height: 1.45;
+            color: #64748b;
+        }
+
+        .elive-ticket-designer .upload-progress {
+            margin-top: .55rem;
+            padding: .5rem .6rem;
+            border-radius: 8px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: .7rem;
+            font-weight: 600;
+        }
+
         .elive-ticket-designer .tool-grid {
             display: grid;
             gap: .55rem;
@@ -158,14 +265,28 @@
         .elive-ticket-designer .canvas-frame {
             position: relative;
             margin: 0 auto;
+            overflow: hidden;
             background: #fff;
             border: 1px solid #cbd5e1;
             box-shadow: 0 14px 36px rgba(15, 23, 42, .10);
             transform-origin: top left;
         }
 
+        .elive-ticket-designer .designer-background {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+            pointer-events: none;
+            user-select: none;
+        }
+
         .elive-ticket-designer .designer-element {
             position: absolute;
+            z-index: 1;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -363,6 +484,21 @@
             300,
             (int) round($canvasHeight * $scale)
         );
+
+        $backgroundUrl =
+            $backgroundImagePath
+                ? \Illuminate\Support\Facades\Storage::disk('public')
+                    ->url($backgroundImagePath)
+                : null;
+
+        $selectedBackgroundName =
+            $this->backgroundUploadName();
+
+        $selectedBackgroundPreviewUrl =
+            $this->backgroundUploadPreviewUrl();
+
+        $backgroundUploadReady =
+            $backgroundUpload !== null;
     @endphp
 
     <div class="elive-ticket-designer">
@@ -416,6 +552,145 @@
                 data-testid="ticket-designer-tools"
                 class="designer-panel tools-panel"
             >
+                <div
+                    data-testid="ticket-designer-background-controls"
+                    class="background-section"
+                >
+                    <h3 class="panel-heading">
+                        Background
+                    </h3>
+
+                    @if ($selectedBackgroundPreviewUrl)
+                        <div class="background-selected-label">
+                            Selected image
+                        </div>
+
+                        <img
+                            data-testid="ticket-background-temporary-preview"
+                            src="{{ $selectedBackgroundPreviewUrl }}"
+                            alt="Selected ticket background preview"
+                            class="background-preview"
+                        >
+
+                        <div class="background-selected-file">
+                            {{ $selectedBackgroundName }}
+                        </div>
+                    @elseif ($backgroundUrl)
+                        <div class="background-current-label">
+                            Current background
+                        </div>
+
+                        <img
+                            src="{{ $backgroundUrl }}"
+                            alt="Current ticket background"
+                            class="background-preview"
+                        >
+                    @else
+                        <div class="background-empty">
+                            No background uploaded for this page.
+                        </div>
+                    @endif
+
+                    <input
+                        type="file"
+                        wire:model="backgroundUpload"
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        class="background-upload"
+                    >
+
+                    @if (! $selectedBackgroundName)
+                        <div
+                            style="
+                                margin-bottom: .65rem;
+                                font-size: .7rem;
+                                color: #64748b;
+                            "
+                        >
+                            Select an image before uploading.
+                        </div>
+                    @endif
+
+                    @error('backgroundUpload')
+                        <div
+                            class="error-box"
+                            style="margin-bottom: .55rem;"
+                        >
+                            {{ $message }}
+                        </div>
+                    @enderror
+
+                    <div class="background-actions">
+                        <button
+                            type="button"
+                            data-testid="ticket-background-upload-button"
+                            data-upload-ready="{{ $backgroundUploadReady ? 'true' : 'false' }}"
+                            wire:click="uploadBackground"
+                            wire:loading.attr="disabled"
+                            wire:target="backgroundUpload,uploadBackground"
+                            @disabled(! $backgroundUploadReady)
+                            class="designer-button primary"
+                            style="width: 100%;"
+                        >
+                            <span
+                                wire:loading.remove
+                                wire:target="uploadBackground"
+                            >
+                                @if ($backgroundImagePath)
+                                    Replace Background
+                                @else
+                                    Upload Background
+                                @endif
+                            </span>
+
+                            <span
+                                wire:loading
+                                wire:target="uploadBackground"
+                            >
+                                Uploading...
+                            </span>
+                        </button>
+
+                        @if ($backgroundImagePath)
+                            <button
+                                type="button"
+                                wire:click="removeBackground"
+                                wire:loading.attr="disabled"
+                                wire:target="removeBackground"
+                                class="designer-button danger"
+                                style="width: 100%;"
+                            >
+                                <span
+                                    wire:loading.remove
+                                    wire:target="removeBackground"
+                                >
+                                    Remove Background
+                                </span>
+
+                                <span
+                                    wire:loading
+                                    wire:target="removeBackground"
+                                >
+                                    Removing...
+                                </span>
+                            </button>
+                        @endif
+                    </div>
+
+                    <div
+                        wire:loading
+                        wire:target="backgroundUpload"
+                        class="upload-progress"
+                    >
+                        Preparing image preview...
+                    </div>
+
+                    <p class="background-help">
+                        JPG, PNG or WEBP. Maximum 10 MB and
+                        4000 × 4000 px. Each page can use a
+                        different background.
+                    </p>
+                </div>
+
                 <h3 class="panel-heading">
                     Elements
                 </h3>
@@ -489,6 +764,15 @@
                             height: {{ $displayHeight }}px;
                         "
                     >
+                        @if ($backgroundUrl)
+                            <img
+                                data-testid="ticket-designer-background-image"
+                                src="{{ $backgroundUrl }}"
+                                alt="Ticket template background"
+                                class="designer-background"
+                            >
+                        @endif
+
                         @foreach ($elements as $element)
                             @php
                                 $elementId =
