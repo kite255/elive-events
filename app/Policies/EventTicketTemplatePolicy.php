@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Event;
 use App\Models\EventTicketTemplate;
 use App\Models\User;
 
@@ -13,8 +14,8 @@ class EventTicketTemplatePolicy
             return true;
         }
 
-        return $user->managedOrganizations()->exists()
-            || $user->eventManagerEvents()->exists();
+        return $user->eventManagerEvents()
+            ->exists();
     }
 
     public function view(
@@ -31,17 +32,9 @@ class EventTicketTemplatePolicy
             return false;
         }
 
-        if (
-            $user->canManageOrganization(
-                $event->organization_id
-            )
-        ) {
-            return true;
-        }
-
-        return $user->hasEventAssignmentRole(
-            $event,
-            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        return $this->canManageEventTemplate(
+            $user,
+            $event
         );
     }
 
@@ -51,8 +44,8 @@ class EventTicketTemplatePolicy
             return true;
         }
 
-        return $user->managedOrganizations()->exists()
-            || $user->eventManagerEvents()->exists();
+        return $user->eventManagerEvents()
+            ->exists();
     }
 
     public function update(
@@ -69,7 +62,7 @@ class EventTicketTemplatePolicy
         User $user,
         EventTicketTemplate $template
     ): bool {
-        return $this->update(
+        return $this->view(
             $user,
             $template
         );
@@ -79,7 +72,7 @@ class EventTicketTemplatePolicy
         User $user,
         EventTicketTemplate $template
     ): bool {
-        return $this->update(
+        return $this->view(
             $user,
             $template
         );
@@ -89,9 +82,28 @@ class EventTicketTemplatePolicy
         User $user,
         EventTicketTemplate $template
     ): bool {
-        return $this->update(
+        return $this->view(
             $user,
             $template
+        );
+    }
+
+    private function canManageEventTemplate(
+        User $user,
+        Event $event
+    ): bool {
+        if (
+            ! $user->hasOrganizationRole(
+                $event->organization_id,
+                User::ORGANIZATION_ROLE_EVENT_MANAGER
+            )
+        ) {
+            return false;
+        }
+
+        return $user->hasEventAssignmentRole(
+            $event,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
         );
     }
 }

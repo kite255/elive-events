@@ -35,7 +35,7 @@ class TicketTemplateAuthorizationTest extends TestCase
         );
     }
 
-    public function test_organization_owner_can_manage_own_organization_template(): void
+    public function test_organization_owner_cannot_manage_organization_template(): void
     {
         $organization = $this->createOrganization('Organization A');
 
@@ -53,12 +53,12 @@ class TicketTemplateAuthorizationTest extends TestCase
 
         $policy = new OrganizationTicketTemplatePolicy();
 
-        $this->assertTrue(
+        $this->assertFalse(
             $policy->update($user, $template)
         );
     }
 
-    public function test_organization_admin_can_manage_own_organization_template(): void
+    public function test_organization_admin_cannot_manage_organization_template(): void
     {
         $organization = $this->createOrganization('Organization A');
 
@@ -75,32 +75,40 @@ class TicketTemplateAuthorizationTest extends TestCase
 
         $policy = new OrganizationTicketTemplatePolicy();
 
-        $this->assertTrue(
+        $this->assertFalse(
             $policy->update($user, $template)
         );
     }
 
-    public function test_user_cannot_manage_another_organizations_template(): void
+    public function test_event_manager_cannot_manage_organization_template(): void
     {
-        $organizationA = $this->createOrganization('Organization A');
-        $organizationB = $this->createOrganization('Organization B');
+        $organization = $this->createOrganization('Organization A');
 
-        $templateB = $this->createOrganizationTemplate(
-            $organizationB
+        $event = $this->createEvent(
+            $organization,
+            'Event A'
+        );
+
+        $template = $this->createOrganizationTemplate(
+            $organization
         );
 
         $user = User::factory()->create();
 
-        $organizationA->attachUser(
+        $organization->attachUser(
             $user,
-            User::ORGANIZATION_ROLE_OWNER,
-            true
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        );
+
+        $user->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
         );
 
         $policy = new OrganizationTicketTemplatePolicy();
 
         $this->assertFalse(
-            $policy->update($user, $templateB)
+            $policy->update($user, $template)
         );
     }
 
@@ -126,7 +134,86 @@ class TicketTemplateAuthorizationTest extends TestCase
         );
     }
 
-    public function test_owner_can_manage_event_template_for_own_organization(): void
+    public function test_super_admin_can_manage_event_template(): void
+    {
+        $organization = $this->createOrganization('Organization A');
+        $event = $this->createEvent($organization, 'Event A');
+        $template = $this->createEventTemplate($event);
+
+        $user = User::factory()->create([
+            'is_super_admin' => true,
+        ]);
+
+        $policy = new EventTicketTemplatePolicy();
+
+        $this->assertTrue(
+            $policy->update($user, $template)
+        );
+    }
+
+    public function test_assigned_event_manager_can_manage_event_template(): void
+    {
+        $organization = $this->createOrganization('Organization A');
+        $event = $this->createEvent($organization, 'Event A');
+        $template = $this->createEventTemplate($event);
+
+        $user = User::factory()->create();
+
+        $organization->attachUser(
+            $user,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        );
+
+        $user->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        );
+
+        $policy = new EventTicketTemplatePolicy();
+
+        $this->assertTrue(
+            $policy->update($user, $template)
+        );
+    }
+
+    public function test_unassigned_event_manager_cannot_manage_event_template(): void
+    {
+        $organization = $this->createOrganization('Organization A');
+
+        $eventA = $this->createEvent(
+            $organization,
+            'Event A'
+        );
+
+        $eventB = $this->createEvent(
+            $organization,
+            'Event B'
+        );
+
+        $templateB = $this->createEventTemplate(
+            $eventB
+        );
+
+        $user = User::factory()->create();
+
+        $organization->attachUser(
+            $user,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        );
+
+        $user->assignToEvent(
+            $eventA,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        );
+
+        $policy = new EventTicketTemplatePolicy();
+
+        $this->assertFalse(
+            $policy->update($user, $templateB)
+        );
+    }
+
+    public function test_organization_owner_cannot_manage_event_template(): void
     {
         $organization = $this->createOrganization('Organization A');
         $event = $this->createEvent($organization, 'Event A');
@@ -142,37 +229,28 @@ class TicketTemplateAuthorizationTest extends TestCase
 
         $policy = new EventTicketTemplatePolicy();
 
-        $this->assertTrue(
+        $this->assertFalse(
             $policy->update($user, $template)
         );
     }
 
-    public function test_user_cannot_manage_event_template_from_another_organization(): void
+    public function test_organization_admin_cannot_manage_event_template(): void
     {
-        $organizationA = $this->createOrganization('Organization A');
-        $organizationB = $this->createOrganization('Organization B');
-
-        $eventB = $this->createEvent(
-            $organizationB,
-            'Event B'
-        );
-
-        $templateB = $this->createEventTemplate(
-            $eventB
-        );
+        $organization = $this->createOrganization('Organization A');
+        $event = $this->createEvent($organization, 'Event A');
+        $template = $this->createEventTemplate($event);
 
         $user = User::factory()->create();
 
-        $organizationA->attachUser(
+        $organization->attachUser(
             $user,
-            User::ORGANIZATION_ROLE_OWNER,
-            true
+            User::ORGANIZATION_ROLE_ADMIN
         );
 
         $policy = new EventTicketTemplatePolicy();
 
         $this->assertFalse(
-            $policy->update($user, $templateB)
+            $policy->update($user, $template)
         );
     }
 
@@ -189,10 +267,53 @@ class TicketTemplateAuthorizationTest extends TestCase
             User::ORGANIZATION_ROLE_TICKET_ORGANIZER
         );
 
+        $user->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
+
         $policy = new EventTicketTemplatePolicy();
 
         $this->assertFalse(
             $policy->update($user, $template)
+        );
+    }
+
+    public function test_event_manager_cannot_manage_template_from_another_organization(): void
+    {
+        $organizationA = $this->createOrganization('Organization A');
+        $organizationB = $this->createOrganization('Organization B');
+
+        $eventA = $this->createEvent(
+            $organizationA,
+            'Event A'
+        );
+
+        $eventB = $this->createEvent(
+            $organizationB,
+            'Event B'
+        );
+
+        $templateB = $this->createEventTemplate(
+            $eventB
+        );
+
+        $user = User::factory()->create();
+
+        $organizationA->attachUser(
+            $user,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        );
+
+        $user->assignToEvent(
+            $eventA,
+            User::ORGANIZATION_ROLE_EVENT_MANAGER
+        );
+
+        $policy = new EventTicketTemplatePolicy();
+
+        $this->assertFalse(
+            $policy->update($user, $templateB)
         );
     }
 
