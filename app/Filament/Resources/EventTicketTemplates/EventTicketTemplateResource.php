@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\EventTicketTemplates;
 
 use App\Filament\Resources\EventTicketTemplates\Pages\CreateEventTicketTemplate;
+use App\Filament\Resources\EventTicketTemplates\Pages\DesignEventTicketTemplate;
 use App\Filament\Resources\EventTicketTemplates\Pages\EditEventTicketTemplate;
 use App\Filament\Resources\EventTicketTemplates\Pages\ListEventTicketTemplates;
 use App\Filament\Resources\EventTicketTemplates\Schemas\EventTicketTemplateForm;
@@ -146,6 +147,11 @@ class EventTicketTemplateResource extends Resource
             'edit' =>
                 EditEventTicketTemplate::route(
                     '/{record}/edit'
+                ),
+
+            'designer' =>
+                DesignEventTicketTemplate::route(
+                    '/{record}/designer'
                 ),
         ];
     }

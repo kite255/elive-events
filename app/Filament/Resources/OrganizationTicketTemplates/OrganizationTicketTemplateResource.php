@@ -3,12 +3,12 @@
 namespace App\Filament\Resources\OrganizationTicketTemplates;
 
 use App\Filament\Resources\OrganizationTicketTemplates\Pages\CreateOrganizationTicketTemplate;
+use App\Filament\Resources\OrganizationTicketTemplates\Pages\DesignOrganizationTicketTemplate;
 use App\Filament\Resources\OrganizationTicketTemplates\Pages\EditOrganizationTicketTemplate;
 use App\Filament\Resources\OrganizationTicketTemplates\Pages\ListOrganizationTicketTemplates;
 use App\Filament\Resources\OrganizationTicketTemplates\Schemas\OrganizationTicketTemplateForm;
 use App\Filament\Resources\OrganizationTicketTemplates\Tables\OrganizationTicketTemplatesTable;
 use App\Models\OrganizationTicketTemplate;
-use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -84,6 +84,11 @@ class OrganizationTicketTemplateResource extends Resource
             'edit' =>
                 EditOrganizationTicketTemplate::route(
                     '/{record}/edit'
+                ),
+
+            'designer' =>
+                DesignOrganizationTicketTemplate::route(
+                    '/{record}/designer'
                 ),
         ];
     }
