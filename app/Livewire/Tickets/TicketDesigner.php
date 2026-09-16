@@ -5,6 +5,7 @@ namespace App\Livewire\Tickets;
 use App\Models\TicketTemplatePage;
 use App\Services\Tickets\TicketDesignerService;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class TicketDesigner extends Component
@@ -180,6 +181,82 @@ class TicketDesigner extends Component
 
         $this->activePageId =
             $activePageId;
+    }
+
+    public function save(): void
+    {
+        if ($this->activePageId === null) {
+            $this->addError(
+                'activePageId',
+                'No active page is selected.'
+            );
+
+            return;
+        }
+
+        $page = $this->findTemplatePage(
+            $this->activePageId
+        );
+
+        if ($page === null) {
+            $this->addError(
+                'activePageId',
+                'The active page does not belong to this template.'
+            );
+
+            return;
+        }
+
+        $definition = [
+            'version' => 1,
+            'elements' => array_values(
+                $this->elements
+            ),
+        ];
+
+        $service = app(
+            TicketDesignerService::class
+        );
+
+        try {
+            $savedPage =
+                $service->saveDefinition(
+                    $page,
+                    $definition
+                );
+        } catch (ValidationException $exception) {
+            $message = collect(
+                $exception->errors()
+            )
+                ->flatten()
+                ->first();
+
+            $this->addError(
+                'definition',
+                is_string($message)
+                    ? $message
+                    : 'The ticket design contains invalid elements.'
+            );
+
+            return;
+        }
+
+        $this->resetErrorBag(
+            'definition'
+        );
+
+        $this->resetErrorBag(
+            'activePageId'
+        );
+
+        $activePageId =
+            $savedPage->id;
+
+        $this->reloadPages();
+
+        $this->loadPage(
+            $activePageId
+        );
     }
 
     public function selectElement(
@@ -412,7 +489,8 @@ class TicketDesigner extends Component
                 continue;
             }
 
-            $element[$key] = $value;
+            $element[$key] =
+                $value;
         }
 
         if (

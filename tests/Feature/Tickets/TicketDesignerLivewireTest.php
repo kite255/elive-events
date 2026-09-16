@@ -1212,6 +1212,238 @@ public function test_delete_with_unknown_selection_does_not_remove_elements(): v
         );
     }
 
+
+    public function test_save_persists_active_page_definition(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText');
+
+        $pageId =
+            $component->get('activePageId');
+
+        $elements =
+            $component->get('elements');
+
+        $component
+            ->call('save')
+            ->assertSet(
+                'isDirty',
+                false
+            );
+
+        $page =
+            TicketTemplatePage::query()
+                ->findOrFail($pageId);
+
+        $this->assertSame(
+            1,
+            $page->definition['version']
+        );
+
+        $this->assertSame(
+            $elements,
+            $page->definition['elements']
+        );
+    }
+
+    public function test_save_preserves_element_order(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->call('addQr');
+
+        $before =
+            $component->get('elements');
+
+        $component
+            ->call(
+                'selectElement',
+                $before[0]['id']
+            )
+            ->call('moveLayerForward')
+            ->call('save');
+
+        $expected =
+            $component->get('elements');
+
+        $page =
+            TicketTemplatePage::query()
+                ->findOrFail(
+                    $component->get(
+                        'activePageId'
+                    )
+                );
+
+        $this->assertSame(
+            array_column(
+                $expected,
+                'id'
+            ),
+            array_column(
+                $page->definition['elements'],
+                'id'
+            )
+        );
+    }
+
+    public function test_invalid_definition_is_not_persisted(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        );
+
+        $pageId =
+            $component->get('activePageId');
+
+        $page =
+            TicketTemplatePage::query()
+                ->findOrFail($pageId);
+
+        $originalDefinition =
+            $page->definition;
+
+        $component
+            ->set(
+                'elements',
+                [
+                    [
+                        'id' => 'bad_001',
+                        'type' => 'javascript',
+                        'x' => 100,
+                        'y' => 100,
+                        'width' => 200,
+                        'height' => 100,
+                        'rotation' => 0,
+                    ],
+                ]
+            )
+            ->call('save')
+            ->assertHasErrors(
+                'definition'
+            );
+
+        $page->refresh();
+
+        $this->assertSame(
+            $originalDefinition,
+            $page->definition
+        );
+    }
+
+    public function test_failed_save_keeps_designer_dirty(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->set(
+                'elements.0.type',
+                'unsupported_type'
+            )
+            ->call('save')
+            ->assertHasErrors(
+                'definition'
+            )
+            ->assertSet(
+                'isDirty',
+                true
+            );
+    }
+
+    public function test_save_cannot_target_page_from_another_template(): void
+    {
+        [$templateType, $templateId] =
+            $this->makeOrganizationTemplateContext();
+
+        $otherOrganization =
+            Organization::query()->create([
+                'name' => 'Organization B',
+            ]);
+
+        $otherTemplate =
+            OrganizationTicketTemplate::query()->create([
+                'organization_id' =>
+                    $otherOrganization->id,
+                'name' => 'Other Template',
+                'width' => 1080,
+                'height' => 1350,
+                'is_active' => true,
+                'is_default' => false,
+            ]);
+
+        $foreignPage =
+            TicketTemplatePage::query()->create([
+                'organization_ticket_template_id' =>
+                    $otherTemplate->id,
+                'event_ticket_template_id' => null,
+                'page_number' => 1,
+                'name' => 'Foreign Page',
+                'definition' => [
+                    'version' => 1,
+                    'elements' => [],
+                ],
+            ]);
+
+        $originalDefinition =
+            $foreignPage->definition;
+
+        $component = Livewire::test(
+            TicketDesigner::class,
+            [
+                'templateType' => $templateType,
+                'templateId' => $templateId,
+            ]
+        )
+            ->call('addText')
+            ->set(
+                'activePageId',
+                $foreignPage->id
+            )
+            ->call('save')
+            ->assertHasErrors(
+                'activePageId'
+            );
+
+        $foreignPage->refresh();
+
+        $this->assertSame(
+            $originalDefinition,
+            $foreignPage->definition
+        );
+    }
+
     private function makeOrganizationTemplateContext(): array
     {
         $organization = Organization::query()->create([
