@@ -864,6 +864,24 @@
                                         $eventDetailsUrl = route('public.events.show', $event->slug);
                                         $eventRegisterUrl = route('public.events.register', $event->slug);
 
+                                        $ticketSettings = $event->ticketSetting;
+
+                                        $ticketSalesOpen =
+                                            $ticketSettings
+                                            && $ticketSettings->salesAreOpen()
+                                            && $event->ticketTypes()
+                                                ->onSale()
+                                                ->exists();
+
+                                        $ticketSalesEnabled =
+                                            $ticketSettings
+                                            && $ticketSettings->ticket_sales_enabled;
+
+                                        $ticketUrl = route(
+                                            'public.tickets.buy',
+                                            ['event' => $event->slug]
+                                        );
+
                                         $eventImage = $event->registration_banner_image_path;
                                         $eventImageUrl = null;
 
@@ -949,13 +967,24 @@
 
                                             <div class="home-event-actions">
 
-                                                    @if ($event->registration_is_open)
+                                                    @if ($ticketSalesOpen)
+                                                        <a
+                                                            href="{{ $ticketUrl }}"
+                                                            class="home-register-btn"
+                                                        >
+                                                            Buy Tickets
+                                                        </a>
+                                                    @elseif ($event->registration_is_open)
                                                         <a
                                                             href="{{ $eventRegisterUrl }}"
                                                             class="home-register-btn"
                                                         >
                                                             Register Now
                                                         </a>
+                                                    @elseif ($ticketSalesEnabled)
+                                                        <span class="home-ended-label">
+                                                            Tickets Closed
+                                                        </span>
                                                     @else
                                                         <span class="home-ended-label">
                                                             Registration Closed
@@ -1102,6 +1131,24 @@
                                         $eventDetailsUrl = route('public.events.show', $event->slug);
                                         $eventRegisterUrl = route('public.events.register', $event->slug);
 
+                                        $ticketSettings = $event->ticketSetting;
+
+                                        $ticketSalesOpen =
+                                            $ticketSettings
+                                            && $ticketSettings->salesAreOpen()
+                                            && $event->ticketTypes()
+                                                ->onSale()
+                                                ->exists();
+
+                                        $ticketSalesEnabled =
+                                            $ticketSettings
+                                            && $ticketSettings->ticket_sales_enabled;
+
+                                        $ticketUrl = route(
+                                            'public.tickets.buy',
+                                            ['event' => $event->slug]
+                                        );
+
                                         $eventImage = $event->registration_banner_image_path;
                                         $eventImageUrl = null;
 
@@ -1187,13 +1234,24 @@
 
                                             <div class="home-event-actions">
 
-                                                    @if ($event->registration_is_open)
+                                                    @if ($ticketSalesOpen)
+                                                        <a
+                                                            href="{{ $ticketUrl }}"
+                                                            class="home-register-btn"
+                                                        >
+                                                            Buy Tickets
+                                                        </a>
+                                                    @elseif ($event->registration_is_open)
                                                         <a
                                                             href="{{ $eventRegisterUrl }}"
                                                             class="home-register-btn"
                                                         >
                                                             Register Now
                                                         </a>
+                                                    @elseif ($ticketSalesEnabled)
+                                                        <span class="home-ended-label">
+                                                            Tickets Closed
+                                                        </span>
                                                     @else
                                                         <span class="home-ended-label">
                                                             Registration Closed
