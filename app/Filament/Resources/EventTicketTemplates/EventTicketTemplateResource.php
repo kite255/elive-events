@@ -2,9 +2,14 @@
 
 namespace App\Filament\Resources\EventTicketTemplates;
 
+use App\Filament\Resources\EventTicketTemplates\Pages\CreateEventTicketTemplate;
+use App\Filament\Resources\EventTicketTemplates\Pages\EditEventTicketTemplate;
+use App\Filament\Resources\EventTicketTemplates\Pages\ListEventTicketTemplates;
+use App\Filament\Resources\EventTicketTemplates\Schemas\EventTicketTemplateForm;
 use App\Models\EventTicketTemplate;
 use App\Models\User;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 
 class EventTicketTemplateResource extends Resource
@@ -14,6 +19,14 @@ class EventTicketTemplateResource extends Resource
 
     protected static ?string $recordTitleAttribute =
         'name';
+
+    public static function form(
+        Schema $schema
+    ): Schema {
+        return EventTicketTemplateForm::configure(
+            $schema
+        );
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -59,5 +72,21 @@ class EventTicketTemplateResource extends Resource
             'event_id',
             $assignedEventIds
         );
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' =>
+                ListEventTicketTemplates::route('/'),
+
+            'create' =>
+                CreateEventTicketTemplate::route('/create'),
+
+            'edit' =>
+                EditEventTicketTemplate::route(
+                    '/{record}/edit'
+                ),
+        ];
     }
 }
