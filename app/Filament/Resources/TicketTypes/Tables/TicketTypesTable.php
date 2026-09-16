@@ -191,7 +191,11 @@ class TicketTypesTable
                 'sort_order'
             )
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->visible(
+                        fn (): bool =>
+                            ! auth()->user()?->isTicketOrganizer()
+                    ),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
