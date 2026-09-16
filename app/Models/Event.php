@@ -579,6 +579,12 @@ class Event extends Model
             ->orderBy('id');
     }
 
+
+    public function ticketTemplates(): HasMany
+    {
+        return $this->hasMany(EventTicketTemplate::class);
+    }
+
     public function activeTicketTypes(): HasMany
     {
         return $this->ticketTypes()

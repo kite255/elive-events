@@ -61,6 +61,12 @@ class TicketType extends Model
         return $this->hasMany(Ticket::class);
     }
 
+
+    public function ticketTemplates(): HasMany
+    {
+        return $this->hasMany(EventTicketTemplate::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
