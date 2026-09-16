@@ -24,6 +24,7 @@ class PaymentFulfillmentService
         protected TicketIssuanceService $ticketIssuanceService,
         protected TicketAvailabilityService $ticketAvailabilityService,
         protected PhoneNumberService $phoneNumberService,
+        protected OrderFinancialCalculator $financialCalculator,
     ) {
     }
 
@@ -67,6 +68,7 @@ class PaymentFulfillmentService
          * - issue duplicate tickets
          * - regenerate badges
          * - resend My Tickets delivery
+         * - recreate financial snapshots
          */
         if ($payment->fulfilled_at) {
             return $payment->fresh();
@@ -87,8 +89,9 @@ class PaymentFulfillmentService
                  *
                  * 1. payment is completed,
                  * 2. order is marked PAID,
-                 * 3. tickets have been issued,
-                 * 4. payment fulfillment has been finalized.
+                 * 3. financial snapshot is frozen,
+                 * 4. tickets have been issued,
+                 * 5. payment fulfillment has been finalized.
                  *
                  * Because fulfilled_at is checked at the beginning of this
                  * method, reconciliation/IPN retries will not enqueue a
@@ -303,6 +306,38 @@ class PaymentFulfillmentService
                 }
 
                 /*
+                 * Freeze the financial snapshot exactly once.
+                 *
+                 * Historical financial values must never change
+                 * when the event commission or gateway fee is
+                 * changed later.
+                 *
+                 * This snapshot becomes the accounting source
+                 * of truth for organizer and admin dashboards.
+                 */
+                if (
+                    ! $lockedOrder->hasFinancialSnapshot()
+                ) {
+                    $lockedOrder->loadMissing([
+                        'event.paymentSetting',
+                    ]);
+
+                    $financialSnapshot =
+                        $this
+                            ->financialCalculator
+                            ->calculate(
+                                $lockedOrder,
+                                $lockedOrder
+                                    ->event
+                                    ?->paymentSetting
+                            );
+
+                    $lockedOrder->forceFill(
+                        $financialSnapshot
+                    )->save();
+                }
+
+                /*
                  * Keep issuance inside the same outer database
                  * transaction.
                  *
@@ -419,7 +454,7 @@ class PaymentFulfillmentService
 
         if (! $event) {
             throw new RuntimeException(
-                'Attendee event is missing.'
+                'Payment attendee event is missing.'
             );
         }
 

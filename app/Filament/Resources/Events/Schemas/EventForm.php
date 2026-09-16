@@ -550,6 +550,89 @@ class EventForm
 
                 /*
                 |--------------------------------------------------------------------------
+                | Event Finance Settings
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make('Event Finance Settings')
+                    ->description(
+                        'Configure eLive commission and payment gateway charges for this event. Changes apply only to future paid orders.'
+                    )
+                    ->relationship('paymentSetting')
+                    ->schema([
+                        TextInput::make(
+                            'platform_commission_rate'
+                        )
+                            ->label(
+                                'eLive Commission Rate'
+                            )
+                            ->suffix('%')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->step(0.01)
+                            ->default(7)
+                            ->required()
+                            ->helperText(
+                                'Percentage retained by eLive from successful sales. Historical paid orders keep their original frozen commission.'
+                            ),
+
+                        TextInput::make(
+                            'gateway_fee_rate'
+                        )
+                            ->label(
+                                'Gateway Fee Rate'
+                            )
+                            ->suffix('%')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->step(0.01)
+                            ->default(0)
+                            ->required()
+                            ->helperText(
+                                'Payment gateway fee percentage used for finance reporting.'
+                            ),
+
+                        Select::make(
+                            'gateway_fee_bearer'
+                        )
+                            ->label(
+                                'Gateway Fee Bearer'
+                            )
+                            ->options([
+                                'organizer' => 'Organizer',
+                                'elive' => 'eLive',
+                                'customer' => 'Customer',
+                            ])
+                            ->default('organizer')
+                            ->required()
+                            ->native(false)
+                            ->helperText(
+                                'Organizer: fee reduces organizer net payable. eLive or Customer: fee is tracked but does not reduce organizer net.'
+                            ),
+
+                        Placeholder::make(
+                            'finance_snapshot_information'
+                        )
+                            ->label(
+                                'Historical Financial Protection'
+                            )
+                            ->content(
+                                'When an order is successfully paid, eLive freezes the commission rate, gateway fee, total charges, and organizer net amount on that order. Later rate changes affect future paid orders only.'
+                            )
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(3)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showTicketing($get)
+                            || self::showRegistration($get)
+                    )
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
                 | Event Structure / Sessions
                 |--------------------------------------------------------------------------
                 */
@@ -1268,6 +1351,7 @@ class EventForm
                                         'payments_enabled'
                                     )
                             ),
+
 
                         Toggle::make(
                             'payment_required_before_confirmation'

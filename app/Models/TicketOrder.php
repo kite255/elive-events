@@ -31,9 +31,20 @@ class TicketOrder extends Model
         'buyer_phone',
         'buyer_email',
         'quantity',
+
         'subtotal',
         'discount_amount',
         'total',
+
+        'gross_amount',
+        'platform_commission_rate',
+        'platform_commission_amount',
+        'gateway_fee_rate',
+        'gateway_fee_amount',
+        'total_charges',
+        'organizer_net_amount',
+        'financial_snapshot_at',
+
         'currency',
         'status',
         'paid_at',
@@ -57,11 +68,23 @@ class TicketOrder extends Model
     {
         return [
             'quantity' => 'integer',
+
             'subtotal' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'total' => 'decimal:2',
+
+            'gross_amount' => 'decimal:2',
+            'platform_commission_rate' => 'decimal:2',
+            'platform_commission_amount' => 'decimal:2',
+            'gateway_fee_rate' => 'decimal:2',
+            'gateway_fee_amount' => 'decimal:2',
+            'total_charges' => 'decimal:2',
+            'organizer_net_amount' => 'decimal:2',
+
+            'financial_snapshot_at' => 'datetime',
             'paid_at' => 'datetime',
             'expires_at' => 'datetime',
+
             'metadata' => 'array',
         ];
     }
@@ -136,6 +159,11 @@ class TicketOrder extends Model
     {
         return $this->status
             === self::STATUS_EXPIRED;
+    }
+
+    public function hasFinancialSnapshot(): bool
+    {
+        return $this->financial_snapshot_at !== null;
     }
 
     public function canIssueTickets(): bool
