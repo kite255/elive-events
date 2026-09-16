@@ -6,11 +6,14 @@ use App\Filament\Resources\EventTicketTemplates\Pages\CreateEventTicketTemplate;
 use App\Filament\Resources\EventTicketTemplates\Pages\EditEventTicketTemplate;
 use App\Filament\Resources\EventTicketTemplates\Pages\ListEventTicketTemplates;
 use App\Filament\Resources\EventTicketTemplates\Schemas\EventTicketTemplateForm;
+use App\Filament\Resources\EventTicketTemplates\Tables\EventTicketTemplatesTable;
 use App\Models\EventTicketTemplate;
 use App\Models\User;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 class EventTicketTemplateResource extends Resource
 {
@@ -20,12 +23,69 @@ class EventTicketTemplateResource extends Resource
     protected static ?string $recordTitleAttribute =
         'name';
 
+    protected static string|UnitEnum|null $navigationGroup =
+        'Ticketing';
+
+    protected static ?string $navigationLabel =
+        'Event Ticket Templates';
+
+    protected static ?string $modelLabel =
+        'Event Ticket Template';
+
+    protected static ?string $pluralModelLabel =
+        'Event Ticket Templates';
+
+    protected static ?int $navigationSort = 31;
+
     public static function form(
         Schema $schema
     ): Schema {
         return EventTicketTemplateForm::configure(
             $schema
         );
+    }
+
+    public static function table(
+        Table $table
+    ): Table {
+        return EventTicketTemplatesTable::configure(
+            $table
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $organizationIds = $user->organizations()
+            ->wherePivot(
+                'status',
+                User::ORGANIZATION_STATUS_ACTIVE
+            )
+            ->wherePivot(
+                'role',
+                User::ORGANIZATION_ROLE_EVENT_MANAGER
+            )
+            ->pluck('organizations.id');
+
+        if ($organizationIds->isEmpty()) {
+            return false;
+        }
+
+        return $user->eventManagerEvents()
+            ->whereIn(
+                'events.organization_id',
+                $organizationIds
+            )
+            ->exists();
     }
 
     public static function getEloquentQuery(): Builder

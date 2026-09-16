@@ -6,10 +6,14 @@ use App\Filament\Resources\OrganizationTicketTemplates\Pages\CreateOrganizationT
 use App\Filament\Resources\OrganizationTicketTemplates\Pages\EditOrganizationTicketTemplate;
 use App\Filament\Resources\OrganizationTicketTemplates\Pages\ListOrganizationTicketTemplates;
 use App\Filament\Resources\OrganizationTicketTemplates\Schemas\OrganizationTicketTemplateForm;
+use App\Filament\Resources\OrganizationTicketTemplates\Tables\OrganizationTicketTemplatesTable;
 use App\Models\OrganizationTicketTemplate;
+use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 class OrganizationTicketTemplateResource extends Resource
 {
@@ -19,12 +23,40 @@ class OrganizationTicketTemplateResource extends Resource
     protected static ?string $recordTitleAttribute =
         'name';
 
+    protected static string|UnitEnum|null $navigationGroup =
+        'Ticketing';
+
+    protected static ?string $navigationLabel =
+        'Ticket Template Library';
+
+    protected static ?string $modelLabel =
+        'Organization Ticket Template';
+
+    protected static ?string $pluralModelLabel =
+        'Ticket Template Library';
+
+    protected static ?int $navigationSort = 30;
+
     public static function form(
         Schema $schema
     ): Schema {
         return OrganizationTicketTemplateForm::configure(
             $schema
         );
+    }
+
+    public static function table(
+        Table $table
+    ): Table {
+        return OrganizationTicketTemplatesTable::configure(
+            $table
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->isSuperAdmin()
+            ?? false;
     }
 
     public static function getEloquentQuery(): Builder
