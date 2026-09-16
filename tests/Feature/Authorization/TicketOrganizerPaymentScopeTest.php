@@ -14,27 +14,22 @@ class TicketOrganizerPaymentScopeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_ticket_organizer_only_sees_payments_from_own_organization(): void
+    public function test_ticketing_manager_only_sees_payments_from_assigned_events(): void
     {
-        $organizationA = Organization::query()->create([
+        $organization = Organization::query()->create([
             'name' => 'Organizer A',
             'email' => 'orga@example.com',
         ]);
 
-        $organizationB = Organization::query()->create([
-            'name' => 'Organizer B',
-            'email' => 'orgb@example.com',
-        ]);
-
         $organizer = User::query()->create([
-            'name' => 'Ticket Organizer A',
+            'name' => 'Ticket Manager A',
             'email' => 'organizer-a@example.com',
             'password' => 'password',
             'is_super_admin' => false,
         ]);
 
         $organizer->organizations()->attach(
-            $organizationA->id,
+            $organization->id,
             [
                 'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
                 'status' => User::ORGANIZATION_STATUS_ACTIVE,
@@ -43,37 +38,42 @@ class TicketOrganizerPaymentScopeTest extends TestCase
             ]
         );
 
-        $eventA = Event::query()->create([
-            'organization_id' => $organizationA->id,
-            'name' => 'Event A',
+        $assignedEvent = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Assigned Event',
             'venue' => 'Venue A',
             'starts_at' => now()->addDay(),
             'status' => Event::STATUS_ACTIVE,
             'registration_is_open' => true,
         ]);
 
-        $eventB = Event::query()->create([
-            'organization_id' => $organizationB->id,
-            'name' => 'Event B',
+        $unassignedEvent = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Unassigned Event',
             'venue' => 'Venue B',
-            'starts_at' => now()->addDay(),
+            'starts_at' => now()->addDays(2),
             'status' => Event::STATUS_ACTIVE,
             'registration_is_open' => true,
         ]);
 
-        $paymentA = Payment::query()->create([
-            'organization_id' => $organizationA->id,
-            'event_id' => $eventA->id,
-            'reference' => 'PAY-A-001',
+        $organizer->assignToEvent(
+            $assignedEvent,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
+
+        $assignedPayment = Payment::query()->create([
+            'organization_id' => $organization->id,
+            'event_id' => $assignedEvent->id,
+            'reference' => 'PAY-ASSIGNED-001',
             'amount' => 50000,
             'currency' => 'TZS',
             'status' => Payment::STATUS_PENDING,
         ]);
 
-        Payment::query()->create([
-            'organization_id' => $organizationB->id,
-            'event_id' => $eventB->id,
-            'reference' => 'PAY-B-001',
+        $unassignedPayment = Payment::query()->create([
+            'organization_id' => $organization->id,
+            'event_id' => $unassignedEvent->id,
+            'reference' => 'PAY-UNASSIGNED-001',
             'amount' => 75000,
             'currency' => 'TZS',
             'status' => Payment::STATUS_PENDING,
@@ -85,8 +85,18 @@ class TicketOrganizerPaymentScopeTest extends TestCase
             ->pluck('payments.id')
             ->all();
 
-        $this->assertSame(
-            [$paymentA->id],
+        $this->assertContains(
+            $assignedPayment->id,
+            $visibleIds
+        );
+
+        $this->assertNotContains(
+            $unassignedPayment->id,
+            $visibleIds
+        );
+
+        $this->assertCount(
+            1,
             $visibleIds
         );
     }

@@ -27,7 +27,7 @@ class TicketOrganizerPaymentDirectAccessTest extends TestCase
         )->assertOk();
     }
 
-    public function test_ticket_organizer_can_directly_view_own_organization_payment(): void
+    public function test_ticket_organizer_can_directly_view_assigned_event_payment(): void
     {
         [
             $organizer,
@@ -36,13 +36,18 @@ class TicketOrganizerPaymentDirectAccessTest extends TestCase
 
         $event = $this->createEvent(
             $organization,
-            'Organizer Concert'
+            'Assigned Organizer Concert'
+        );
+
+        $organizer->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
         );
 
         $payment = $this->createPayment(
             $organization,
             $event,
-            'PAY-OWN-001'
+            'PAY-ASSIGNED-001'
         );
 
         $this->actingAs($organizer);
@@ -57,6 +62,45 @@ class TicketOrganizerPaymentDirectAccessTest extends TestCase
         )->assertOk();
     }
 
+    public function test_ticket_organizer_cannot_directly_view_unassigned_same_organization_payment(): void
+    {
+        [
+            $organizer,
+            $organization,
+        ] = $this->createTicketOrganizerContext();
+
+        $event = $this->createEvent(
+            $organization,
+            'Unassigned Organizer Concert'
+        );
+
+        $payment = $this->createPayment(
+            $organization,
+            $event,
+            'PAY-UNASSIGNED-001'
+        );
+
+        $this->actingAs($organizer);
+
+        $response = $this->get(
+            PaymentResource::getUrl(
+                'view',
+                [
+                    'record' => $payment,
+                ]
+            )
+        );
+
+        $this->assertContains(
+            $response->getStatusCode(),
+            [
+                403,
+                404,
+            ],
+            'Ticket Organizer must not directly view a payment from an unassigned event.'
+        );
+    }
+
     public function test_ticket_organizer_cannot_directly_view_another_organization_payment(): void
     {
         [
@@ -65,8 +109,11 @@ class TicketOrganizerPaymentDirectAccessTest extends TestCase
 
         $otherOrganization =
             Organization::query()->create([
-                'name' => 'Other Events Ltd',
-                'email' => 'other-events@example.com',
+                'name' =>
+                    'Other Events Ltd',
+
+                'email' =>
+                    'other-events@example.com',
             ]);
 
         $otherEvent = $this->createEvent(
@@ -105,16 +152,26 @@ class TicketOrganizerPaymentDirectAccessTest extends TestCase
     {
         $organization =
             Organization::query()->create([
-                'name' => 'Ticket Events Ltd',
-                'email' => 'ticket-events@example.com',
+                'name' =>
+                    'Ticket Events Ltd',
+
+                'email' =>
+                    'ticket-events@example.com',
             ]);
 
         $organizer =
             User::query()->create([
-                'name' => 'Ticket Organizer',
-                'email' => 'ticket.organizer@example.com',
-                'password' => 'password',
-                'is_super_admin' => false,
+                'name' =>
+                    'Ticket Organizer',
+
+                'email' =>
+                    'ticket.organizer@example.com',
+
+                'password' =>
+                    'password',
+
+                'is_super_admin' =>
+                    false,
             ]);
 
         $organizer->organizations()->attach(
@@ -126,8 +183,11 @@ class TicketOrganizerPaymentDirectAccessTest extends TestCase
                 'status' =>
                     User::ORGANIZATION_STATUS_ACTIVE,
 
-                'is_owner' => false,
-                'joined_at' => now(),
+                'is_owner' =>
+                    false,
+
+                'joined_at' =>
+                    now(),
             ]
         );
 

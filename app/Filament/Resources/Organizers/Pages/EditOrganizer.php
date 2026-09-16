@@ -40,6 +40,12 @@ class EditOrganizer extends EditRecord
             $membership?->pivot?->status
             ?? User::ORGANIZATION_STATUS_ACTIVE;
 
+        $data['assigned_event_ids'] =
+            $organizer
+                ->assignedTicketingEventIds()
+                ->values()
+                ->all();
+
         /*
          * Never send the existing password hash
          * back into the edit form.

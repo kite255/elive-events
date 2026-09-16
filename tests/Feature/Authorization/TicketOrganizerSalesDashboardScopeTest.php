@@ -13,52 +13,81 @@ class TicketOrganizerSalesDashboardScopeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_ticket_organizer_only_sees_own_organization_events_on_sales_dashboard(): void
+    public function test_ticketing_manager_only_sees_assigned_events_on_sales_dashboard(): void
     {
-        $organizationA = Organization::query()->create([
+        $organization = Organization::query()->create([
             'name' => 'Organizer A',
             'email' => 'orga@example.com',
         ]);
 
-        $organizationB = Organization::query()->create([
-            'name' => 'Organizer B',
-            'email' => 'orgb@example.com',
-        ]);
-
         $organizer = User::query()->create([
-            'name' => 'Ticket Organizer A',
+            'name' => 'Ticket Manager A',
             'email' => 'organizer-a@example.com',
             'password' => 'password',
             'is_super_admin' => false,
         ]);
 
         $organizer->organizations()->attach(
-            $organizationA->id,
+            $organization->id,
             [
-                'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
-                'status' => User::ORGANIZATION_STATUS_ACTIVE,
-                'is_owner' => false,
-                'joined_at' => now(),
+                'role' =>
+                    User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+
+                'status' =>
+                    User::ORGANIZATION_STATUS_ACTIVE,
+
+                'is_owner' =>
+                    false,
+
+                'joined_at' =>
+                    now(),
             ]
         );
 
-        $eventA = Event::query()->create([
-            'organization_id' => $organizationA->id,
-            'name' => 'Event A',
-            'venue' => 'Venue A',
-            'starts_at' => now()->addDay(),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+        $assignedEvent = Event::query()->create([
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Assigned Event',
+
+            'venue' =>
+                'Venue A',
+
+            'starts_at' =>
+                now()->addDay(),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
 
-        Event::query()->create([
-            'organization_id' => $organizationB->id,
-            'name' => 'Event B',
-            'venue' => 'Venue B',
-            'starts_at' => now()->addDays(2),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+        $unassignedEvent = Event::query()->create([
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Unassigned Event',
+
+            'venue' =>
+                'Venue B',
+
+            'starts_at' =>
+                now()->addDays(2),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
+
+        $organizer->assignToEvent(
+            $assignedEvent,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
 
         $this->actingAs($organizer);
 
@@ -66,10 +95,23 @@ class TicketOrganizerSalesDashboardScopeTest extends TestCase
 
         $options = $page->eventOptions();
 
+        $this->assertArrayHasKey(
+            $assignedEvent->id,
+            $options
+        );
+
         $this->assertSame(
-            [
-                $eventA->id => 'Event A',
-            ],
+            'Assigned Event',
+            $options[$assignedEvent->id]
+        );
+
+        $this->assertArrayNotHasKey(
+            $unassignedEvent->id,
+            $options
+        );
+
+        $this->assertCount(
+            1,
             $options
         );
     }

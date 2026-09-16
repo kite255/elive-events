@@ -104,10 +104,10 @@ class AdminTicketLookupService
 
         if ($user->isTicketOrganizer()) {
             return $user
-                ->ticketOrganizerOrganizations()
+                ->assignedTicketingEvents()
                 ->where(
-                    'organizations.id',
-                    $event->organization_id
+                    'events.id',
+                    $event->id
                 )
                 ->exists();
         }
@@ -121,9 +121,14 @@ class AdminTicketLookupService
     private function mapTicket(
         Ticket $ticket
     ): array {
-        $order = $ticket->order;
-        $event = $ticket->event;
-        $ticketType = $ticket->ticketType;
+        $order =
+            $ticket->order;
+
+        $event =
+            $ticket->event;
+
+        $ticketType =
+            $ticket->ticketType;
 
         return [
             'ticket_id' =>

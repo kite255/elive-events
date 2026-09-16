@@ -67,8 +67,32 @@ class OrganizerFinanceOverview extends Page
             return [];
         }
 
-        $organizationIds = $this
-            ->financeOrganizationIds($user);
+        if ($user->isTicketOrganizer()) {
+            $assignedEventIds =
+                $user->assignedTicketingEventIds();
+
+            if ($assignedEventIds->isEmpty()) {
+                return [];
+            }
+
+            return Event::query()
+                ->whereIn(
+                    'id',
+                    $assignedEventIds
+                )
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->mapWithKeys(
+                    fn ($name, $id) => [
+                        (int) $id => $name,
+                    ]
+                )
+                ->toArray();
+        }
+
+        $organizationIds = $user
+            ->ownedOrganizations()
+            ->pluck('organizations.id');
 
         if ($organizationIds->isEmpty()) {
             return [];
@@ -134,8 +158,26 @@ class OrganizerFinanceOverview extends Page
             return null;
         }
 
-        $organizationIds = $this
-            ->financeOrganizationIds($user);
+        if ($user->isTicketOrganizer()) {
+            $assignedEventIds =
+                $user->assignedTicketingEventIds();
+
+            if ($assignedEventIds->isEmpty()) {
+                return null;
+            }
+
+            return Event::query()
+                ->whereKey($eventId)
+                ->whereIn(
+                    'id',
+                    $assignedEventIds
+                )
+                ->first();
+        }
+
+        $organizationIds = $user
+            ->ownedOrganizations()
+            ->pluck('organizations.id');
 
         if ($organizationIds->isEmpty()) {
             return null;
@@ -148,20 +190,6 @@ class OrganizerFinanceOverview extends Page
                 $organizationIds
             )
             ->first();
-    }
-
-    private function financeOrganizationIds(
-        User $user
-    ) {
-        if ($user->isTicketOrganizer()) {
-            return $user
-                ->ticketOrganizerOrganizations()
-                ->pluck('organizations.id');
-        }
-
-        return $user
-            ->ownedOrganizations()
-            ->pluck('organizations.id');
     }
 
     private function emptyMetrics(): array

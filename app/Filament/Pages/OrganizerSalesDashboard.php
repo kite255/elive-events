@@ -12,7 +12,8 @@ use UnitEnum;
 
 class OrganizerSalesDashboard extends Page
 {
-    protected static ?string $navigationLabel = 'Sales Dashboard';
+    protected static ?string $navigationLabel =
+        'Sales Dashboard';
 
     protected static string|UnitEnum|null $navigationGroup =
         'Ticketing';
@@ -79,14 +80,17 @@ class OrganizerSalesDashboard extends Page
         }
 
         if ($user->isTicketOrganizer()) {
-            $organizationIds = $user
-                ->ticketOrganizerOrganizations()
-                ->pluck('organizations.id');
+            $assignedEventIds =
+                $user->assignedTicketingEventIds();
+
+            if ($assignedEventIds->isEmpty()) {
+                return [];
+            }
 
             return Event::query()
                 ->whereIn(
-                    'organization_id',
-                    $organizationIds
+                    'id',
+                    $assignedEventIds
                 )
                 ->orderByDesc('starts_at')
                 ->pluck('name', 'id')
@@ -103,7 +107,9 @@ class OrganizerSalesDashboard extends Page
             ->get()
             ->filter(
                 fn (Event $event): bool =>
-                    $user->canViewEventReports($event)
+                    $user->canViewEventReports(
+                        $event
+                    )
             )
             ->pluck('name', 'id')
             ->mapWithKeys(
@@ -166,15 +172,17 @@ class OrganizerSalesDashboard extends Page
 
         if ($user->isTicketOrganizer()) {
             return $user
-                ->ticketOrganizerOrganizations()
+                ->assignedTicketingEvents()
                 ->where(
-                    'organizations.id',
-                    $event->organization_id
+                    'events.id',
+                    $event->id
                 )
                 ->exists();
         }
 
-        return $user->canViewEventReports($event);
+        return $user->canViewEventReports(
+            $event
+        );
     }
 
     /*

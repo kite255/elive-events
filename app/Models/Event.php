@@ -299,6 +299,15 @@ class Event extends Model
             );
     }
 
+    public function ticketingManagers(): BelongsToMany
+    {
+        return $this->activeUsers()
+            ->wherePivot(
+                'role',
+                User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+            );
+    }
+
     public function registrationOfficers(): BelongsToMany
     {
         return $this->activeUsers()

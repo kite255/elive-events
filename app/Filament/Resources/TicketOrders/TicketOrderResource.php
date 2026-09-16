@@ -84,7 +84,9 @@ class TicketOrderResource extends Resource
             return false;
         }
 
-        return parent::canEdit($record);
+        return parent::canEdit(
+            $record
+        );
     }
 
     public static function canDelete(
@@ -96,7 +98,9 @@ class TicketOrderResource extends Resource
             return false;
         }
 
-        return parent::canDelete($record);
+        return parent::canDelete(
+            $record
+        );
     }
 
     public static function canDeleteAny(): bool
@@ -118,25 +122,28 @@ class TicketOrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
+        $query =
+            parent::getEloquentQuery();
 
-        $user = auth()->user();
+        $user =
+            auth()->user();
 
         if (! $user?->isTicketOrganizer()) {
             return $query;
         }
 
-        $organizationIds = $user
-            ->ticketOrganizerOrganizations()
-            ->pluck('organizations.id');
+        $assignedEventIds =
+            $user->assignedTicketingEventIds();
 
-        return $query->whereHas(
-            'event',
-            fn (Builder $eventQuery) =>
-                $eventQuery->whereIn(
-                    'organization_id',
-                    $organizationIds
-                )
+        if ($assignedEventIds->isEmpty()) {
+            return $query->whereRaw(
+                '1 = 0'
+            );
+        }
+
+        return $query->whereIn(
+            'event_id',
+            $assignedEventIds
         );
     }
 

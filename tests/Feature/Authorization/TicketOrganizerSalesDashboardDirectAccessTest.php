@@ -21,11 +21,16 @@ class TicketOrganizerSalesDashboardDirectAccessTest extends TestCase
             $organization,
         ] = $this->createTicketOrganizerContext();
 
-        Event::query()->create([
+        $event = Event::query()->create([
             'organization_id' => $organization->id,
             'name' => 'Organizer Concert',
             'status' => Event::STATUS_ACTIVE,
         ]);
+
+        $organizer->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
 
         $this->actingAs($organizer);
 
@@ -34,29 +39,29 @@ class TicketOrganizerSalesDashboardDirectAccessTest extends TestCase
         )->assertOk();
     }
 
-    public function test_sales_dashboard_only_exposes_organizer_events(): void
+    public function test_sales_dashboard_only_exposes_assigned_events(): void
     {
         [
             $organizer,
-            $organizationA,
+            $organization,
         ] = $this->createTicketOrganizerContext();
 
-        $organizationB = Organization::query()->create([
-            'name' => 'Other Organization',
-            'email' => 'other@example.com',
-        ]);
-
-        $eventA = Event::query()->create([
-            'organization_id' => $organizationA->id,
-            'name' => 'Organizer Event',
+        $assignedEvent = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Assigned Event',
             'status' => Event::STATUS_ACTIVE,
         ]);
 
-        $eventB = Event::query()->create([
-            'organization_id' => $organizationB->id,
-            'name' => 'Other Event',
+        $unassignedEvent = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Unassigned Event',
             'status' => Event::STATUS_ACTIVE,
         ]);
+
+        $organizer->assignToEvent(
+            $assignedEvent,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
 
         $this->actingAs($organizer);
 
@@ -69,17 +74,17 @@ class TicketOrganizerSalesDashboardDirectAccessTest extends TestCase
             ->eventOptions();
 
         $this->assertArrayHasKey(
-            $eventA->id,
+            $assignedEvent->id,
             $options
         );
 
         $this->assertArrayNotHasKey(
-            $eventB->id,
+            $unassignedEvent->id,
             $options
         );
     }
 
-    public function test_sales_dashboard_defaults_to_an_allowed_event(): void
+    public function test_sales_dashboard_defaults_to_an_assigned_event(): void
     {
         [
             $organizer,
@@ -92,6 +97,11 @@ class TicketOrganizerSalesDashboardDirectAccessTest extends TestCase
             'status' => Event::STATUS_ACTIVE,
         ]);
 
+        $organizer->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
+
         $this->actingAs($organizer);
 
         Livewire::test(
@@ -102,20 +112,16 @@ class TicketOrganizerSalesDashboardDirectAccessTest extends TestCase
         );
     }
 
-    public function test_ticket_organizer_cannot_force_sales_metrics_for_another_organization_event(): void
+    public function test_ticket_organizer_cannot_force_sales_metrics_for_unassigned_event(): void
     {
         [
             $organizer,
+            $organization,
         ] = $this->createTicketOrganizerContext();
 
-        $otherOrganization = Organization::query()->create([
-            'name' => 'Other Organization',
-            'email' => 'other@example.com',
-        ]);
-
-        $otherEvent = Event::query()->create([
-            'organization_id' => $otherOrganization->id,
-            'name' => 'Other Event',
+        $unassignedEvent = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Unassigned Event',
             'status' => Event::STATUS_ACTIVE,
         ]);
 
@@ -126,7 +132,7 @@ class TicketOrganizerSalesDashboardDirectAccessTest extends TestCase
         )
             ->set(
                 'selectedEventId',
-                $otherEvent->id
+                $unassignedEvent->id
             );
 
         $metrics = $component

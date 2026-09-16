@@ -14,79 +14,150 @@ class TicketOrganizerTicketOrderScopeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_ticket_organizer_only_sees_ticket_orders_from_own_organization(): void
+    public function test_ticketing_manager_only_sees_ticket_orders_from_assigned_events(): void
     {
-        $organizationA = Organization::query()->create([
+        $organization = Organization::query()->create([
             'name' => 'Organizer A',
-            'email' => 'orga@example.com',
-        ]);
-
-        $organizationB = Organization::query()->create([
-            'name' => 'Organizer B',
-            'email' => 'orgb@example.com',
+            'email' => 'orders@example.com',
         ]);
 
         $organizer = User::query()->create([
-            'name' => 'Ticket Organizer A',
-            'email' => 'organizer-a@example.com',
+            'name' => 'Ticket Manager A',
+            'email' => 'order.manager@example.com',
             'password' => 'password',
             'is_super_admin' => false,
         ]);
 
         $organizer->organizations()->attach(
-            $organizationA->id,
+            $organization->id,
             [
-                'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
-                'status' => User::ORGANIZATION_STATUS_ACTIVE,
-                'is_owner' => false,
-                'joined_at' => now(),
+                'role' =>
+                    User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+
+                'status' =>
+                    User::ORGANIZATION_STATUS_ACTIVE,
+
+                'is_owner' =>
+                    false,
+
+                'joined_at' =>
+                    now(),
             ]
         );
 
-        $eventA = Event::query()->create([
-            'organization_id' => $organizationA->id,
-            'name' => 'Event A',
-            'venue' => 'Venue A',
-            'starts_at' => now()->addDay(),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+        $assignedEvent = Event::query()->create([
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Assigned Concert',
+
+            'venue' =>
+                'Hall A',
+
+            'starts_at' =>
+                now()->addDay(),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
 
-        $eventB = Event::query()->create([
-            'organization_id' => $organizationB->id,
-            'name' => 'Event B',
-            'venue' => 'Venue B',
-            'starts_at' => now()->addDay(),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+        $unassignedEvent = Event::query()->create([
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Unassigned Concert',
+
+            'venue' =>
+                'Hall B',
+
+            'starts_at' =>
+                now()->addDays(2),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
 
-        $orderA = TicketOrder::query()->create([
-            'event_id' => $eventA->id,
-            'order_number' => 'ORD-A-001',
-            'buyer_name' => 'Buyer A',
-            'buyer_phone' => '0711111111',
-            'buyer_email' => 'buyer-a@example.com',
-            'quantity' => 1,
-            'subtotal' => 50000,
-            'discount_amount' => 0,
-            'total' => 50000,
-            'currency' => 'TZS',
-            'status' => TicketOrder::STATUS_PENDING,
+        $organizer->assignToEvent(
+            $assignedEvent,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
+
+        $assignedOrder = TicketOrder::query()->create([
+            'event_id' =>
+                $assignedEvent->id,
+
+            'order_number' =>
+                'ORD-ASSIGNED-001',
+
+            'buyer_name' =>
+                'Assigned Buyer',
+
+            'buyer_phone' =>
+                '0711000001',
+
+            'quantity' =>
+                1,
+
+            'subtotal' =>
+                50000,
+
+            'discount_amount' =>
+                0,
+
+            'total' =>
+                50000,
+
+            'currency' =>
+                'TZS',
+
+            'status' =>
+                TicketOrder::STATUS_PAID,
+
+            'paid_at' =>
+                now(),
         ]);
 
-        TicketOrder::query()->create([
-            'event_id' => $eventB->id,
-            'order_number' => 'ORD-B-001',
-            'buyer_name' => 'Buyer B',
-            'buyer_phone' => '0722222222',
-            'buyer_email' => 'buyer-b@example.com',
-            'quantity' => 1,
-            'subtotal' => 75000,
-            'discount_amount' => 0,
-            'total' => 75000,
-            'currency' => 'TZS',
-            'status' => TicketOrder::STATUS_PENDING,
+        $unassignedOrder = TicketOrder::query()->create([
+            'event_id' =>
+                $unassignedEvent->id,
+
+            'order_number' =>
+                'ORD-UNASSIGNED-001',
+
+            'buyer_name' =>
+                'Unassigned Buyer',
+
+            'buyer_phone' =>
+                '0711000002',
+
+            'quantity' =>
+                1,
+
+            'subtotal' =>
+                30000,
+
+            'discount_amount' =>
+                0,
+
+            'total' =>
+                30000,
+
+            'currency' =>
+                'TZS',
+
+            'status' =>
+                TicketOrder::STATUS_PAID,
+
+            'paid_at' =>
+                now(),
         ]);
 
         $this->actingAs($organizer);
@@ -95,8 +166,18 @@ class TicketOrganizerTicketOrderScopeTest extends TestCase
             ->pluck('ticket_orders.id')
             ->all();
 
-        $this->assertSame(
-            [$orderA->id],
+        $this->assertContains(
+            $assignedOrder->id,
+            $visibleIds
+        );
+
+        $this->assertNotContains(
+            $unassignedOrder->id,
+            $visibleIds
+        );
+
+        $this->assertCount(
+            1,
             $visibleIds
         );
     }

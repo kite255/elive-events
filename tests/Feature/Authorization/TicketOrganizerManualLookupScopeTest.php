@@ -16,27 +16,22 @@ class TicketOrganizerManualLookupScopeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_ticket_organizer_only_finds_tickets_from_own_organization(): void
+    public function test_ticketing_manager_only_finds_tickets_from_assigned_events(): void
     {
-        $organizationA = Organization::query()->create([
+        $organization = Organization::query()->create([
             'name' => 'Organizer A',
             'email' => 'orga@example.com',
         ]);
 
-        $organizationB = Organization::query()->create([
-            'name' => 'Organizer B',
-            'email' => 'orgb@example.com',
-        ]);
-
         $organizer = User::query()->create([
-            'name' => 'Ticket Organizer A',
+            'name' => 'Ticket Manager A',
             'email' => 'organizer-a@example.com',
             'password' => 'password',
             'is_super_admin' => false,
         ]);
 
         $organizer->organizations()->attach(
-            $organizationA->id,
+            $organization->id,
             [
                 'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
                 'status' => User::ORGANIZATION_STATUS_ACTIVE,
@@ -45,42 +40,47 @@ class TicketOrganizerManualLookupScopeTest extends TestCase
             ]
         );
 
-        $eventA = Event::query()->create([
-            'organization_id' => $organizationA->id,
-            'name' => 'Event A',
+        $assignedEvent = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Assigned Event',
             'venue' => 'Venue A',
             'starts_at' => now()->addDay(),
             'status' => Event::STATUS_ACTIVE,
             'registration_is_open' => true,
         ]);
 
-        $eventB = Event::query()->create([
-            'organization_id' => $organizationB->id,
-            'name' => 'Event B',
+        $unassignedEvent = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Unassigned Event',
             'venue' => 'Venue B',
             'starts_at' => now()->addDays(2),
             'status' => Event::STATUS_ACTIVE,
             'registration_is_open' => true,
         ]);
 
-        $ticketTypeA = TicketType::query()->create([
-            'event_id' => $eventA->id,
-            'name' => 'General A',
+        $organizer->assignToEvent(
+            $assignedEvent,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
+
+        $assignedTicketType = TicketType::query()->create([
+            'event_id' => $assignedEvent->id,
+            'name' => 'General Assigned',
             'code' => 'GEN-A',
             'price' => 50000,
             'currency' => 'TZS',
         ]);
 
-        $ticketTypeB = TicketType::query()->create([
-            'event_id' => $eventB->id,
-            'name' => 'General B',
+        $unassignedTicketType = TicketType::query()->create([
+            'event_id' => $unassignedEvent->id,
+            'name' => 'General Unassigned',
             'code' => 'GEN-B',
             'price' => 75000,
             'currency' => 'TZS',
         ]);
 
-        $orderA = TicketOrder::query()->create([
-            'event_id' => $eventA->id,
+        $assignedOrder = TicketOrder::query()->create([
+            'event_id' => $assignedEvent->id,
             'order_number' => 'ORD-A-001',
             'buyer_name' => 'Shared Buyer',
             'buyer_phone' => '0711111111',
@@ -93,8 +93,8 @@ class TicketOrganizerManualLookupScopeTest extends TestCase
             'status' => TicketOrder::STATUS_PAID,
         ]);
 
-        $orderB = TicketOrder::query()->create([
-            'event_id' => $eventB->id,
+        $unassignedOrder = TicketOrder::query()->create([
+            'event_id' => $unassignedEvent->id,
             'order_number' => 'ORD-B-001',
             'buyer_name' => 'Shared Buyer',
             'buyer_phone' => '0722222222',
@@ -107,10 +107,10 @@ class TicketOrganizerManualLookupScopeTest extends TestCase
             'status' => TicketOrder::STATUS_PAID,
         ]);
 
-        $ticketA = Ticket::query()->create([
-            'event_id' => $eventA->id,
-            'ticket_order_id' => $orderA->id,
-            'ticket_type_id' => $ticketTypeA->id,
+        $assignedTicket = Ticket::query()->create([
+            'event_id' => $assignedEvent->id,
+            'ticket_order_id' => $assignedOrder->id,
+            'ticket_type_id' => $assignedTicketType->id,
             'ticket_number' => 'TKT-A-001',
             'public_token' => 'public-token-a',
             'qr_token_hash' => hash(
@@ -125,10 +125,10 @@ class TicketOrganizerManualLookupScopeTest extends TestCase
             'status' => Ticket::STATUS_ISSUED,
         ]);
 
-        Ticket::query()->create([
-            'event_id' => $eventB->id,
-            'ticket_order_id' => $orderB->id,
-            'ticket_type_id' => $ticketTypeB->id,
+        $unassignedTicket = Ticket::query()->create([
+            'event_id' => $unassignedEvent->id,
+            'ticket_order_id' => $unassignedOrder->id,
+            'ticket_type_id' => $unassignedTicketType->id,
             'ticket_number' => 'TKT-B-001',
             'public_token' => 'public-token-b',
             'qr_token_hash' => hash(
@@ -150,18 +150,27 @@ class TicketOrganizerManualLookupScopeTest extends TestCase
             'shared@example.com'
         );
 
+        $ticketIds = collect($results)
+            ->pluck('ticket_id')
+            ->all();
+
+        $this->assertContains(
+            $assignedTicket->id,
+            $ticketIds
+        );
+
+        $this->assertNotContains(
+            $unassignedTicket->id,
+            $ticketIds
+        );
+
         $this->assertCount(
             1,
             $results
         );
 
         $this->assertSame(
-            $ticketA->id,
-            $results[0]['ticket_id']
-        );
-
-        $this->assertSame(
-            $eventA->id,
+            $assignedEvent->id,
             $results[0]['event_id']
         );
     }

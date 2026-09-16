@@ -33,10 +33,17 @@ class TicketOrganizerTicketTypeAccessTest extends TestCase
         $organizer->organizations()->attach(
             $organization->id,
             [
-                'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
-                'status' => User::ORGANIZATION_STATUS_ACTIVE,
-                'is_owner' => false,
-                'joined_at' => now(),
+                'role' =>
+                    User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+
+                'status' =>
+                    User::ORGANIZATION_STATUS_ACTIVE,
+
+                'is_owner' =>
+                    false,
+
+                'joined_at' =>
+                    now(),
             ]
         );
 
@@ -80,35 +87,73 @@ class TicketOrganizerTicketTypeAccessTest extends TestCase
         $organizer->organizations()->attach(
             $organization->id,
             [
-                'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
-                'status' => User::ORGANIZATION_STATUS_ACTIVE,
-                'is_owner' => false,
-                'joined_at' => now(),
+                'role' =>
+                    User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+
+                'status' =>
+                    User::ORGANIZATION_STATUS_ACTIVE,
+
+                'is_owner' =>
+                    false,
+
+                'joined_at' =>
+                    now(),
             ]
         );
 
         $event = Event::query()->create([
-            'organization_id' => $organization->id,
-            'name' => 'Concert Event',
-            'venue' => 'Main Hall',
-            'starts_at' => now()->addDay(),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Concert Event',
+
+            'venue' =>
+                'Main Hall',
+
+            'starts_at' =>
+                now()->addDay(),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
 
+        $organizer->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
+
         $ticketType = TicketType::query()->create([
-            'event_id' => $event->id,
-            'name' => 'VIP',
-            'code' => 'VIP',
-            'price' => 50000,
-            'currency' => 'TZS',
-            'is_active' => true,
-            'is_public' => true,
+            'event_id' =>
+                $event->id,
+
+            'name' =>
+                'VIP',
+
+            'code' =>
+                'VIP',
+
+            'price' =>
+                50000,
+
+            'currency' =>
+                'TZS',
+
+            'is_active' =>
+                true,
+
+            'is_public' =>
+                true,
         ]);
 
         $this->actingAs($organizer);
 
-        Livewire::test(ListTicketTypes::class)
+        Livewire::test(
+            ListTicketTypes::class
+        )
             ->assertTableActionHidden(
                 'edit',
                 $ticketType
@@ -130,27 +175,53 @@ class TicketOrganizerTicketTypeAccessTest extends TestCase
         ]);
 
         $event = Event::query()->create([
-            'organization_id' => $organization->id,
-            'name' => 'Concert Event',
-            'venue' => 'Main Hall',
-            'starts_at' => now()->addDay(),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Concert Event',
+
+            'venue' =>
+                'Main Hall',
+
+            'starts_at' =>
+                now()->addDay(),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
 
         $ticketType = TicketType::query()->create([
-            'event_id' => $event->id,
-            'name' => 'Regular',
-            'code' => 'REG',
-            'price' => 25000,
-            'currency' => 'TZS',
-            'is_active' => true,
-            'is_public' => true,
+            'event_id' =>
+                $event->id,
+
+            'name' =>
+                'Regular',
+
+            'code' =>
+                'REG',
+
+            'price' =>
+                25000,
+
+            'currency' =>
+                'TZS',
+
+            'is_active' =>
+                true,
+
+            'is_public' =>
+                true,
         ]);
 
         $this->actingAs($superAdmin);
 
-        Livewire::test(ListTicketTypes::class)
+        Livewire::test(
+            ListTicketTypes::class
+        )
             ->assertTableActionVisible(
                 'edit',
                 $ticketType
@@ -174,37 +245,79 @@ class TicketOrganizerTicketTypeAccessTest extends TestCase
         $organizer->organizations()->attach(
             $organization->id,
             [
-                'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
-                'status' => User::ORGANIZATION_STATUS_ACTIVE,
-                'is_owner' => false,
-                'joined_at' => now(),
+                'role' =>
+                    User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+
+                'status' =>
+                    User::ORGANIZATION_STATUS_ACTIVE,
+
+                'is_owner' =>
+                    false,
+
+                'joined_at' =>
+                    now(),
             ]
         );
 
         $event = Event::query()->create([
-            'organization_id' => $organization->id,
-            'name' => 'Concert Event',
-            'venue' => 'Main Hall',
-            'starts_at' => now()->addDay(),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Concert Event',
+
+            'venue' =>
+                'Main Hall',
+
+            'starts_at' =>
+                now()->addDay(),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
 
+        $organizer->assignToEvent(
+            $event,
+            User::ORGANIZATION_ROLE_TICKET_ORGANIZER
+        );
+
         TicketType::query()->create([
-            'event_id' => $event->id,
-            'name' => 'VIP',
-            'code' => 'VIP-ACTIONS',
-            'price' => 50000,
-            'currency' => 'TZS',
-            'is_active' => true,
-            'is_public' => true,
+            'event_id' =>
+                $event->id,
+
+            'name' =>
+                'VIP',
+
+            'code' =>
+                'VIP-ACTIONS',
+
+            'price' =>
+                50000,
+
+            'currency' =>
+                'TZS',
+
+            'is_active' =>
+                true,
+
+            'is_public' =>
+                true,
         ]);
 
         $this->actingAs($organizer);
 
-        Livewire::test(ListTicketTypes::class)
-            ->assertActionHidden('create')
-            ->assertTableBulkActionHidden('delete');
+        Livewire::test(
+            ListTicketTypes::class
+        )
+            ->assertActionHidden(
+                'create'
+            )
+            ->assertTableBulkActionHidden(
+                'delete'
+            );
     }
 
     public function test_super_admin_still_sees_create_and_bulk_delete_actions(): void
@@ -222,28 +335,58 @@ class TicketOrganizerTicketTypeAccessTest extends TestCase
         ]);
 
         $event = Event::query()->create([
-            'organization_id' => $organization->id,
-            'name' => 'Admin Concert',
-            'venue' => 'Main Hall',
-            'starts_at' => now()->addDay(),
-            'status' => Event::STATUS_ACTIVE,
-            'registration_is_open' => true,
+            'organization_id' =>
+                $organization->id,
+
+            'name' =>
+                'Admin Concert',
+
+            'venue' =>
+                'Main Hall',
+
+            'starts_at' =>
+                now()->addDay(),
+
+            'status' =>
+                Event::STATUS_ACTIVE,
+
+            'registration_is_open' =>
+                true,
         ]);
 
         TicketType::query()->create([
-            'event_id' => $event->id,
-            'name' => 'Regular',
-            'code' => 'REG-ACTIONS',
-            'price' => 25000,
-            'currency' => 'TZS',
-            'is_active' => true,
-            'is_public' => true,
+            'event_id' =>
+                $event->id,
+
+            'name' =>
+                'Regular',
+
+            'code' =>
+                'REG-ACTIONS',
+
+            'price' =>
+                25000,
+
+            'currency' =>
+                'TZS',
+
+            'is_active' =>
+                true,
+
+            'is_public' =>
+                true,
         ]);
 
         $this->actingAs($superAdmin);
 
-        Livewire::test(ListTicketTypes::class)
-            ->assertActionVisible('create')
-            ->assertTableBulkActionVisible('delete');
+        Livewire::test(
+            ListTicketTypes::class
+        )
+            ->assertActionVisible(
+                'create'
+            )
+            ->assertTableBulkActionVisible(
+                'delete'
+            );
     }
 }

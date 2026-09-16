@@ -18,27 +18,35 @@ use UnitEnum;
 
 class PaymentResource extends Resource
 {
-    protected static ?string $model = Payment::class;
+    protected static ?string $model =
+        Payment::class;
 
     protected static string|BackedEnum|null $navigationIcon =
         Heroicon::OutlinedBanknotes;
 
-    protected static ?string $recordTitleAttribute = 'reference';
+    protected static ?string $recordTitleAttribute =
+        'reference';
 
-    protected static ?string $navigationLabel = 'Payments';
+    protected static ?string $navigationLabel =
+        'Payments';
 
-    protected static ?string $modelLabel = 'Payment';
+    protected static ?string $modelLabel =
+        'Payment';
 
-    protected static ?string $pluralModelLabel = 'Payments';
+    protected static ?string $pluralModelLabel =
+        'Payments';
 
     protected static string|UnitEnum|null $navigationGroup =
         'Finance';
 
     protected static ?int $navigationSort = 1;
 
-    public static function table(Table $table): Table
-    {
-        return PaymentsTable::configure($table);
+    public static function table(
+        Table $table
+    ): Table {
+        return PaymentsTable::configure(
+            $table
+        );
     }
 
     /*
@@ -60,7 +68,9 @@ class PaymentResource extends Resource
             ]);
 
         if (! $user instanceof User) {
-            return $query->whereRaw('1 = 0');
+            return $query->whereRaw(
+                '1 = 0'
+            );
         }
 
         if ($user->isSuperAdmin()) {
@@ -68,24 +78,27 @@ class PaymentResource extends Resource
         }
 
         if ($user->isTicketOrganizer()) {
-            $organizationIds = $user
-                ->ticketOrganizerOrganizations()
-                ->pluck('organizations.id');
+            $assignedEventIds =
+                $user->assignedTicketingEventIds();
 
-            return $query->whereHas(
-                'event',
-                fn (Builder $eventQuery): Builder =>
-                    $eventQuery->whereIn(
-                        'organization_id',
-                        $organizationIds
-                    )
+            if ($assignedEventIds->isEmpty()) {
+                return $query->whereRaw(
+                    '1 = 0'
+                );
+            }
+
+            return $query->whereIn(
+                'event_id',
+                $assignedEventIds
             );
         }
 
         return $query->whereHas(
             'event',
             fn (Builder $eventQuery): Builder =>
-                $eventQuery->accessibleBy($user)
+                $eventQuery->accessibleBy(
+                    $user
+                )
         );
     }
 
@@ -118,8 +131,9 @@ class PaymentResource extends Resource
             ->exists();
     }
 
-    public static function canView(Model $record): bool
-    {
+    public static function canView(
+        Model $record
+    ): bool {
         $user = auth()->user();
 
         if (
@@ -134,20 +148,23 @@ class PaymentResource extends Resource
         }
 
         if ($user->isTicketOrganizer()) {
-            if ($record->event === null) {
+            if ($record->event_id === null) {
                 return false;
             }
 
-            $organizationIds = $user
-                ->ticketOrganizerOrganizations()
-                ->pluck('organizations.id');
-
-            return $organizationIds->contains(
-                $record->event->organization_id
-            );
+            return $user
+                ->assignedTicketingEvents()
+                ->where(
+                    'events.id',
+                    $record->event_id
+                )
+                ->exists();
         }
 
-        return $record->event?->isAccessibleBy($user) ?? false;
+        return $record
+            ->event
+            ?->isAccessibleBy($user)
+            ?? false;
     }
 
     public static function canCreate(): bool
@@ -155,13 +172,15 @@ class PaymentResource extends Resource
         return false;
     }
 
-    public static function canEdit(Model $record): bool
-    {
+    public static function canEdit(
+        Model $record
+    ): bool {
         return false;
     }
 
-    public static function canDelete(Model $record): bool
-    {
+    public static function canDelete(
+        Model $record
+    ): bool {
         return false;
     }
 
@@ -188,10 +207,13 @@ class PaymentResource extends Resource
         }
 
         $pending = static::getEloquentQuery()
-            ->whereIn('status', [
-                Payment::STATUS_PENDING,
-                Payment::STATUS_PROCESSING,
-            ])
+            ->whereIn(
+                'status',
+                [
+                    Payment::STATUS_PENDING,
+                    Payment::STATUS_PROCESSING,
+                ]
+            )
             ->count();
 
         return $pending > 0
@@ -219,7 +241,9 @@ class PaymentResource extends Resource
                 ListPayments::route('/'),
 
             'view' =>
-                ViewPayment::route('/{record}'),
+                ViewPayment::route(
+                    '/{record}'
+                ),
         ];
     }
 }

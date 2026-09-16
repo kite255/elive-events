@@ -82,7 +82,9 @@ class TicketTypeResource extends Resource
             return false;
         }
 
-        return parent::canEdit($record);
+        return parent::canEdit(
+            $record
+        );
     }
 
     public static function canDelete(
@@ -94,7 +96,9 @@ class TicketTypeResource extends Resource
             return false;
         }
 
-        return parent::canDelete($record);
+        return parent::canDelete(
+            $record
+        );
     }
 
     public static function canDeleteAny(): bool
@@ -116,25 +120,38 @@ class TicketTypeResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
+        $query =
+            parent::getEloquentQuery();
 
-        $user = auth()->user();
+        $user =
+            auth()->user();
 
+        /*
+         * Super Admin and all non-Ticketing-Manager users
+         * keep their existing query behavior.
+         */
         if (! $user?->isTicketOrganizer()) {
             return $query;
         }
 
-        $organizationIds = $user
-            ->ticketOrganizerOrganizations()
-            ->pluck('organizations.id');
+        /*
+         * Ticketing Managers may only see Ticket Types
+         * belonging to events explicitly assigned to them.
+         *
+         * Organization membership alone is not enough.
+         */
+        $assignedEventIds =
+            $user->assignedTicketingEventIds();
 
-        return $query->whereHas(
-            'event',
-            fn (Builder $eventQuery) =>
-                $eventQuery->whereIn(
-                    'organization_id',
-                    $organizationIds
-                )
+        if ($assignedEventIds->isEmpty()) {
+            return $query->whereRaw(
+                '1 = 0'
+            );
+        }
+
+        return $query->whereIn(
+            'event_id',
+            $assignedEventIds
         );
     }
 
