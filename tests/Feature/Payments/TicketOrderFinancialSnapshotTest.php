@@ -12,11 +12,19 @@ use App\Models\TicketOrderItem;
 use App\Models\TicketType;
 use App\Services\Payments\PaymentFulfillmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class TicketOrderFinancialSnapshotTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Queue::fake();
+    }
 
     public function test_completed_ticket_payment_creates_financial_snapshot(): void
     {

@@ -22,6 +22,9 @@ class CommunicationTemplate extends Model
     public const KEY_REGISTRATION_CONFIRMED_EMAIL =
         'registration_confirmed_email';
 
+    public const KEY_TICKET_DELIVERY_EMAIL =
+        'ticket_delivery_email';
+
     public const KEY_EVENT_UPDATE_EMAIL =
         'event_update_email';
 
@@ -69,6 +72,9 @@ class CommunicationTemplate extends Model
 
     public const KEY_REGISTRATION_CONFIRMED_SMS =
         'registration_confirmed_sms';
+
+    public const KEY_TICKET_DELIVERY_SMS =
+        'ticket_delivery_sms';
 
     public const KEY_EVENT_UPDATE_SMS =
         'event_update_sms';
@@ -264,6 +270,9 @@ class CommunicationTemplate extends Model
             self::KEY_REGISTRATION_CONFIRMED_EMAIL =>
                 'Registration Confirmation',
 
+            self::KEY_TICKET_DELIVERY_EMAIL =>
+                'Ticket Delivery',
+
             self::KEY_EVENT_UPDATE_EMAIL =>
                 'Event Update',
 
@@ -316,6 +325,9 @@ class CommunicationTemplate extends Model
 
             self::KEY_REGISTRATION_CONFIRMED_SMS =>
                 'Registration Confirmation',
+
+            self::KEY_TICKET_DELIVERY_SMS =>
+                'Ticket Delivery',
 
             self::KEY_EVENT_UPDATE_SMS =>
                 'Event Update',

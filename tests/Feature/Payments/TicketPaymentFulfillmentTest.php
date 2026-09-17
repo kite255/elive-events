@@ -11,11 +11,19 @@ use App\Models\TicketOrderItem;
 use App\Models\TicketType;
 use App\Services\Payments\PaymentFulfillmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class TicketPaymentFulfillmentTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Queue::fake();
+    }
 
     private function createScenario(): array
     {
@@ -180,98 +188,97 @@ class TicketPaymentFulfillmentTest extends TestCase
             );
     }
 
-public function test_expired_ticket_order_cannot_be_fulfilled_when_capacity_is_no_longer_available(): void
-{
-    [
-        'event' => $event,
-        'ticketType' => $ticketType,
-        'order' => $expiredOrder,
-        'payment' => $payment,
-    ] = $this->createScenario();
+    public function test_expired_ticket_order_cannot_be_fulfilled_when_capacity_is_no_longer_available(): void
+    {
+        [
+            'event' => $event,
+            'ticketType' => $ticketType,
+            'order' => $expiredOrder,
+            'payment' => $payment,
+        ] = $this->createScenario();
 
-    /*
-     * Original reservation expired.
-     */
-    $expiredOrder->update([
-        'status' => TicketOrder::STATUS_EXPIRED,
-        'expires_at' => now()->subMinute(),
-    ]);
-
-    /*
-     * Make this ticket type have capacity for only
-     * the two tickets from this order.
-     */
-    $ticketType->update([
-        'capacity' => 2,
-    ]);
-
-    /*
-     * Another valid paid order has already consumed
-     * the inventory after the first reservation expired.
-     */
-    $replacementOrder = TicketOrder::query()->create([
-        'event_id' => $event->id,
-        'order_number' => 'ORD-REPLACEMENT-' . uniqid(),
-        'buyer_name' => 'Replacement Buyer',
-        'buyer_phone' => '255700000999',
-        'buyer_email' => 'replacement@example.com',
-        'quantity' => 2,
-        'subtotal' => 100000,
-        'discount_amount' => 0,
-        'total' => 100000,
-        'currency' => 'TZS',
-        'status' => TicketOrder::STATUS_PAID,
-        'paid_at' => now(),
-    ]);
-
-    $replacementItem = TicketOrderItem::query()->create([
-        'ticket_order_id' => $replacementOrder->id,
-        'ticket_type_id' => $ticketType->id,
-        'quantity' => 2,
-        'unit_price' => 50000,
-        'subtotal' => 100000,
-        'discount_amount' => 0,
-        'total' => 100000,
-    ]);
-
-    for ($i = 1; $i <= 2; $i++) {
-        Ticket::query()->create([
-            'event_id' => $event->id,
-            'ticket_order_id' => $replacementOrder->id,
-            'ticket_order_item_id' => $replacementItem->id,
-            'ticket_type_id' => $ticketType->id,
-            'ticket_number' => 'REPLACEMENT-' . uniqid() . '-' . $i,
-            'public_token' => \Illuminate\Support\Str::random(40),
-            'qr_token_hash' => hash(
-                'sha256',
-                \Illuminate\Support\Str::random(64)
-            ),
-            'holder_name' => 'Replacement Buyer',
-            'price' => 50000,
-            'currency' => 'TZS',
-            'status' => Ticket::STATUS_ISSUED,
-            'issued_at' => now(),
+        /*
+         * Original reservation expired.
+         */
+        $expiredOrder->update([
+            'status' => TicketOrder::STATUS_EXPIRED,
+            'expires_at' => now()->subMinute(),
         ]);
-    }
 
-    $this->expectException(
-        \RuntimeException::class
-    );
+        /*
+         * Make this ticket type have capacity for only
+         * the two tickets from this order.
+         */
+        $ticketType->update([
+            'capacity' => 2,
+        ]);
 
-    app(PaymentFulfillmentService::class)
-        ->fulfill(
-            $payment->fresh()
+        /*
+         * Another valid paid order has already consumed
+         * the inventory after the first reservation expired.
+         */
+        $replacementOrder = TicketOrder::query()->create([
+            'event_id' => $event->id,
+            'order_number' => 'ORD-REPLACEMENT-' . uniqid(),
+            'buyer_name' => 'Replacement Buyer',
+            'buyer_phone' => '255700000999',
+            'buyer_email' => 'replacement@example.com',
+            'quantity' => 2,
+            'subtotal' => 100000,
+            'discount_amount' => 0,
+            'total' => 100000,
+            'currency' => 'TZS',
+            'status' => TicketOrder::STATUS_PAID,
+            'paid_at' => now(),
+        ]);
+
+        $replacementItem = TicketOrderItem::query()->create([
+            'ticket_order_id' => $replacementOrder->id,
+            'ticket_type_id' => $ticketType->id,
+            'quantity' => 2,
+            'unit_price' => 50000,
+            'subtotal' => 100000,
+            'discount_amount' => 0,
+            'total' => 100000,
+        ]);
+
+        for ($i = 1; $i <= 2; $i++) {
+            Ticket::query()->create([
+                'event_id' => $event->id,
+                'ticket_order_id' => $replacementOrder->id,
+                'ticket_order_item_id' => $replacementItem->id,
+                'ticket_type_id' => $ticketType->id,
+                'ticket_number' => 'REPLACEMENT-' . uniqid() . '-' . $i,
+                'public_token' => \Illuminate\Support\Str::random(40),
+                'qr_token_hash' => hash(
+                    'sha256',
+                    \Illuminate\Support\Str::random(64)
+                ),
+                'holder_name' => 'Replacement Buyer',
+                'price' => 50000,
+                'currency' => 'TZS',
+                'status' => Ticket::STATUS_ISSUED,
+                'issued_at' => now(),
+            ]);
+        }
+
+        $this->expectException(
+            \RuntimeException::class
         );
 
-    $this->assertSame(
-        0,
-        Ticket::query()
-            ->where(
-                'ticket_order_id',
-                $expiredOrder->id
-            )
-            ->count()
-    );
-}
+        app(PaymentFulfillmentService::class)
+            ->fulfill(
+                $payment->fresh()
+            );
 
+        $this->assertSame(
+            0,
+            Ticket::query()
+                ->where(
+                    'ticket_order_id',
+                    $expiredOrder->id
+                )
+                ->count()
+        );
+    }
 }

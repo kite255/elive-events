@@ -3,6 +3,7 @@
 namespace Tests\Feature\Tickets;
 
 use App\Jobs\SendTicketAccessLinkJob;
+use App\Models\CommunicationLog;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\TicketOrder;
@@ -91,9 +92,15 @@ class PublicTicketRecoveryTest extends TestCase
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
             function (SendTicketAccessLinkJob $job) use ($order): bool {
-                return $job->ticketOrderId === $order->id
-                    && $job->channel === 'email'
-                    && $job->recipient === 'buyer@example.com';
+                $log = CommunicationLog::query()
+                    ->find($job->communicationLogId);
+
+                return $log?->ticket_order_id === $order->id
+                    && $log->purpose
+                        === CommunicationLog::PURPOSE_TICKET_ACCESS_RECOVERY
+                    && $log->channel
+                        === CommunicationLog::CHANNEL_EMAIL
+                    && $log->recipient === 'buyer@example.com';
             }
         );
     }
@@ -112,9 +119,15 @@ class PublicTicketRecoveryTest extends TestCase
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
             function (SendTicketAccessLinkJob $job) use ($order): bool {
-                return $job->ticketOrderId === $order->id
-                    && $job->channel === 'sms'
-                    && $job->recipient === '255712345678';
+                $log = CommunicationLog::query()
+                    ->find($job->communicationLogId);
+
+                return $log?->ticket_order_id === $order->id
+                    && $log->purpose
+                        === CommunicationLog::PURPOSE_TICKET_ACCESS_RECOVERY
+                    && $log->channel
+                        === CommunicationLog::CHANNEL_SMS
+                    && $log->recipient === '255712345678';
             }
         );
     }

@@ -11,6 +11,18 @@ class CommunicationLog extends Model
 {
     /*
     |--------------------------------------------------------------------------
+    | Purposes
+    |--------------------------------------------------------------------------
+    */
+
+    public const PURPOSE_TICKET_ACCESS =
+        'ticket_access';
+
+    public const PURPOSE_TICKET_ACCESS_RECOVERY =
+        'ticket_access_recovery';
+
+    /*
+    |--------------------------------------------------------------------------
     | Statuses
     |--------------------------------------------------------------------------
     */
@@ -48,7 +60,10 @@ class CommunicationLog extends Model
     protected $fillable = [
         'event_id',
         'attendee_id',
+        'ticket_order_id',
         'communication_campaign_id',
+
+        'purpose',
 
         'channel',
         'recipient',
@@ -57,6 +72,7 @@ class CommunicationLog extends Model
         'message',
 
         'status',
+        'attempt_count',
 
         'provider_message_id',
         'error',
@@ -76,6 +92,7 @@ class CommunicationLog extends Model
     protected function casts(): array
     {
         return [
+            'attempt_count' => 'integer',
             'queued_at' => 'datetime',
             'sent_at' => 'datetime',
             'delivered_at' => 'datetime',
@@ -100,6 +117,13 @@ class CommunicationLog extends Model
     {
         return $this->belongsTo(
             Attendee::class
+        );
+    }
+
+    public function ticketOrder(): BelongsTo
+    {
+        return $this->belongsTo(
+            TicketOrder::class
         );
     }
 

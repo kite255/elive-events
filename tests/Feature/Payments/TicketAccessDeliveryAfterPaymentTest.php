@@ -3,6 +3,7 @@
 namespace Tests\Feature\Payments;
 
 use App\Jobs\SendTicketAccessLinkJob;
+use App\Models\CommunicationLog;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\Payment;
@@ -95,9 +96,10 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
         );
     }
 
-    public function test_successful_ticket_payment_queues_my_tickets_email(): void
+    public function test_successful_payment_queues_whatsapp_and_email_ticket_delivery(): void
     {
         Queue::fake();
+        $this->configureWhatsApp();
 
         [
             'order' => $order,
@@ -107,19 +109,24 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
         app(PaymentFulfillmentService::class)
             ->fulfill($payment);
 
+        $this->assertDeliveryChannels(
+            $order,
+            [
+                CommunicationLog::CHANNEL_EMAIL,
+                CommunicationLog::CHANNEL_WHATSAPP,
+            ]
+        );
+
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            function (SendTicketAccessLinkJob $job) use ($order): bool {
-                return $job->ticketOrderId === $order->id
-                    && $job->channel === 'email'
-                    && $job->recipient === 'buyer@example.com';
-            }
+            2
         );
     }
 
     public function test_ticket_access_delivery_is_not_queued_twice_when_fulfillment_retries(): void
     {
         Queue::fake();
+        $this->configureWhatsApp();
 
         [
             'order' => $order,
@@ -131,43 +138,116 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
         $service->fulfill($payment);
         $service->fulfill($payment->fresh());
 
-        Queue::assertPushed(
-            SendTicketAccessLinkJob::class,
-            1
+        $this->assertSame(
+            2,
+            CommunicationLog::query()
+                ->where('ticket_order_id', $order->id)
+                ->where(
+                    'purpose',
+                    CommunicationLog::PURPOSE_TICKET_ACCESS
+                )
+                ->count()
         );
 
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            function (SendTicketAccessLinkJob $job) use ($order): bool {
-                return $job->ticketOrderId === $order->id
-                    && $job->channel === 'email'
-                    && $job->recipient === 'buyer@example.com';
-            }
+            2
         );
     }
 
-    public function test_successful_ticket_payment_falls_back_to_sms_when_email_is_missing(): void
+    public function test_successful_payment_queues_only_whatsapp_when_email_is_missing(): void
     {
         Queue::fake();
+        $this->configureWhatsApp();
 
         [
             'order' => $order,
             'payment' => $payment,
         ] = $this->createScenario(
-            email: null,
-            phone: '0712345678'
+            email: null
         );
 
         app(PaymentFulfillmentService::class)
             ->fulfill($payment);
 
+        $this->assertDeliveryChannels(
+            $order,
+            [
+                CommunicationLog::CHANNEL_WHATSAPP,
+            ]
+        );
+
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            function (SendTicketAccessLinkJob $job) use ($order): bool {
-                return $job->ticketOrderId === $order->id
-                    && $job->channel === 'sms'
-                    && $job->recipient === '255712345678';
-            }
+            1
+        );
+    }
+
+    public function test_successful_payment_uses_sms_fallback_when_whatsapp_is_unavailable(): void
+    {
+        Queue::fake();
+
+        config([
+            'services.whatsapp.access_token' => null,
+            'services.whatsapp.phone_number_id' => null,
+        ]);
+
+        [
+            'order' => $order,
+            'payment' => $payment,
+        ] = $this->createScenario();
+
+        app(PaymentFulfillmentService::class)
+            ->fulfill($payment);
+
+        $this->assertDeliveryChannels(
+            $order,
+            [
+                CommunicationLog::CHANNEL_EMAIL,
+                CommunicationLog::CHANNEL_SMS,
+            ]
+        );
+
+        Queue::assertPushed(
+            SendTicketAccessLinkJob::class,
+            2
+        );
+    }
+
+    private function configureWhatsApp(): void
+    {
+        config([
+            'services.whatsapp.access_token' => 'test-token',
+            'services.whatsapp.phone_number_id' => '123456789',
+            'services.whatsapp.templates.registration_confirmation' =>
+                'event_registration_confirmation',
+            'services.whatsapp.templates.ticket_access' =>
+                'concert_tickets_delivery_en',
+        ]);
+    }
+
+    /**
+     * @param array<int, string> $expectedChannels
+     */
+    private function assertDeliveryChannels(
+        TicketOrder $order,
+        array $expectedChannels
+    ): void {
+        $actualChannels = CommunicationLog::query()
+            ->where('ticket_order_id', $order->id)
+            ->where(
+                'purpose',
+                CommunicationLog::PURPOSE_TICKET_ACCESS
+            )
+            ->orderBy('channel')
+            ->pluck('channel')
+            ->all();
+
+        sort($expectedChannels);
+
+        $this->assertSame(
+            $expectedChannels,
+            $actualChannels
         );
     }
 }

@@ -83,6 +83,9 @@ class Event extends Model
         'registration_whatsapp_enabled',
         'registration_sms_template_id',
 
+        'ticket_delivery_email_template_id',
+        'ticket_delivery_sms_template_id',
+
         'show_merchandise_images',
 
         'payment_method',
@@ -133,6 +136,9 @@ class Event extends Model
             'registration_email_enabled' => 'boolean',
             'registration_whatsapp_enabled' => 'boolean',
             'registration_sms_template_id' => 'integer',
+
+            'ticket_delivery_email_template_id' => 'integer',
+            'ticket_delivery_sms_template_id' => 'integer',
 
             'show_merchandise_images' => 'boolean',
         ];
@@ -813,6 +819,22 @@ class Event extends Model
         return $this->belongsTo(
             CommunicationTemplate::class,
             'registration_sms_template_id'
+        );
+    }
+
+    public function ticketDeliveryEmailTemplate(): BelongsTo
+    {
+        return $this->belongsTo(
+            CommunicationTemplate::class,
+            'ticket_delivery_email_template_id'
+        );
+    }
+
+    public function ticketDeliverySmsTemplate(): BelongsTo
+    {
+        return $this->belongsTo(
+            CommunicationTemplate::class,
+            'ticket_delivery_sms_template_id'
         );
     }
 

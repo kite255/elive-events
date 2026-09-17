@@ -116,6 +116,16 @@ class EventForm
                                         'registration_sms_template_id',
                                         null
                                     );
+
+                                    $set(
+                                        'ticket_delivery_email_template_id',
+                                        null
+                                    );
+
+                                    $set(
+                                        'ticket_delivery_sms_template_id',
+                                        null
+                                    );
                                 }
                             ),
 
@@ -1009,6 +1019,151 @@ class EventForm
                     ->visible(
                         fn (Get $get): bool =>
                             self::showRegistration($get)
+                    )
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Ticket Delivery Communication
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make(
+                    'Ticket Delivery Communication'
+                )
+                    ->description(
+                        'Select the email and SMS templates used to deliver ticket access links after successful payment.'
+                    )
+                    ->schema([
+                        Select::make(
+                            'ticket_delivery_email_template_id'
+                        )
+                            ->label(
+                                'Ticket Delivery Email Template'
+                            )
+                            ->placeholder(
+                                'Use system default email template'
+                            )
+                            ->options(
+                                function (
+                                    Get $get
+                                ): array {
+                                    $organizationId =
+                                        $get(
+                                            'organization_id'
+                                        );
+
+                                    if (
+                                        blank(
+                                            $organizationId
+                                        )
+                                    ) {
+                                        return [];
+                                    }
+
+                                    return CommunicationTemplate::query()
+                                        ->where(
+                                            'organization_id',
+                                            $organizationId
+                                        )
+                                        ->where(
+                                            'channel',
+                                            CommunicationTemplate::CHANNEL_EMAIL
+                                        )
+                                        ->where(
+                                            'key',
+                                            CommunicationTemplate::KEY_TICKET_DELIVERY_EMAIL
+                                        )
+                                        ->where(
+                                            'is_active',
+                                            true
+                                        )
+                                        ->orderBy('name')
+                                        ->pluck(
+                                            'name',
+                                            'id'
+                                        )
+                                        ->all();
+                                }
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->helperText(
+                                'Leave empty to use the system default ticket-delivery email.'
+                            ),
+
+                        Select::make(
+                            'ticket_delivery_sms_template_id'
+                        )
+                            ->label(
+                                'Ticket Delivery SMS Template'
+                            )
+                            ->placeholder(
+                                'Use system default SMS template'
+                            )
+                            ->options(
+                                function (
+                                    Get $get
+                                ): array {
+                                    $organizationId =
+                                        $get(
+                                            'organization_id'
+                                        );
+
+                                    if (
+                                        blank(
+                                            $organizationId
+                                        )
+                                    ) {
+                                        return [];
+                                    }
+
+                                    return CommunicationTemplate::query()
+                                        ->where(
+                                            'organization_id',
+                                            $organizationId
+                                        )
+                                        ->where(
+                                            'channel',
+                                            CommunicationTemplate::CHANNEL_SMS
+                                        )
+                                        ->where(
+                                            'key',
+                                            CommunicationTemplate::KEY_TICKET_DELIVERY_SMS
+                                        )
+                                        ->where(
+                                            'is_active',
+                                            true
+                                        )
+                                        ->orderBy('name')
+                                        ->pluck(
+                                            'name',
+                                            'id'
+                                        )
+                                        ->all();
+                                }
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->helperText(
+                                'Leave empty to use the system default ticket-delivery SMS.'
+                            ),
+
+                        Placeholder::make(
+                            'ticket_delivery_channels_information'
+                        )
+                            ->label('Delivery priority')
+                            ->content(
+                                'WhatsApp is attempted first when available. Email is also sent when present, and SMS is used when WhatsApp is unavailable or permanently fails.'
+                            )
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showTicketing($get)
                     )
                     ->collapsible(),
 

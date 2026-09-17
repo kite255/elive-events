@@ -424,6 +424,11 @@ return [
                 'event_registration_confirmation'
             ),
 
+            'ticket_access' => env(
+                'WHATSAPP_TEMPLATE_TICKET_ACCESS',
+                'concert_tickets_delivery_en'
+            ),
+
         ],
 
     ],

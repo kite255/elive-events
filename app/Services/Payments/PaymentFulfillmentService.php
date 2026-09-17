@@ -2,17 +2,15 @@
 
 namespace App\Services\Payments;
 
-use App\Jobs\SendTicketAccessLinkJob;
 use App\Models\Payment;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Services\AutomaticCommunicationService;
 use App\Services\BadgeGenerationService;
-use App\Services\PhoneNumberService;
+use App\Services\Tickets\TicketAccessDeliveryService;
 use App\Services\Tickets\TicketAvailabilityService;
 use App\Services\Tickets\TicketIssuanceService;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
@@ -23,7 +21,7 @@ class PaymentFulfillmentService
         protected AutomaticCommunicationService $communicationService,
         protected TicketIssuanceService $ticketIssuanceService,
         protected TicketAvailabilityService $ticketAvailabilityService,
-        protected PhoneNumberService $phoneNumberService,
+        protected TicketAccessDeliveryService $ticketAccessDeliveryService,
         protected OrderFinancialCalculator $financialCalculator,
     ) {
     }
@@ -356,10 +354,9 @@ class PaymentFulfillmentService
      * Queue the secure My Tickets link after successful
      * ticket payment fulfillment.
      *
-     * Delivery preference:
-     *
-     * 1. Email, when available.
-     * 2. SMS, only when email is unavailable.
+     * The delivery service selects WhatsApp/email and
+     * the SMS fallback, creates auditable logs, and
+     * prevents duplicate automatic delivery.
      */
     private function queueTicketAccessLink(
         Payment $payment
@@ -377,54 +374,10 @@ class PaymentFulfillmentService
             return;
         }
 
-        if (filled($order->buyer_email)) {
-            $email =
-                mb_strtolower(
-                    trim(
-                        (string) $order->buyer_email
-                    )
-                );
-
-            if (
-                filter_var(
-                    $email,
-                    FILTER_VALIDATE_EMAIL
-                )
-            ) {
-                SendTicketAccessLinkJob::dispatch(
-                    $order->id,
-                    'email',
-                    $email
-                );
-
-                return;
-            }
-        }
-
-        if (blank($order->buyer_phone)) {
-            return;
-        }
-
-        try {
-            $phone =
-                $this
-                    ->phoneNumberService
-                    ->normalize(
-                        $order->buyer_phone
-                    );
-        } catch (InvalidArgumentException) {
-            return;
-        }
-
-        if (blank($phone)) {
-            return;
-        }
-
-        SendTicketAccessLinkJob::dispatch(
-            $order->id,
-            'sms',
-            $phone
-        );
+        $this->ticketAccessDeliveryService
+            ->queueAutomatic(
+                $order
+            );
     }
 
     private function fulfillAttendeePayment(

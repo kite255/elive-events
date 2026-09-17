@@ -131,6 +131,7 @@ class WhatsAppService
         string $languageCode,
         array $bodyParameters = [],
         ?string $imageUrl = null,
+        array $urlButtons = [],
     ): array {
         $this->validateConfiguration();
 
@@ -230,6 +231,53 @@ class WhatsAppService
                         )
                         ->values()
                         ->all(),
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dynamic URL Buttons
+        |--------------------------------------------------------------------------
+        |
+        | Meta URL templates receive only the dynamic value that replaces the
+        | approved {{1}} suffix. For ticket delivery this is the secure order
+        | token, not the complete URL and not a QR credential.
+        |
+        */
+
+        foreach ($urlButtons as $urlButton) {
+            $index = $urlButton['index'] ?? null;
+            $value = $urlButton['value'] ?? null;
+
+            if (
+                ! is_int($index)
+                || $index < 0
+                || blank($value)
+            ) {
+                throw new RuntimeException(
+                    'WhatsApp URL button index and value are required.'
+                );
+            }
+
+            $components[] = [
+                'type' =>
+                    'button',
+
+                'sub_type' =>
+                    'url',
+
+                'index' =>
+                    (string) $index,
+
+                'parameters' => [
+                    [
+                        'type' =>
+                            'text',
+
+                        'text' =>
+                            (string) $value,
+                    ],
+                ],
             ];
         }
 

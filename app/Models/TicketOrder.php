@@ -117,6 +117,13 @@ class TicketOrder extends Model
         );
     }
 
+    public function communicationLogs(): HasMany
+    {
+        return $this->hasMany(
+            CommunicationLog::class
+        );
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(

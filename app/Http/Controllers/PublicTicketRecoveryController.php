@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendTicketAccessLinkJob;
+use App\Models\CommunicationLog;
 use App\Models\TicketOrder;
 use App\Services\PhoneNumberService;
 use Illuminate\Contracts\View\View;
@@ -123,9 +124,9 @@ class PublicTicketRecoveryController extends Controller
                     $submittedEmail
                 )
             ) {
-                SendTicketAccessLinkJob::dispatch(
-                    $order->id,
-                    'email',
+                $this->queueRecoveryLog(
+                    $order,
+                    CommunicationLog::CHANNEL_EMAIL,
                     $savedEmail
                 );
             }
@@ -157,11 +158,43 @@ class PublicTicketRecoveryController extends Controller
                 $submittedPhone
             )
         ) {
-            SendTicketAccessLinkJob::dispatch(
-                $order->id,
-                'sms',
+            $this->queueRecoveryLog(
+                $order,
+                CommunicationLog::CHANNEL_SMS,
                 $savedPhone
             );
         }
+    }
+
+    private function queueRecoveryLog(
+        TicketOrder $order,
+        string $channel,
+        string $recipient
+    ): void {
+        $log = CommunicationLog::query()->create([
+            'event_id' => $order->event_id,
+            'ticket_order_id' => $order->id,
+            'purpose' =>
+                CommunicationLog::PURPOSE_TICKET_ACCESS_RECOVERY,
+            'channel' => $channel,
+            'recipient' => $recipient,
+            'subject' => $channel
+                === CommunicationLog::CHANNEL_EMAIL
+                    ? 'Ticket access recovery'
+                    : null,
+            'message' =>
+                "Secure ticket access recovery for order {$order->order_number}",
+            'status' =>
+                CommunicationLog::STATUS_QUEUED,
+            'queued_at' => now(),
+        ]);
+
+        SendTicketAccessLinkJob::dispatch(
+            $log->id
+        )->onQueue(
+            $channel === CommunicationLog::CHANNEL_SMS
+                ? 'communications-sms'
+                : 'communications-email'
+        );
     }
 }
