@@ -16,7 +16,7 @@ class TicketAccessDeliveryServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_queues_whatsapp_and_email_without_sms_when_whatsapp_is_configured(): void
+    public function test_it_queues_whatsapp_email_and_sms_when_whatsapp_is_configured(): void
     {
         Queue::fake();
         $this->configureWhatsApp();
@@ -29,13 +29,14 @@ class TicketAccessDeliveryServiceTest extends TestCase
             $order,
             [
                 CommunicationLog::CHANNEL_EMAIL,
+                CommunicationLog::CHANNEL_SMS,
                 CommunicationLog::CHANNEL_WHATSAPP,
             ]
         );
 
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            2
+            3
         );
     }
 
@@ -78,7 +79,7 @@ class TicketAccessDeliveryServiceTest extends TestCase
         $service->queueAutomatic($order->fresh());
 
         $this->assertSame(
-            2,
+            3,
             CommunicationLog::query()
                 ->where('ticket_order_id', $order->id)
                 ->where(
@@ -90,7 +91,7 @@ class TicketAccessDeliveryServiceTest extends TestCase
 
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            2
+            3
         );
     }
 

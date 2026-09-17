@@ -96,7 +96,7 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
         );
     }
 
-    public function test_successful_payment_queues_whatsapp_and_email_ticket_delivery(): void
+    public function test_successful_payment_queues_whatsapp_email_and_sms_ticket_delivery(): void
     {
         Queue::fake();
         $this->configureWhatsApp();
@@ -113,13 +113,14 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
             $order,
             [
                 CommunicationLog::CHANNEL_EMAIL,
+                CommunicationLog::CHANNEL_SMS,
                 CommunicationLog::CHANNEL_WHATSAPP,
             ]
         );
 
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            2
+            3
         );
     }
 
@@ -139,7 +140,7 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
         $service->fulfill($payment->fresh());
 
         $this->assertSame(
-            2,
+            3,
             CommunicationLog::query()
                 ->where('ticket_order_id', $order->id)
                 ->where(
@@ -151,11 +152,11 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
 
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            2
+            3
         );
     }
 
-    public function test_successful_payment_queues_only_whatsapp_when_email_is_missing(): void
+    public function test_successful_payment_queues_whatsapp_and_sms_when_email_is_missing(): void
     {
         Queue::fake();
         $this->configureWhatsApp();
@@ -173,17 +174,18 @@ class TicketAccessDeliveryAfterPaymentTest extends TestCase
         $this->assertDeliveryChannels(
             $order,
             [
+                CommunicationLog::CHANNEL_SMS,
                 CommunicationLog::CHANNEL_WHATSAPP,
             ]
         );
 
         Queue::assertPushed(
             SendTicketAccessLinkJob::class,
-            1
+            2
         );
     }
 
-    public function test_successful_payment_uses_sms_fallback_when_whatsapp_is_unavailable(): void
+    public function test_successful_payment_uses_sms_when_whatsapp_is_unavailable(): void
     {
         Queue::fake();
 

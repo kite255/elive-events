@@ -61,19 +61,26 @@ class TicketAccessDeliveryService
                     return $logs;
                 }
 
-                $channel = $this->whatsAppService
-                    ->isConfigured()
-                        ? CommunicationLog::CHANNEL_WHATSAPP
-                        : CommunicationLog::CHANNEL_SMS;
+                if ($this->whatsAppService->isConfigured()) {
+                    $whatsAppLog = $this->createAutomaticLog(
+                        $lockedOrder,
+                        CommunicationLog::CHANNEL_WHATSAPP,
+                        $phone
+                    );
 
-                $log = $this->createAutomaticLog(
+                    if ($whatsAppLog !== null) {
+                        $logs[] = $whatsAppLog;
+                    }
+                }
+
+                $smsLog = $this->createAutomaticLog(
                     $lockedOrder,
-                    $channel,
+                    CommunicationLog::CHANNEL_SMS,
                     $phone
                 );
 
-                if ($log !== null) {
-                    $logs[] = $log;
+                if ($smsLog !== null) {
+                    $logs[] = $smsLog;
                 }
 
                 return $logs;
