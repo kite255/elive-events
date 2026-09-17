@@ -32,11 +32,17 @@ class TicketDesigner extends Component
 
     public ?string $selectedElementId = null;
 
+    public $manualWidth = null;
+
+    public $manualHeight = null;
+
     public bool $isDirty = false;
 
     public $backgroundUpload = null;
 
     public ?string $backgroundImagePath = null;
+
+    public $elementImageUpload = null;
 
     public function mount(
         string $templateType,
@@ -85,6 +91,13 @@ class TicketDesigner extends Component
     {
         $this->resetErrorBag(
             'backgroundUpload'
+        );
+    }
+
+    public function updatedElementImageUpload(): void
+    {
+        $this->resetErrorBag(
+            'elementImageUpload'
         );
     }
 
@@ -198,7 +211,7 @@ class TicketDesigner extends Component
             $activePageId;
     }
 
-    public function save(): void
+    public function save(): bool
     {
         if ($this->activePageId === null) {
             $this->addError(
@@ -206,7 +219,7 @@ class TicketDesigner extends Component
                 'No active page is selected.'
             );
 
-            return;
+            return false;
         }
 
         $page = $this->findTemplatePage(
@@ -219,7 +232,7 @@ class TicketDesigner extends Component
                 'The active page does not belong to this template.'
             );
 
-            return;
+            return false;
         }
 
         $definition = [
@@ -253,7 +266,7 @@ class TicketDesigner extends Component
                     : 'The ticket design contains invalid elements.'
             );
 
-            return;
+            return false;
         }
 
         $this->resetErrorBag(
@@ -264,13 +277,162 @@ class TicketDesigner extends Component
             'activePageId'
         );
 
-        $activePageId =
-            $savedPage->id;
+        $activePageId = $savedPage->id;
+
+        $selectedElementId =
+            $this->selectedElementId;
 
         $this->reloadPages();
 
         $this->loadPage(
             $activePageId
+        );
+
+        $this->selectElement(
+            $selectedElementId
+        );
+
+        return true;
+    }
+
+    public function uploadSelectedElementImage(): void
+    {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            $this->addError(
+                'elementImageUpload',
+                'Select an image, logo, or sponsor logo element first.'
+            );
+
+            return;
+        }
+
+        $type =
+            $this->elements[$index]['type']
+                ?? null;
+
+        if (! in_array(
+            $type,
+            ['image', 'logo', 'sponsor_logo'],
+            true
+        )) {
+            $this->addError(
+                'elementImageUpload',
+                'The selected element does not support image uploads.'
+            );
+
+            return;
+        }
+
+        $this->validate([
+            'elementImageUpload' => [
+                'required',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:10240',
+                'dimensions:max_width=4000,max_height=4000',
+            ],
+        ]);
+
+        $originalElement =
+            $this->elements[$index];
+
+        $oldPath =
+            $originalElement['asset_path']
+                ?? null;
+
+        $newPath =
+            $this->elementImageUpload->store(
+                'ticket-template-elements',
+                'public'
+            );
+
+        $this->elements[$index]['asset_path'] =
+            $newPath;
+
+        $this->isDirty = true;
+
+        if (! $this->save()) {
+            $this->elements[$index] =
+                $originalElement;
+
+            Storage::disk('public')->delete(
+                $newPath
+            );
+
+            return;
+        }
+
+        if (
+            filled($oldPath)
+            && $oldPath !== $newPath
+        ) {
+            Storage::disk('public')->delete(
+                $oldPath
+            );
+        }
+
+        $this->elementImageUpload = null;
+
+        $this->resetErrorBag(
+            'elementImageUpload'
+        );
+    }
+
+    public function removeSelectedElementImage(): void
+    {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            return;
+        }
+
+        $type =
+            $this->elements[$index]['type']
+                ?? null;
+
+        if (! in_array(
+            $type,
+            ['image', 'logo', 'sponsor_logo'],
+            true
+        )) {
+            return;
+        }
+
+        $oldPath =
+            $this->elements[$index]['asset_path']
+                ?? null;
+
+        if (! filled($oldPath)) {
+            return;
+        }
+
+        $originalElement =
+            $this->elements[$index];
+
+        unset(
+            $this->elements[$index]['asset_path'],
+            $this->elements[$index]['asset_id']
+        );
+
+        $this->isDirty = true;
+
+        if (! $this->save()) {
+            $this->elements[$index] =
+                $originalElement;
+
+            return;
+        }
+
+        Storage::disk('public')->delete(
+            $oldPath
+        );
+
+        $this->elementImageUpload = null;
+
+        $this->resetErrorBag(
+            'elementImageUpload'
         );
     }
 
@@ -304,7 +466,6 @@ class TicketDesigner extends Component
                 'image',
                 'mimes:jpg,jpeg,png,webp',
                 'max:10240',
-                'dimensions:max_width=4000,max_height=4000',
             ],
         ]);
 
@@ -402,24 +563,40 @@ class TicketDesigner extends Component
     public function selectElement(
         ?string $elementId
     ): void {
+        $this->elementImageUpload = null;
+
+        $this->resetErrorBag(
+            'elementImageUpload'
+        );
+
         if ($elementId === null) {
             $this->selectedElementId = null;
+
+            $this->manualWidth = null;
+
+            $this->manualHeight = null;
 
             return;
         }
 
-        $exists = collect(
+        $element = collect(
             $this->elements
-        )->contains(
+        )->first(
             fn (array $element): bool =>
                 ($element['id'] ?? null)
                     === $elementId
         );
 
         $this->selectedElementId =
-            $exists
+            $element !== null
                 ? $elementId
                 : null;
+
+        $this->manualWidth =
+            $element['width'] ?? null;
+
+        $this->manualHeight =
+            $element['height'] ?? null;
     }
 
     public function addText(): void
@@ -547,13 +724,70 @@ class TicketDesigner extends Component
             return;
         }
 
-        $this->elements[$index]['x'] =
-            $x;
+        $width = max(
+            1,
+            (float) ($this->elements[$index]['width'] ?? 1)
+        );
 
-        $this->elements[$index]['y'] =
-            $y;
+        $height = max(
+            1,
+            (float) ($this->elements[$index]['height'] ?? 1)
+        );
+
+        $this->elements[$index]['x'] = max(
+            0,
+            min($x, max(0, $this->canvasWidth - $width))
+        );
+
+        $this->elements[$index]['y'] = max(
+            0,
+            min($y, max(0, $this->canvasHeight - $height))
+        );
 
         $this->isDirty = true;
+    }
+
+    public function moveElement(
+        string $elementId,
+        int|float $x,
+        int|float $y
+    ): void {
+        $this->selectElement(
+            $elementId
+        );
+
+        if ($this->selectedElementId !== $elementId) {
+            return;
+        }
+
+        $this->moveSelectedElement(
+            $x,
+            $y
+        );
+    }
+
+    public function nudgeSelectedElement(
+        int|float $deltaX,
+        int|float $deltaY
+    ): void {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            return;
+        }
+
+        $x =
+            (float) ($this->elements[$index]['x'] ?? 0)
+            + $deltaX;
+
+        $y =
+            (float) ($this->elements[$index]['y'] ?? 0)
+            + $deltaY;
+
+        $this->moveSelectedElement(
+            $x,
+            $y
+        );
     }
 
     public function resizeSelectedElement(
@@ -574,13 +808,112 @@ class TicketDesigner extends Component
             return;
         }
 
-        $this->elements[$index]['width'] =
-            $width;
+        $x = max(
+            0,
+            (float) ($this->elements[$index]['x'] ?? 0)
+        );
 
-        $this->elements[$index]['height'] =
-            $height;
+        $y = max(
+            0,
+            (float) ($this->elements[$index]['y'] ?? 0)
+        );
+
+        $this->elements[$index]['width'] = min(
+            $width,
+            max(1, $this->canvasWidth - $x)
+        );
+
+        $this->elements[$index]['height'] = min(
+            $height,
+            max(1, $this->canvasHeight - $y)
+        );
+
+        $this->manualWidth =
+            $this->elements[$index]['width'];
+
+        $this->manualHeight =
+            $this->elements[$index]['height'];
 
         $this->isDirty = true;
+    }
+
+    public function resizeElement(
+        string $elementId,
+        int|float $width,
+        int|float $height
+    ): void {
+        $this->selectElement(
+            $elementId
+        );
+
+        if ($this->selectedElementId !== $elementId) {
+            return;
+        }
+
+        $this->resizeSelectedElement(
+            $width,
+            $height
+        );
+    }
+
+    public function applyManualSize(): void
+    {
+        $index = $this->selectedElementIndex();
+
+        if ($index === null) {
+            $this->addError(
+                'manualWidth',
+                'Select an element before applying its size.'
+            );
+
+            return;
+        }
+
+        $this->validate([
+            'manualWidth' => [
+                'required',
+                'numeric',
+                'min:1',
+            ],
+            'manualHeight' => [
+                'required',
+                'numeric',
+                'min:1',
+            ],
+        ]);
+
+        $width = (float) $this->manualWidth;
+
+        $height = (float) $this->manualHeight;
+
+        if (
+            ($this->elements[$index]['type'] ?? null)
+                === 'qr'
+        ) {
+            $height = $width;
+
+            $this->manualHeight = $width;
+        }
+
+        $this->resizeSelectedElement(
+            $width,
+            $height
+        );
+
+        $this->dispatch(
+            'ticket-element-sized',
+            elementId: $this->selectedElementId,
+            width: $this->manualWidth,
+            height: $this->manualHeight
+        );
+
+        $this->resetErrorBag(
+            'manualWidth'
+        );
+
+        $this->resetErrorBag(
+            'manualHeight'
+        );
     }
 
     public function updateSelectedElement(
@@ -734,6 +1067,10 @@ class TicketDesigner extends Component
         $this->selectedElementId =
             null;
 
+        $this->manualWidth = null;
+
+        $this->manualHeight = null;
+
         if ($deleted) {
             $this->isDirty = true;
         }
@@ -779,6 +1116,46 @@ class TicketDesigner extends Component
         }
     }
 
+    public function elementImageUploadName(): ?string
+    {
+        if ($this->elementImageUpload === null) {
+            return null;
+        }
+
+        return $this->elementImageUpload
+            ->getClientOriginalName();
+    }
+
+    public function elementImageUploadPreviewUrl(): ?string
+    {
+        if ($this->elementImageUpload === null) {
+            return null;
+        }
+
+        try {
+            $mimeType =
+                $this->elementImageUpload
+                    ->getMimeType();
+
+            if (! in_array(
+                $mimeType,
+                [
+                    'image/jpeg',
+                    'image/png',
+                    'image/webp',
+                ],
+                true
+            )) {
+                return null;
+            }
+
+            return $this->elementImageUpload
+                ->temporaryUrl();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     protected function addElement(
         string $prefix,
         array $element
@@ -792,6 +1169,20 @@ class TicketDesigner extends Component
             'id' => $id,
             ...$element,
         ];
+
+        $offset =
+            (count($this->elements) % 6)
+                * 40;
+
+        $element['x'] = min(
+            max(0, $this->canvasWidth - (int) ($element['width'] ?? 100)),
+            (int) ($element['x'] ?? 0) + $offset
+        );
+
+        $element['y'] = min(
+            max(0, $this->canvasHeight - (int) ($element['height'] ?? 100)),
+            (int) ($element['y'] ?? 0) + $offset
+        );
 
         $this->elements[] =
             $element;
@@ -937,8 +1328,15 @@ class TicketDesigner extends Component
         $this->backgroundUpload =
             null;
 
+        $this->elementImageUpload =
+            null;
+
         $this->resetErrorBag(
             'backgroundUpload'
+        );
+
+        $this->resetErrorBag(
+            'elementImageUpload'
         );
 
         $definition =
@@ -959,6 +1357,12 @@ class TicketDesigner extends Component
                 : [];
 
         $this->selectedElementId =
+            null;
+
+        $this->manualWidth =
+            null;
+
+        $this->manualHeight =
             null;
 
         $this->isDirty =

@@ -279,7 +279,7 @@
             display: block;
             width: 100%;
             height: 100%;
-            object-fit: fill;
+            object-fit: contain;
             pointer-events: none;
             user-select: none;
         }
@@ -291,13 +291,36 @@
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            cursor: pointer;
+            cursor: move;
             border: 1px dashed transparent;
+            touch-action: none;
         }
 
         .elive-ticket-designer .designer-element.selected {
+            overflow: visible;
             border-color: var(--elive-blue);
             box-shadow: 0 0 0 2px rgba(0, 122, 178, .10);
+        }
+
+        .elive-ticket-designer .designer-element.dragging,
+        .elive-ticket-designer .designer-element.resizing {
+            z-index: 50;
+            cursor: grabbing;
+        }
+
+        .elive-ticket-designer .element-resize-handle {
+            position: absolute;
+            right: -1px;
+            bottom: -1px;
+            z-index: 60;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-radius: 4px 0 0 0;
+            background: var(--elive-blue);
+            box-shadow: 0 1px 4px rgba(15, 23, 42, .25);
+            cursor: nwse-resize;
+            touch-action: none;
         }
 
         .elive-ticket-designer .designer-element.text {
@@ -320,6 +343,20 @@
             font-size: .72rem;
             text-align: center;
             padding: .4rem;
+        }
+
+        .elive-ticket-designer .designer-element .element-asset {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .elive-ticket-designer .element-image-controls {
+            display: grid;
+            gap: .55rem;
         }
 
         .elive-ticket-designer .pages-bar {
@@ -463,6 +500,443 @@
         }
     </style>
 
+    <script>
+        window.ticketDesignerElement = window.ticketDesignerElement
+            || function (config) {
+                return {
+                    id: config.id,
+                    type: config.type,
+                    x: Number(config.x),
+                    y: Number(config.y),
+                    width: Number(config.width),
+                    height: Number(config.height),
+                    rotation: Number(config.rotation),
+                    scale: Number(config.scale) || 1,
+                    canvasWidth: Number(config.canvasWidth),
+                    canvasHeight: Number(config.canvasHeight),
+                    dragging: false,
+                    resizing: false,
+                    moved: false,
+                    startClientX: 0,
+                    startClientY: 0,
+                    startX: 0,
+                    startY: 0,
+                    startWidth: 0,
+                    startHeight: 0,
+                    moveListener: null,
+                    upListener: null,
+                    animationFrame: null,
+                    pendingPointer: null,
+
+                    get elementStyle() {
+                        return [
+                            'left: 0px',
+                            'top: 0px',
+                            `width: ${Math.max(1, this.width * this.scale)}px`,
+                            `height: ${Math.max(1, this.height * this.scale)}px`,
+                            `transform: translate3d(${this.x * this.scale}px, ${this.y * this.scale}px, 0) rotate(${this.rotation}deg)`,
+                            'will-change: transform',
+                        ].join('; ');
+                    },
+
+                    startDrag(event) {
+                        if (event.button !== 0) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        this.dragging = true;
+                        this.moved = false;
+                        this.startClientX = event.clientX;
+                        this.startClientY = event.clientY;
+                        this.startX = this.x;
+                        this.startY = this.y;
+                        this.bindPointerEvents('drag');
+                    },
+
+                    startResize(event) {
+                        if (event.button !== 0) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        event.stopPropagation();
+                        this.resizing = true;
+                        this.moved = false;
+                        this.startClientX = event.clientX;
+                        this.startClientY = event.clientY;
+                        this.startWidth = this.width;
+                        this.startHeight = this.height;
+                        this.bindPointerEvents('resize');
+                    },
+
+                    bindPointerEvents(mode) {
+                        this.removePointerEvents();
+
+                        this.moveListener = (event) =>
+                            this.schedulePointerUpdate(
+                                mode,
+                                event
+                            );
+
+                        this.upListener = () => {
+                            this.finishInteraction(mode);
+                        };
+
+                        window.addEventListener(
+                            'pointermove',
+                            this.moveListener
+                        );
+
+                        window.addEventListener(
+                            'pointerup',
+                            this.upListener,
+                            { once: true }
+                        );
+
+                        window.addEventListener(
+                            'pointercancel',
+                            this.upListener,
+                            { once: true }
+                        );
+                    },
+
+                    schedulePointerUpdate(mode, event) {
+                        this.pendingPointer = {
+                            clientX: event.clientX,
+                            clientY: event.clientY,
+                        };
+
+                        if (this.animationFrame !== null) {
+                            return;
+                        }
+
+                        this.animationFrame =
+                            window.requestAnimationFrame(() => {
+                                this.animationFrame = null;
+                                this.applyPointerUpdate(mode);
+                            });
+                    },
+
+                    applyPointerUpdate(mode) {
+                        if (! this.pendingPointer) {
+                            return;
+                        }
+
+                        const pointer =
+                            this.pendingPointer;
+
+                        this.pendingPointer = null;
+
+                        if (mode === 'drag') {
+                            this.dragTo(pointer);
+                        } else {
+                            this.resizeTo(pointer);
+                        }
+                    },
+
+                    dragTo(event) {
+                        const deltaX =
+                            (event.clientX - this.startClientX)
+                                / this.scale;
+
+                        const deltaY =
+                            (event.clientY - this.startClientY)
+                                / this.scale;
+
+                        this.x = this.clamp(
+                            this.startX + deltaX,
+                            0,
+                            Math.max(0, this.canvasWidth - this.width)
+                        );
+
+                        this.y = this.clamp(
+                            this.startY + deltaY,
+                            0,
+                            Math.max(0, this.canvasHeight - this.height)
+                        );
+
+                        this.moved = true;
+                    },
+
+                    resizeTo(event) {
+                        const minimumSize = 20;
+
+                        const deltaX =
+                            (event.clientX - this.startClientX)
+                                / this.scale;
+
+                        const deltaY =
+                            (event.clientY - this.startClientY)
+                                / this.scale;
+
+                        const maximumWidth =
+                            Math.max(minimumSize, this.canvasWidth - this.x);
+
+                        const maximumHeight =
+                            Math.max(minimumSize, this.canvasHeight - this.y);
+
+                        if (this.type === 'qr') {
+                            const requestedSize = Math.max(
+                                this.startWidth + deltaX,
+                                this.startHeight + deltaY
+                            );
+
+                            const size = this.clamp(
+                                requestedSize,
+                                minimumSize,
+                                Math.min(maximumWidth, maximumHeight)
+                            );
+
+                            this.width = size;
+                            this.height = size;
+                        } else {
+                            this.width = this.clamp(
+                                this.startWidth + deltaX,
+                                minimumSize,
+                                maximumWidth
+                            );
+
+                            this.height = this.clamp(
+                                this.startHeight + deltaY,
+                                minimumSize,
+                                maximumHeight
+                            );
+                        }
+
+                        this.moved = true;
+                    },
+
+                    nudgeBy(deltaX, deltaY) {
+                        this.x = this.clamp(
+                            this.x + deltaX,
+                            0,
+                            Math.max(0, this.canvasWidth - this.width)
+                        );
+
+                        this.y = this.clamp(
+                            this.y + deltaY,
+                            0,
+                            Math.max(0, this.canvasHeight - this.height)
+                        );
+                    },
+
+                    finishInteraction(mode) {
+                        if (this.animationFrame !== null) {
+                            window.cancelAnimationFrame(
+                                this.animationFrame
+                            );
+
+                            this.animationFrame = null;
+                        }
+
+                        this.applyPointerUpdate(mode);
+                        this.removePointerEvents();
+                        this.dragging = false;
+                        this.resizing = false;
+
+                        if (! this.moved) {
+                            this.$wire.selectElement(
+                                this.id
+                            );
+
+                            return;
+                        }
+
+                        if (mode === 'drag') {
+                            this.$wire.moveElement(
+                                this.id,
+                                this.round(this.x),
+                                this.round(this.y)
+                            );
+
+                            return;
+                        }
+
+                        this.$wire.resizeElement(
+                            this.id,
+                            this.round(this.width),
+                            this.round(this.height)
+                        );
+                    },
+
+                    removePointerEvents() {
+                        if (this.animationFrame !== null) {
+                            window.cancelAnimationFrame(
+                                this.animationFrame
+                            );
+
+                            this.animationFrame = null;
+                        }
+
+                        this.pendingPointer = null;
+
+                        if (this.moveListener) {
+                            window.removeEventListener(
+                                'pointermove',
+                                this.moveListener
+                            );
+                        }
+
+                        if (this.upListener) {
+                            window.removeEventListener(
+                                'pointerup',
+                                this.upListener
+                            );
+
+                            window.removeEventListener(
+                                'pointercancel',
+                                this.upListener
+                            );
+                        }
+
+                        this.moveListener = null;
+                        this.upListener = null;
+                    },
+
+                    clamp(value, minimum, maximum) {
+                        return Math.min(
+                            maximum,
+                            Math.max(minimum, value)
+                        );
+                    },
+
+                    round(value) {
+                        return Math.round(value * 100) / 100;
+                    },
+                };
+            };
+
+        window.ticketDesignerKeyboard = window.ticketDesignerKeyboard
+            || function () {
+                return {
+                    pendingX: 0,
+                    pendingY: 0,
+                    nudgeTimer: null,
+
+                    handleKeydown(event) {
+                        const target = event.target;
+
+                        if (
+                            target instanceof HTMLInputElement
+                            || target instanceof HTMLSelectElement
+                            || target instanceof HTMLTextAreaElement
+                            || target?.isContentEditable
+                        ) {
+                            return;
+                        }
+
+                        if (! this.$root.dataset.selectedElement) {
+                            return;
+                        }
+
+                        const directions = {
+                            ArrowLeft: [-1, 0],
+                            ArrowRight: [1, 0],
+                            ArrowUp: [0, -1],
+                            ArrowDown: [0, 1],
+                        };
+
+                        const direction =
+                            directions[event.key];
+
+                        if (! direction) {
+                            return;
+                        }
+
+                        event.preventDefault();
+
+                        const distance =
+                            event.shiftKey ? 10 : 1;
+
+                        this.pendingX +=
+                            direction[0] * distance;
+
+                        this.pendingY +=
+                            direction[1] * distance;
+
+                        if (this.nudgeTimer !== null) {
+                            return;
+                        }
+
+                        this.nudgeTimer = window.setTimeout(
+                            () => this.flushNudge(),
+                            50
+                        );
+                    },
+
+                    flushNudge() {
+                        const deltaX = this.pendingX;
+                        const deltaY = this.pendingY;
+
+                        this.pendingX = 0;
+                        this.pendingY = 0;
+                        this.nudgeTimer = null;
+
+                        if (deltaX === 0 && deltaY === 0) {
+                            return;
+                        }
+
+                        const elementState =
+                            this.findElementState(
+                                this.$root.dataset.selectedElement
+                            );
+
+                        elementState?.nudgeBy(
+                            deltaX,
+                            deltaY
+                        );
+
+                        this.$wire.nudgeSelectedElement(
+                            deltaX,
+                            deltaY
+                        );
+                    },
+
+                    syncElementSize(detail) {
+                        const elementState =
+                            this.findElementState(
+                                detail?.elementId
+                            );
+
+                        if (! elementState) {
+                            return;
+                        }
+
+                        elementState.width =
+                            Number(detail.width);
+
+                        elementState.height =
+                            Number(detail.height);
+                    },
+
+                    findElementState(elementId) {
+                        if (! elementId) {
+                            return null;
+                        }
+
+                        const element = Array.from(
+                            this.$root.querySelectorAll(
+                                '[data-element-id]'
+                            )
+                        ).find(
+                            (candidate) =>
+                                candidate.dataset.elementId
+                                    === elementId
+                        );
+
+                        if (! element || ! window.Alpine) {
+                            return null;
+                        }
+
+                        return window.Alpine.$data(
+                            element
+                        );
+                    },
+                };
+            };
+    </script>
+
     @php
         $selectedElement = collect($elements)->first(
             fn (array $element): bool =>
@@ -499,9 +973,43 @@
 
         $backgroundUploadReady =
             $backgroundUpload !== null;
+
+        $selectedElementSupportsImage =
+            $selectedElement
+            && in_array(
+                $selectedElement['type'] ?? null,
+                ['image', 'logo', 'sponsor_logo'],
+                true
+            );
+
+        $selectedElementAssetPath =
+            $selectedElementSupportsImage
+                ? ($selectedElement['asset_path'] ?? null)
+                : null;
+
+        $selectedElementAssetUrl =
+            $selectedElementAssetPath
+                ? \Illuminate\Support\Facades\Storage::disk('public')
+                    ->url($selectedElementAssetPath)
+                : null;
+
+        $selectedElementUploadName =
+            $this->elementImageUploadName();
+
+        $selectedElementUploadPreviewUrl =
+            $this->elementImageUploadPreviewUrl();
+
+        $elementImageUploadReady =
+            $elementImageUpload !== null;
     @endphp
 
-    <div class="elive-ticket-designer">
+    <div
+        class="elive-ticket-designer"
+        data-selected-element="{{ $selectedElementId ?? '' }}"
+        x-data="ticketDesignerKeyboard()"
+        x-on:keydown.window="handleKeydown($event)"
+        x-on:ticket-element-sized.window="syncElementSize($event.detail)"
+    >
         <div
             data-testid="ticket-designer-toolbar"
             class="designer-toolbar"
@@ -685,9 +1193,10 @@
                     </div>
 
                     <p class="background-help">
-                        JPG, PNG or WEBP. Maximum 10 MB and
-                        4000 × 4000 px. Each page can use a
-                        different background.
+                        JPG, PNG or WEBP, up to 10 MB. Images of
+                        any dimensions are fitted inside the ticket
+                        canvas without cropping or distortion. Each
+                        page can use a different background.
                     </p>
                 </div>
 
@@ -822,27 +1331,57 @@
 
                                 $isSelected =
                                     $selectedElementId === $elementId;
+
+                                $assetPath =
+                                    $element['asset_path'] ?? null;
+
+                                $assetUrl =
+                                    filled($assetPath)
+                                        ? \Illuminate\Support\Facades\Storage::disk('public')
+                                            ->url($assetPath)
+                                        : null;
+
+                                $isImageElement =
+                                    in_array(
+                                        $elementType,
+                                        ['image', 'logo', 'sponsor_logo'],
+                                        true
+                                    );
                             @endphp
 
                             <div
                                 wire:key="designer-element-{{ $elementId }}"
-                                wire:click="selectElement('{{ $elementId }}')"
+                                x-data="ticketDesignerElement({
+                                    id: @js($elementId),
+                                    type: @js($elementType),
+                                    x: @js($x),
+                                    y: @js($y),
+                                    width: @js($width),
+                                    height: @js($height),
+                                    rotation: @js($rotation),
+                                    scale: @js($scale),
+                                    canvasWidth: @js($canvasWidth),
+                                    canvasHeight: @js($canvasHeight)
+                                })"
+                                x-bind:style="elementStyle"
+                                x-bind:class="{
+                                    dragging: dragging,
+                                    resizing: resizing
+                                }"
+                                x-on:pointerdown="startDrag($event)"
                                 data-element-id="{{ $elementId }}"
                                 data-element-type="{{ $elementType }}"
                                 class="
                                     designer-element
                                     {{ $elementType }}
                                     {{ $isSelected ? 'selected' : '' }}
-                                    {{ in_array(
-                                        $elementType,
-                                        [
-                                            'image',
-                                            'logo',
-                                            'sponsor_logo',
-                                            'shape',
-                                            'line',
-                                        ],
-                                        true
+                                    {{ (
+                                        ($isImageElement && ! $assetUrl)
+                                        || in_array(
+                                            $elementType,
+                                            ['shape', 'line'],
+                                            true
+                                        )
                                     ) ? 'placeholder' : '' }}
                                 "
                                 style="
@@ -872,15 +1411,39 @@
                                         @break
 
                                     @case('image')
-                                        <span>Image</span>
+                                        @if ($assetUrl)
+                                            <img
+                                                src="{{ $assetUrl }}"
+                                                alt="Ticket image"
+                                                class="element-asset"
+                                            >
+                                        @else
+                                            <span>Image</span>
+                                        @endif
                                         @break
 
                                     @case('logo')
-                                        <span>Logo</span>
+                                        @if ($assetUrl)
+                                            <img
+                                                src="{{ $assetUrl }}"
+                                                alt="Event logo"
+                                                class="element-asset"
+                                            >
+                                        @else
+                                            <span>Logo</span>
+                                        @endif
                                         @break
 
                                     @case('sponsor_logo')
-                                        <span>Sponsor Logo</span>
+                                        @if ($assetUrl)
+                                            <img
+                                                src="{{ $assetUrl }}"
+                                                alt="Sponsor logo"
+                                                class="element-asset"
+                                            >
+                                        @else
+                                            <span>Sponsor Logo</span>
+                                        @endif
                                         @break
 
                                     @case('shape')
@@ -894,6 +1457,16 @@
                                     @default
                                         <span>{{ $elementType }}</span>
                                 @endswitch
+
+                                @if ($isSelected)
+                                    <button
+                                        type="button"
+                                        class="element-resize-handle"
+                                        aria-label="Resize {{ $elementType }} element"
+                                        title="Drag to resize"
+                                        x-on:pointerdown="startResize($event)"
+                                    ></button>
+                                @endif
                             </div>
                         @endforeach
                     </div>
@@ -973,22 +1546,121 @@
                             </div>
                         </div>
 
+                        @if ($selectedElementSupportsImage)
+                            <div class="property-section">
+                                <h4 class="property-section-title">
+                                    Element Image
+                                </h4>
+
+                                <div class="element-image-controls">
+                                    @if ($selectedElementUploadPreviewUrl)
+                                        <img
+                                            src="{{ $selectedElementUploadPreviewUrl }}"
+                                            alt="Selected element image preview"
+                                            class="background-preview"
+                                        >
+
+                                        <div class="background-selected-file">
+                                            {{ $selectedElementUploadName }}
+                                        </div>
+                                    @elseif ($selectedElementAssetUrl)
+                                        <img
+                                            src="{{ $selectedElementAssetUrl }}"
+                                            alt="Current element image"
+                                            class="background-preview"
+                                        >
+                                    @else
+                                        <div class="background-empty">
+                                            No image uploaded for this element.
+                                        </div>
+                                    @endif
+
+                                    <input
+                                        type="file"
+                                        wire:model="elementImageUpload"
+                                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                                        class="background-upload"
+                                    >
+
+                                    @error('elementImageUpload')
+                                        <div class="error-box">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+
+                                    <button
+                                        type="button"
+                                        wire:click="uploadSelectedElementImage"
+                                        wire:loading.attr="disabled"
+                                        wire:target="elementImageUpload,uploadSelectedElementImage"
+                                        @disabled(! $elementImageUploadReady)
+                                        class="designer-button primary"
+                                    >
+                                        <span
+                                            wire:loading.remove
+                                            wire:target="uploadSelectedElementImage"
+                                        >
+                                            {{ $selectedElementAssetUrl
+                                                ? 'Replace Image'
+                                                : 'Upload Image' }}
+                                        </span>
+
+                                        <span
+                                            wire:loading
+                                            wire:target="uploadSelectedElementImage"
+                                        >
+                                            Uploading...
+                                        </span>
+                                    </button>
+
+                                    @if ($selectedElementAssetUrl)
+                                        <button
+                                            type="button"
+                                            wire:click="removeSelectedElementImage"
+                                            wire:loading.attr="disabled"
+                                            wire:target="removeSelectedElementImage"
+                                            class="designer-button danger"
+                                        >
+                                            Remove Image
+                                        </button>
+                                    @endif
+
+                                    <div
+                                        wire:loading
+                                        wire:target="elementImageUpload"
+                                        class="upload-progress"
+                                    >
+                                        Preparing image preview...
+                                    </div>
+
+                                    <p class="background-help">
+                                        JPG, PNG or WEBP. Maximum 10 MB and
+                                        4000 × 4000 px. Transparent PNG is
+                                        recommended for logos.
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="property-section">
                             <h4 class="property-section-title">
-                                Size
+                                Manual Size
                             </h4>
 
                             <div class="property-grid">
                                 <div class="property-field">
-                                    <label>Width</label>
+                                    <label>
+                                        {{ ($selectedElement['type'] ?? null) === 'qr'
+                                            ? 'QR Size'
+                                            : 'Width' }}
+                                    </label>
 
                                     <input
                                         type="number"
                                         min="1"
-                                        value="{{ $selectedElement['width'] ?? 1 }}"
-                                        wire:change="updateSelectedElement({
-                                            width: Number($event.target.value)
-                                        })"
+                                        step="1"
+                                        wire:model="manualWidth"
+                                        wire:keydown.enter="applyManualSize"
                                     >
                                 </div>
 
@@ -998,13 +1670,62 @@
                                     <input
                                         type="number"
                                         min="1"
-                                        value="{{ $selectedElement['height'] ?? 1 }}"
-                                        wire:change="updateSelectedElement({
-                                            height: Number($event.target.value)
-                                        })"
+                                        step="1"
+                                        wire:model="manualHeight"
+                                        wire:keydown.enter="applyManualSize"
+                                        @disabled(
+                                            ($selectedElement['type'] ?? null)
+                                                === 'qr'
+                                        )
                                     >
                                 </div>
+
+                                @error('manualWidth')
+                                    <div class="property-field full">
+                                        <div class="error-box">
+                                            {{ $message }}
+                                        </div>
+                                    </div>
+                                @enderror
+
+                                @error('manualHeight')
+                                    <div class="property-field full">
+                                        <div class="error-box">
+                                            {{ $message }}
+                                        </div>
+                                    </div>
+                                @enderror
+
+                                <div class="property-field full">
+                                    <button
+                                        type="button"
+                                        wire:click="applyManualSize"
+                                        wire:loading.attr="disabled"
+                                        wire:target="applyManualSize"
+                                        class="designer-button primary"
+                                    >
+                                        <span
+                                            wire:loading.remove
+                                            wire:target="applyManualSize"
+                                        >
+                                            Apply Size
+                                        </span>
+
+                                        <span
+                                            wire:loading
+                                            wire:target="applyManualSize"
+                                        >
+                                            Applying...
+                                        </span>
+                                    </button>
+                                </div>
                             </div>
+
+                            <p class="background-help">
+                                Use the arrow keys to move this element by
+                                1 px. Hold Shift while pressing an arrow key
+                                to move it by 10 px.
+                            </p>
                         </div>
 
                         <div class="property-section">
