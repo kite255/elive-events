@@ -359,6 +359,56 @@
             text-align: center;
         }
 
+        .designed-ticket {
+            display: grid;
+            gap: 20px;
+        }
+
+        .designed-ticket-toolbar,
+        .designed-ticket-page-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .designed-ticket-toolbar {
+            padding: 16px 18px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: #FFFFFF;
+        }
+
+        .designed-ticket-toolbar span {
+            margin-left: 10px;
+            color: var(--muted);
+        }
+
+        .ticket-download-button,
+        .designed-ticket-page-heading a {
+            color: var(--elive-blue);
+            font-weight: 800;
+        }
+
+        .designed-ticket-page-heading {
+            padding: 11px 14px;
+            font-size: 13px;
+        }
+
+        .designed-ticket-page {
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: #FFFFFF;
+            box-shadow: 0 15px 40px rgba(22, 25, 67, .08);
+        }
+
+        .designed-ticket-canvas svg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
         @media (
             max-width: 620px
         ) {
@@ -437,6 +487,10 @@
 
 <main class="ticket-wrapper">
     <div class="container">
+
+        @if (! empty($renderedPages))
+            @include('public.tickets.partials.designed-ticket')
+        @else
 
         <article class="ticket">
 
@@ -632,6 +686,8 @@
             </section>
 
         </article>
+
+        @endif
 
     </div>
 </main>

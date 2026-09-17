@@ -10,6 +10,7 @@ use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicTicketController;
+use App\Http\Controllers\PublicTicketDownloadController;
 use App\Http\Controllers\PublicTicketOrderController;
 use App\Http\Controllers\PublicTicketRecoveryController;
 use App\Http\Controllers\PublicTicketViewController;
@@ -215,6 +216,27 @@ Route::get(
 | - qr_token_hash
 |
 */
+
+Route::get(
+    '/tickets/{token}/pages/{pageNumber}.png',
+    [
+        PublicTicketDownloadController::class,
+        'png',
+    ]
+)
+    ->whereNumber('pageNumber')
+    ->middleware('throttle:60,1')
+    ->name('public.tickets.pages.png');
+
+Route::get(
+    '/tickets/{token}/download.pdf',
+    [
+        PublicTicketDownloadController::class,
+        'pdf',
+    ]
+)
+    ->middleware('throttle:30,1')
+    ->name('public.tickets.download.pdf');
 
 Route::get(
     '/tickets/{token}',
