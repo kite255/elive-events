@@ -73,6 +73,33 @@ class PublicTicketCheckoutTest extends TestCase
         ]);
     }
 
+    public function test_ticket_page_hides_purchase_limit_labels_but_keeps_constraints(): void
+    {
+        $event = $this->createEvent();
+
+        $ticketType = $this->createTicketType(
+            $event
+        );
+
+        $response = $this->get(
+            route(
+                'public.tickets.buy',
+                [
+                    'event' => $event->slug,
+                ]
+            )
+        );
+
+        $response
+            ->assertOk()
+            ->assertDontSee('Min:')
+            ->assertDontSee('Max:')
+            ->assertSee('min="0"', false)
+            ->assertSee('max="5"', false)
+            ->assertSee('data-minimum="1"', false)
+            ->assertSee('data-maximum="5"', false);
+    }
+
     public function test_buyer_can_create_ticket_order_and_payment(): void
     {
         $event = $this->createEvent();

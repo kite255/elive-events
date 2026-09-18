@@ -1277,15 +1277,6 @@
 
                                                         @endif
 
-                                                        <span class="status-pill">
-                                                            Min:
-                                                            {{ $minimum }}
-                                                        </span>
-
-                                                        <span class="status-pill">
-                                                            Max:
-                                                            {{ $maximum }}
-                                                        </span>
 
                                                     </div>
 
