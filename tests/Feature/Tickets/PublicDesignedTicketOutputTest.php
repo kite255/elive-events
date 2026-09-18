@@ -31,7 +31,7 @@ class PublicDesignedTicketOutputTest extends TestCase
             ->assertOk()
             ->assertSee('Designed ticket')
             ->assertSee('Download PNG')
-            ->assertSee('Download PDF')
+            ->assertDontSee('Download PDF')
             ->assertSee('<svg', false)
             ->assertDontSee($ticket->qr_token_hash)
             ->assertDontSee($ticket->qr_token_encrypted);

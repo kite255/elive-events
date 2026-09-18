@@ -6,7 +6,8 @@ use App\Data\Tickets\RenderedTicketPage;
 use App\Models\Ticket;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Imagick;
+use RuntimeException;
+use Symfony\Component\Process\Process;
 
 final class TicketOutputService
 {
@@ -103,24 +104,31 @@ final class TicketOutputService
 
     private function rasterize(RenderedTicketPage $page): string
     {
-        $image = new Imagick();
+        $process = new Process([
+            '/usr/bin/rsvg-convert',
+            '--format=png',
+            '--width=' . $page->width,
+            '--height=' . $page->height,
+        ]);
 
-        try {
-            $image->setBackgroundColor('white');
-            $image->readImageBlob($page->svg);
-            $image->setImageFormat('png');
-            $image->setImageBackgroundColor('white');
+        $process->setInput($page->svg);
+        $process->setTimeout(30);
+        $process->mustRun();
 
-            $flattened = $image->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
-            $flattened->setImageFormat('png');
-            $bytes = $flattened->getImageBlob();
-            $flattened->clear();
-            $flattened->destroy();
+        $bytes = $process->getOutput();
 
-            return $bytes;
-        } finally {
-            $image->clear();
-            $image->destroy();
+        if (
+            $bytes === ''
+            || ! str_starts_with(
+                $bytes,
+                "\x89PNG\r\n\x1a\n"
+            )
+        ) {
+            throw new RuntimeException(
+                'Ticket SVG rasterization did not produce a valid PNG.'
+            );
         }
+
+        return $bytes;
     }
 }
