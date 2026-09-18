@@ -120,12 +120,7 @@
         body {
             margin: 0;
 
-            background:
-                linear-gradient(
-                    180deg,
-                    #FFFFFF 0,
-                    var(--elive-bg) 420px
-                );
+            background: var(--elive-bg);
 
             color: #0F172A;
 
@@ -154,8 +149,8 @@
 
         .container {
             width: min(
-                1180px,
-                calc(100% - 32px)
+                1320px,
+                calc(100% - 48px)
             );
 
             margin-inline: auto;
@@ -166,10 +161,7 @@
             top: 0;
             z-index: 50;
 
-            background:
-                rgba(255, 255, 255, .94);
-
-            backdrop-filter: blur(12px);
+            background: #FFFFFF;
 
             border-bottom:
                 1px solid var(--elive-border);
@@ -186,10 +178,15 @@
         }
 
         .brand {
-            color: var(--elive-navy);
+            display: inline-flex;
+            align-items: center;
+        }
 
-            font-size: 22px;
-            font-weight: 900;
+        .brand-logo {
+            width: auto;
+            height: 38px;
+
+            display: block;
         }
 
         .back-link {
@@ -214,22 +211,30 @@
                 minmax(0, 1.25fr)
                 minmax(300px, .75fr);
 
+            grid-template-areas:
+                "content visual"
+                "notice visual";
+
+            grid-template-rows:
+                1fr
+                auto;
+
             background: var(--elive-navy);
 
             border-radius: 26px;
 
             color: #FFFFFF;
 
-            box-shadow:
-                0 18px 55px
-                rgba(22, 25, 67, .16);
+            border: 1px solid rgba(255, 255, 255, .08);
         }
 
         .hero-content {
+            grid-area: content;
+
             padding:
                 42px
                 42px
-                38px;
+                18px;
         }
 
         .eyebrow {
@@ -286,7 +291,12 @@
         }
 
         .reservation-notice {
-            margin-top: 24px;
+            grid-area: notice;
+
+            margin:
+                0
+                42px
+                38px;
 
             padding:
                 14px
@@ -308,14 +318,11 @@
         }
 
         .hero-visual {
+            grid-area: visual;
+
             min-height: 320px;
 
-            background:
-                linear-gradient(
-                    135deg,
-                    var(--elive-blue),
-                    #065276
-                );
+            background: #EAF6FB;
         }
 
         .hero-image {
@@ -336,12 +343,7 @@
             display: grid;
             place-items: center;
 
-            background:
-                linear-gradient(
-                    135deg,
-                    var(--elive-blue),
-                    #074E72
-                );
+            background: var(--elive-blue);
 
             color:
                 rgba(255, 255, 255, .92);
@@ -360,10 +362,10 @@
             display: grid;
 
             grid-template-columns:
-                minmax(0, 1.45fr)
-                minmax(320px, .75fr);
+                minmax(0, 1.65fr)
+                minmax(340px, .75fr);
 
-            gap: 24px;
+            gap: 28px;
 
             align-items: start;
         }
@@ -374,7 +376,7 @@
         }
 
         .panel {
-            padding: 26px;
+            padding: 30px;
 
             background: var(--elive-surface);
 
@@ -383,9 +385,6 @@
 
             border-radius: 20px;
 
-            box-shadow:
-                0 8px 28px
-                rgba(22, 25, 67, .045);
         }
 
         .panel-title {
@@ -449,7 +448,7 @@
         }
 
         .ticket-card {
-            padding: 20px;
+            padding: 22px;
 
             border:
                 1px solid var(--elive-border);
@@ -458,7 +457,6 @@
 
             transition:
                 border-color .15s ease,
-                box-shadow .15s ease,
                 transform .15s ease;
         }
 
@@ -466,9 +464,7 @@
             border-color:
                 rgba(0, 122, 178, .65);
 
-            box-shadow:
-                0 0 0 3px
-                rgba(0, 122, 178, .08);
+            background: #F6FBFE;
         }
 
         .ticket-card.unavailable {
@@ -597,9 +593,9 @@
             display: inline-grid;
 
             grid-template-columns:
-                40px
-                52px
-                40px;
+                46px
+                58px
+                46px;
 
             align-items: center;
 
@@ -614,7 +610,7 @@
         }
 
         .quantity-button {
-            height: 42px;
+            height: 46px;
 
             border: 0;
 
@@ -636,8 +632,8 @@
         }
 
         .quantity-input {
-            width: 52px;
-            height: 42px;
+            width: 58px;
+            height: 46px;
 
             border: 0;
             border-inline:
@@ -740,9 +736,8 @@
         .field input:focus {
             border-color: var(--elive-blue);
 
-            box-shadow:
-                0 0 0 3px
-                rgba(0, 122, 178, .10);
+            outline: 3px solid rgba(0, 122, 178, .10);
+            outline-offset: 0;
         }
 
         .field-error {
@@ -904,6 +899,13 @@
         ) {
             .hero-card {
                 grid-template-columns: 1fr;
+
+                grid-template-areas:
+                    "content"
+                    "visual"
+                    "notice";
+
+                grid-template-rows: auto;
             }
 
             .hero-visual {
@@ -930,7 +932,7 @@
                 width:
                     min(
                         100% - 22px,
-                        1180px
+                        1320px
                     );
             }
 
@@ -939,17 +941,60 @@
             }
 
             .brand {
-                font-size: 19px;
+                max-width: 150px;
+            }
+
+            .brand-logo {
+                height: 32px;
             }
 
             .hero {
-                padding-top: 22px;
+                padding:
+                    24px 0
+                    20px;
             }
 
             .hero-content {
                 padding:
-                    28px
-                    22px;
+                    24px
+                    20px;
+            }
+
+            .hero h1 {
+                font-size: 34px;
+                line-height: 1.08;
+            }
+
+            .hero-meta {
+                margin-top: 16px;
+                gap: 7px;
+            }
+
+            .hero-meta span {
+                padding:
+                    6px
+                    9px;
+
+                font-size: 12px;
+            }
+
+            .hero-visual,
+            .hero-placeholder {
+                min-height: 210px;
+            }
+
+            .reservation-notice {
+                margin:
+                    14px
+                    20px
+                    20px;
+
+                padding:
+                    10px
+                    12px;
+
+                font-size: 12px;
+                line-height: 1.45;
             }
 
             .panel {
@@ -966,6 +1011,12 @@
 
             .ticket-actions {
                 align-items: flex-end;
+            }
+
+            .checkout-button {
+                position: sticky;
+                bottom: 12px;
+                z-index: 10;
             }
 
             .field-grid {
@@ -987,8 +1038,13 @@
         <a
             href="{{ route('home') }}"
             class="brand"
+            aria-label="eLive Events home"
         >
-            eLive Events
+            <img
+                class="brand-logo"
+                src="{{ asset('eLive-Logo.png') }}"
+                alt="eLive Events"
+            >
         </a>
 
         <a
@@ -1045,21 +1101,6 @@
 
                     </div>
 
-                    <div class="reservation-notice">
-                        Once you continue to payment,
-                        your selected tickets are reserved for
-
-                        <strong>
-                            {{ $reservationMinutes }}
-                            {{ Str::plural(
-                                'minute',
-                                $reservationMinutes
-                            ) }}
-                        </strong>.
-
-                        Complete payment before the reservation expires.
-                    </div>
-
                 </div>
 
                 <div class="hero-visual">
@@ -1080,6 +1121,20 @@
 
                     @endif
 
+                </div>
+
+                <div class="reservation-notice">
+                    Tickets are reserved for
+
+                    <strong>
+                        {{ $reservationMinutes }}
+                        {{ Str::plural(
+                            'minute',
+                            $reservationMinutes
+                        ) }}
+                    </strong>
+
+                    after you continue to payment.
                 </div>
 
             </div>
