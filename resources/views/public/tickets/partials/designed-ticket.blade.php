@@ -5,12 +5,6 @@
             <span>{{ ucfirst($ticket->status) }}</span>
         </div>
 
-        <a
-            class="ticket-download-button"
-            href="{{ route('public.tickets.download.pdf', ['token' => $ticket->public_token]) }}"
-        >
-            Download PDF
-        </a>
     </div>
 
     @foreach ($renderedPages as $renderedPage)
