@@ -205,7 +205,7 @@
         }
 
         .elive-ticket-designer .background-selected-file::before {
-            content: "✓";
+            content: "âœ“";
             flex: 0 0 auto;
             display: inline-flex;
             align-items: center;
@@ -1035,7 +1035,7 @@
                 <h2>{{ $templateName }}</h2>
 
                 <p>
-                    {{ $canvasWidth }} × {{ $canvasHeight }} px
+                    {{ $canvasWidth }} Ã— {{ $canvasHeight }} px
                 </p>
             </div>
 
@@ -1546,7 +1546,7 @@
                                         type="number"
                                         value="{{ $selectedElement['x'] ?? 0 }}"
                                         wire:change="updateSelectedElement({
-                                            x: Number($event.target.value)
+                                            x: $event.target.value
                                         })"
                                     >
                                 </div>
@@ -1558,7 +1558,7 @@
                                         type="number"
                                         value="{{ $selectedElement['y'] ?? 0 }}"
                                         wire:change="updateSelectedElement({
-                                            y: Number($event.target.value)
+                                            y: $event.target.value
                                         })"
                                     >
                                 </div>
@@ -1654,7 +1654,7 @@
 
                                     <p class="background-help">
                                         JPG, PNG or WEBP. Maximum 10 MB and
-                                        4000 × 4000 px. Transparent PNG is
+                                        4000 Ã— 4000 px. Transparent PNG is
                                         recommended for logos.
                                     </p>
                                 </div>
@@ -1759,7 +1759,7 @@
                                     type="number"
                                     value="{{ $selectedElement['rotation'] ?? 0 }}"
                                     wire:change="updateSelectedElement({
-                                        rotation: Number($event.target.value)
+                                        rotation: $event.target.value
                                     })"
                                 >
                             </div>
