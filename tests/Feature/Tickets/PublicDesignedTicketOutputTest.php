@@ -29,6 +29,10 @@ class PublicDesignedTicketOutputTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertSee('Your digital ticket')
+            ->assertSee('Ticket details')
+            ->assertSee('Ready for entry')
+            ->assertSee('Keep this ticket private')
             ->assertSee('Designed ticket')
             ->assertSee('Download PNG')
             ->assertDontSee('Download PDF')

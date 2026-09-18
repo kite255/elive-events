@@ -28,10 +28,12 @@
 
     <style>
         :root {
-            --elive-navy: #161943;
-            --elive-blue: #007AB2;
-            --elive-orange: #FF9800;
-            --background: #F6F8FC;
+            --elive-navy: #0B1F3A;
+            --elive-blue: #233F7E;
+            --elive-blue-hover: #1D356A;
+            --elive-orange: #F99A12;
+            --elive-orange-hover: #E48600;
+            --background: #F8FAFC;
             --surface: #FFFFFF;
             --border: #E6EBF2;
             --text: #101828;
@@ -44,6 +46,18 @@
 
         * {
             box-sizing: border-box;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
 
         body {
@@ -69,7 +83,7 @@
 
         .container {
             width: min(
-                760px,
+                1120px,
                 calc(100% - 30px)
             );
 
@@ -88,9 +102,24 @@
         }
 
         .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
             color: var(--elive-navy);
-            font-size: 20px;
+            font-size: 19px;
             font-weight: 900;
+        }
+
+        .brand-mark {
+            display: grid;
+            width: 38px;
+            height: 38px;
+            place-items: center;
+            border-radius: 12px;
+            background: linear-gradient(145deg, var(--elive-blue), var(--elive-blue-hover));
+            color: #FFFFFF;
+            font-size: 21px;
+            box-shadow: 0 8px 22px rgba(35, 63, 126, .20);
         }
 
         .back-link {
@@ -100,7 +129,74 @@
         }
 
         .ticket-wrapper {
-            padding: 8px 0 60px;
+            padding: 12px 0 60px;
+        }
+
+        .page-intro {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .page-kicker {
+            margin: 0 0 7px;
+            color: var(--elive-orange-hover);
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+
+        .page-title {
+            margin: 0;
+            color: var(--elive-navy);
+            font-size: clamp(28px, 5vw, 42px);
+            line-height: 1.08;
+            letter-spacing: -.035em;
+        }
+
+        .page-description {
+            max-width: 560px;
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.65;
+        }
+
+        .entry-badge {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 13px;
+            border: 1px solid #BBF7D0;
+            border-radius: 999px;
+            background: var(--success-bg);
+            color: var(--success);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .entry-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #16A34A;
+            box-shadow: 0 0 0 4px rgba(22, 163, 74, .12);
+        }
+
+        .entry-badge.is-used {
+            border-color: #FDE68A;
+            background: var(--used-bg);
+            color: var(--used);
+        }
+
+        .entry-badge.is-used::before {
+            background: #CA8A04;
+            box-shadow: 0 0 0 4px rgba(202, 138, 4, .12);
         }
 
         .ticket {
@@ -361,7 +457,7 @@
 
         .designed-ticket {
             display: grid;
-            gap: 20px;
+            gap: 18px;
         }
 
         .designed-ticket-toolbar,
@@ -373,26 +469,72 @@
         }
 
         .designed-ticket-toolbar {
-            padding: 16px 18px;
+            padding: 17px 20px;
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 18px;
             background: #FFFFFF;
+            box-shadow: 0 10px 30px rgba(11, 31, 58, .05);
         }
 
-        .designed-ticket-toolbar span {
-            margin-left: 10px;
+        .ticket-toolbar-copy {
+            display: grid;
+            gap: 3px;
+        }
+
+        .ticket-toolbar-label {
             color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .07em;
+            text-transform: uppercase;
         }
 
-        .ticket-download-button,
-        .designed-ticket-page-heading a {
-            color: var(--elive-blue);
+        .ticket-toolbar-number {
+            color: var(--elive-navy);
+            font-size: 15px;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .ticket-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 9px;
+        }
+
+        .ticket-download-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 16px;
+            border-radius: 11px;
+            background: var(--elive-blue);
+            color: #FFFFFF;
+            font-size: 13px;
             font-weight: 800;
         }
 
+        .page-download-link {
+            color: var(--elive-blue);
+            font-weight: 900;
+        }
+
+        .page-download-link:hover {
+            color: var(--elive-blue-hover);
+        }
+
+        .ticket-download-button:hover {
+            background: var(--elive-blue-hover);
+        }
+
         .designed-ticket-page-heading {
-            padding: 11px 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--muted);
             font-size: 13px;
+            font-weight: 800;
         }
 
         .designed-ticket-page {
@@ -407,6 +549,66 @@
             display: block;
             width: 100%;
             height: auto;
+        }
+
+        .ticket-summary {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: #FFFFFF;
+        }
+
+        .summary-item {
+            min-width: 0;
+            padding: 17px 18px;
+            border-right: 1px solid var(--border);
+        }
+
+        .summary-item:last-child { border-right: 0; }
+
+        .summary-label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+
+        .summary-value {
+            display: block;
+            color: var(--elive-navy);
+            font-size: 14px;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px 18px;
+            border: 1px solid #FDE3B5;
+            border-radius: 16px;
+            background: #FFF9ED;
+            color: #7A4900;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .security-icon {
+            display: grid;
+            flex: 0 0 auto;
+            width: 30px;
+            height: 30px;
+            place-items: center;
+            border-radius: 9px;
+            background: rgba(249, 154, 18, .16);
+            color: var(--elive-orange-hover);
+            font-weight: 900;
         }
 
         @media (
@@ -431,6 +633,27 @@
 
             .ticket-number {
                 text-align: left;
+            }
+
+            .page-intro,
+            .designed-ticket-toolbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .entry-badge { align-self: flex-start; }
+
+            .ticket-actions,
+            .ticket-download-button { width: 100%; }
+
+            .ticket-summary {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .summary-item:nth-child(2) { border-right: 0; }
+
+            .summary-item:nth-child(-n + 2) {
+                border-bottom: 1px solid var(--border);
             }
         }
 
@@ -464,7 +687,8 @@
             href="{{ route('home') }}"
             class="brand"
         >
-            eLive Events
+            <span class="brand-mark" aria-hidden="true">e</span>
+            <span>eLive Events</span>
         </a>
 
         <a
@@ -487,6 +711,20 @@
 
 <main class="ticket-wrapper">
     <div class="container">
+
+        <section class="page-intro" aria-labelledby="ticket-page-title">
+            <div>
+                <p class="page-kicker">Official event access</p>
+                <h1 class="page-title" id="ticket-page-title">Your digital ticket</h1>
+                <p class="page-description">
+                    Keep this page available on your phone and present the QR code at the entrance.
+                </p>
+            </div>
+
+            <span class="entry-badge {{ $ticket->isUsed() ? 'is-used' : '' }}">
+                {{ $ticket->isUsed() ? 'Already used' : 'Ready for entry' }}
+            </span>
+        </section>
 
         @if (! empty($renderedPages))
             @include('public.tickets.partials.designed-ticket')
