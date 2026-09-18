@@ -85,7 +85,9 @@ class SendTicketAccessLinkJob implements ShouldQueue
                     $this->sendEmail(
                         $log->recipient,
                         $messages['email_subject'],
-                        $messages['email_body']
+                        $messages['email_body'],
+                        $order,
+                        $url
                     ),
 
                 CommunicationLog::CHANNEL_SMS =>
@@ -123,10 +125,19 @@ class SendTicketAccessLinkJob implements ShouldQueue
     private function sendEmail(
         string $recipient,
         string $subject,
-        string $body
+        string $body,
+        TicketOrder $order,
+        string $ticketsUrl
     ): ?string {
-        Mail::raw(
-            $body,
+        Mail::send(
+            'emails.ticket-access',
+            [
+                'subject' => $subject,
+                'body' => $body,
+                'order' => $order,
+                'event' => $order->event,
+                'ticketsUrl' => $ticketsUrl,
+            ],
             function (Message $message) use (
                 $recipient,
                 $subject

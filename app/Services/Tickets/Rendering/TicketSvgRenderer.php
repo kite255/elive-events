@@ -10,6 +10,10 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 final class TicketSvgRenderer
 {
+    private const QR_SOURCE_SIZE = 800;
+
+    private const QR_MARGIN = 4;
+
     private const FONTS = [
         'Creato Display',
         'Arial',
@@ -153,22 +157,28 @@ final class TicketSvgRenderer
 
         [$x, $y, $width, $height, $rotation] = $this->geometry($element);
         $size = min($width, $height);
+        $qrX = $x + (($width - $size) / 2);
+        $qrY = $y + (($height - $size) / 2);
         $qr = (string) QrCode::format('svg')
-            ->size(800)
-            ->margin(1)
+            ->size(self::QR_SOURCE_SIZE)
+            ->margin(self::QR_MARGIN)
             ->generate($context->qrCredential);
 
         if (! preg_match('/<svg\b[^>]*>(.*)<\/svg>\s*$/s', $qr, $matches)) {
             return '';
         }
 
-        $scale = $size / 800;
+        $scale = $size / self::QR_SOURCE_SIZE;
 
         return sprintf(
-            '<g transform="%s"><g transform="translate(%s %s) scale(%s)">%s</g></g>',
-            $this->rotation($rotation, $x, $y, $size, $size),
-            $this->decimal($x),
-            $this->decimal($y),
+            '<g transform="%s"><rect x="%s" y="%s" width="%s" height="%s" fill="#FFFFFF"/><g transform="translate(%s %s) scale(%s)" shape-rendering="crispEdges">%s</g></g>',
+            $this->rotation($rotation, $x, $y, $width, $height),
+            $this->decimal($qrX),
+            $this->decimal($qrY),
+            $this->decimal($size),
+            $this->decimal($size),
+            $this->decimal($qrX),
+            $this->decimal($qrY),
             $this->decimal($scale),
             $matches[1]
         );

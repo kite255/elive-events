@@ -1,3 +1,16 @@
+@php
+    /*
+     * Use a harmless, static credential for the designer preview. Rendering
+     * it through the same QR library and settings as the ticket exporter
+     * keeps the editor's quiet zone, proportions and alignment accurate
+     * without exposing a real ticket credential.
+     */
+    $ticketDesignerQrPreview = (string) \SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')
+        ->size(800)
+        ->margin(4)
+        ->generate('ELIVE-TICKET-DESIGNER-PREVIEW');
+@endphp
+
 <div
     data-testid="ticket-designer"
     class="space-y-4"
@@ -328,12 +341,16 @@
         }
 
         .elive-ticket-designer .designer-element.qr {
-            background:
-                linear-gradient(45deg, #111 25%, transparent 25%) 0 0/14px 14px,
-                linear-gradient(-45deg, #111 25%, transparent 25%) 0 7px/14px 14px,
-                linear-gradient(45deg, transparent 75%, #111 75%) 7px -7px/14px 14px,
-                linear-gradient(-45deg, transparent 75%, #111 75%) -7px 0/14px 14px;
             background-color: #fff;
+            overflow: hidden;
+        }
+
+        .elive-ticket-designer .designer-element.qr > svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            user-select: none;
         }
 
         .elive-ticket-designer .designer-element.placeholder {
@@ -1405,8 +1422,10 @@
                                         @break
 
                                     @case('qr')
+                                        {!! $ticketDesignerQrPreview !!}
+
                                         <span class="sr-only">
-                                            Ticket QR
+                                            Ticket QR preview
                                         </span>
                                         @break
 

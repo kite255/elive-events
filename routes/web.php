@@ -506,11 +506,23 @@ Route::get(
             404
         );
 
+        $event->load([
+            'organization',
+            'ticketSetting',
+        ]);
+
+        $publicTicketTypes = $event
+            ->publicTicketTypes()
+            ->get();
+
         return view(
             'public.events.show',
             [
                 'event' =>
                     $event,
+
+                'publicTicketTypes' =>
+                    $publicTicketTypes,
             ]
         );
     }

@@ -8,6 +8,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -261,6 +262,189 @@ class EventForm
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
+
+                Section::make('Public Event Page')
+                    ->description(
+                        'Build the detailed page customers see before registering or buying tickets. Empty optional sections are hidden automatically.'
+                    )
+                    ->schema([
+                        TextInput::make('public_theme')
+                            ->label('Event Theme')
+                            ->placeholder('Revive Us Again, Lord')
+                            ->maxLength(255),
+
+                        TextInput::make('venue_address')
+                            ->label('Full Venue Address')
+                            ->maxLength(255),
+
+                        TextInput::make('map_url')
+                            ->label('Google Maps Link')
+                            ->url()
+                            ->maxLength(2048),
+
+                        TextInput::make('ministry_years')
+                            ->label('Years of Ministry / Experience')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->maxValue(999),
+
+                        TextInput::make('group_members_count')
+                            ->label('Group Members')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->maxValue(9999),
+
+                        Repeater::make('public_highlights')
+                            ->label('Additional Highlights')
+                            ->schema([
+                                TextInput::make('value')
+                                    ->label('Value')
+                                    ->placeholder('Live Band')
+                                    ->required()
+                                    ->maxLength(100),
+                                TextInput::make('label')
+                                    ->label('Label')
+                                    ->placeholder('Experience')
+                                    ->required()
+                                    ->maxLength(100),
+                            ])
+                            ->columns(2)
+                            ->defaultItems(0)
+                            ->reorderable()
+                            ->collapsible()
+                            ->cloneable()
+                            ->addActionLabel('Add Highlight')
+                            ->columnSpanFull(),
+
+                        Repeater::make('public_gallery')
+                            ->label('Photo Gallery')
+                            ->schema([
+                                FileUpload::make('image_path')
+                                    ->label('Photo')
+                                    ->disk('public')
+                                    ->directory('events/gallery')
+                                    ->image()
+                                    ->imageEditor()
+                                    ->maxSize(5120)
+                                    ->required(),
+                                TextInput::make('caption')
+                                    ->label('Caption')
+                                    ->maxLength(255),
+                            ])
+                            ->columns(2)
+                            ->defaultItems(0)
+                            ->reorderable()
+                            ->collapsible()
+                            ->addActionLabel('Add Photo')
+                            ->columnSpanFull(),
+
+                        Repeater::make('public_speakers')
+                            ->label('Speakers / Performers')
+                            ->schema([
+                                TextInput::make('name')
+                                    ->required()
+                                    ->maxLength(255),
+                                TextInput::make('role')
+                                    ->label('Role or Description')
+                                    ->maxLength(255),
+                                FileUpload::make('image_path')
+                                    ->label('Photo')
+                                    ->disk('public')
+                                    ->directory('events/speakers')
+                                    ->image()
+                                    ->imageEditor()
+                                    ->maxSize(4096),
+                            ])
+                            ->columns(3)
+                            ->defaultItems(0)
+                            ->reorderable()
+                            ->collapsible()
+                            ->addActionLabel('Add Speaker or Performer')
+                            ->columnSpanFull(),
+
+                        Repeater::make('public_faqs')
+                            ->label('Frequently Asked Questions')
+                            ->schema([
+                                TextInput::make('question')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->columnSpanFull(),
+                                Textarea::make('answer')
+                                    ->required()
+                                    ->rows(3)
+                                    ->columnSpanFull(),
+                            ])
+                            ->defaultItems(0)
+                            ->reorderable()
+                            ->collapsible()
+                            ->cloneable()
+                            ->addActionLabel('Add Question')
+                            ->columnSpanFull(),
+
+                        Textarea::make('dress_code')
+                            ->label('Dress Code')
+                            ->rows(3),
+
+                        Textarea::make('seating_policy')
+                            ->label('Seating Information')
+                            ->rows(3),
+
+                        Textarea::make('age_restriction')
+                            ->label('Age Restrictions')
+                            ->rows(3),
+
+                        Textarea::make('ticket_policy')
+                            ->label('Ticket and Entry Policy')
+                            ->rows(3),
+
+                        Textarea::make('refund_policy')
+                            ->label('Cancellation / Refund Policy')
+                            ->rows(3),
+
+                        TextInput::make('organizer_contact_email')
+                            ->label('Public Contact Email')
+                            ->email()
+                            ->maxLength(255),
+
+                        TextInput::make('organizer_contact_phone')
+                            ->label('Public Contact Phone')
+                            ->tel()
+                            ->maxLength(40),
+
+                        TextInput::make('website_url')
+                            ->label('Event Website')
+                            ->url()
+                            ->maxLength(2048),
+
+                        TextInput::make('facebook_url')
+                            ->label('Facebook Link')
+                            ->url()
+                            ->maxLength(2048),
+
+                        TextInput::make('instagram_url')
+                            ->label('Instagram Link')
+                            ->url()
+                            ->maxLength(2048),
+
+                        TextInput::make('youtube_url')
+                            ->label('YouTube Link')
+                            ->url()
+                            ->maxLength(2048),
+
+                        TextInput::make('final_cta_title')
+                            ->label('Final Call-to-Action Heading')
+                            ->maxLength(255)
+                            ->columnSpanFull(),
+
+                        Textarea::make('final_cta_body')
+                            ->label('Final Call-to-Action Message')
+                            ->rows(4)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
 
                 /*
                 |--------------------------------------------------------------------------

@@ -151,17 +151,13 @@ class TicketAccessMessageFactory
             [
                 'Hello {{buyer_name}},',
                 '',
-                'Your tickets for {{event_name}} are ready.',
+                'Your payment has been confirmed and your tickets for {{event_name}} are ready.',
                 '',
                 'Number of tickets: {{ticket_count}}',
                 'Order: {{order_number}}',
                 '',
-                'View and download your tickets:',
-                '{{tickets_url}}',
-                '',
-                'Keep this link private because it provides access to your tickets.',
-                '',
-                'eLive Events',
+                'Use the button below to view and download your tickets.',
+                'We look forward to welcoming you.',
             ]
         );
     }
