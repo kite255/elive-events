@@ -346,6 +346,9 @@ class TicketDesignerServiceTest extends TestCase
                         'y' => 50,
                         'width' => 300,
                         'height' => 100,
+                        'style' => [
+                            'fontSize' => 40,
+                        ],
                     ],
                     [
                         'id' => 'qr_001',
@@ -382,6 +385,10 @@ class TicketDesignerServiceTest extends TestCase
         $this->assertEquals(100, $text['y']);
         $this->assertEquals(600, $text['width']);
         $this->assertEquals(200, $text['height']);
+        $this->assertEquals(
+            80,
+            $text['style']['fontSize']
+        );
 
         $this->assertEquals(1600, $qr['x']);
         $this->assertEquals(600, $qr['y']);

@@ -146,11 +146,13 @@ class TicketDesignerService
 
         $scaleX = $newWidth / $oldWidth;
         $scaleY = $newHeight / $oldHeight;
+        $fontScale = min($scaleX, $scaleY);
 
         DB::transaction(function () use (
             $template,
             $scaleX,
             $scaleY,
+            $fontScale,
             $newWidth,
             $newHeight
         ): void {
@@ -175,11 +177,26 @@ class TicketDesignerService
                         (float) ($element['height'] ?? 0)
                     ) * $scaleY;
 
+                    if (
+                        ($element['type'] ?? null) === 'text'
+                        && isset(
+                            $element['style']['fontSize']
+                        )
+                    ) {
+                        $element['style']['fontSize'] = round(
+                            (float) $element['style']['fontSize']
+                                * $fontScale,
+                            2
+                        );
+                    }
+
                     $isQr = in_array(
                         $element['type'] ?? null,
                         ['qr', 'qr_code'],
                         true
-                    ) || ($element['binding'] ?? null) === 'ticket_qr';
+                    ) || (
+                        $element['binding'] ?? null
+                    ) === 'ticket_qr';
 
                     if ($isQr) {
                         $size = min(
@@ -190,6 +207,16 @@ class TicketDesignerService
                         $element['width'] = $size;
                         $element['height'] = $size;
                     }
+
+                    $element['width'] = min(
+                        (float) $element['width'],
+                        $newWidth
+                    );
+
+                    $element['height'] = min(
+                        (float) $element['height'],
+                        $newHeight
+                    );
 
                     $element['x'] = max(
                         0,
@@ -214,16 +241,6 @@ class TicketDesignerService
                             )
                         )
                     );
-
-                    $element['width'] = min(
-                        (float) $element['width'],
-                        $newWidth
-                    );
-
-                    $element['height'] = min(
-                        (float) $element['height'],
-                        $newHeight
-                    );
                 }
 
                 unset($element);
@@ -247,6 +264,7 @@ class TicketDesignerService
         array $definition
     ): TicketTemplatePage {
         $eventTemplateId = $page->event_ticket_template_id;
+
         $organizationTemplateId =
             $page->organization_ticket_template_id;
 
