@@ -71,7 +71,7 @@ class PublicEventDetailedPageTest extends TestCase
             ->assertSee('Secure your seat for an evening of revival');
     }
 
-    public function test_public_ticket_tiers_show_live_remaining_capacity(): void
+    public function test_public_event_hides_ticket_preview_and_shows_mobile_ticket_cta(): void
     {
         $organization = Organization::query()->create([
             'name' => 'Ticket Test Organization',
@@ -116,9 +116,12 @@ class PublicEventDetailedPageTest extends TestCase
 
         $this->get(route('public.events.show', ['event' => $event->slug]))
             ->assertOk()
-            ->assertSee('Ticket Options')
-            ->assertSee('VIP')
-            ->assertSee('10 remaining')
-            ->assertSee('TZS 50,000');
+            ->assertDontSee('Choose your experience')
+            ->assertDontSee('Ticket Options')
+            ->assertDontSee('Explore Event')
+            ->assertDontSee('10 remaining')
+            ->assertDontSee('TZS 50,000')
+            ->assertSee('class="hero-action primary desktop-ticket-cta"', false)
+            ->assertSee('class="mobile-ticket-cta"', false);
     }
 }

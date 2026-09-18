@@ -808,6 +808,10 @@
             transform: translateY(-2px);
         }
 
+        .mobile-ticket-cta {
+            display: none;
+        }
+
         .countdown-card {
             margin-top: 22px;
             padding: 24px;
@@ -1600,6 +1604,33 @@
         }
 
         @media (max-width: 760px) {
+            .has-mobile-ticket-cta {
+                padding-bottom: calc(92px + env(safe-area-inset-bottom));
+            }
+
+            .desktop-ticket-cta {
+                display: none;
+            }
+
+            .mobile-ticket-cta {
+                position: fixed;
+                z-index: 1200;
+                right: 14px;
+                bottom: calc(14px + env(safe-area-inset-bottom));
+                left: 14px;
+                min-height: 56px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0 24px;
+                border-radius: 14px;
+                background: var(--elive-orange);
+                color: #FFFFFF;
+                font-size: 16px;
+                font-weight: 800;
+                box-shadow: 0 14px 34px rgba(11, 31, 58, .24);
+            }
+
             .container {
                 width: min(100% - 28px, 1180px);
             }
@@ -1775,7 +1806,7 @@
     </style>
 </head>
 
-<body>
+<body class="{{ $ticketSalesOpen && ! $isPast ? 'has-mobile-ticket-cta' : '' }}">
 
 <header class="site-header">
     <div class="container">
@@ -1953,7 +1984,7 @@
 
                         <div class="hero-actions">
                             @if ($ticketSalesOpen && ! $isPast)
-                                <a href="{{ $ticketUrl }}" class="hero-action primary">
+                                <a href="{{ $ticketUrl }}" class="hero-action primary desktop-ticket-cta">
                                     Secure Your Seat
                                 </a>
                             @elseif ($event->registration_is_open && ! $isPast)
@@ -1961,10 +1992,6 @@
                                     Register Now
                                 </a>
                             @endif
-
-                            <a href="#event-details" class="hero-action">
-                                Explore Event
-                            </a>
                         </div>
 
                     </div>
@@ -2242,56 +2269,6 @@
 
         </div>
     </section>
-
-    @if ($publicTicketTypes->isNotEmpty())
-        <section id="tickets" class="public-detail-section alt" aria-labelledby="tickets-heading">
-            <div class="container">
-                <p class="public-detail-kicker">Choose your experience</p>
-                <h2 id="tickets-heading" class="public-detail-heading">Ticket Options</h2>
-
-                <div class="ticket-grid">
-                    @foreach ($publicTicketTypes as $ticketType)
-                        @php
-                            $remaining = $ticketType->remainingCapacity();
-                            $soldOut = $remaining !== null && $remaining <= 0;
-                            $lowStock = $remaining !== null
-                                && $remaining > 0
-                                && $remaining <= max(5, (int) ceil($ticketType->capacity * .1));
-                            $tierSalesOpen = $ticketSalesOpen
-                                && (! $ticketType->sales_start_at || $ticketType->sales_start_at->lte(now()))
-                                && (! $ticketType->sales_end_at || $ticketType->sales_end_at->gte(now()));
-                        @endphp
-
-                        <article class="ticket-tier">
-                            <h3>{{ $ticketType->name }}</h3>
-
-                            <div class="ticket-price">
-                                {{ $ticketType->price > 0
-                                    ? $ticketType->currency . ' ' . number_format((float) $ticketType->price)
-                                    : 'Free' }}
-                            </div>
-
-                            @if ($ticketType->description)
-                                <p class="ticket-copy">{{ $ticketType->description }}</p>
-                            @endif
-
-                            <p class="ticket-stock {{ $soldOut ? 'stock-out' : ($lowStock ? 'stock-low' : 'stock-ok') }}">
-                                {{ $soldOut
-                                    ? 'Sold Out'
-                                    : ($remaining === null ? 'Available' : number_format($remaining) . ' remaining') }}
-                            </p>
-
-                            @if ($tierSalesOpen && ! $soldOut)
-                                <a class="public-action" href="{{ $ticketUrl }}">Buy Tickets</a>
-                            @elseif (! $soldOut)
-                                <span class="ticket-stock stock-out">Sales Closed</span>
-                            @endif
-                        </article>
-                    @endforeach
-                </div>
-            </div>
-        </section>
-    @endif
 
     @if ($sessions->isNotEmpty())
         <section class="public-detail-section" aria-labelledby="programme-heading">
@@ -2590,7 +2567,7 @@
                 <p>{{ $event->final_cta_body ?: 'Join us for a memorable event and reserve your place while availability remains.' }}</p>
 
                 @if ($ticketSalesOpen && ! $isPast)
-                    <a class="final-cta-action public-action" href="{{ $ticketUrl }}">Secure Your Seat</a>
+                    <a class="final-cta-action public-action desktop-ticket-cta" href="{{ $ticketUrl }}">Secure Your Seat</a>
                 @elseif ($event->registration_is_open && ! $isPast)
                     <a class="final-cta-action public-action" href="{{ $registerUrl }}">Register Now</a>
                 @endif
@@ -2600,6 +2577,15 @@
 
 </main>
 
+
+@if ($ticketSalesOpen && ! $isPast)
+    <a
+        class="mobile-ticket-cta"
+        href="{{ $ticketUrl }}"
+    >
+        Secure Your Seat
+    </a>
+@endif
 
 <footer class="site-footer">
     <div class="container footer-inner">
