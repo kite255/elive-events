@@ -6,6 +6,7 @@ use App\Models\EventTicketTemplate;
 use App\Models\OrganizationTicketTemplate;
 use App\Models\TicketTemplatePage;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class TicketDesignerService
@@ -44,10 +45,7 @@ class TicketDesignerService
         string $type,
         int $templateId
     ): Collection {
-        $template = $this->loadTemplate(
-            $type,
-            $templateId
-        );
+        $template = $this->loadTemplate($type, $templateId);
 
         return $template->pages()
             ->orderBy('page_number')
@@ -58,10 +56,7 @@ class TicketDesignerService
         string $type,
         int $templateId
     ): TicketTemplatePage {
-        $template = $this->loadTemplate(
-            $type,
-            $templateId
-        );
+        $template = $this->loadTemplate($type, $templateId);
 
         $existingPage = $template->pages()
             ->orderBy('page_number')
@@ -86,14 +81,10 @@ class TicketDesignerService
         int $templateId,
         ?string $name = null
     ): TicketTemplatePage {
-        $template = $this->loadTemplate(
-            $type,
-            $templateId
-        );
+        $template = $this->loadTemplate($type, $templateId);
 
         $nextPageNumber = (
-            (int) $template->pages()
-                ->max('page_number')
+            (int) $template->pages()->max('page_number')
         ) + 1;
 
         return $template->pages()->create([
@@ -127,13 +118,135 @@ class TicketDesignerService
         return $page->refresh();
     }
 
+    public function resizeTemplate(
+        string $type,
+        int $templateId,
+        int $oldWidth,
+        int $oldHeight,
+        int $newWidth,
+        int $newHeight
+    ): void {
+        if (
+            $oldWidth <= 0
+            || $oldHeight <= 0
+            || $newWidth <= 0
+            || $newHeight <= 0
+        ) {
+            return;
+        }
+
+        if (
+            $oldWidth === $newWidth
+            && $oldHeight === $newHeight
+        ) {
+            return;
+        }
+
+        $template = $this->loadTemplate($type, $templateId);
+
+        $scaleX = $newWidth / $oldWidth;
+        $scaleY = $newHeight / $oldHeight;
+
+        DB::transaction(function () use (
+            $template,
+            $scaleX,
+            $scaleY,
+            $newWidth,
+            $newHeight
+        ): void {
+            foreach ($template->pages()->get() as $page) {
+                $definition = $page->definition ?? [];
+                $elements = $definition['elements'] ?? [];
+
+                foreach ($elements as &$element) {
+                    $element['x'] = (
+                        (float) ($element['x'] ?? 0)
+                    ) * $scaleX;
+
+                    $element['y'] = (
+                        (float) ($element['y'] ?? 0)
+                    ) * $scaleY;
+
+                    $element['width'] = (
+                        (float) ($element['width'] ?? 0)
+                    ) * $scaleX;
+
+                    $element['height'] = (
+                        (float) ($element['height'] ?? 0)
+                    ) * $scaleY;
+
+                    $isQr = in_array(
+                        $element['type'] ?? null,
+                        ['qr', 'qr_code'],
+                        true
+                    ) || ($element['binding'] ?? null) === 'ticket_qr';
+
+                    if ($isQr) {
+                        $size = min(
+                            (float) $element['width'],
+                            (float) $element['height']
+                        );
+
+                        $element['width'] = $size;
+                        $element['height'] = $size;
+                    }
+
+                    $element['x'] = max(
+                        0,
+                        min(
+                            (float) $element['x'],
+                            max(
+                                0,
+                                $newWidth
+                                    - (float) $element['width']
+                            )
+                        )
+                    );
+
+                    $element['y'] = max(
+                        0,
+                        min(
+                            (float) $element['y'],
+                            max(
+                                0,
+                                $newHeight
+                                    - (float) $element['height']
+                            )
+                        )
+                    );
+
+                    $element['width'] = min(
+                        (float) $element['width'],
+                        $newWidth
+                    );
+
+                    $element['height'] = min(
+                        (float) $element['height'],
+                        $newHeight
+                    );
+                }
+
+                unset($element);
+
+                $definition['elements'] = $elements;
+
+                $page->update([
+                    'definition' => $definition,
+                ]);
+            }
+
+            $template->update([
+                'width' => $newWidth,
+                'height' => $newHeight,
+            ]);
+        });
+    }
+
     public function saveDefinition(
         TicketTemplatePage $page,
         array $definition
     ): TicketTemplatePage {
-        $eventTemplateId =
-            $page->event_ticket_template_id;
-
+        $eventTemplateId = $page->event_ticket_template_id;
         $organizationTemplateId =
             $page->organization_ticket_template_id;
 
@@ -158,12 +271,11 @@ class TicketDesignerService
             );
         }
 
-        $validatedDefinition =
-            $this->validator->validate(
-                $definition,
-                (int) $template->width,
-                (int) $template->height
-            );
+        $validatedDefinition = $this->validator->validate(
+            $definition,
+            (int) $template->width,
+            (int) $template->height
+        );
 
         $page->update([
             'definition' => $validatedDefinition,
