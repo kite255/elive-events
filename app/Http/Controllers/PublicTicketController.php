@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Services\Payments\PaymentFulfillmentService;
 use App\Services\Payments\PaymentService;
 use App\Services\Tickets\TicketAvailabilityService;
 use App\Services\Tickets\TicketOrderService;
@@ -15,7 +16,8 @@ class PublicTicketController extends Controller
     public function __construct(
         protected TicketAvailabilityService $availabilityService,
         protected TicketOrderService $ticketOrderService,
-        protected PaymentService $paymentService
+        protected PaymentService $paymentService,
+        protected PaymentFulfillmentService $paymentFulfillmentService
     ) {
     }
 
@@ -260,6 +262,26 @@ class PublicTicketController extends Controller
                 ->createForTicketOrder(
                     $order
                 );
+
+        if ($payment->isCompleted()) {
+            $this->paymentFulfillmentService
+                ->fulfill(
+                    $payment
+                );
+
+            return redirect()
+                ->route(
+                    'public.ticket-orders.show',
+                    [
+                        'token' =>
+                            $order->public_token,
+                    ]
+                )
+                ->with(
+                    'success',
+                    'Your free tickets are ready.'
+                );
+        }
 
         return redirect()
             ->route(

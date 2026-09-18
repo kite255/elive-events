@@ -2,14 +2,18 @@
 
 namespace Tests\Feature\Tickets;
 
+use App\Jobs\SendTicketAccessLinkJob;
+use App\Models\CommunicationLog;
 use App\Models\Event;
 use App\Models\EventTicketSetting;
 use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
+use App\Models\Ticket;
 use App\Models\TicketOrder;
 use App\Models\TicketType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class PublicTicketCheckoutTest extends TestCase
@@ -154,6 +158,138 @@ class PublicTicketCheckoutTest extends TestCase
             route(
                 'payments.pay',
                 $payment
+            )
+        );
+    }
+
+    public function test_buyer_can_complete_a_free_ticket_order_without_a_gateway(): void
+    {
+        Queue::fake();
+
+        config([
+            'services.whatsapp.access_token' =>
+                'test-token',
+            'services.whatsapp.phone_number_id' =>
+                '123456789',
+            'services.whatsapp.templates.registration_confirmation' =>
+                'event_registration_confirmation',
+            'services.whatsapp.templates.ticket_access' =>
+                'concert_tickets_delivery_en',
+        ]);
+
+        $event = $this->createEvent();
+
+        PaymentGateway::query()->delete();
+
+        $ticketType =
+            $this->createTicketType(
+                $event
+            );
+
+        $ticketType->update([
+            'price' => 0,
+        ]);
+
+        $response =
+            $this->post(
+                '/events/'
+                . $event->slug
+                . '/tickets',
+                [
+                    'buyer_name' =>
+                        'Free Ticket Buyer',
+
+                    'buyer_phone' =>
+                        '255700000001',
+
+                    'buyer_email' =>
+                        'free@example.com',
+
+                    'tickets' => [
+                        $ticketType->id => 2,
+                    ],
+                ]
+            );
+
+        $order =
+            TicketOrder::query()
+                ->latest('id')
+                ->firstOrFail();
+
+        $payment =
+            Payment::query()
+                ->where(
+                    'ticket_order_id',
+                    $order->id
+                )
+                ->firstOrFail();
+
+        $this->assertSame(
+            TicketOrder::STATUS_PAID,
+            $order->status
+        );
+
+        $this->assertSame(
+            '0.00',
+            $order->total
+        );
+
+        $this->assertSame(
+            Payment::STATUS_COMPLETED,
+            $payment->status
+        );
+
+        $this->assertSame(
+            'free',
+            $payment->payment_method
+        );
+
+        $this->assertNull(
+            $payment->payment_gateway_id
+        );
+
+        $this->assertNotNull(
+            $payment->fulfilled_at
+        );
+
+        $this->assertSame(
+            2,
+            Ticket::query()
+                ->where(
+                    'ticket_order_id',
+                    $order->id
+                )
+                ->count()
+        );
+
+        $this->assertSame(
+            [
+                CommunicationLog::CHANNEL_EMAIL,
+                CommunicationLog::CHANNEL_SMS,
+                CommunicationLog::CHANNEL_WHATSAPP,
+            ],
+            CommunicationLog::query()
+                ->where(
+                    'ticket_order_id',
+                    $order->id
+                )
+                ->orderBy('channel')
+                ->pluck('channel')
+                ->all()
+        );
+
+        Queue::assertPushed(
+            SendTicketAccessLinkJob::class,
+            3
+        );
+
+        $response->assertRedirect(
+            route(
+                'public.ticket-orders.show',
+                [
+                    'token' =>
+                        $order->public_token,
+                ]
             )
         );
     }

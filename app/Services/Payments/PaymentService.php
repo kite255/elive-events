@@ -148,7 +148,11 @@ class PaymentService
     }
 
     /**
-     * Create one pending payment for a ticket order.
+     * Create a payment record for a ticket order.
+     *
+     * Paid orders receive a pending gateway payment. Free orders receive a
+     * completed zero-value payment so they can use the same audited,
+     * idempotent fulfillment pipeline without contacting a gateway.
      */
     public function createForTicketOrder(
         TicketOrder $order
@@ -195,23 +199,28 @@ class PaymentService
         $amount =
             (float) $order->total;
 
-        if ($amount <= 0) {
+        if ($amount < 0) {
             throw new RuntimeException(
-                'The ticket order total must be greater than zero.'
+                'The ticket order total cannot be negative.'
             );
         }
 
+        $isFree = $amount === 0.0;
+
         $gateway =
-            $this->defaultGatewayForOrganization(
-                (int) $event->organization_id
-            );
+            $isFree
+                ? null
+                : $this->defaultGatewayForOrganization(
+                    (int) $event->organization_id
+                );
 
         return DB::transaction(
             function () use (
                 $order,
                 $event,
                 $gateway,
-                $amount
+                $amount,
+                $isFree
             ): Payment {
                 $lockedOrder =
                     TicketOrder::query()
@@ -289,7 +298,7 @@ class PaymentService
                         $lockedOrder->getKey(),
 
                     'payment_gateway_id' =>
-                        $gateway->getKey(),
+                        $gateway?->getKey(),
 
                     'reference' =>
                         $this->referenceService
@@ -307,7 +316,14 @@ class PaymentService
                         ),
 
                     'status' =>
-                        Payment::STATUS_PENDING,
+                        $isFree
+                            ? Payment::STATUS_COMPLETED
+                            : Payment::STATUS_PENDING,
+
+                    'payment_method' =>
+                        $isFree
+                            ? 'free'
+                            : null,
 
                     'description' =>
                         'Ticket payment for '
@@ -318,12 +334,20 @@ class PaymentService
                     'initiated_at' =>
                         now(),
 
+                    'paid_at' =>
+                        $isFree
+                            ? now()
+                            : null,
+
                     'metadata' => [
                         'payment_purpose' =>
                             'ticket_order',
 
                         'ticket_order_number' =>
                             $lockedOrder->order_number,
+
+                        'is_free' =>
+                            $isFree,
                     ],
                 ]);
             }
