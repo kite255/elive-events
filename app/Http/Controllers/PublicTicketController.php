@@ -158,12 +158,15 @@ class PublicTicketController extends Controller
                 ],
 
                 'buyer_phone' => [
+                    'required_without:buyer_email',
                     'nullable',
                     'string',
                     'max:30',
+                    'regex:/^\+?[0-9][0-9\s().-]{7,29}$/',
                 ],
 
                 'buyer_email' => [
+                    'required_without:buyer_phone',
                     'nullable',
                     'email',
                     'max:255',

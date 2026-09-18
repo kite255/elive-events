@@ -1433,8 +1433,7 @@
                                 </h2>
 
                                 <p class="panel-description">
-                                    We will use these details
-                                    for your order and ticket delivery.
+                                    Enter at least a phone number or email address so we can send your ticket link.
                                 </p>
 
                                 <div class="field-grid">
@@ -1468,7 +1467,7 @@
                                     <div class="field">
 
                                         <label for="buyer_phone">
-                                            Phone number
+                                            Phone number (optional)
                                         </label>
 
                                         <input
@@ -1492,7 +1491,7 @@
                                     <div class="field">
 
                                         <label for="buyer_email">
-                                            Email address
+                                            Email address (optional)
                                         </label>
 
                                         <input

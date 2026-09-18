@@ -100,6 +100,26 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('data-maximum="5"', false);
     }
 
+    public function test_ticket_page_explains_contact_requirement(): void
+    {
+        $event = $this->createEvent();
+        $this->createTicketType($event);
+
+        $response = $this->get(
+            route('public.tickets.buy', [
+                'event' => $event->slug,
+            ])
+        );
+
+        $response
+            ->assertOk()
+            ->assertSee(
+                'Enter at least a phone number or email address'
+            )
+            ->assertSee('Phone number (optional)')
+            ->assertSee('Email address (optional)');
+    }
+
     public function test_buyer_can_create_ticket_order_and_payment(): void
     {
         $event = $this->createEvent();
@@ -187,6 +207,118 @@ class PublicTicketCheckoutTest extends TestCase
                 $payment
             )
         );
+    }
+
+    public function test_checkout_accepts_phone_without_email(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $response = $this->post(
+            '/events/'.$event->slug.'/tickets',
+            [
+                'buyer_name' => 'Phone Buyer',
+                'buyer_phone' => '0712345678',
+                'buyer_email' => '',
+                'tickets' => [
+                    $ticketType->id => 1,
+                ],
+            ]
+        );
+
+        $order = TicketOrder::query()
+            ->latest('id')
+            ->firstOrFail();
+
+        $response->assertRedirect();
+        $this->assertSame('0712345678', $order->buyer_phone);
+        $this->assertNull($order->buyer_email);
+    }
+
+    public function test_checkout_accepts_email_without_phone(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $response = $this->post(
+            '/events/'.$event->slug.'/tickets',
+            [
+                'buyer_name' => 'Email Buyer',
+                'buyer_phone' => '',
+                'buyer_email' => 'email.buyer@example.com',
+                'tickets' => [
+                    $ticketType->id => 1,
+                ],
+            ]
+        );
+
+        $order = TicketOrder::query()
+            ->latest('id')
+            ->firstOrFail();
+
+        $response->assertRedirect();
+        $this->assertNull($order->buyer_phone);
+        $this->assertSame(
+            'email.buyer@example.com',
+            $order->buyer_email
+        );
+    }
+
+    public function test_checkout_requires_phone_or_email(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $response = $this
+            ->from('/events/'.$event->slug.'/tickets')
+            ->post(
+                '/events/'.$event->slug.'/tickets',
+                [
+                    'buyer_name' => 'No Contact Buyer',
+                    'buyer_phone' => '',
+                    'buyer_email' => '',
+                    'tickets' => [
+                        $ticketType->id => 1,
+                    ],
+                ]
+            );
+
+        $response
+            ->assertRedirect()
+            ->assertSessionHasErrors([
+                'buyer_phone',
+                'buyer_email',
+            ]);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
+    public function test_checkout_rejects_invalid_phone_when_email_is_absent(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $response = $this
+            ->from('/events/'.$event->slug.'/tickets')
+            ->post(
+                '/events/'.$event->slug.'/tickets',
+                [
+                    'buyer_name' => 'Invalid Phone Buyer',
+                    'buyer_phone' => '12345',
+                    'buyer_email' => '',
+                    'tickets' => [
+                        $ticketType->id => 1,
+                    ],
+                ]
+            );
+
+        $response
+            ->assertRedirect()
+            ->assertSessionHasErrors([
+                'buyer_phone',
+            ]);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
     }
 
     public function test_buyer_can_complete_a_free_ticket_order_without_a_gateway(): void
