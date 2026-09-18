@@ -944,6 +944,93 @@
             align-items: stretch;
         }
 
+        .ticket-package-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 22px;
+        }
+
+        .ticket-package-card {
+            overflow: hidden;
+            border: 1px solid var(--elive-border);
+            border-radius: 22px;
+            background: #FFFFFF;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, .07);
+        }
+
+        .ticket-package-card.vvip {
+            border-color: rgba(232, 122, 18, .38);
+        }
+
+        .ticket-package-header {
+            padding: 24px 26px;
+            background: var(--elive-navy);
+            color: #FFFFFF;
+        }
+
+        .ticket-package-card.vvip .ticket-package-header {
+            background: linear-gradient(135deg, var(--elive-navy), var(--elive-blue));
+        }
+
+        .ticket-package-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #F6A623;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+        }
+
+        .ticket-package-header h3 {
+            margin: 0;
+            font-size: 26px;
+            line-height: 1.15;
+        }
+
+        .ticket-package-list {
+            display: grid;
+            gap: 0;
+            margin: 0;
+            padding: 8px 26px 14px;
+            list-style: none;
+        }
+
+        .ticket-package-list li {
+            position: relative;
+            padding: 17px 0 17px 28px;
+            border-bottom: 1px solid #EDF1F6;
+            color: var(--elive-muted);
+            line-height: 1.6;
+        }
+
+        .ticket-package-list li:last-child {
+            border-bottom: 0;
+        }
+
+        .ticket-package-list li::before {
+            content: '\2713';
+            position: absolute;
+            top: 18px;
+            left: 0;
+            display: grid;
+            width: 18px;
+            height: 18px;
+            place-items: center;
+            border-radius: 50%;
+            background: rgba(35, 63, 126, .10);
+            color: var(--elive-blue);
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .ticket-package-list strong {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--elive-navy);
+            font-size: 15px;
+        }
+
         .gallery-viewport {
             overflow-x: auto;
             overscroll-behavior-inline: contain;
@@ -1700,6 +1787,10 @@
                 padding: 54px 0;
             }
 
+            .ticket-package-grid {
+                grid-template-columns: 1fr;
+            }
+
             .programme-row {
                 grid-template-columns: 1fr;
                 gap: 8px;
@@ -2269,6 +2360,48 @@
 
         </div>
     </section>
+
+    @if ($event->slug === 'the-revived-way')
+        <section class="public-detail-section alt" aria-labelledby="ticket-packages-heading">
+            <div class="container">
+                <p class="public-detail-kicker">More than a ticket</p>
+                <h2 id="ticket-packages-heading" class="public-detail-heading">Premium Package Benefits</h2>
+
+                <div class="ticket-package-grid">
+                    <article class="ticket-package-card">
+                        <header class="ticket-package-header">
+                            <span class="ticket-package-label">Elevated concert experience</span>
+                            <h3>VIP Experience</h3>
+                        </header>
+
+                        <ul class="ticket-package-list">
+                            <li><strong>Priority Seating</strong>Reserved front or centre seating for an excellent view and concert experience.</li>
+                            <li><strong>Exclusive Welcome Package</strong>A concert booklet, wristband and themed scarf.</li>
+                            <li><strong>Meet and Greet</strong>An opportunity to interact with the guest artists before or after the concert.</li>
+                            <li><strong>Semi-Luxury Hospitality</strong>Complimentary light snacks and drinks during the concert.</li>
+                            <li><strong>Photo Opportunity</strong>Access to the designated photo booth and backdrop, including a photo with Revived Music.</li>
+                        </ul>
+                    </article>
+
+                    <article class="ticket-package-card vvip">
+                        <header class="ticket-package-header">
+                            <span class="ticket-package-label">Our most exclusive experience</span>
+                            <h3>VVIP Experience</h3>
+                        </header>
+
+                        <ul class="ticket-package-list">
+                            <li><strong>Front-Row Seating</strong>Premium front-row seating with a personalized name tag.</li>
+                            <li><strong>Backstage Access</strong>An exclusive behind-the-scenes tour or prayer session with the singers.</li>
+                            <li><strong>Luxury Hospitality</strong>Light snacks and drinks during the concert, followed by a fully catered dinner after the concert.</li>
+                            <li><strong>Personalized Gifts</strong>A flash drive with The Revived Way album songs, a customized insulated bottle bearing your name, and a personalized wooden appreciation keepsake.</li>
+                            <li><strong>Recognition</strong>Public acknowledgement during the concert by the MC and Revived Music.</li>
+                            <li><strong>Photo Opportunity</strong>Access to the designated photo booth and backdrop, including a photo with Revived Music.</li>
+                        </ul>
+                    </article>
+                </div>
+            </div>
+        </section>
+    @endif
 
     @if ($sessions->isNotEmpty())
         <section class="public-detail-section" aria-labelledby="programme-heading">
