@@ -2361,7 +2361,7 @@
         </div>
     </section>
 
-    @if ($event->slug === 'the-revived-way')
+    @if ($event->slug === 'the-revived-way-album-launch-concert')
         <section class="public-detail-section alt" aria-labelledby="ticket-packages-heading">
             <div class="container">
                 <p class="public-detail-kicker">More than a ticket</p>
