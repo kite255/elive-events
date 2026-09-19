@@ -282,6 +282,8 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 
+<script defer src="https://analytics.elive.co.tz/script.js" data-website-id="a4922c3a-16d3-4451-a2b4-3224dbc16f84"></script>
+
     <style>
         :root {
             --elive-navy: #161943;
@@ -2382,7 +2384,7 @@
         </div>
     </section>
 
-    @if ($event->slug === 'the-revived-way')
+    @if ($event->slug === 'the-revived-way-album-launch-concert')
         <section class="public-detail-section alt" aria-labelledby="ticket-packages-heading">
             <div class="container">
                 <p class="public-detail-kicker">More than a ticket</p>
