@@ -187,6 +187,10 @@ class EditEvent extends EditRecord
                     ->label('Badge Print Station')
                     ->icon('heroicon-o-printer')
                     ->color('primary')
+                    ->visible(
+                        fn (): bool =>
+                            ! (auth()->user()?->isTicketOrganizer() ?? false)
+                    )
                     ->url(
                         fn (): string =>
                             BadgePrintStation::getUrl([
@@ -331,6 +335,10 @@ class EditEvent extends EditRecord
                     ->label('Attendance Dashboard')
                     ->icon('heroicon-o-chart-bar-square')
                     ->color('primary')
+                    ->visible(
+                        fn (): bool =>
+                            ! (auth()->user()?->isTicketOrganizer() ?? false)
+                    )
                     ->url(
                         fn (): string =>
                             AttendanceDashboard::getUrl([
@@ -343,6 +351,10 @@ class EditEvent extends EditRecord
                     ->label('Attendance Report')
                     ->icon('heroicon-o-clipboard-document-check')
                     ->color('gray')
+                    ->visible(
+                        fn (): bool =>
+                            ! (auth()->user()?->isTicketOrganizer() ?? false)
+                    )
                     ->url(
                         fn (): string =>
                             AttendanceReport::getUrl([
