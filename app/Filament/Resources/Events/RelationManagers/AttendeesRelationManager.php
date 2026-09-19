@@ -424,7 +424,8 @@ class AttendeesRelationManager extends RelationManager
                         ->color('primary')
                         ->visible(
                             fn ($record): bool =>
-                                AttendeeResource::canManageBadge(
+                                ! (auth()->user()?->isTicketOrganizer() ?? false)
+                                && AttendeeResource::canManageBadge(
                                     $record
                                 )
                         )
