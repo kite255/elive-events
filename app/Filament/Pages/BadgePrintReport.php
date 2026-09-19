@@ -70,6 +70,10 @@ class BadgePrintReport extends Page
             return true;
         }
 
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
         return Event::query()
             ->accessibleBy($user)
             ->exists();
