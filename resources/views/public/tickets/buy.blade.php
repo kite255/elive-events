@@ -88,6 +88,8 @@
         ])
     @endif
 
+<script defer src="https://analytics.elive.co.tz/script.js" data-website-id="a4922c3a-16d3-4451-a2b4-3224dbc16f84"></script>
+
     <style>
         :root {
             --elive-navy: #161943;
