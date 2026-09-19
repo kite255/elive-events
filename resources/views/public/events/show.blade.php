@@ -998,10 +998,11 @@
 
         .ticket-package-list li {
             position: relative;
-            padding: 17px 0 17px 28px;
+            padding: 19px 0 19px 28px;
             border-bottom: 1px solid #EDF1F6;
             color: var(--elive-muted);
-            line-height: 1.6;
+            font-size: 16px;
+            line-height: 1.7;
         }
 
         .ticket-package-list li:last-child {
@@ -1026,9 +1027,10 @@
 
         .ticket-package-list strong {
             display: block;
-            margin-bottom: 3px;
+            margin-bottom: 7px;
             color: var(--elive-navy);
-            font-size: 15px;
+            font-size: 16px;
+            line-height: 1.35;
         }
 
         .gallery-viewport {
@@ -1789,6 +1791,25 @@
 
             .ticket-package-grid {
                 grid-template-columns: 1fr;
+                gap: 18px;
+            }
+
+            .ticket-package-header {
+                padding: 22px 20px;
+            }
+
+            .ticket-package-list {
+                padding: 8px 20px 14px;
+            }
+
+            .ticket-package-list li {
+                padding: 17px 0 17px 28px;
+                font-size: 15px;
+            }
+
+            .ticket-package-list strong {
+                margin-bottom: 6px;
+                font-size: 15px;
             }
 
             .programme-row {
