@@ -353,7 +353,7 @@
         .nav {
             display: flex;
             align-items: center;
-            gap: 30px;
+            gap: 22px;
         }
 
         .nav-link {
@@ -1927,9 +1927,9 @@
 
         <div class="header-inner">
             <a
-                href="{{ route('home') }}"
+                href="https://elive.co.tz/"
                 class="brand"
-                aria-label="eLive Events home"
+                aria-label="eLive home"
             >
                 <img
                     src="{{ asset('eLive-Logo.png') }}"
@@ -1938,8 +1938,16 @@
             </a>
 
             <nav class="nav" aria-label="Primary navigation">
-                <a href="{{ route('home') }}" class="nav-link">
+                <a href="https://elive.co.tz/" class="nav-link">
                     Home
+                </a>
+
+                <a href="https://elive.co.tz/about" class="nav-link">
+                    About
+                </a>
+
+                <a href="https://elive.co.tz/bulksms" class="nav-link">
+                    Bulk SMS
                 </a>
 
                 <a
@@ -1950,7 +1958,15 @@
                     Events
                 </a>
 
-                <a href="{{ route('home') }}#contact" class="nav-link">
+                <a href="https://elive.co.tz/creative-design" class="nav-link">
+                    Creative Design
+                </a>
+
+                <a href="https://elive.co.tz/multimedia" class="nav-link">
+                    Multimedia
+                </a>
+
+                <a href="https://elive.co.tz/contact" class="nav-link">
                     Contact
                 </a>
 
@@ -1995,11 +2011,16 @@
 
         <div id="mobile-menu" class="mobile-nav">
             <nav class="mobile-nav-list" aria-label="Mobile navigation">
-                <a
-                    href="{{ route('home') }}"
-                    class="mobile-nav-link"
-                >
+                <a href="https://elive.co.tz/" class="mobile-nav-link">
                     Home
+                </a>
+
+                <a href="https://elive.co.tz/about" class="mobile-nav-link">
+                    About
+                </a>
+
+                <a href="https://elive.co.tz/bulksms" class="mobile-nav-link">
+                    Bulk SMS
                 </a>
 
                 <a
@@ -2010,10 +2031,15 @@
                     Events
                 </a>
 
-                <a
-                    href="{{ route('home') }}#contact"
-                    class="mobile-nav-link"
-                >
+                <a href="https://elive.co.tz/creative-design" class="mobile-nav-link">
+                    Creative Design
+                </a>
+
+                <a href="https://elive.co.tz/multimedia" class="mobile-nav-link">
+                    Multimedia
+                </a>
+
+                <a href="https://elive.co.tz/contact" class="mobile-nav-link">
                     Contact
                 </a>
 
