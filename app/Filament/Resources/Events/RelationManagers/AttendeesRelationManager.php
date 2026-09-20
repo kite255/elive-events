@@ -880,6 +880,90 @@ class AttendeesRelationManager extends RelationManager
                                 ->send();
                         }),
 
+                    BulkAction::make('resend_badges')
+                        ->label('Resend Badges')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('info')
+                        ->form([
+                            Select::make('channel')
+                                ->label('Send through')
+                                ->options([
+                                    'whatsapp' => 'WhatsApp',
+                                    'email' => 'Email',
+                                    'sms' => 'SMS',
+                                ])
+                                ->required()
+                                ->native(false),
+                        ])
+                        ->requiresConfirmation()
+                        ->modalHeading('Resend selected badges?')
+                        ->modalDescription(
+                            'Each attendee will be queued separately. Existing badges and QR codes will be reused.'
+                        )
+                        ->modalSubmitActionLabel('Queue Badges')
+                        ->action(function (
+                            Collection $records,
+                            array $data
+                        ): void {
+                            $queued = 0;
+                            $failed = 0;
+                            $skipped = 0;
+
+                            foreach ($records as $record) {
+                                if (
+                                    ! in_array(
+                                        $record->status,
+                                        [
+                                            'registered',
+                                            'confirmed',
+                                            'checked_in',
+                                            'approved',
+                                        ],
+                                        true
+                                    )
+                                ) {
+                                    $skipped++;
+
+                                    continue;
+                                }
+
+                                try {
+                                    $availableChannels =
+                                        app(BadgeDeliveryService::class)
+                                            ->availableChannels($record);
+
+                                    if (
+                                        ! array_key_exists(
+                                            (string) $data['channel'],
+                                            $availableChannels
+                                        )
+                                    ) {
+                                        $skipped++;
+
+                                        continue;
+                                    }
+
+                                    app(BadgeDeliveryService::class)
+                                        ->resend(
+                                            $record,
+                                            (string) $data['channel']
+                                        );
+
+                                    $queued++;
+                                } catch (Throwable $e) {
+                                    report($e);
+                                    $failed++;
+                                }
+                            }
+
+                            self::sendBulkResultNotification(
+                                title: 'Badge resend queued',
+                                body:
+                                    "Queued: {$queued}. Failed: {$failed}. Skipped: {$skipped}.",
+                                failed: $failed
+                            );
+                        }),
+
                     BulkAction::make('generate_badges')
                         ->label('Generate / Regenerate Badges')
                         ->icon('heroicon-o-identification')
