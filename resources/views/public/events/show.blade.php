@@ -353,7 +353,7 @@
         .nav {
             display: flex;
             align-items: center;
-            gap: 22px;
+            gap: 30px;
         }
 
         .nav-link {
@@ -1942,16 +1942,12 @@
                     Home
                 </a>
 
-                <a href="https://digital.elive.co.tz" class="nav-link">
-                    Digital Invitations
-                </a>
-
                 <a
                     href="{{ route('public.events.index') }}"
                     class="nav-link active"
                     aria-current="page"
                 >
-                    Events & Tickets
+                    Events
                 </a>
 
                 <a href="{{ route('home') }}#contact" class="nav-link">
@@ -1999,12 +1995,11 @@
 
         <div id="mobile-menu" class="mobile-nav">
             <nav class="mobile-nav-list" aria-label="Mobile navigation">
-                <a href="{{ route('home') }}" class="mobile-nav-link">
+                <a
+                    href="{{ route('home') }}"
+                    class="mobile-nav-link"
+                >
                     Home
-                </a>
-
-                <a href="https://digital.elive.co.tz" class="mobile-nav-link">
-                    Digital Invitations
                 </a>
 
                 <a
@@ -2012,10 +2007,13 @@
                     class="mobile-nav-link active"
                     aria-current="page"
                 >
-                    Events & Tickets
+                    Events
                 </a>
 
-                <a href="{{ route('home') }}#contact" class="mobile-nav-link">
+                <a
+                    href="{{ route('home') }}#contact"
+                    class="mobile-nav-link"
+                >
                     Contact
                 </a>
 
