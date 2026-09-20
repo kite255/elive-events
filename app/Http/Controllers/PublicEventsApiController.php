@@ -84,10 +84,15 @@ class PublicEventsApiController extends Controller
         if (
             $event->starts_at !== null
             && $event->starts_at->isPast()
-            && (
-                $event->ends_at === null
-                || $event->ends_at->isFuture()
-            )
+            && $event->ends_at?->isFuture()
+        ) {
+            return 'live';
+        }
+
+        if (
+            $event->starts_at !== null
+            && $event->ends_at === null
+            && $event->starts_at->isToday()
         ) {
             return 'live';
         }
