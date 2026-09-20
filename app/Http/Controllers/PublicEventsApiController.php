@@ -12,6 +12,7 @@ class PublicEventsApiController extends Controller
     public function __invoke(): JsonResponse
     {
         $events = Event::query()
+            ->where('show_on_elive_website', true)
             ->whereNotIn('status', [
                 Event::STATUS_DRAFT,
                 Event::STATUS_CANCELLED,
