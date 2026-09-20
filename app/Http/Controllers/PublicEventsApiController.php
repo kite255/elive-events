@@ -41,21 +41,43 @@ class PublicEventsApiController extends Controller
                     'kind' => $kind,
                     'name' => $event->name,
                     'event_type' => $event->custom_event_type ?: $event->event_type,
+
                     'summary' => filled($event->description)
-                        ? Str::of(strip_tags((string) $event->description))->squish()->limit(180)->toString()
+                        ? Str::of(strip_tags((string) $event->description))
+                            ->squish()
+                            ->limit(180)
+                            ->toString()
                         : null,
+
                     'starts_at' => $event->starts_at?->toIso8601String(),
                     'ends_at' => $event->ends_at?->toIso8601String(),
+
                     'venue' => $event->venue,
                     'venue_address' => $event->venue_address,
-                    'image_url' => $this->imageUrl($event->registration_banner_image_path),
+
+                    'image_url' => $this->imageUrl(
+                        $event->registration_banner_image_path
+                    ),
+
                     'status' => $status,
-                    'url' => route('public.events.show', ['event' => $event->slug]),
+
+                    'url' => route(
+                        'public.events.show',
+                        ['event' => $event->slug]
+                    ),
+
                     'registration_url' => $hasRegistration
-                        ? route('public.events.register', ['event' => $event->slug])
+                        ? route(
+                            'public.events.register',
+                            ['event' => $event->slug]
+                        )
                         : null,
+
                     'ticket_url' => $hasTickets
-                        ? route('public.tickets.buy', ['event' => $event->getKey()])
+                        ? route(
+                            'public.tickets.buy',
+                            ['event' => $event->slug]
+                        )
                         : null,
                 ];
             })
@@ -63,6 +85,7 @@ class PublicEventsApiController extends Controller
 
         return response()->json([
             'data' => $events,
+
             'meta' => [
                 'source' => 'events.elive.co.tz',
                 'count' => $events->count(),
