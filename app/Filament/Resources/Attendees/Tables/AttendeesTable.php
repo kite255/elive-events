@@ -440,6 +440,8 @@ class AttendeesTable
                             fn ($record): bool =>
                                 ! (auth()->user()?->isTicketOrganizer() ?? false)
                                 && AttendeeResource::canManageBadge($record)
+                                && app(BadgeDeliveryService::class)
+                                    ->availableChannels($record) !== []
                                 && in_array(
                                     $record->status,
                                     [
