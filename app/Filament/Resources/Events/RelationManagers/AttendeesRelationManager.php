@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Events\RelationManagers;
 
 use App\Filament\Pages\BadgePrintStation;
 use App\Filament\Resources\Attendees\AttendeeResource;
+use App\Services\BadgeDeliveryService;
 use App\Services\BadgeGenerationService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -594,6 +595,76 @@ class AttendeesRelationManager extends RelationManager
                                 ->send();
                         }),
 
+                    Action::make('resend_badge')
+                        ->label('Resend Badge')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('info')
+                        ->visible(
+                            fn ($record): bool =>
+                                ! (auth()->user()?->isTicketOrganizer() ?? false)
+                                && AttendeeResource::canManageBadge($record)
+                                && app(BadgeDeliveryService::class)
+                                    ->availableChannels($record) !== []
+                                && in_array(
+                                    $record->status,
+                                    [
+                                        'registered',
+                                        'confirmed',
+                                        'checked_in',
+                                        'approved',
+                                    ],
+                                    true
+                                )
+                        )
+                        ->form([
+                            Select::make('channel')
+                                ->label('Send through')
+                                ->options(
+                                    fn ($record): array =>
+                                        app(BadgeDeliveryService::class)
+                                            ->availableChannels($record)
+                                )
+                                ->required()
+                                ->native(false)
+                                ->helperText(
+                                    'Only channels with valid attendee contact details are shown.'
+                                ),
+                        ])
+                        ->requiresConfirmation()
+                        ->modalHeading('Resend attendee badge?')
+                        ->modalDescription(
+                            'The existing badge and QR code will be reused. The message will be queued for delivery.'
+                        )
+                        ->modalSubmitActionLabel('Queue Badge')
+                        ->action(function ($record, array $data): void {
+                            try {
+                                $log = app(
+                                    BadgeDeliveryService::class
+                                )->resend(
+                                    $record,
+                                    (string) $data['channel']
+                                );
+
+                                Notification::make()
+                                    ->title('Badge queued for delivery')
+                                    ->body(
+                                        'Channel: '
+                                        . strtoupper($log->channel)
+                                        . '. The attendee QR code was not changed.'
+                                    )
+                                    ->success()
+                                    ->send();
+                            } catch (Throwable $e) {
+                                report($e);
+
+                                Notification::make()
+                                    ->title('Badge resend failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
                     Action::make('generate_badge')
                         ->label(fn ($record): string => filled($record->badge_path) ? 'Regenerate Badge' : 'Generate Badge')
                         ->icon('heroicon-o-identification')
@@ -809,6 +880,90 @@ class AttendeesRelationManager extends RelationManager
                                 ->body($rejected . ' attendee(s) rejected.')
                                 ->success()
                                 ->send();
+                        }),
+
+                    BulkAction::make('resend_badges')
+                        ->label('Resend Badges')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('info')
+                        ->form([
+                            Select::make('channel')
+                                ->label('Send through')
+                                ->options([
+                                    'whatsapp' => 'WhatsApp',
+                                    'email' => 'Email',
+                                    'sms' => 'SMS',
+                                ])
+                                ->required()
+                                ->native(false),
+                        ])
+                        ->requiresConfirmation()
+                        ->modalHeading('Resend selected badges?')
+                        ->modalDescription(
+                            'Each attendee will be queued separately. Existing badges and QR codes will be reused.'
+                        )
+                        ->modalSubmitActionLabel('Queue Badges')
+                        ->action(function (
+                            Collection $records,
+                            array $data
+                        ): void {
+                            $queued = 0;
+                            $failed = 0;
+                            $skipped = 0;
+
+                            foreach ($records as $record) {
+                                if (
+                                    ! in_array(
+                                        $record->status,
+                                        [
+                                            'registered',
+                                            'confirmed',
+                                            'checked_in',
+                                            'approved',
+                                        ],
+                                        true
+                                    )
+                                ) {
+                                    $skipped++;
+
+                                    continue;
+                                }
+
+                                try {
+                                    $availableChannels =
+                                        app(BadgeDeliveryService::class)
+                                            ->availableChannels($record);
+
+                                    if (
+                                        ! array_key_exists(
+                                            (string) $data['channel'],
+                                            $availableChannels
+                                        )
+                                    ) {
+                                        $skipped++;
+
+                                        continue;
+                                    }
+
+                                    app(BadgeDeliveryService::class)
+                                        ->resend(
+                                            $record,
+                                            (string) $data['channel']
+                                        );
+
+                                    $queued++;
+                                } catch (Throwable $e) {
+                                    report($e);
+                                    $failed++;
+                                }
+                            }
+
+                            self::sendBulkResultNotification(
+                                title: 'Badge resend queued',
+                                body:
+                                    "Queued: {$queued}. Failed: {$failed}. Skipped: {$skipped}.",
+                                failed: $failed
+                            );
                         }),
 
                     BulkAction::make('generate_badges')

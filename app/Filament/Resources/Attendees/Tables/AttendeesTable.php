@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Attendees\Tables;
 use App\Exports\AttendeesExport;
 use App\Filament\Pages\BadgePrintStation;
 use App\Filament\Resources\Attendees\AttendeeResource;
+use App\Services\BadgeDeliveryService;
 use App\Services\BadgeGenerationService;
 use App\Services\QrTokenService;
 use Filament\Actions\Action;
@@ -429,6 +430,76 @@ class AttendeesTable
                                 Storage::disk('public')->path($record->badge_path),
                                 str($record->full_name)->slug() . '-badge.svg'
                             );
+                        }),
+
+                    Action::make('resend_badge')
+                        ->label('Resend Badge')
+                        ->icon('heroicon-o-paper-airplane')
+                        ->color('info')
+                        ->visible(
+                            fn ($record): bool =>
+                                ! (auth()->user()?->isTicketOrganizer() ?? false)
+                                && AttendeeResource::canManageBadge($record)
+                                && app(BadgeDeliveryService::class)
+                                    ->availableChannels($record) !== []
+                                && in_array(
+                                    $record->status,
+                                    [
+                                        'registered',
+                                        'confirmed',
+                                        'checked_in',
+                                        'approved',
+                                    ],
+                                    true
+                                )
+                        )
+                        ->form([
+                            Select::make('channel')
+                                ->label('Send through')
+                                ->options(
+                                    fn ($record): array =>
+                                        app(BadgeDeliveryService::class)
+                                            ->availableChannels($record)
+                                )
+                                ->required()
+                                ->native(false)
+                                ->helperText(
+                                    'Only channels with valid attendee contact details are shown.'
+                                ),
+                        ])
+                        ->requiresConfirmation()
+                        ->modalHeading('Resend attendee badge?')
+                        ->modalDescription(
+                            'The existing badge and QR code will be reused. The message will be queued for delivery.'
+                        )
+                        ->modalSubmitActionLabel('Queue Badge')
+                        ->action(function ($record, array $data): void {
+                            try {
+                                $log = app(
+                                    BadgeDeliveryService::class
+                                )->resend(
+                                    $record,
+                                    (string) $data['channel']
+                                );
+
+                                Notification::make()
+                                    ->title('Badge queued for delivery')
+                                    ->body(
+                                        'Channel: '
+                                        . strtoupper($log->channel)
+                                        . '. The attendee QR code was not changed.'
+                                    )
+                                    ->success()
+                                    ->send();
+                            } catch (Throwable $e) {
+                                report($e);
+
+                                Notification::make()
+                                    ->title('Badge resend failed')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
                         }),
 
                     Action::make('generate_badge')
