@@ -1927,9 +1927,9 @@
 
         <div class="header-inner">
             <a
-                href="https://elive.co.tz/"
+                href="{{ route('home') }}"
                 class="brand"
-                aria-label="eLive home"
+                aria-label="eLive Events home"
             >
                 <img
                     src="{{ asset('eLive-Logo.png') }}"
@@ -1938,16 +1938,12 @@
             </a>
 
             <nav class="nav" aria-label="Primary navigation">
-                <a href="https://elive.co.tz/" class="nav-link">
+                <a href="{{ route('home') }}" class="nav-link">
                     Home
                 </a>
 
-                <a href="https://elive.co.tz/about" class="nav-link">
-                    About
-                </a>
-
-                <a href="https://elive.co.tz/bulksms" class="nav-link">
-                    Bulk SMS
+                <a href="https://digital.elive.co.tz" class="nav-link">
+                    Digital Invitations
                 </a>
 
                 <a
@@ -1955,18 +1951,10 @@
                     class="nav-link active"
                     aria-current="page"
                 >
-                    Events
+                    Events & Tickets
                 </a>
 
-                <a href="https://elive.co.tz/creative-design" class="nav-link">
-                    Creative Design
-                </a>
-
-                <a href="https://elive.co.tz/multimedia" class="nav-link">
-                    Multimedia
-                </a>
-
-                <a href="https://elive.co.tz/contact" class="nav-link">
+                <a href="{{ route('home') }}#contact" class="nav-link">
                     Contact
                 </a>
 
@@ -2011,16 +1999,12 @@
 
         <div id="mobile-menu" class="mobile-nav">
             <nav class="mobile-nav-list" aria-label="Mobile navigation">
-                <a href="https://elive.co.tz/" class="mobile-nav-link">
+                <a href="{{ route('home') }}" class="mobile-nav-link">
                     Home
                 </a>
 
-                <a href="https://elive.co.tz/about" class="mobile-nav-link">
-                    About
-                </a>
-
-                <a href="https://elive.co.tz/bulksms" class="mobile-nav-link">
-                    Bulk SMS
+                <a href="https://digital.elive.co.tz" class="mobile-nav-link">
+                    Digital Invitations
                 </a>
 
                 <a
@@ -2028,18 +2012,10 @@
                     class="mobile-nav-link active"
                     aria-current="page"
                 >
-                    Events
+                    Events & Tickets
                 </a>
 
-                <a href="https://elive.co.tz/creative-design" class="mobile-nav-link">
-                    Creative Design
-                </a>
-
-                <a href="https://elive.co.tz/multimedia" class="mobile-nav-link">
-                    Multimedia
-                </a>
-
-                <a href="https://elive.co.tz/contact" class="mobile-nav-link">
+                <a href="{{ route('home') }}#contact" class="mobile-nav-link">
                     Contact
                 </a>
 
