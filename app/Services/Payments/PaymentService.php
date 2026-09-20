@@ -1,0 +1,1177 @@
+<?php
+
+namespace App\Services\Payments;
+
+use App\Contracts\PaymentGateway as PaymentGatewayContract;
+use App\Jobs\FulfillCompletedPayment;
+use App\Models\Attendee;
+use App\Models\Payment;
+use App\Models\PaymentGateway;
+use App\Models\PaymentTransaction;
+use App\Models\TicketOrder;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
+use Throwable;
+
+class PaymentService
+{
+    public function __construct(
+        protected PaymentReferenceService $referenceService,
+        protected PesapalService $pesapalService
+    ) {
+    }
+
+    /**
+     * Create one pending registration payment for an attendee.
+     */
+    public function createForAttendee(
+        Attendee $attendee
+    ): Payment {
+        $attendee->loadMissing([
+            'event.paymentSetting',
+            'event.organization',
+        ]);
+
+        $event = $attendee->event;
+
+        if (! $event) {
+            throw new RuntimeException(
+                'Attendee is not linked to an event.'
+            );
+        }
+
+        $settings = $event->paymentSetting;
+
+        if (
+            ! $settings
+            || ! $settings->payments_enabled
+        ) {
+            throw new RuntimeException(
+                'Online payments are not enabled for this event.'
+            );
+        }
+
+        $amount =
+            (float) $settings->registration_fee;
+
+        if ($amount <= 0) {
+            throw new RuntimeException(
+                'The event registration fee must be greater than zero.'
+            );
+        }
+
+        $gateway =
+            $this->defaultGatewayForOrganization(
+                (int) $event->organization_id
+            );
+
+        return DB::transaction(
+            function () use (
+                $attendee,
+                $event,
+                $settings,
+                $gateway,
+                $amount
+            ): Payment {
+                /*
+                 * Reuse an existing unpaid registration payment
+                 * instead of creating duplicates when an
+                 * attendee retries.
+                 */
+                $existing =
+                    Payment::query()
+                        ->where(
+                            'attendee_id',
+                            $attendee->getKey()
+                        )
+                        ->where(
+                            'event_id',
+                            $event->getKey()
+                        )
+                        ->whereIn(
+                            'status',
+                            [
+                                Payment::STATUS_PENDING,
+                                Payment::STATUS_PROCESSING,
+                            ]
+                        )
+                        ->latest('id')
+                        ->first();
+
+                if ($existing) {
+                    return $existing;
+                }
+
+                return Payment::create([
+                    'organization_id' =>
+                        $event->organization_id,
+
+                    'event_id' =>
+                        $event->getKey(),
+
+                    'attendee_id' =>
+                        $attendee->getKey(),
+
+                    'ticket_order_id' =>
+                        null,
+
+                    'payment_gateway_id' =>
+                        $gateway->getKey(),
+
+                    'reference' =>
+                        $this->referenceService
+                            ->generate($event),
+
+                    'amount' =>
+                        $amount,
+
+                    'currency' =>
+                        strtoupper(
+                            (string) (
+                                $settings->currency
+                                ?: 'TZS'
+                            )
+                        ),
+
+                    'status' =>
+                        Payment::STATUS_PENDING,
+
+                    'description' =>
+                        'Registration payment for '
+                        . $event->name,
+
+                    'initiated_at' =>
+                        now(),
+                ]);
+            }
+        );
+    }
+
+    /**
+     * Create a payment record for a ticket order.
+     *
+     * Paid orders receive a pending gateway payment. Free orders receive a
+     * completed zero-value payment so they can use the same audited,
+     * idempotent fulfillment pipeline without contacting a gateway.
+     */
+    public function createForTicketOrder(
+        TicketOrder $order
+    ): Payment {
+        $order->loadMissing([
+            'event.organization',
+        ]);
+
+        $event = $order->event;
+
+        if (! $event) {
+            throw new RuntimeException(
+                'Ticket order is not linked to an event.'
+            );
+        }
+
+        if ($order->isPaid()) {
+            throw new RuntimeException(
+                'This ticket order is already paid.'
+            );
+        }
+
+        if ($order->isCancelled()) {
+            throw new RuntimeException(
+                'This ticket order has been cancelled.'
+            );
+        }
+
+        if ($order->isExpired()) {
+            throw new RuntimeException(
+                'This ticket order has expired.'
+            );
+        }
+
+        if (
+            $order->expires_at !== null
+            && $order->expires_at->isPast()
+        ) {
+            throw new RuntimeException(
+                'This ticket reservation has expired.'
+            );
+        }
+
+        $amount =
+            (float) $order->total;
+
+        if ($amount < 0) {
+            throw new RuntimeException(
+                'The ticket order total cannot be negative.'
+            );
+        }
+
+        $isFree = $amount === 0.0;
+
+        $gateway =
+            $isFree
+                ? null
+                : $this->defaultGatewayForOrganization(
+                    (int) $event->organization_id
+                );
+
+        return DB::transaction(
+            function () use (
+                $order,
+                $event,
+                $gateway,
+                $amount,
+                $isFree
+            ): Payment {
+                $lockedOrder =
+                    TicketOrder::query()
+                        ->lockForUpdate()
+                        ->findOrFail(
+                            $order->getKey()
+                        );
+
+                if ($lockedOrder->isPaid()) {
+                    throw new RuntimeException(
+                        'This ticket order is already paid.'
+                    );
+                }
+
+                if ($lockedOrder->isCancelled()) {
+                    throw new RuntimeException(
+                        'This ticket order has been cancelled.'
+                    );
+                }
+
+                if ($lockedOrder->isExpired()) {
+                    throw new RuntimeException(
+                        'This ticket order has expired.'
+                    );
+                }
+
+                if (
+                    $lockedOrder->expires_at !== null
+                    && $lockedOrder->expires_at->isPast()
+                ) {
+                    throw new RuntimeException(
+                        'This ticket reservation has expired.'
+                    );
+                }
+
+                /*
+                 * Reuse an unresolved ticket payment when the
+                 * customer retries checkout.
+                 */
+                $existing =
+                    Payment::query()
+                        ->where(
+                            'ticket_order_id',
+                            $lockedOrder->getKey()
+                        )
+                        ->where(
+                            'event_id',
+                            $event->getKey()
+                        )
+                        ->whereIn(
+                            'status',
+                            [
+                                Payment::STATUS_PENDING,
+                                Payment::STATUS_PROCESSING,
+                            ]
+                        )
+                        ->latest('id')
+                        ->first();
+
+                if ($existing) {
+                    return $existing;
+                }
+
+                return Payment::create([
+                    'organization_id' =>
+                        $event->organization_id,
+
+                    'event_id' =>
+                        $event->getKey(),
+
+                    'attendee_id' =>
+                        null,
+
+                    'ticket_order_id' =>
+                        $lockedOrder->getKey(),
+
+                    'payment_gateway_id' =>
+                        $gateway?->getKey(),
+
+                    'reference' =>
+                        $this->referenceService
+                            ->generate($event),
+
+                    'amount' =>
+                        $amount,
+
+                    'currency' =>
+                        strtoupper(
+                            (string) (
+                                $lockedOrder->currency
+                                ?: 'TZS'
+                            )
+                        ),
+
+                    'status' =>
+                        $isFree
+                            ? Payment::STATUS_COMPLETED
+                            : Payment::STATUS_PENDING,
+
+                    'payment_method' =>
+                        $isFree
+                            ? 'free'
+                            : null,
+
+                    'description' =>
+                        'Ticket payment for '
+                        . $event->name
+                        . ' - '
+                        . $lockedOrder->order_number,
+
+                    'initiated_at' =>
+                        now(),
+
+                    'paid_at' =>
+                        $isFree
+                            ? now()
+                            : null,
+
+                    'metadata' => [
+                        'payment_purpose' =>
+                            'ticket_order',
+
+                        'ticket_order_number' =>
+                            $lockedOrder->order_number,
+
+                        'is_free' =>
+                            $isFree,
+                    ],
+                ]);
+            }
+        );
+    }
+
+    /**
+     * Submit the local payment to its configured gateway.
+     */
+    public function start(
+        Payment $payment
+    ): array {
+        if ($payment->isCompleted()) {
+            throw new RuntimeException(
+                'This payment is already completed.'
+            );
+        }
+
+        /*
+         * Do not start Pesapal checkout for an expired
+         * ticket reservation.
+         */
+        if ($payment->ticket_order_id) {
+            $payment->loadMissing(
+                'ticketOrder'
+            );
+
+            $ticketOrder =
+                $payment->ticketOrder;
+
+            if (! $ticketOrder) {
+                throw new RuntimeException(
+                    'Ticket order linked to this payment is missing.'
+                );
+            }
+
+            if ($ticketOrder->isPaid()) {
+                throw new RuntimeException(
+                    'This ticket order is already paid.'
+                );
+            }
+
+            if ($ticketOrder->isCancelled()) {
+                throw new RuntimeException(
+                    'This ticket order has been cancelled.'
+                );
+            }
+
+            if (
+                $ticketOrder->isExpired()
+                || (
+                    $ticketOrder->expires_at !== null
+                    && $ticketOrder->expires_at->isPast()
+                )
+            ) {
+                throw new RuntimeException(
+                    'This ticket reservation has expired.'
+                );
+            }
+        }
+
+        $payment->loadMissing(
+            'gateway'
+        );
+
+        $gatewayModel =
+            $payment->gateway;
+
+        if (! $gatewayModel) {
+            throw new RuntimeException(
+                'No payment gateway is linked to this payment.'
+            );
+        }
+
+        if (! $gatewayModel->is_enabled) {
+            throw new RuntimeException(
+                'The selected payment gateway is disabled.'
+            );
+        }
+
+        $gateway =
+            $this->gatewayFor(
+                $gatewayModel
+            );
+
+        try {
+            $response =
+                $gateway->createPayment(
+                    $payment
+                );
+
+            $returnedReference =
+                trim(
+                    (string) data_get(
+                        $response,
+                        'merchant_reference',
+                        ''
+                    )
+                );
+
+            if (
+                $returnedReference === ''
+                || ! hash_equals(
+                    $payment->reference,
+                    $returnedReference
+                )
+            ) {
+                throw new RuntimeException(
+                    'Payment gateway returned an unexpected merchant reference.'
+                );
+            }
+
+            $trackingId =
+                trim(
+                    (string) data_get(
+                        $response,
+                        'order_tracking_id',
+                        ''
+                    )
+                );
+
+            if ($trackingId === '') {
+                throw new RuntimeException(
+                    'Payment gateway did not return an order tracking ID.'
+                );
+            }
+
+            $redirectUrl =
+                trim(
+                    (string) data_get(
+                        $response,
+                        'redirect_url',
+                        ''
+                    )
+                );
+
+            if ($redirectUrl === '') {
+                throw new RuntimeException(
+                    'Payment gateway did not return a checkout URL.'
+                );
+            }
+
+            DB::transaction(
+                function () use (
+                    $payment,
+                    $response,
+                    $returnedReference,
+                    $trackingId,
+                    $redirectUrl
+                ): void {
+                    $lockedPayment =
+                        Payment::query()
+                            ->lockForUpdate()
+                            ->findOrFail(
+                                $payment->getKey()
+                            );
+
+                    if ($lockedPayment->isCompleted()) {
+                        throw new RuntimeException(
+                            'This payment is already completed.'
+                        );
+                    }
+
+                    $lockedPayment->update([
+                        'status' =>
+                            Payment::STATUS_PROCESSING,
+
+                        'provider_reference' =>
+                            $returnedReference,
+
+                        'provider_tracking_id' =>
+                            $trackingId,
+
+                        'metadata' =>
+                            array_merge(
+                                $lockedPayment->metadata
+                                    ?? [],
+                                [
+                                    'checkout_redirect_url' =>
+                                        $redirectUrl,
+                                ]
+                            ),
+                    ]);
+
+                    /*
+                     * TicketOrder mirrors checkout state only.
+                     *
+                     * Do NOT mark it paid here.
+                     */
+                    if ($lockedPayment->ticket_order_id) {
+                        TicketOrder::query()
+                            ->whereKey(
+                                $lockedPayment
+                                    ->ticket_order_id
+                            )
+                            ->where(
+                                'status',
+                                TicketOrder::STATUS_PENDING
+                            )
+                            ->update([
+                                'status' =>
+                                    TicketOrder::STATUS_PROCESSING,
+                            ]);
+                    }
+
+                    $lockedPayment
+                        ->transactions()
+                        ->create([
+                            'type' =>
+                                PaymentTransaction::TYPE_ORDER_CREATED,
+
+                            'provider_reference' =>
+                                $trackingId,
+
+                            'response_payload' =>
+                                $response,
+
+                            'status' =>
+                                'success',
+                        ]);
+                }
+            );
+
+            return $response;
+        } catch (Throwable $exception) {
+            try {
+                $payment
+                    ->transactions()
+                    ->create([
+                        'type' =>
+                            PaymentTransaction::TYPE_ORDER_CREATED,
+
+                        'status' =>
+                            'failed',
+
+                        'error_message' =>
+                            $exception->getMessage(),
+                    ]);
+            } catch (Throwable $loggingException) {
+                report(
+                    $loggingException
+                );
+            }
+
+            report(
+                $exception
+            );
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * Verify a payment directly with its gateway
+     * and synchronize eLive.
+     */
+    public function syncFromGateway(
+        Payment $payment,
+        ?string $providerTrackingId = null
+    ): Payment {
+        $payment->loadMissing(
+            'gateway'
+        );
+
+        $trackingId =
+            $providerTrackingId
+            ?: $payment->provider_tracking_id;
+
+        $trackingId =
+            trim(
+                (string) $trackingId
+            );
+
+        if ($trackingId === '') {
+            throw new RuntimeException(
+                'Provider tracking ID is missing.'
+            );
+        }
+
+        $gatewayModel =
+            $payment->gateway;
+
+        if (! $gatewayModel) {
+            throw new RuntimeException(
+                'Payment gateway is missing.'
+            );
+        }
+
+        $gateway =
+            $this->gatewayFor(
+                $gatewayModel
+            );
+
+        $response =
+            $gateway->getPaymentStatus(
+                $trackingId
+            );
+
+        $this->verifyGatewayResponse(
+            $payment,
+            $trackingId,
+            $response
+        );
+
+        $gatewayStatus =
+            strtoupper(
+                trim(
+                    (string) data_get(
+                        $response,
+                        'payment_status_description',
+                        ''
+                    )
+                )
+            );
+
+        $localStatus =
+            match ($gatewayStatus) {
+                'COMPLETED' =>
+                    Payment::STATUS_COMPLETED,
+
+                'FAILED',
+                'INVALID' =>
+                    Payment::STATUS_FAILED,
+
+                'REVERSED' =>
+                    Payment::STATUS_REFUNDED,
+
+                default =>
+                    Payment::STATUS_PROCESSING,
+            };
+
+        /*
+         * Pesapal may continue returning PENDING for an abandoned
+         * checkout even after the local ticket reservation has expired.
+         *
+         * In that case, expire the local payment without pretending
+         * that Pesapal reported a failed payment.
+         */
+        if (
+            $gatewayStatus === 'PENDING'
+            && $payment->ticket_order_id
+        ) {
+            $payment->loadMissing(
+                'ticketOrder'
+            );
+
+            $ticketOrder =
+                $payment->ticketOrder;
+
+            if (
+                $ticketOrder
+                && (
+                    $ticketOrder->isExpired()
+                    || (
+                        $ticketOrder->expires_at !== null
+                        && $ticketOrder->expires_at->isPast()
+                    )
+                )
+            ) {
+                $localStatus =
+                    Payment::STATUS_EXPIRED;
+            }
+        }
+
+        $transitionedToCompleted =
+            DB::transaction(
+                function () use (
+                    $payment,
+                    $trackingId,
+                    $response,
+                    $gatewayStatus,
+                    $localStatus
+                ): bool {
+                    $lockedPayment =
+                        Payment::query()
+                            ->lockForUpdate()
+                            ->findOrFail(
+                                $payment->getKey()
+                            );
+
+                    $previousStatus =
+                        $lockedPayment->status;
+
+                    /*
+                     * Never downgrade a payment that has already
+                     * been completed.
+                     */
+                    if (
+                        $previousStatus
+                        === Payment::STATUS_COMPLETED
+                        && $localStatus
+                        !== Payment::STATUS_COMPLETED
+                    ) {
+                        $lockedPayment
+                            ->transactions()
+                            ->create([
+                                'type' =>
+                                    PaymentTransaction::TYPE_PAYMENT_STATUS,
+
+                                'provider_reference' =>
+                                    $trackingId,
+
+                                'response_payload' =>
+                                    $response,
+
+                                'status' =>
+                                    Payment::STATUS_COMPLETED,
+                            ]);
+
+                        return false;
+                    }
+
+                    $confirmationCode =
+                        trim(
+                            (string) data_get(
+                                $response,
+                                'confirmation_code',
+                                ''
+                            )
+                        );
+
+                    $paymentMethod =
+                        trim(
+                            (string) data_get(
+                                $response,
+                                'payment_method',
+                                ''
+                            )
+                        );
+
+                    $paymentAccount =
+                        trim(
+                            (string) data_get(
+                                $response,
+                                'payment_account',
+                                ''
+                            )
+                        );
+
+                    $attributes = [
+                        'provider_tracking_id' =>
+                            $trackingId,
+
+                        'provider_reference' =>
+                            $lockedPayment
+                                ->provider_reference,
+
+                        'payment_method' =>
+                            $paymentMethod,
+
+                        'status' =>
+                            $localStatus,
+
+                        'metadata' =>
+                            array_merge(
+                                $lockedPayment->metadata
+                                    ?? [],
+                                [
+                                    'pesapal_status' =>
+                                        $gatewayStatus,
+
+                                    'pesapal_status_code' =>
+                                        data_get(
+                                            $response,
+                                            'status_code'
+                                        ),
+
+                                    'pesapal_payment_account' =>
+                                        $paymentAccount,
+
+                                    'pesapal_confirmation_code' =>
+                                        $confirmationCode,
+                                ]
+                            ),
+                    ];
+
+                    if (
+                        $localStatus
+                        === Payment::STATUS_COMPLETED
+                    ) {
+                        $attributes['paid_at'] =
+                            $lockedPayment->paid_at
+                            ?? now();
+
+                        $attributes['failed_at'] =
+                            null;
+
+                        $attributes['cancelled_at'] =
+                            null;
+                    }
+
+                    if (
+                        $localStatus
+                        === Payment::STATUS_FAILED
+                    ) {
+                        $attributes['failed_at'] =
+                            $lockedPayment->failed_at
+                            ?? now();
+                    }
+
+                    $lockedPayment->update(
+                        $attributes
+                    );
+
+                    /*
+                     * IMPORTANT:
+                     *
+                     * Do NOT mark TicketOrder as PAID when
+                     * Pesapal merely reports COMPLETED.
+                     *
+                     * A completed payment may arrive after the
+                     * original reservation has expired.
+                     *
+                     * PaymentFulfillmentService must first:
+                     *
+                     * - verify whether reservation is still valid
+                     * - reacquire inventory when necessary
+                     * - reject overselling if capacity is gone
+                     * - mark order paid
+                     * - issue tickets
+                     */
+                    if (
+                        $lockedPayment->ticket_order_id
+                        && $localStatus
+                            === Payment::STATUS_FAILED
+                    ) {
+                        $ticketOrder =
+                            TicketOrder::query()
+                                ->lockForUpdate()
+                                ->find(
+                                    $lockedPayment
+                                        ->ticket_order_id
+                                );
+
+                        if (
+                            $ticketOrder
+                            && ! $ticketOrder->isPaid()
+                            && ! $ticketOrder->isCancelled()
+                            && ! $ticketOrder->isExpired()
+                            && (
+                                $ticketOrder->expires_at
+                                    === null
+                                || $ticketOrder
+                                    ->expires_at
+                                    ->isFuture()
+                            )
+                        ) {
+                            /*
+                             * Failed gateway attempt:
+                             * allow retry while the original
+                             * reservation remains valid.
+                             */
+                            $ticketOrder->update([
+                                'status' =>
+                                    TicketOrder::STATUS_PENDING,
+                            ]);
+                        }
+                    }
+
+                    $lockedPayment
+                        ->transactions()
+                        ->create([
+                            'type' =>
+                                PaymentTransaction::TYPE_PAYMENT_STATUS,
+
+                            'provider_reference' =>
+                                $trackingId,
+
+                            'response_payload' =>
+                                $response,
+
+                            'status' =>
+                                $localStatus,
+                        ]);
+
+                    return (
+                        $previousStatus
+                        !== Payment::STATUS_COMPLETED
+                        && $localStatus
+                        === Payment::STATUS_COMPLETED
+                    );
+                }
+            );
+
+        $payment =
+            $payment->fresh();
+
+        /*
+         * Only the first verified transition into COMPLETED
+         * dispatches fulfillment.
+         */
+        if (
+            $transitionedToCompleted
+            && $payment->isCompleted()
+            && ! $payment->isFulfilled()
+        ) {
+            FulfillCompletedPayment::dispatch(
+                $payment->getKey()
+            )->onQueue(
+                'payments'
+            );
+        }
+
+        return $payment;
+    }
+
+    /**
+     * Verify that a payment-gateway response belongs
+     * to the exact local eLive payment being synchronized.
+     */
+    private function verifyGatewayResponse(
+        Payment $payment,
+        string $trackingId,
+        array $response
+    ): void {
+        /*
+         * 1. Verify merchant reference.
+         */
+        $merchantReference =
+            trim(
+                (string) data_get(
+                    $response,
+                    'merchant_reference',
+                    ''
+                )
+            );
+
+        if (
+            $merchantReference === ''
+            || ! hash_equals(
+                $payment->reference,
+                $merchantReference
+            )
+        ) {
+            throw new RuntimeException(
+                'Payment gateway merchant reference mismatch.'
+            );
+        }
+
+        /*
+         * 2. Verify returned order tracking ID.
+         */
+        $responseTrackingId =
+            trim(
+                (string) data_get(
+                    $response,
+                    'order_tracking_id',
+                    ''
+                )
+            );
+
+        if (
+            $responseTrackingId === ''
+            || ! hash_equals(
+                $trackingId,
+                $responseTrackingId
+            )
+        ) {
+            throw new RuntimeException(
+                'Payment gateway tracking ID mismatch.'
+            );
+        }
+
+        if (
+            filled(
+                $payment->provider_tracking_id
+            )
+            && ! hash_equals(
+                (string) $payment->provider_tracking_id,
+                $trackingId
+            )
+        ) {
+            throw new RuntimeException(
+                'Payment provider tracking ID does not match the local payment.'
+            );
+        }
+
+        /*
+         * 3. Verify currency.
+         */
+        $gatewayCurrency =
+            strtoupper(
+                trim(
+                    (string) data_get(
+                        $response,
+                        'currency',
+                        ''
+                    )
+                )
+            );
+
+        $localCurrency =
+            strtoupper(
+                trim(
+                    (string) $payment->currency
+                )
+            );
+
+        if (
+            $gatewayCurrency === ''
+            || $gatewayCurrency
+                !== $localCurrency
+        ) {
+            throw new RuntimeException(
+                'Payment gateway currency mismatch.'
+            );
+        }
+
+        /*
+         * 4. Verify amount.
+         */
+        $gatewayAmount =
+            data_get(
+                $response,
+                'amount'
+            );
+
+        if (
+            $gatewayAmount === null
+            || $gatewayAmount === ''
+        ) {
+            throw new RuntimeException(
+                'Payment gateway amount is missing.'
+            );
+        }
+
+        $normalizedGatewayAmount =
+            number_format(
+                (float) $gatewayAmount,
+                2,
+                '.',
+                ''
+            );
+
+        $normalizedLocalAmount =
+            number_format(
+                (float) $payment->amount,
+                2,
+                '.',
+                ''
+            );
+
+        if (
+            bccomp(
+                $normalizedGatewayAmount,
+                $normalizedLocalAmount,
+                2
+            ) !== 0
+        ) {
+            throw new RuntimeException(
+                'Payment gateway amount mismatch.'
+            );
+        }
+    }
+
+    /**
+     * Resolve the gateway implementation.
+     */
+    public function gatewayFor(
+        PaymentGateway $gateway
+    ): PaymentGatewayContract {
+        return match (
+            strtolower(
+                $gateway->code
+            )
+        ) {
+            'pesapal' =>
+                $this->pesapalService,
+
+            default =>
+                throw new RuntimeException(
+                    'Unsupported payment gateway: '
+                    . $gateway->code
+                ),
+        };
+    }
+
+    /**
+     * Get the enabled default gateway for an organization.
+     *
+     * Organization-specific gateway takes priority over
+     * the platform-wide default gateway.
+     */
+    protected function defaultGatewayForOrganization(
+        int $organizationId
+    ): PaymentGateway {
+        $gateway =
+            PaymentGateway::query()
+                ->where(
+                    'is_enabled',
+                    true
+                )
+                ->where(
+                    'is_default',
+                    true
+                )
+                ->where(
+                    function (
+                        $query
+                    ) use (
+                        $organizationId
+                    ): void {
+                        $query
+                            ->where(
+                                'organization_id',
+                                $organizationId
+                            )
+                            ->orWhereNull(
+                                'organization_id'
+                            );
+                    }
+                )
+                ->orderByRaw(
+                    'CASE WHEN organization_id = ? THEN 0 ELSE 1 END',
+                    [$organizationId]
+                )
+                ->first();
+
+        if (! $gateway) {
+            throw new RuntimeException(
+                'No enabled default payment gateway is configured.'
+            );
+        }
+
+        return $gateway;
+    }
+}

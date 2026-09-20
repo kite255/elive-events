@@ -102,7 +102,7 @@ class BadgeTemplatesRelationManager extends RelationManager
                                     ->required(),
 
                                 ColorPicker::make('header_color')
-                                    ->default('#233F7E')
+                                    ->default('#161943')
                                     ->required(),
 
                                 ColorPicker::make('accent_color')
@@ -348,7 +348,7 @@ class BadgeTemplatesRelationManager extends RelationManager
                 'height' => 35,
                 'font_size' => 22,
                 'font_weight' => '800',
-                'color' => '#233F7E',
+                'color' => '#161943',
                 'background_color' => '#FFFFFF',
                 'text_align' => 'center',
                 'sort_order' => 5,

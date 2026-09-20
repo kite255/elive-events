@@ -2,38 +2,980 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ $event->registration_welcome_title ?: 'Register for ' . $event->name }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    @php
+        /*
+         * Social sharing / link preview metadata.
+         *
+         * Priority:
+         * 1. Event registration banner
+         * 2. Event / organization logo
+         * 3. Generic eLive fallback image
+         */
+        $shareTitle =
+            $event->registration_welcome_title
+            ?: $event->name;
+
+        $shareDescription =
+            $event->registration_welcome_message
+            ?: (
+                filled($event->description)
+                    ? \Illuminate\Support\Str::limit(
+                        strip_tags((string) $event->description),
+                        180
+                    )
+                    : 'Register for ' . $event->name . ' with eLive Events.'
+            );
+
+        $shareImage = filled($branding['banner'] ?? null)
+            ? asset('storage/' . $branding['banner'])
+            : (
+                filled($branding['logo'] ?? null)
+                    ? asset('storage/' . $branding['logo'])
+                    : asset('images/elive-events-share.png')
+            );
+
+        $shareUrl = url()->current();
+    @endphp
+
+    <title>
+        {{ $shareTitle }}
+    </title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
+
+    <meta
+        name="description"
+        content="{{ $shareDescription }}"
+    >
+
+    <link
+        rel="canonical"
+        href="{{ $shareUrl }}"
+    >
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="eLive Events">
+    <meta property="og:title" content="{{ $shareTitle }}">
+    <meta property="og:description" content="{{ $shareDescription }}">
+    <meta property="og:url" content="{{ $shareUrl }}">
+    <meta property="og:image" content="{{ $shareImage }}">
+    <meta property="og:image:secure_url" content="{{ $shareImage }}">
+    <meta property="og:image:alt" content="{{ $event->name }}">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $shareTitle }}">
+    <meta name="twitter:description" content="{{ $shareDescription }}">
+    <meta name="twitter:image" content="{{ $shareImage }}">
+
+    
+    <script defer src="https://analytics.elive.co.tz/script.js" data-website-id="a4922c3a-16d3-4451-a2b4-3224dbc16f84"></script>
+
+    <style>
+        :root {
+            /*
+            |--------------------------------------------------------------------------
+            | Event branding
+            |--------------------------------------------------------------------------
+            | These remain configurable per event / organization.
+            */
+            --elive-primary: {{ $branding['primary_color'] }};
+            --elive-button: {{ $branding['button_color'] }};
+            --elive-bg: {{ $branding['background_color'] }};
+
+            /*
+            |--------------------------------------------------------------------------
+            | eLive platform foundation
+            |--------------------------------------------------------------------------
+            */
+            --elive-navy: #161943;
+            --elive-blue: #007AB2;
+            --elive-orange: #FF9800;
+
+            --elive-text: #0F172A;
+            --elive-muted: #667085;
+            --elive-border: #E6E8EF;
+            --elive-soft: #F7F8FC;
+            --elive-danger: #DC2626;
+
+            --elive-radius-lg: 24px;
+            --elive-radius-md: 18px;
+            --elive-radius-sm: 12px;
+
+            --elive-shadow: 0 24px 60px rgba(22, 25, 67, 0.12);
+            --elive-shadow-soft: 0 10px 26px rgba(22, 25, 67, 0.07);
+
+            --elive-font:
+                'Creato Display',
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, color-mix(in srgb, var(--elive-primary) 12%, transparent), transparent 34%),
+                linear-gradient(180deg, #f8fafc 0%, var(--elive-bg) 42%, #eef2f7 100%) !important;
+            color: var(--elive-text) !important;
+            font-family: var(--elive-font) !important;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        button,
+        input,
+        select,
+        textarea,
+        option {
+            font-family: var(--elive-font) !important;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: var(--elive-font) !important;
+        }
+
+        .elive-shell :focus-visible {
+            outline: 3px solid color-mix(
+                in srgb,
+                var(--elive-primary) 32%,
+                transparent
+            );
+            outline-offset: 2px;
+        }
+
+        .elive-page {
+            min-height: 100vh;
+            padding: 36px 18px 28px !important;
+        }
+
+        .elive-container {
+            width: min(100%, 1040px);
+            margin: 0 auto !important;
+        }
+
+        .elive-shell {
+            background: rgba(255, 255, 255, 0.96) !important;
+            border: 1px solid rgba(226, 232, 240, 0.95) !important;
+            border-radius: 28px !important;
+            box-shadow: var(--elive-shadow) !important;
+            backdrop-filter: blur(12px);
+        }
+
+        .elive-banner {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            overflow: hidden;
+            background: var(--elive-primary);
+        }
+
+        .elive-banner img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: 45% center;
+        }
+
+        .elive-banner::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                180deg,
+                rgba(22, 25, 67, 0.00) 68%,
+                rgba(22, 25, 67, 0.08) 100%
+            );
+            pointer-events: none;
+        }
+
+        .elive-content {
+            padding: 34px !important;
+        }
+
+        .elive-heading {
+            display: flex !important;
+            align-items: center !important;
+            gap: 18px !important;
+            padding-bottom: 6px;
+        }
+
+        .elive-heading img {
+            width: 78px !important;
+            height: 78px !important;
+            border-radius: 20px !important;
+            border: 1px solid var(--elive-border) !important;
+            box-shadow: 0 8px 24px rgba(22, 25, 67, 0.08);
+        }
+
+        .elive-title {
+            font-size: clamp(28px, 4vw, 42px) !important;
+            letter-spacing: -0.03em;
+            color: var(--elive-primary) !important;
+        }
+
+        .elive-description {
+            max-width: 760px;
+            margin-top: 10px !important;
+            color: var(--elive-muted) !important;
+            font-size: 15px !important;
+            line-height: 1.7;
+        }
+
+        .event-summary {
+            margin-top: 26px !important;
+            gap: 14px !important;
+        }
+
+        .event-summary > div {
+            position: relative;
+            overflow: hidden;
+            min-height: 88px;
+            padding: 16px !important;
+            background:
+                linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
+            border: 1px solid var(--elive-border) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 6px 18px rgba(22, 25, 67, 0.05);
+        }
+
+        .event-summary > div::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--elive-primary);
+            opacity: 0.85;
+        }
+
+        .event-summary > div > div:first-child {
+            color: var(--elive-muted) !important;
+            letter-spacing: 0.08em;
+            font-size: 10px !important;
+        }
+
+        .event-summary > div > div:last-child {
+            margin-top: 8px !important;
+            color: var(--elive-text);
+            font-size: 15px !important;
+            line-height: 1.45;
+        }
+
+        form {
+            margin-top: 30px !important;
+        }
+
+        form > div {
+            margin-top: 20px !important;
+            padding: 24px !important;
+            background: #ffffff !important;
+            border: 1px solid var(--elive-border) !important;
+            border-radius: 22px !important;
+            box-shadow: var(--elive-shadow-soft) !important;
+            transition:
+                transform 160ms ease,
+                box-shadow 160ms ease,
+                border-color 160ms ease;
+        }
+
+        form > div:first-of-type {
+            margin-top: 0 !important;
+        }
+
+        form > div:hover {
+            border-color: color-mix(in srgb, var(--elive-primary) 28%, var(--elive-border)) !important;
+            box-shadow: 0 14px 34px rgba(22, 25, 67, 0.09) !important;
+        }
+
+        form h2 {
+            position: relative;
+            margin: 0 0 20px !important;
+            padding-left: 16px;
+            color: var(--elive-primary) !important;
+            font-size: 21px !important;
+            letter-spacing: -0.02em;
+        }
+
+        form h2::before {
+            content: "";
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            left: 0;
+            width: 5px;
+            border-radius: 999px;
+            background: var(--elive-primary);
+        }
+
+        form label {
+            color: #1e293b;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        form input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+        form select,
+        form textarea {
+            min-height: 46px;
+            width: 100%;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 13px !important;
+            background: #ffffff !important;
+            color: var(--elive-text);
+            font: inherit;
+            outline: none;
+            transition:
+                border-color 150ms ease,
+                box-shadow 150ms ease,
+                background 150ms ease;
+        }
+
+        form textarea {
+            min-height: 116px;
+            resize: vertical;
+        }
+
+        form input:not([type="checkbox"]):not([type="radio"]):focus,
+        form select:focus,
+        form textarea:focus {
+            border-color: var(--elive-primary) !important;
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--elive-primary) 15%, transparent);
+            background: #ffffff !important;
+        }
+
+        form input::placeholder,
+        form textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        form input[type="checkbox"],
+        form input[type="radio"] {
+            accent-color: var(--elive-primary);
+        }
+
+        .elive-field-invalid input,
+        .elive-field-invalid select,
+        .elive-field-invalid textarea {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
+        }
+
+        .elive-field-invalid label {
+            color: #991b1b;
+        }
+
+        .elive-validation-summary {
+            margin-top: 22px;
+            background: #fff7f7;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-weight: 700;
+        }
+
+        .elive-validation-summary ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .elive-session-day-group {
+            display: grid;
+            gap: 12px;
+        }
+
+        .elive-session-day-group[hidden] {
+            display: none !important;
+        }
+
+        .elive-session-day-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--elive-primary) 7%, #ffffff);
+            border: 1px solid color-mix(in srgb, var(--elive-primary) 20%, var(--elive-border));
+        }
+
+        .elive-session-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        .elive-session-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            border: 1px solid var(--elive-border);
+            border-radius: 16px;
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            cursor: pointer;
+            transition:
+                border-color 150ms ease,
+                transform 150ms ease,
+                box-shadow 150ms ease,
+                opacity 150ms ease;
+        }
+
+        .elive-session-card:hover {
+            transform: translateY(-1px);
+            border-color: color-mix(in srgb, var(--elive-primary) 30%, var(--elive-border));
+            box-shadow: 0 10px 24px rgba(22, 25, 67, 0.07);
+        }
+
+        .elive-session-card[data-full="1"] {
+            cursor: not-allowed;
+            opacity: 0.62;
+        }
+
+        .elive-session-card input {
+            width: 19px;
+            height: 19px;
+            margin-top: 2px;
+            flex: 0 0 auto;
+        }
+
+        .elive-session-type {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 7px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--elive-primary) 10%, #ffffff);
+            color: var(--elive-primary);
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .elive-session-meta {
+            display: block;
+            margin-top: 5px;
+            color: var(--elive-muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .elive-session-capacity {
+            display: block;
+            margin-top: 7px;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .elive-session-empty {
+            padding: 16px;
+            border: 1px dashed var(--elive-border);
+            border-radius: 14px;
+            color: var(--elive-muted);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Merchandise cards
+        |--------------------------------------------------------------------------
+        */
+
+        [data-merchandise-card] {
+            background: #ffffff !important;
+            border: 1px solid #dbe3ef !important;
+            border-radius: 20px !important;
+            padding: 20px !important;
+            box-shadow: 0 8px 24px rgba(22, 25, 67, 0.06);
+            transition:
+                border-color 150ms ease,
+                transform 150ms ease,
+                box-shadow 150ms ease;
+        }
+
+        [data-merchandise-card]:hover {
+            transform: translateY(-1px);
+            border-color: color-mix(in srgb, var(--elive-primary) 34%, #dbe3ef) !important;
+            box-shadow: 0 14px 30px rgba(22, 25, 67, 0.09);
+        }
+
+        .elive-merch-layout {
+            display: grid !important;
+            grid-template-columns: 150px minmax(0, 1fr);
+            gap: 20px !important;
+            align-items: start !important;
+        }
+
+        .elive-merch-image {
+            width: 150px !important;
+            height: 150px !important;
+            object-fit: contain !important;
+            object-position: center !important;
+            padding: 10px !important;
+            border-radius: 18px !important;
+            border: 1px solid #cbd5e1 !important;
+            background:
+                linear-gradient(
+                    145deg,
+                    #e5e7eb 0%,
+                    #f8fafc 100%
+                ) !important;
+            box-shadow: 0 8px 20px rgba(22, 25, 67, 0.10) !important;
+        }
+
+        .elive-merch-content {
+            min-width: 0 !important;
+        }
+
+        .elive-merch-header {
+            display: flex !important;
+            align-items: flex-start !important;
+            justify-content: space-between !important;
+            gap: 14px !important;
+            flex-wrap: wrap !important;
+        }
+
+        .elive-merch-heading {
+            flex: 1 1 320px;
+            min-width: 0;
+        }
+
+        .elive-merch-title {
+            margin: 0 !important;
+            color: #0f172a !important;
+            font-size: 21px !important;
+            line-height: 1.25 !important;
+            font-weight: 900 !important;
+            letter-spacing: -0.015em;
+        }
+
+        .elive-merch-description {
+            margin: 7px 0 0 !important;
+            max-width: 680px;
+            color: #475569 !important;
+            font-size: 14px !important;
+            line-height: 1.6 !important;
+            font-weight: 500 !important;
+        }
+
+        .elive-merch-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex: 0 0 auto;
+            padding: 7px 11px !important;
+            border-radius: 999px !important;
+            font-size: 11px !important;
+            line-height: 1 !important;
+            font-weight: 900 !important;
+            white-space: nowrap;
+        }
+
+        .elive-merch-select {
+            display: flex !important;
+            align-items: center !important;
+            gap: 11px !important;
+            width: fit-content;
+            max-width: 100%;
+            margin-top: 16px !important;
+            padding: 11px 14px !important;
+            border: 1px solid #dbe3ef;
+            border-radius: 13px;
+            background: #f8fafc;
+            color: #0f172a !important;
+            font-size: 14px !important;
+            font-weight: 850 !important;
+            cursor: pointer;
+        }
+
+        .elive-merch-select:hover {
+            border-color: color-mix(in srgb, var(--elive-primary) 35%, #dbe3ef);
+            background: color-mix(in srgb, var(--elive-primary) 4%, #ffffff);
+        }
+
+        .elive-merch-select input[type="checkbox"] {
+            width: 21px !important;
+            height: 21px !important;
+            margin: 0 !important;
+            flex: 0 0 auto;
+        }
+
+        [data-merchandise-fields] {
+            padding-top: 2px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Merchandise Image Popup
+        |--------------------------------------------------------------------------
+        */
+
+        .elive-merch-image-button {
+            display: block;
+            padding: 0;
+            border: 0;
+            border-radius: 18px;
+            background: transparent;
+            cursor: zoom-in;
+        }
+
+        .elive-merch-image-button:focus-visible {
+            outline: 3px solid color-mix(
+                in srgb,
+                var(--elive-primary) 35%,
+                transparent
+            );
+            outline-offset: 3px;
+        }
+
+        .elive-merch-image-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(22, 25, 67, 0.86);
+            backdrop-filter: blur(5px);
+        }
+
+        .elive-merch-image-modal.is-open {
+            display: flex;
+        }
+
+        .elive-merch-image-dialog {
+            position: relative;
+            width: min(100%, 760px);
+            max-height: calc(100vh - 48px);
+            padding: 18px;
+            border-radius: 22px;
+            background: #ffffff;
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+        }
+
+        .elive-merch-image-preview-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-height: calc(100vh - 150px);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #f8fafc;
+        }
+
+        .elive-merch-image-preview {
+            display: block;
+            max-width: 100%;
+            max-height: calc(100vh - 150px);
+            object-fit: contain;
+        }
+
+        .elive-merch-image-title {
+            margin: 14px 44px 0 2px;
+            color: #0f172a;
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 1.4;
+        }
+
+        .elive-merch-image-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 2;
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 999px;
+            background: rgba(22, 25, 67, 0.94);
+            color: #ffffff;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .elive-merch-image-close:hover {
+            background: var(--elive-navy);
+        }
+
+        body.elive-image-modal-open {
+            overflow: hidden;
+        }
+
+        @media (max-width: 600px) {
+            .elive-merch-image-modal {
+                padding: 12px;
+            }
+
+            .elive-merch-image-dialog {
+                max-height: calc(100vh - 24px);
+                padding: 12px;
+                border-radius: 18px;
+            }
+
+            .elive-merch-image-preview-wrap,
+            .elive-merch-image-preview {
+                max-height: calc(100vh - 120px);
+            }
+        }
+
+        [data-payment-section] {
+            background:
+                linear-gradient(
+                    145deg,
+                    color-mix(in srgb, var(--elive-primary) 5%, #ffffff),
+                    #ffffff
+                ) !important;
+        }
+
+        [data-submit-button] {
+            min-height: 54px;
+            margin-top: 22px !important;
+            border-radius: 15px !important;
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--elive-button),
+                    color-mix(in srgb, var(--elive-button) 78%, #0f172a)
+                ) !important;
+            box-shadow: 0 12px 26px color-mix(in srgb, var(--elive-button) 28%, transparent);
+            letter-spacing: 0.01em;
+            transition:
+                transform 150ms ease,
+                box-shadow 150ms ease,
+                opacity 150ms ease;
+        }
+
+        [data-submit-button]:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 32px color-mix(in srgb, var(--elive-button) 34%, transparent);
+        }
+
+        [data-submit-button]:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .elive-footer {
+            padding: 10px 12px 0;
+            color: var(--elive-muted) !important;
+            font-size: 12px !important;
+            line-height: 1.7;
+        }
+
+        .elive-footer strong {
+            color: var(--elive-navy);
+            font-weight: 800;
+        }
+
+        @media (max-width: 720px) {
+            .elive-page {
+                padding: 14px 10px 22px !important;
+            }
+
+            .elive-shell {
+                border-radius: 20px !important;
+            }
+
+            .elive-banner {
+                height: 150px;
+            }
+
+            .elive-banner img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                object-position: 45% center;
+            }
+
+            .elive-content {
+                padding: 20px 16px !important;
+            }
+
+            .elive-heading {
+                align-items: flex-start !important;
+            }
+
+            .elive-heading img {
+                width: 62px !important;
+                height: 62px !important;
+            }
+
+            .elive-title {
+                font-size: 27px !important;
+            }
+
+            .event-summary {
+                grid-template-columns: 1fr !important;
+                gap: 10px !important;
+                margin-top: 20px !important;
+            }
+
+            .event-summary > div {
+                min-height: 0 !important;
+                padding: 13px 14px !important;
+                border-radius: 15px !important;
+            }
+
+            .event-summary > div > div:first-child {
+                font-size: 9px !important;
+            }
+
+            .event-summary > div > div:last-child {
+                margin-top: 5px !important;
+                font-size: 14px !important;
+                line-height: 1.35;
+            }
+
+            form > div {
+                padding: 18px !important;
+                border-radius: 18px !important;
+            }
+
+            form h2 {
+                font-size: 19px !important;
+            }
+
+            [data-merchandise-card] {
+                padding: 16px !important;
+            }
+
+            .elive-merch-layout {
+                grid-template-columns: 108px minmax(0, 1fr);
+                gap: 14px !important;
+            }
+
+            .elive-merch-image {
+                width: 108px !important;
+                height: 108px !important;
+                padding: 7px !important;
+                border-radius: 15px !important;
+            }
+
+            .elive-merch-title {
+                font-size: 17px !important;
+            }
+
+            .elive-merch-description {
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+            }
+
+            .elive-merch-badge {
+                padding: 6px 9px !important;
+                font-size: 10px !important;
+            }
+
+            .elive-merch-select {
+                width: 100%;
+                margin-top: 13px !important;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .elive-merch-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-merch-image {
+                width: 100% !important;
+                height: 210px !important;
+                max-width: none !important;
+            }
+
+            .elive-merch-header {
+                display: grid !important;
+                grid-template-columns: 1fr auto;
+                align-items: start !important;
+            }
+
+            .elive-merch-heading {
+                flex: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                transition: none !important;
+            }
+        }
+    </style>
+
 </head>
 
 <body style="
     margin: 0;
     background: {{ $branding['background_color'] }};
     color: #0f172a;
-    font-family: Arial, sans-serif;
+    font-family: 'Creato Display', ui-sans-serif, system-ui, sans-serif;
 ">
-    <div style="min-height: 100vh; padding: 28px 16px;">
-        <div style="max-width: 980px; margin: 0 auto;">
-            <div style="
+    <div class="elive-page" style="min-height: 100vh; padding: 28px 16px;">
+        <div class="elive-container" style="max-width: 980px; margin: 0 auto;">
+            <div class="elive-shell" style="
                 background: #ffffff;
                 border-radius: 24px;
                 overflow: hidden;
-                box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12);
+                box-shadow: 0 16px 35px rgba(22, 25, 67, 0.12);
                 border: 1px solid #e5e7eb;
             ">
                 @if ($branding['banner'])
-                    <div style="
-                        height: 230px;
-                        background-image: url('{{ asset('storage/' . $branding['banner']) }}');
-                        background-size: cover;
-                        background-position: center;
-                    "></div>
+                    <div class="elive-banner">
+                        <img
+                            src="{{ asset('storage/' . $branding['banner']) }}"
+                            alt="{{ $event->name }} banner"
+                            loading="eager"
+                            decoding="async"
+                        >
+                    </div>
                 @else
-                    <div style="height: 16px; background: {{ $branding['primary_color'] }};"></div>
+                    <div
+                        class="elive-banner"
+                        style="
+                            height: 16px;
+                            background: {{ $branding['primary_color'] }};
+                        "
+                    ></div>
                 @endif
 
-                <div style="padding: 28px;">
-                    <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+                <div class="elive-content" style="padding: 28px;">
+                    <div class="elive-heading" style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
                         @if ($branding['logo'])
                             <img
                                 src="{{ asset('storage/' . $branding['logo']) }}"
@@ -51,7 +993,7 @@
                         @endif
 
                         <div style="flex: 1; min-width: 260px;">
-                            <h1 style="
+                            <h1 class="elive-title" style="
                                 margin: 0;
                                 color: {{ $branding['primary_color'] }};
                                 font-size: 30px;
@@ -61,32 +1003,44 @@
                                 {{ $event->registration_welcome_title ?: 'Register for ' . $event->name }}
                             </h1>
 
-                            <p style="margin: 8px 0 0 0; color: #64748b; font-size: 15px;">
+                            <p class="elive-description" style="margin: 8px 0 0 0; color: var(--elive-muted); font-size: 15px;">
                                 {{ $event->registration_welcome_message ?: 'Complete the form below to register for this event.' }}
                             </p>
                         </div>
                     </div>
 
-                    <div style="
+                    <div class="event-summary" style="
                         margin-top: 24px;
                         display: grid;
                         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
                         gap: 12px;
                     ">
                         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;">
-                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Event</div>
+                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--elive-muted);">Event</div>
                             <div style="font-size:15px;font-weight:800;margin-top:5px;">{{ $event->name }}</div>
                         </div>
 
                         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;">
-                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Venue</div>
+                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--elive-muted);">Venue</div>
                             <div style="font-size:15px;font-weight:800;margin-top:5px;">{{ $event->venue ?: 'To be announced' }}</div>
                         </div>
 
                         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:14px;">
-                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#64748b;">Date</div>
+                            <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--elive-muted);">Date</div>
                             <div style="font-size:15px;font-weight:800;margin-top:5px;">
-                                {{ $event->starts_at?->format('d M Y, H:i') ?? 'To be announced' }}
+                                @if ($event->starts_at && $event->ends_at)
+                                    @if ($event->starts_at->isSameDay($event->ends_at))
+                                        {{ $event->starts_at->format('d M Y, H:i') }}
+                                        – {{ $event->ends_at->format('H:i') }}
+                                    @else
+                                        {{ $event->starts_at->format('d M Y') }}
+                                        – {{ $event->ends_at->format('d M Y') }}
+                                    @endif
+                                @elseif ($event->starts_at)
+                                    {{ $event->starts_at->format('d M Y, H:i') }}
+                                @else
+                                    To be announced
+                                @endif
                             </div>
                         </div>
 
@@ -107,16 +1061,13 @@
                     @endif
 
                     @if ($errors->any())
-                        <div style="
-                            margin-top: 22px;
-                            background: #fee2e2;
-                            color: #991b1b;
-                            border: 1px solid #fecaca;
-                            border-radius: 14px;
-                            padding: 14px;
-                            font-weight: 700;
-                        ">
-                            {{ $errors->first() }}
+                        <div class="elive-validation-summary" role="alert">
+                            Please review the highlighted field{{ $errors->count() === 1 ? '' : 's' }} below.
+                            <ul>
+                                @foreach ($errors->all() as $message)
+                                    <li>{{ $message }}</li>
+                                @endforeach
+                            </ul>
                         </div>
                     @endif
 
@@ -171,8 +1122,83 @@
                             </div>
                         @endif
 
-                        <form method="POST" action="{{ route('public.registration.store', $event) }}" style="margin-top: 28px;">
+                        <form method="POST" action="{{ route('public.registration.store', $event) }}" data-registration-form style="margin-top: 28px;">
                             @csrf
+
+                            @php
+                                /*
+                                 * Multi-purpose standard field configuration.
+                                 *
+                                 * These values are read from the Event model when the
+                                 * corresponding database columns exist. Safe defaults
+                                 * preserve the current registration experience.
+                                 */
+                                $standardFields = [
+                                    'phone' => [
+                                        'show' => (bool) ($event->registration_show_phone ?? true),
+                                        'required' => (bool) ($event->registration_require_phone ?? true),
+                                    ],
+                                    'email' => [
+                                        'show' => (bool) ($event->registration_show_email ?? true),
+                                        'required' => (bool) ($event->registration_require_email ?? false),
+                                    ],
+                                    'organization' => [
+                                        'show' => (bool) ($event->registration_show_organization ?? true),
+                                        'required' => (bool) ($event->registration_require_organization ?? false),
+                                    ],
+                                    'position' => [
+                                        'show' => (bool) ($event->registration_show_position ?? true),
+                                        'required' => (bool) ($event->registration_require_position ?? false),
+                                    ],
+                                    'category' => [
+                                        'show' => (bool) ($event->registration_show_category ?? true),
+                                        'required' => (bool) ($event->registration_require_category ?? false),
+                                    ],
+                                    'badge_type' => [
+                                        'show' => (bool) ($event->registration_show_badge_type ?? false),
+                                        'required' => (bool) ($event->registration_require_badge_type ?? false),
+                                    ],
+                                ];
+
+                                $allowDaySelection = (bool) (
+                                    $allowDaySelection
+                                    ?? $event->allowsDaySelection()
+                                );
+
+                                $allowAllDaysSelection = (bool) (
+                                    $allowAllDaysSelection
+                                    ?? $event->allowsAllDaysSelection()
+                                );
+
+                                $allowSessionRegistration = (bool) (
+                                    $allowSessionRegistration
+                                    ?? $event->allowsSessionRegistration()
+                                );
+
+                                $sectionLabels = $registrationSectionLabels
+                                    ?? $event->registrationSectionLabels();
+
+                                $availableCategories = collect($categories ?? []);
+                                $availableBadgeTypes = collect($badgeTypes ?? []);
+
+                                $isChurchLikeEvent = in_array(
+                                    $event->event_type,
+                                    ['church_event', 'community_event', 'charity_event'],
+                                    true
+                                );
+
+                                $organizationFieldLabel = $isChurchLikeEvent
+                                    ? 'Church / Congregation'
+                                    : 'Organization / Company';
+
+                                $positionFieldLabel = $isChurchLikeEvent
+                                    ? 'Church Position / Responsibility'
+                                    : 'Position / Title';
+
+                                $categoryFieldLabel = $isChurchLikeEvent
+                                    ? 'Participant Type'
+                                    : 'Attendee Category';
+                            @endphp
 
                             @if ($isFull && $waitlistEnabled)
                                 <input type="hidden" name="join_waitlist" value="1">
@@ -183,7 +1209,7 @@
                                 border: 1px solid #e2e8f0;
                                 border-radius: 20px;
                                 padding: 22px;
-                                box-shadow: 0 8px 22px rgba(15,23,42,0.06);
+                                box-shadow: 0 8px 22px rgba(22,25,67,0.06);
                             ">
                                 <h2 style="
                                     margin: 0 0 18px 0;
@@ -191,253 +1217,235 @@
                                     font-size: 22px;
                                     font-weight: 900;
                                 ">
-                                    Attendee Information
+                                    {{ $sectionLabels['personal'] ?? 'Personal Details' }}
                                 </h2>
 
                                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
-                                    <div>
+                                    <div id="field-full-name" class="@error('full_name') elive-field-invalid @enderror">
                                         <label style="display:block;font-weight:800;margin-bottom:7px;">Full Name *</label>
                                         <input
                                             name="full_name"
                                             value="{{ old('full_name') }}"
                                             required
+                                            autocomplete="name"
                                             style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                         >
+                                        @error('full_name')
+                                            <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                {{ $message }}
+                                            </div>
+                                        @enderror
                                     </div>
 
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Phone Number</label>
-                                        <input
-                                            type="tel"
-                                            name="phone"
-                                            value="{{ old('phone') }}"
-                                            placeholder="255712345678"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Email Address</label>
-                                        <input
-                                            type="email"
-                                            name="email"
-                                            value="{{ old('email') }}"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Organization / Company</label>
-                                        <input
-                                            name="organization_name"
-                                            value="{{ old('organization_name') }}"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Position / Title</label>
-                                        <input
-                                            name="position"
-                                            value="{{ old('position') }}"
-                                            style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
-                                        >
-                                    </div>
-
-                                    @if (($categories ?? collect())->count())
-                                        <div>
-                                            <label style="display:block;font-weight:800;margin-bottom:7px;">Category</label>
-                                            <select
-                                                name="category_id"
-                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                    @if ($standardFields['phone']['show'])
+                                        <div id="field-phone" class="@error('phone') elive-field-invalid @enderror">
+                                            <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                Phone Number
+                                                @if ($standardFields['phone']['required'])
+                                                    <span style="color:#dc2626;">*</span>
+                                                @endif
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                name="phone"
+                                                value="{{ old('phone') }}"
+                                                placeholder="255712345678"
+                                                inputmode="tel"
+                                                autocomplete="tel"
+                                                @required($standardFields['phone']['required'])
+                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                             >
-                                                <option value="">Select category</option>
-                                                @foreach ($categories as $category)
-                                                    <option value="{{ $category->id }}" @selected(old('category_id') == $category->id)>
-                                                        {{ $category->name }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                            @error('phone')
+                                                <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                    {{ $message }}
+                                                </div>
+                                            @enderror
                                         </div>
                                     @endif
 
-                                    @if (($badgeTypes ?? collect())->count())
-                                        <div>
-                                            <label style="display:block;font-weight:800;margin-bottom:7px;">Badge Type</label>
-                                            <select
-                                                name="badge_type_id"
-                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                    @if ($standardFields['email']['show'])
+                                        <div id="field-email" class="@error('email') elive-field-invalid @enderror">
+                                            <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                Email Address
+                                                @if ($standardFields['email']['required'])
+                                                    <span style="color:#dc2626;">*</span>
+                                                @endif
+                                            </label>
+                                            <input
+                                                type="email"
+                                                name="email"
+                                                value="{{ old('email') }}"
+                                                autocomplete="email"
+                                                @required($standardFields['email']['required'])
+                                                style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                             >
-                                                <option value="">Select badge type</option>
-                                                @foreach ($badgeTypes as $badgeType)
-                                                    <option value="{{ $badgeType->id }}" @selected(old('badge_type_id') == $badgeType->id)>
-                                                        {{ $badgeType->name }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                            @error('email')
+                                                <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                    {{ $message }}
+                                                </div>
+                                            @enderror
                                         </div>
                                     @endif
                                 </div>
                             </div>
 
-                            @if (($eventDays ?? collect())->count())
-                                @php
-                                    $oldEventDays = collect(old('event_days', []))
-                                        ->map(fn ($id) => (int) $id)
-                                        ->all();
-                                @endphp
+                            @php
+                                $showOptionalStandardDetails =
+                                    $standardFields['organization']['show']
+                                    || $standardFields['position']['show']
+                                    || $standardFields['category']['show']
+                                    || $standardFields['badge_type']['show'];
+                            @endphp
 
+                            @if ($showOptionalStandardDetails)
                                 <div style="
                                     margin-top:22px;
                                     background:#ffffff;
                                     border:1px solid #e2e8f0;
                                     border-radius:20px;
                                     padding:22px;
-                                    box-shadow:0 8px 22px rgba(15,23,42,0.06);
+                                    box-shadow:0 8px 22px rgba(22,25,67,0.06);
                                 ">
-                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-                                        <div>
-                                            <h2 style="
-                                                margin:0;
-                                                color:{{ $branding['primary_color'] }};
-                                                font-size:22px;
-                                                font-weight:900;
-                                            ">
-                                                Attendance Days
-                                            </h2>
-
-                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
-                                                Select all days you expect to attend.
-                                            </p>
-                                        </div>
-
-                                        <div style="
-                                            background:#eef2ff;
-                                            border:1px solid #c7d2fe;
-                                            color:#3730a3;
-                                            border-radius:12px;
-                                            padding:10px 12px;
-                                            font-size:12px;
-                                            font-weight:800;
-                                        ">
-                                            Select at least one day
-                                        </div>
-                                    </div>
-
-                                    <div style="
-                                        display:grid;
-                                        grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
-                                        gap:12px;
-                                        margin-top:18px;
+                                    <h2 style="
+                                        margin:0 0 18px 0;
+                                        color:{{ $branding['primary_color'] }};
+                                        font-size:22px;
+                                        font-weight:900;
                                     ">
-                                        @foreach ($eventDays as $day)
-                                            @php
-                                                $daySelected = in_array(
-                                                    (int) $day->id,
-                                                    $oldEventDays,
-                                                    true
-                                                );
-                                            @endphp
+                                        {{ $sectionLabels['professional'] ?? 'Professional / Registration Details' }}
+                                    </h2>
 
-                                            <label style="
-                                                display:flex;
-                                                align-items:flex-start;
-                                                gap:12px;
-                                                padding:16px;
-                                                border:1px solid #e2e8f0;
-                                                border-radius:16px;
-                                                background:#f8fafc;
-                                                cursor:pointer;
-                                            ">
-                                                <input
-                                                    type="checkbox"
-                                                    name="event_days[]"
-                                                    value="{{ $day->id }}"
-                                                    @checked($daySelected)
-                                                    style="
-                                                        width:19px;
-                                                        height:19px;
-                                                        margin-top:2px;
-                                                        flex:0 0 auto;
-                                                    "
-                                                >
-
-                                                <span style="display:block;min-width:0;">
-                                                    <strong style="
-                                                        display:block;
-                                                        color:#0f172a;
-                                                        font-size:15px;
-                                                        line-height:1.35;
-                                                    ">
-                                                        {{ $day->name }}
-                                                    </strong>
-
-                                                    <span style="
-                                                        display:block;
-                                                        margin-top:5px;
-                                                        color:#64748b;
-                                                        font-size:13px;
-                                                        line-height:1.5;
-                                                    ">
-                                                        {{ $day->event_date?->format('d M Y') }}
-
-                                                        @if ($day->starts_at)
-                                                            — {{ $day->starts_at?->format('H:i') }}
-                                                        @endif
-
-                                                        @if ($day->ends_at)
-                                                            to {{ $day->ends_at?->format('H:i') }}
-                                                        @endif
-                                                    </span>
-
-                                                    @if (filled($day->venue_name))
-                                                        <span style="
-                                                            display:block;
-                                                            margin-top:4px;
-                                                            color:#475569;
-                                                            font-size:12px;
-                                                            font-weight:700;
-                                                        ">
-                                                            {{ $day->venue_name }}
-                                                        </span>
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
+                                        @if ($standardFields['organization']['show'])
+                                            <div id="field-organization-name" class="@error('organization_name') elive-field-invalid @enderror">
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    {{ $organizationFieldLabel }}
+                                                    @if ($standardFields['organization']['required'])
+                                                        <span style="color:#dc2626;">*</span>
                                                     @endif
-                                                </span>
-                                            </label>
-                                        @endforeach
+                                                </label>
+                                                <input
+                                                    name="organization_name"
+                                                    value="{{ old('organization_name') }}"
+                                                    @required($standardFields['organization']['required'])
+                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
+                                                >
+                                                @error('organization_name')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
+
+                                        @if ($standardFields['position']['show'])
+                                            <div id="field-position" class="@error('position') elive-field-invalid @enderror">
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    {{ $positionFieldLabel }}
+                                                    @if ($standardFields['position']['required'])
+                                                        <span style="color:#dc2626;">*</span>
+                                                    @endif
+                                                </label>
+                                                <input
+                                                    name="position"
+                                                    value="{{ old('position') }}"
+                                                    @required($standardFields['position']['required'])
+                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
+                                                >
+                                                @error('position')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
+
+                                        @if ($standardFields['category']['show'])
+                                            <div id="field-category-id" class="@error('category_id') elive-field-invalid @enderror">
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    {{ $categoryFieldLabel }}
+                                                    @if ($standardFields['category']['required'])
+                                                        <span style="color:#dc2626;">*</span>
+                                                    @endif
+                                                </label>
+
+                                                @if ($availableCategories->isNotEmpty())
+                                                    <select
+                                                        name="category_id"
+                                                        @required($standardFields['category']['required'])
+                                                        style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                                    >
+                                                        <option value="">Select {{ strtolower($categoryFieldLabel) }}</option>
+
+                                                        @foreach ($availableCategories as $category)
+                                                            <option
+                                                                value="{{ $category->id }}"
+                                                                @selected((string) old('category_id') === (string) $category->id)
+                                                            >
+                                                                {{ $category->name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                @else
+                                                    <select
+                                                        disabled
+                                                        style="width:100%;box-sizing:border-box;border:1px solid #f59e0b;border-radius:14px;padding:12px;font-size:15px;background:#fffbeb;color:#92400e;"
+                                                    >
+                                                        <option>No participant types have been configured for this event</option>
+                                                    </select>
+
+                                                    <div style="font-size:12px;color:#92400e;margin-top:7px;font-weight:700;line-height:1.5;">
+                                                        The organizer must add at least one attendee category before registration can continue.
+                                                    </div>
+                                                @endif
+
+                                                @error('category_id')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
+
+                                        @if ($standardFields['badge_type']['show'] && $availableBadgeTypes->isNotEmpty())
+                                            <div id="field-badge-type-id" class="@error('badge_type_id') elive-field-invalid @enderror">
+                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                    Badge Type
+                                                    @if ($standardFields['badge_type']['required'])
+                                                        <span style="color:#dc2626;">*</span>
+                                                    @endif
+                                                </label>
+                                                <select
+                                                    name="badge_type_id"
+                                                    @required($standardFields['badge_type']['required'])
+                                                    style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
+                                                >
+                                                    <option value="">Select badge type</option>
+                                                    @foreach ($availableBadgeTypes as $badgeType)
+                                                        <option value="{{ $badgeType->id }}" @selected(old('badge_type_id') == $badgeType->id)>
+                                                            {{ $badgeType->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                @error('badge_type_id')
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+                                            </div>
+                                        @endif
                                     </div>
-
-                                    @error('event_days')
-                                        <div style="
-                                            margin-top:12px;
-                                            color:#dc2626;
-                                            font-size:13px;
-                                            font-weight:800;
-                                        ">
-                                            {{ $message }}
-                                        </div>
-                                    @enderror
-
-                                    @error('event_days.*')
-                                        <div style="
-                                            margin-top:12px;
-                                            color:#dc2626;
-                                            font-size:13px;
-                                            font-weight:800;
-                                        ">
-                                            {{ $message }}
-                                        </div>
-                                    @enderror
                                 </div>
                             @endif
 
-                            @if (($fields ?? collect())->count())
+                            @if (($fields ?? collect())->isNotEmpty())
                                 <div style="
                                     margin-top: 22px;
                                     background: #ffffff;
                                     border: 1px solid #e2e8f0;
                                     border-radius: 20px;
                                     padding: 22px;
-                                    box-shadow: 0 8px 22px rgba(15,23,42,0.06);
+                                    box-shadow: 0 8px 22px rgba(22,25,67,0.06);
                                 ">
                                     <h2 style="
                                         margin: 0 0 18px 0;
@@ -445,7 +1453,7 @@
                                         font-size: 22px;
                                         font-weight: 900;
                                     ">
-                                        Additional Information
+                                        {{ $sectionLabels['additional'] ?? 'Additional Information' }}
                                     </h2>
 
                                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
@@ -619,13 +1627,511 @@
                                                 @endif
 
                                                 @if ($helpText)
-                                                    <div style="font-size:12px;color:#64748b;margin-top:6px;">
+                                                    <div style="font-size:12px;color:var(--elive-muted);margin-top:6px;">
                                                         {{ $helpText }}
                                                     </div>
                                                 @endif
+
+                                                @error('answers.' . $field->id)
+                                                    <div style="font-size:12px;color:#dc2626;margin-top:6px;font-weight:700;">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
                                             </div>
                                         @endforeach
                                     </div>
+                                </div>
+                            @endif
+
+                            @if (
+                                $allowDaySelection
+                                && ($eventDays ?? collect())->count()
+                            )
+                                @php
+                                    $oldEventDaysRaw = collect(old('event_days', []))
+                                        ->map(fn ($value) => (string) $value);
+
+                                    $allDaysPreviouslySelected = $oldEventDaysRaw
+                                        ->contains('all');
+
+                                    $oldEventDays = $oldEventDaysRaw
+                                        ->filter(fn ($value) => is_numeric($value))
+                                        ->map(fn ($id) => (int) $id)
+                                        ->all();
+                                @endphp
+
+                                <div style="
+                                    margin-top:22px;
+                                    background:#ffffff;
+                                    border:1px solid #e2e8f0;
+                                    border-radius:20px;
+                                    padding:22px;
+                                    box-shadow:0 8px 22px rgba(22,25,67,0.06);
+                                ">
+                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+                                        <div>
+                                            <h2 style="
+                                                margin:0;
+                                                color:{{ $branding['primary_color'] }};
+                                                font-size:22px;
+                                                font-weight:900;
+                                            ">
+                                                {{ $sectionLabels['attendance'] ?? 'Attendance Selection' }}
+                                            </h2>
+
+                                            <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
+                                                Choose the event days you plan to attend.
+                                                @if ($allowAllDaysSelection)
+                                                    You may also select all available days at once.
+                                                @endif
+                                            </p>
+                                        </div>
+
+                                        <div style="
+                                            background:color-mix(in srgb, {{ $branding['primary_color'] }} 8%, #ffffff);
+                                            border:1px solid color-mix(in srgb, {{ $branding['primary_color'] }} 24%, #e2e8f0);
+                                            color:{{ $branding['primary_color'] }};
+                                            border-radius:12px;
+                                            padding:10px 12px;
+                                            font-size:12px;
+                                            font-weight:800;
+                                        ">
+                                            Select at least one day
+                                        </div>
+                                    </div>
+
+                                    @if ($allowAllDaysSelection)
+                                    <label
+                                        data-all-days-card
+                                        style="
+                                            display:flex;
+                                            align-items:flex-start;
+                                            gap:12px;
+                                            margin-top:18px;
+                                            padding:17px;
+                                            border:2px solid {{ $branding['primary_color'] }};
+                                            border-radius:16px;
+                                            background:color-mix(in srgb, {{ $branding['primary_color'] }} 8%, #ffffff);
+                                            cursor:pointer;
+                                        "
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            name="event_days[]"
+                                            value="all"
+                                            data-all-days-checkbox
+                                            @checked($allDaysPreviouslySelected)
+                                            style="
+                                                width:20px;
+                                                height:20px;
+                                                margin-top:2px;
+                                                flex:0 0 auto;
+                                            "
+                                        >
+
+                                        <span style="display:block;min-width:0;">
+                                            <strong style="
+                                                display:block;
+                                                color:{{ $branding['primary_color'] }};
+                                                font-size:16px;
+                                                line-height:1.35;
+                                            ">
+                                                All Event Days
+                                            </strong>
+
+                                            <span style="
+                                                display:block;
+                                                margin-top:5px;
+                                                color:#475569;
+                                                font-size:13px;
+                                                line-height:1.5;
+                                            ">
+                                                Register me for every available day of this event.
+                                            </span>
+                                        </span>
+                                    </label>
+                                    @endif
+
+                                    <div style="
+                                        display:grid;
+                                        grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+                                        gap:12px;
+                                        margin-top:12px;
+                                    ">
+                                        @foreach ($eventDays as $day)
+                                            @php
+                                                $daySelected = in_array(
+                                                    (int) $day->id,
+                                                    $oldEventDays,
+                                                    true
+                                                );
+                                            @endphp
+
+                                            <label style="
+                                                display:flex;
+                                                align-items:flex-start;
+                                                gap:12px;
+                                                padding:16px;
+                                                border:1px solid #e2e8f0;
+                                                border-radius:16px;
+                                                background:#f8fafc;
+                                                cursor:pointer;
+                                            ">
+                                                <input
+                                                    type="checkbox"
+                                                    name="event_days[]"
+                                                    value="{{ $day->id }}"
+                                                    data-event-day-checkbox
+                                                    @checked($daySelected || $allDaysPreviouslySelected)
+                                                    style="
+                                                        width:19px;
+                                                        height:19px;
+                                                        margin-top:2px;
+                                                        flex:0 0 auto;
+                                                    "
+                                                >
+
+                                                <span style="display:block;min-width:0;">
+                                                    <strong style="
+                                                        display:block;
+                                                        color:#0f172a;
+                                                        font-size:15px;
+                                                        line-height:1.35;
+                                                    ">
+                                                        {{ $day->name }}
+                                                    </strong>
+
+                                                    <span style="
+                                                        display:block;
+                                                        margin-top:5px;
+                                                        color:var(--elive-muted);
+                                                        font-size:13px;
+                                                        line-height:1.5;
+                                                    ">
+                                                        {{ $day->event_date?->format('d M Y') }}
+
+                                                        @if ($day->starts_at)
+                                                            — {{ $day->starts_at?->format('H:i') }}
+                                                        @endif
+
+                                                        @if ($day->ends_at)
+                                                            to {{ $day->ends_at?->format('H:i') }}
+                                                        @endif
+                                                    </span>
+
+                                                    @if (filled($day->venue_name))
+                                                        <span style="
+                                                            display:block;
+                                                            margin-top:4px;
+                                                            color:#475569;
+                                                            font-size:12px;
+                                                            font-weight:700;
+                                                        ">
+                                                            {{ $day->venue_name }}
+                                                        </span>
+                                                    @endif
+                                                </span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+
+                                    @error('event_days')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+
+                                    @error('event_days.*')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+                                </div>
+                            @endif
+
+                            @if (
+                                $allowSessionRegistration
+                                && ($eventSessions ?? collect())->isNotEmpty()
+                            )
+                                @php
+                                    $oldEventSessions = collect(
+                                        old('event_sessions', [])
+                                    )
+                                        ->filter(
+                                            fn ($value) =>
+                                                is_numeric($value)
+                                        )
+                                        ->map(
+                                            fn ($value) =>
+                                                (int) $value
+                                        )
+                                        ->all();
+
+                                    $sessionsByDay = $eventSessions
+                                        ->groupBy('event_day_id');
+                                @endphp
+
+                                <div
+                                    data-session-section
+                                    style="
+                                        margin-top:22px;
+                                        background:#ffffff;
+                                        border:1px solid #e2e8f0;
+                                        border-radius:20px;
+                                        padding:22px;
+                                        box-shadow:0 8px 22px rgba(22,25,67,0.06);
+                                    "
+                                >
+                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+                                        <div>
+                                            <h2 style="
+                                                margin:0;
+                                                color:{{ $branding['primary_color'] }};
+                                                font-size:22px;
+                                                font-weight:900;
+                                            ">
+                                                {{ $sectionLabels['sessions'] ?? 'Sessions / Activities' }}
+                                            </h2>
+
+                                            <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
+                                                Select the sessions or activities you would like to attend.
+                                                @if ($allowDaySelection)
+                                                    Only sessions belonging to your selected event days are shown.
+                                                @else
+                                                    Available sessions are shown for all event days assigned to your registration.
+                                                @endif
+                                            </p>
+                                        </div>
+
+                                        <div style="
+                                            background:#f8fafc;
+                                            border:1px solid #e2e8f0;
+                                            border-radius:12px;
+                                            padding:10px 12px;
+                                            font-size:12px;
+                                            color:#475569;
+                                            font-weight:800;
+                                        ">
+                                            Session selection is optional unless specified by the organizer.
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        data-session-groups
+                                        style="
+                                            display:grid;
+                                            gap:18px;
+                                            margin-top:18px;
+                                        "
+                                    >
+                                        @foreach ($eventDays as $day)
+                                            @php
+                                                $daySessions = $sessionsByDay
+                                                    ->get($day->id, collect());
+                                            @endphp
+
+                                            @if ($daySessions->isNotEmpty())
+                                                <div
+                                                    class="elive-session-day-group"
+                                                    data-session-day-group="{{ $day->id }}"
+                                                    @if ($allowDaySelection) hidden @endif
+                                                >
+                                                    <div class="elive-session-day-title">
+                                                        <div>
+                                                            <strong style="
+                                                                display:block;
+                                                                color:{{ $branding['primary_color'] }};
+                                                                font-size:15px;
+                                                            ">
+                                                                {{ $day->name }}
+                                                            </strong>
+
+                                                            <span style="
+                                                                display:block;
+                                                                margin-top:3px;
+                                                                color:var(--elive-muted);
+                                                                font-size:12px;
+                                                            ">
+                                                                {{ $day->event_date?->format('d M Y') }}
+                                                            </span>
+                                                        </div>
+
+                                                        <span style="
+                                                            font-size:11px;
+                                                            font-weight:900;
+                                                            color:#475569;
+                                                        ">
+                                                            {{ $daySessions->count() }}
+                                                            {{ \Illuminate\Support\Str::plural('session', $daySessions->count()) }}
+                                                        </span>
+                                                    </div>
+
+                                                    <div class="elive-session-grid">
+                                                        @foreach ($daySessions as $session)
+                                                            @php
+                                                                $capacity = $session->capacity;
+                                                                $registeredCount = (int) (
+                                                                    $session->registered_attendees_count
+                                                                    ?? 0
+                                                                );
+
+                                                                $remainingCapacity = $capacity !== null
+                                                                    && (int) $capacity > 0
+                                                                        ? max(
+                                                                            (int) $capacity
+                                                                            - $registeredCount,
+                                                                            0
+                                                                        )
+                                                                        : null;
+
+                                                                $sessionIsFull =
+                                                                    $remainingCapacity !== null
+                                                                    && $remainingCapacity <= 0;
+
+                                                                $sessionSelected = in_array(
+                                                                    (int) $session->id,
+                                                                    $oldEventSessions,
+                                                                    true
+                                                                );
+
+                                                                $sessionType = ucwords(
+                                                                    str_replace(
+                                                                        '_',
+                                                                        ' ',
+                                                                        $session->session_type
+                                                                            ?: 'session'
+                                                                    )
+                                                                );
+                                                            @endphp
+
+                                                            <label
+                                                                class="elive-session-card"
+                                                                data-session-card
+                                                                data-session-day="{{ $day->id }}"
+                                                                data-full="{{ $sessionIsFull ? '1' : '0' }}"
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="event_sessions[]"
+                                                                    value="{{ $session->id }}"
+                                                                    data-session-checkbox
+                                                                    data-session-day="{{ $day->id }}"
+                                                                    @checked($sessionSelected && ! $sessionIsFull)
+                                                                    @disabled($sessionIsFull)
+                                                                >
+
+                                                                <span style="display:block;min-width:0;">
+                                                                    <strong style="
+                                                                        display:block;
+                                                                        color:#0f172a;
+                                                                        font-size:15px;
+                                                                        line-height:1.35;
+                                                                    ">
+                                                                        {{ $session->name }}
+                                                                    </strong>
+
+                                                                    <span class="elive-session-type">
+                                                                        {{ $sessionType }}
+                                                                    </span>
+
+                                                                    @if ($session->starts_at || $session->ends_at)
+                                                                        <span class="elive-session-meta">
+                                                                            @if ($session->starts_at)
+                                                                                {{ $session->starts_at->format('H:i') }}
+                                                                            @endif
+
+                                                                            @if ($session->ends_at)
+                                                                                @if ($session->starts_at)
+                                                                                    –
+                                                                                @endif
+                                                                                {{ $session->ends_at->format('H:i') }}
+                                                                            @endif
+                                                                        </span>
+                                                                    @endif
+
+                                                                    @if (filled($session->venue_name))
+                                                                        <span class="elive-session-meta">
+                                                                            {{ $session->venue_name }}
+                                                                        </span>
+                                                                    @endif
+
+                                                                    @if (filled($session->description))
+                                                                        <span class="elive-session-meta">
+                                                                            {{ \Illuminate\Support\Str::limit($session->description, 120) }}
+                                                                        </span>
+                                                                    @endif
+
+                                                                    @if ($sessionIsFull)
+                                                                        <span
+                                                                            class="elive-session-capacity"
+                                                                            style="color:#b91c1c;"
+                                                                        >
+                                                                            Session full
+                                                                        </span>
+                                                                    @elseif ($remainingCapacity !== null)
+                                                                        <span class="elive-session-capacity">
+                                                                            {{ $remainingCapacity }}
+                                                                            {{ \Illuminate\Support\Str::plural('place', $remainingCapacity) }}
+                                                                            available
+                                                                        </span>
+                                                                    @else
+                                                                        <span class="elive-session-capacity">
+                                                                            Open capacity
+                                                                        </span>
+                                                                    @endif
+                                                                </span>
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+
+                                    <div
+                                        data-session-empty
+                                        class="elive-session-empty"
+                                        hidden
+                                        style="margin-top:16px;"
+                                    >
+                                        @if ($allowDaySelection)
+                                            Select an event day above to view the sessions available for that day.
+                                        @else
+                                            No public sessions are currently available.
+                                        @endif
+                                    </div>
+
+                                    @error('event_sessions')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+
+                                    @error('event_sessions.*')
+                                        <div style="
+                                            margin-top:12px;
+                                            color:#dc2626;
+                                            font-size:13px;
+                                            font-weight:800;
+                                        ">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
                                 </div>
                             @endif
 
@@ -636,7 +2142,7 @@
                                     border: 1px solid #e2e8f0;
                                     border-radius: 20px;
                                     padding: 22px;
-                                    box-shadow: 0 8px 22px rgba(15,23,42,0.06);
+                                    box-shadow: 0 8px 22px rgba(22,25,67,0.06);
                                 ">
                                     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
                                         <div>
@@ -649,7 +2155,7 @@
                                                 Merchandise Order
                                             </h2>
 
-                                            <p style="margin:7px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                            <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
                                                 Select the items you would like to order, including the preferred size, color and quantity.
                                                 Payment instructions for paid items will be provided after registration.
                                             </p>
@@ -682,39 +2188,52 @@
                                                 data-required="{{ $item->selection_type === 'required' ? '1' : '0' }}"
                                                 style="border:1px solid #e2e8f0;border-radius:18px;padding:18px;background:#f8fafc;"
                                             >
-                                                <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+                                                <div class="elive-merch-layout">
                                                     @if ($showItemImage)
-                                                        <img
-                                                            src="{{ asset('storage/' . $item->image_path) }}"
-                                                            alt="{{ $item->name }}"
-                                                            style="width:110px;height:110px;object-fit:cover;border-radius:16px;border:1px solid #e2e8f0;background:white;"
+                                                        @php
+                                                            $merchandiseImageUrl = asset(
+                                                                'storage/' . $item->image_path
+                                                            );
+                                                        @endphp
+
+                                                        <button
+                                                            type="button"
+                                                            class="elive-merch-image-button"
+                                                            data-merchandise-image-trigger
+                                                            data-image-src="{{ $merchandiseImageUrl }}"
+                                                            data-image-alt="{{ $item->name }}"
+                                                            aria-label="View larger image of {{ $item->name }}"
+                                                            title="Click to enlarge"
                                                         >
+                                                            <img
+                                                                src="{{ $merchandiseImageUrl }}"
+                                                                alt="{{ $item->name }}"
+                                                                class="elive-merch-image"
+                                                            >
+                                                        </button>
                                                     @endif
 
-                                                    <div style="flex:1;min-width:240px;">
-                                                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-                                                            <div>
-                                                                <h3 style="margin:0;font-size:18px;font-weight:900;color:#0f172a;">
+                                                    <div class="elive-merch-content">
+                                                        <div class="elive-merch-header">
+                                                            <div class="elive-merch-heading">
+                                                                <h3 class="elive-merch-title">
                                                                     {{ $item->name }}
                                                                 </h3>
 
                                                                 @if (filled($item->description))
-                                                                    <p style="margin:6px 0 0;color:#64748b;font-size:14px;line-height:1.5;">
+                                                                    <p class="elive-merch-description">
                                                                         {{ $item->description }}
                                                                     </p>
                                                                 @endif
                                                             </div>
 
-                                                            <span style="
-                                                                display:inline-flex;
-                                                                align-items:center;
-                                                                border-radius:999px;
-                                                                padding:6px 10px;
-                                                                font-size:11px;
-                                                                font-weight:900;
-                                                                background:{{ $item->selection_type === 'required' ? '#fee2e2' : '#e2e8f0' }};
-                                                                color:{{ $item->selection_type === 'required' ? '#991b1b' : '#334155' }};
-                                                            ">
+                                                            <span
+                                                                class="elive-merch-badge"
+                                                                style="
+                                                                    background:{{ $item->selection_type === 'required' ? '#fee2e2' : '#e2e8f0' }};
+                                                                    color:{{ $item->selection_type === 'required' ? '#991b1b' : '#334155' }};
+                                                                "
+                                                            >
                                                                 {{ $item->selection_type === 'required' ? 'Required' : 'Optional' }}
                                                             </span>
                                                         </div>
@@ -726,14 +2245,13 @@
                                                                 value="1"
                                                             >
                                                         @else
-                                                            <label style="display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:800;cursor:pointer;">
+                                                            <label class="elive-merch-select">
                                                                 <input
                                                                     type="checkbox"
                                                                     name="merchandise[{{ $item->id }}][selected]"
                                                                     value="1"
                                                                     data-merchandise-toggle
                                                                     @checked($oldSelected)
-                                                                    style="width:18px;height:18px;"
                                                                 >
                                                                 <span>Add this item to my order</span>
                                                             </label>
@@ -822,7 +2340,7 @@
                                                                             style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
                                                                         >
 
-                                                                        <div style="font-size:12px;color:#64748b;margin-top:6px;">
+                                                                        <div style="font-size:12px;color:var(--elive-muted);margin-top:6px;">
                                                                             Maximum allowed: {{ $maximumQuantity }}
                                                                         </div>
 
@@ -856,8 +2374,220 @@
                                 </div>
                             @endif
 
+                            @if (($merchandiseItems ?? collect())->isNotEmpty())
+                                <div
+                                    data-payment-section
+                                    style="
+                                        margin-top:22px;
+                                        background:#ffffff;
+                                        border:1px solid #e2e8f0;
+                                        border-radius:20px;
+                                        padding:22px;
+                                        box-shadow:0 8px 22px rgba(22,25,67,0.06);
+                                    "
+                                >
+                                    <h2 style="
+                                        margin:0;
+                                        color:{{ $branding['primary_color'] }};
+                                        font-size:22px;
+                                        font-weight:900;
+                                    ">
+                                        Payment
+                                    </h2>
+
+                                    <p style="margin:7px 0 0;color:var(--elive-muted);font-size:14px;line-height:1.5;">
+                                        Payment is only required when a paid item is selected.
+                                    </p>
+
+                                    <div style="
+                                        margin-top:16px;
+                                        background:#f8fafc;
+                                        border:1px solid #e2e8f0;
+                                        border-radius:14px;
+                                        padding:14px;
+                                    ">
+                                        <div style="
+                                            display:flex;
+                                            justify-content:space-between;
+                                            gap:12px;
+                                            align-items:center;
+                                            font-size:14px;
+                                            color:#475569;
+                                        ">
+                                            <span>Amount payable</span>
+                                            <strong
+                                                data-payment-total
+                                                style="
+                                                    color:#0f172a;
+                                                    font-size:16px;
+                                                "
+                                            >
+                                                No payment required
+                                            </strong>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        data-payment-details
+                                        hidden
+                                        style="
+                                            margin-top:16px;
+                                            padding:18px;
+                                            border:1px solid color-mix(
+                                                in srgb,
+                                                {{ $branding['primary_color'] }} 25%,
+                                                #e2e8f0
+                                            );
+                                            border-radius:16px;
+                                            background:color-mix(
+                                                in srgb,
+                                                {{ $branding['primary_color'] }} 5%,
+                                                #ffffff
+                                            );
+                                        "
+                                    >
+                                        <div style="
+                                            display:flex;
+                                            align-items:center;
+                                            gap:10px;
+                                            margin-bottom:14px;
+                                        ">
+                                            <div style="
+                                                width:36px;
+                                                height:36px;
+                                                display:flex;
+                                                align-items:center;
+                                                justify-content:center;
+                                                border-radius:999px;
+                                                background:{{ $branding['primary_color'] }};
+                                                color:white;
+                                                font-weight:900;
+                                            ">
+                                                $
+                                            </div>
+
+                                            <div>
+                                                <div style="
+                                                    color:#0f172a;
+                                                    font-size:15px;
+                                                    font-weight:900;
+                                                ">
+                                                    Payment Instructions
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:2px;
+                                                    color:var(--elive-muted);
+                                                    font-size:12px;
+                                                ">
+                                                    Use the details below to complete payment.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        @if (filled($event->payment_method))
+                                            <div style="
+                                                padding:11px 0;
+                                                border-bottom:1px solid #e2e8f0;
+                                            ">
+                                                <div style="
+                                                    color:var(--elive-muted);
+                                                    font-size:11px;
+                                                    font-weight:800;
+                                                    text-transform:uppercase;
+                                                    letter-spacing:.05em;
+                                                ">
+                                                    Payment Method
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:4px;
+                                                    color:#0f172a;
+                                                    font-size:15px;
+                                                    font-weight:900;
+                                                ">
+                                                    {{ $event->payment_method }}
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if (filled($event->payment_account_name))
+                                            <div style="
+                                                padding:11px 0;
+                                                border-bottom:1px solid #e2e8f0;
+                                            ">
+                                                <div style="
+                                                    color:var(--elive-muted);
+                                                    font-size:11px;
+                                                    font-weight:800;
+                                                    text-transform:uppercase;
+                                                    letter-spacing:.05em;
+                                                ">
+                                                    Account Name
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:4px;
+                                                    color:#0f172a;
+                                                    font-size:15px;
+                                                    font-weight:900;
+                                                ">
+                                                    {{ $event->payment_account_name }}
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if (filled($event->payment_account_number))
+                                            <div style="
+                                                padding:11px 0;
+                                                border-bottom:1px solid #e2e8f0;
+                                            ">
+                                                <div style="
+                                                    color:var(--elive-muted);
+                                                    font-size:11px;
+                                                    font-weight:800;
+                                                    text-transform:uppercase;
+                                                    letter-spacing:.05em;
+                                                ">
+                                                    Account Number
+                                                </div>
+
+                                                <div style="
+                                                    margin-top:4px;
+                                                    color:#0f172a;
+                                                    font-size:18px;
+                                                    font-weight:900;
+                                                    letter-spacing:.03em;
+                                                    word-break:break-word;
+                                                ">
+                                                    {{ $event->payment_account_number }}
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if (filled($event->payment_instructions))
+                                            <div style="
+                                                margin-top:14px;
+                                                padding:13px 14px;
+                                                border-radius:12px;
+                                                background:#ffffff;
+                                                border:1px solid #e2e8f0;
+                                                color:#475569;
+                                                font-size:13px;
+                                                line-height:1.6;
+                                            ">
+                                                {{ $event->payment_instructions }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+
                             <button
                                 type="submit"
+                                data-submit-button
+                                data-default-label="{{ $isFull && $waitlistEnabled ? 'Join Waitlist' : 'Submit Registration' }}"
+                                data-order-label="Submit Registration and Order"
                                 style="
                                     margin-top: 22px;
                                     width: 100%;
@@ -873,17 +2603,15 @@
                             >
                                 {{ $isFull && $waitlistEnabled
                                     ? 'Join Waitlist'
-                                    : (($merchandiseItems ?? collect())->count()
-                                        ? 'Submit Registration and Order'
-                                        : 'Submit Registration') }}
+                                    : 'Submit Registration' }}
                             </button>
                         </form>
                     @endif
                 </div>
             </div>
 
-            <div style="text-align:center;color:#64748b;font-size:13px;margin-top:18px;">
-                Powered by eLive Events
+            <div class="elive-footer" style="text-align:center;color:var(--elive-muted);font-size:13px;margin-top:18px;">
+                Powered by <strong>eLive Events</strong>
                 @if ($branding['support_email'])
                     | Support: {{ $branding['support_email'] }}
                 @endif
@@ -894,8 +2622,180 @@
         </div>
     </div>
 
+
+    <div
+        class="elive-merch-image-modal"
+        data-merchandise-image-modal
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="elive-merch-image-title"
+    >
+        <div
+            class="elive-merch-image-dialog"
+            data-merchandise-image-dialog
+        >
+            <button
+                type="button"
+                class="elive-merch-image-close"
+                data-merchandise-image-close
+                aria-label="Close image preview"
+                title="Close"
+            >
+                ×
+            </button>
+
+            <div class="elive-merch-image-preview-wrap">
+                <img
+                    class="elive-merch-image-preview"
+                    data-merchandise-image-preview
+                    src=""
+                    alt=""
+                >
+            </div>
+
+            <div
+                id="elive-merch-image-title"
+                class="elive-merch-image-title"
+                data-merchandise-image-title
+            ></div>
+        </div>
+    </div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        /*
+        |--------------------------------------------------------------------------
+        | Merchandise image popup
+        |--------------------------------------------------------------------------
+        */
+
+        const merchandiseImageModal = document.querySelector(
+            '[data-merchandise-image-modal]'
+        );
+
+        const merchandiseImageDialog = document.querySelector(
+            '[data-merchandise-image-dialog]'
+        );
+
+        const merchandiseImagePreview = document.querySelector(
+            '[data-merchandise-image-preview]'
+        );
+
+        const merchandiseImageTitle = document.querySelector(
+            '[data-merchandise-image-title]'
+        );
+
+        const merchandiseImageClose = document.querySelector(
+            '[data-merchandise-image-close]'
+        );
+
+        let lastMerchandiseImageTrigger = null;
+
+        const closeMerchandiseImageModal = () => {
+            if (!merchandiseImageModal) {
+                return;
+            }
+
+            merchandiseImageModal.classList.remove('is-open');
+            merchandiseImageModal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('elive-image-modal-open');
+
+            if (merchandiseImagePreview) {
+                merchandiseImagePreview.src = '';
+                merchandiseImagePreview.alt = '';
+            }
+
+            lastMerchandiseImageTrigger?.focus();
+            lastMerchandiseImageTrigger = null;
+        };
+
+        const openMerchandiseImageModal = (trigger) => {
+            if (
+                !merchandiseImageModal
+                || !merchandiseImagePreview
+            ) {
+                return;
+            }
+
+            const imageSrc = trigger.dataset.imageSrc || '';
+            const imageAlt = trigger.dataset.imageAlt || 'Merchandise image';
+
+            if (!imageSrc) {
+                return;
+            }
+
+            lastMerchandiseImageTrigger = trigger;
+
+            merchandiseImagePreview.src = imageSrc;
+            merchandiseImagePreview.alt = imageAlt;
+
+            if (merchandiseImageTitle) {
+                merchandiseImageTitle.textContent = imageAlt;
+            }
+
+            merchandiseImageModal.classList.add('is-open');
+            merchandiseImageModal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('elive-image-modal-open');
+
+            window.setTimeout(() => {
+                merchandiseImageClose?.focus();
+            }, 10);
+        };
+
+        document.querySelectorAll(
+            '[data-merchandise-image-trigger]'
+        ).forEach((trigger) => {
+            trigger.addEventListener('click', () => {
+                openMerchandiseImageModal(trigger);
+            });
+        });
+
+        merchandiseImageClose?.addEventListener(
+            'click',
+            closeMerchandiseImageModal
+        );
+
+        merchandiseImageModal?.addEventListener('click', (event) => {
+            if (event.target === merchandiseImageModal) {
+                closeMerchandiseImageModal();
+            }
+        });
+
+        merchandiseImageDialog?.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (
+                event.key === 'Escape'
+                && merchandiseImageModal?.classList.contains('is-open')
+            ) {
+                closeMerchandiseImageModal();
+            }
+        });
+
+        const firstInvalidField = document.querySelector('.elive-field-invalid');
+
+        if (firstInvalidField) {
+            window.setTimeout(() => {
+                firstInvalidField.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+
+                const focusable = firstInvalidField.querySelector(
+                    'input:not([type="hidden"]), select, textarea'
+                );
+
+                focusable?.focus({ preventScroll: true });
+            }, 120);
+        }
+
+        const allowDaySelection = @json($allowDaySelection);
+        const allowAllDaysSelection = @json($allowAllDaysSelection);
+        const allowSessionRegistration = @json($allowSessionRegistration);
+
         const formatMoney = (amount, currency) => {
             const numericAmount = Number(amount || 0);
 
@@ -908,6 +2808,245 @@
                 maximumFractionDigits: 2,
             })}`;
         };
+
+        const registrationForm = document.querySelector('[data-registration-form]');
+        const submitButton = document.querySelector('[data-submit-button]');
+        const paymentTotal = document.querySelector('[data-payment-total]');
+        const paymentDetails = document.querySelector('[data-payment-details]');
+        const allDaysCheckbox = document.querySelector('[data-all-days-checkbox]');
+        const eventDayCheckboxes = Array.from(
+            document.querySelectorAll('[data-event-day-checkbox]')
+        );
+
+        const sessionSection = document.querySelector(
+            '[data-session-section]'
+        );
+
+        const sessionDayGroups = Array.from(
+            document.querySelectorAll('[data-session-day-group]')
+        );
+
+        const sessionCheckboxes = Array.from(
+            document.querySelectorAll('[data-session-checkbox]')
+        );
+
+        const sessionEmpty = document.querySelector(
+            '[data-session-empty]'
+        );
+
+        const selectedEventDayIds = () => {
+            if (!allowDaySelection) {
+                return sessionDayGroups
+                    .map(
+                        (group) =>
+                            String(
+                                group.dataset.sessionDayGroup
+                                || ''
+                            )
+                    )
+                    .filter(Boolean);
+            }
+
+            return eventDayCheckboxes
+                .filter((checkbox) => checkbox.checked)
+                .map((checkbox) => String(checkbox.value));
+        };
+
+        const refreshSessionVisibility = () => {
+            if (!sessionSection || !allowSessionRegistration) {
+                return;
+            }
+
+            const selectedDays = new Set(
+                selectedEventDayIds()
+            );
+
+            let visibleGroups = 0;
+
+            sessionDayGroups.forEach((group) => {
+                const dayId = String(
+                    group.dataset.sessionDayGroup || ''
+                );
+
+                const visible =
+                    !allowDaySelection
+                    || selectedDays.has(dayId);
+
+                group.hidden = !visible;
+
+                if (visible) {
+                    visibleGroups += 1;
+                }
+            });
+
+            sessionCheckboxes.forEach((checkbox) => {
+                const dayId = String(
+                    checkbox.dataset.sessionDay || ''
+                );
+
+                const daySelected =
+                    !allowDaySelection
+                    || selectedDays.has(dayId);
+
+                const card = checkbox.closest(
+                    '[data-session-card]'
+                );
+
+                const full = card?.dataset.full === '1';
+
+                checkbox.disabled =
+                    !daySelected || full;
+
+                if (
+                    allowDaySelection
+                    && !daySelected
+                ) {
+                    checkbox.checked = false;
+                }
+            });
+
+            if (sessionEmpty) {
+                sessionEmpty.hidden = visibleGroups > 0;
+            }
+        };
+
+        const refreshAllDaysSelection = () => {
+            if (
+                !allowDaySelection
+                || !allowAllDaysSelection
+                || !allDaysCheckbox
+                || eventDayCheckboxes.length === 0
+            ) {
+                return;
+            }
+
+            const everyDaySelected = eventDayCheckboxes.every(
+                (checkbox) => checkbox.checked
+            );
+
+            const noDaySelected = eventDayCheckboxes.every(
+                (checkbox) => !checkbox.checked
+            );
+
+            allDaysCheckbox.checked = everyDaySelected;
+            allDaysCheckbox.indeterminate = !everyDaySelected && !noDaySelected;
+        };
+
+        if (
+            allowDaySelection
+            && allowAllDaysSelection
+        ) {
+            allDaysCheckbox?.addEventListener('change', () => {
+            eventDayCheckboxes.forEach((checkbox) => {
+                checkbox.checked = allDaysCheckbox.checked;
+            });
+
+            allDaysCheckbox.indeterminate = false;
+
+                refreshSessionVisibility();
+            });
+        }
+
+        if (allowDaySelection) {
+            eventDayCheckboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', () => {
+                    refreshAllDaysSelection();
+                    refreshSessionVisibility();
+                });
+            });
+        }
+
+        refreshAllDaysSelection();
+        refreshSessionVisibility();
+
+        const refreshSubmitLabel = () => {
+            if (!submitButton) {
+                return;
+            }
+
+            const hasSelectedMerchandise = Array.from(
+                document.querySelectorAll('[data-merchandise-card]')
+            ).some((card) => {
+                const required = card.dataset.required === '1';
+                const toggle = card.querySelector('[data-merchandise-toggle]');
+
+                return required || Boolean(toggle?.checked);
+            });
+
+            submitButton.textContent = hasSelectedMerchandise
+                ? submitButton.dataset.orderLabel
+                : submitButton.dataset.defaultLabel;
+        };
+
+        const refreshPaymentTotal = () => {
+            if (!paymentTotal) {
+                return;
+            }
+
+            let total = 0;
+            let currency = 'TZS';
+
+            document.querySelectorAll('[data-merchandise-card]').forEach((card) => {
+                const required = card.dataset.required === '1';
+                const toggle = card.querySelector('[data-merchandise-toggle]');
+                const selected = required || Boolean(toggle?.checked);
+
+                if (!selected) {
+                    return;
+                }
+
+                const variantSelect = card.querySelector('[data-variant-select]');
+                const quantityInput = card.querySelector('[data-quantity-input]');
+                const option = variantSelect?.options[variantSelect.selectedIndex];
+
+                if (!option?.value) {
+                    return;
+                }
+
+                const price = Number(option.dataset.price || 0);
+                const quantity = Number(quantityInput?.value || 1);
+
+                currency = option.dataset.currency || currency;
+                total += price * quantity;
+            });
+
+            paymentTotal.textContent = total > 0
+                ? formatMoney(total, currency)
+                : 'No payment required';
+
+            if (paymentDetails) {
+                paymentDetails.hidden = total <= 0;
+            }
+        };
+
+        registrationForm?.addEventListener('submit', (event) => {
+            if (
+                allowDaySelection
+                && eventDayCheckboxes.length > 0
+                && (
+                    !allowAllDaysSelection
+                    || !allDaysCheckbox?.checked
+                )
+                && !eventDayCheckboxes.some(
+                    (checkbox) => checkbox.checked
+                )
+            ) {
+                event.preventDefault();
+
+                window.alert('Please select at least one event day.');
+
+                return;
+            }
+
+            if (!submitButton) {
+                return;
+            }
+
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.7';
+            submitButton.style.cursor = 'not-allowed';
+            submitButton.textContent = 'Submitting...';
+        });
 
         document.querySelectorAll('[data-merchandise-card]').forEach((card) => {
             const required = card.dataset.required === '1';
@@ -945,6 +3084,8 @@
                 }
 
                 refreshSummary();
+                refreshSubmitLabel();
+                refreshPaymentTotal();
             };
 
             const refreshSummary = () => {
@@ -981,12 +3122,26 @@
             };
 
             toggle?.addEventListener('change', refreshVisibility);
-            variantSelect?.addEventListener('change', refreshSummary);
-            quantityInput?.addEventListener('input', refreshSummary);
-            quantityInput?.addEventListener('change', refreshSummary);
+            variantSelect?.addEventListener('change', () => {
+                refreshSummary();
+                refreshPaymentTotal();
+            });
+
+            quantityInput?.addEventListener('input', () => {
+                refreshSummary();
+                refreshPaymentTotal();
+            });
+
+            quantityInput?.addEventListener('change', () => {
+                refreshSummary();
+                refreshPaymentTotal();
+            });
 
             refreshVisibility();
         });
+
+        refreshSubmitLabel();
+        refreshPaymentTotal();
     });
 </script>
 

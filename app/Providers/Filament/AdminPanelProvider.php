@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -27,28 +29,128 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+
+            /*
+            |--------------------------------------------------------------------------
+            | Authentication
+            |--------------------------------------------------------------------------
+            */
+
+            ->login(Login::class)
+
+            /*
+            |--------------------------------------------------------------------------
+            | eLive Branding
+            |--------------------------------------------------------------------------
+            */
+
             ->brandName('eLive Events')
             ->brandLogo(asset('eLive-Logo.png'))
             ->brandLogoHeight('2.5rem')
             ->favicon(asset('favicon.ico'))
+
+            /*
+            |--------------------------------------------------------------------------
+            | Font
+            |--------------------------------------------------------------------------
+            |
+            | Official eLive typography:
+            | Creato Display
+            |
+            */
+
+            ->font(
+                'Creato Display',
+                url: asset('css/creato-font.css'),
+                provider: LocalFontProvider::class,
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | Filament Admin Theme
+            |--------------------------------------------------------------------------
+            |
+            | IMPORTANT:
+            | Do not load resources/css/app.css directly as the Filament theme.
+            |
+            | This dedicated stylesheet imports Filament's own base theme first,
+            | then applies eLive-specific customizations.
+            |
+            */
+
+            ->viteTheme(
+                'resources/css/filament/admin/theme.css'
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | Official eLive Brand Colors
+            |--------------------------------------------------------------------------
+            |
+            | Deep Navy Blue : #161943
+            | Light Blue     : #007AB2
+            | Orange Peel    : #FF9800
+            |
+            */
+
             ->colors([
-                'primary' => Color::hex('#233F7E'),
+                'primary' => Color::hex('#161943'),
+                'info' => Color::hex('#007AB2'),
+                'warning' => Color::hex('#FF9800'),
+
                 'gray' => Color::Slate,
                 'success' => Color::Green,
-                'warning' => Color::Amber,
                 'danger' => Color::Red,
             ])
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
+
+            /*
+            |--------------------------------------------------------------------------
+            | Resources
+            |--------------------------------------------------------------------------
+            */
+
+            ->discoverResources(
+                in: app_path('Filament/Resources'),
+                for: 'App\\Filament\\Resources'
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | Pages
+            |--------------------------------------------------------------------------
+            */
+
+            ->discoverPages(
+                in: app_path('Filament/Pages'),
+                for: 'App\\Filament\\Pages'
+            )
+
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
+
+            /*
+            |--------------------------------------------------------------------------
+            | Widgets
+            |--------------------------------------------------------------------------
+            */
+
+            ->discoverWidgets(
+                in: app_path('Filament/Widgets'),
+                for: 'App\\Filament\\Widgets'
+            )
+
             ->widgets([
                 AccountWidget::class,
                 FilamentInfoWidget::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | Middleware
+            |--------------------------------------------------------------------------
+            */
+
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -60,6 +162,13 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | Authentication Middleware
+            |--------------------------------------------------------------------------
+            */
+
             ->authMiddleware([
                 Authenticate::class,
             ]);

@@ -15,34 +15,142 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class BadgeTemplateResource extends Resource
 {
-    protected static ?string $model = BadgeTemplate::class;
+    protected static ?string $model =
+        BadgeTemplate::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon =
+        Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'name';
+    protected static ?string $recordTitleAttribute =
+        'name';
 
-    protected static ?string $navigationLabel = 'Badge Templates';
+    protected static ?string $navigationLabel =
+        'Badge Templates';
 
-    protected static ?string $modelLabel = 'Badge Template';
+    protected static ?string $modelLabel =
+        'Badge Template';
 
-    protected static ?string $pluralModelLabel = 'Badge Templates';
+    protected static ?string $pluralModelLabel =
+        'Badge Templates';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Badge Management';
+    protected static string|UnitEnum|null $navigationGroup =
+        'Badge Management';
 
     protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {
-        return BadgeTemplateForm::configure($schema);
+        return BadgeTemplateForm::configure(
+            $schema
+        );
     }
 
     public static function table(Table $table): Table
     {
-        return BadgeTemplatesTable::configure($table);
+        return BadgeTemplatesTable::configure(
+            $table
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::shouldRegisterNavigation();
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canViewAny();
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canCreate();
+    }
+
+    public static function canEdit(
+        $record
+    ): bool {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canEdit(
+            $record
+        );
+    }
+
+    public static function canDelete(
+        $record
+    ): bool {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDelete(
+            $record
+        );
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDeleteAny();
     }
 
     public static function getRelations(): array
@@ -55,11 +163,28 @@ class BadgeTemplateResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListBadgeTemplates::route('/'),
-            'create' => CreateBadgeTemplate::route('/create'),
-            'edit' => EditBadgeTemplate::route('/{record}/edit'),
-            'preview' => PreviewBadgeTemplate::route('/{record}/preview'),
-            'design' => DesignBadgeTemplate::route('/{record}/design'),
+            'index' =>
+                ListBadgeTemplates::route('/'),
+
+            'create' =>
+                CreateBadgeTemplate::route(
+                    '/create'
+                ),
+
+            'edit' =>
+                EditBadgeTemplate::route(
+                    '/{record}/edit'
+                ),
+
+            'preview' =>
+                PreviewBadgeTemplate::route(
+                    '/{record}/preview'
+                ),
+
+            'design' =>
+                DesignBadgeTemplate::route(
+                    '/{record}/design'
+                ),
         ];
     }
 }

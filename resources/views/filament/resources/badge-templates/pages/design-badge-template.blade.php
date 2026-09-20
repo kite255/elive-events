@@ -566,7 +566,7 @@
             top: 0;
             width: 80px;
             height: 100%;
-            background: #233f7e;
+            background: #161943;
         }
 
         .elive-fallback-bottom {

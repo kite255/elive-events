@@ -30,6 +30,16 @@ class AttendeeMerchandisesTable
                     ->sortable()
                     ->weight('bold'),
 
+                TextColumn::make('attendee.phone')
+                    ->label('Phone')
+                    ->icon('heroicon-o-phone')
+                    ->searchable()
+                    ->copyable()
+                    ->copyMessage('Phone number copied')
+                    ->copyMessageDuration(1500)
+                    ->placeholder('—')
+                    ->toggleable(),
+
                 TextColumn::make('attendee.event.name')
                     ->label('Event')
                     ->searchable()

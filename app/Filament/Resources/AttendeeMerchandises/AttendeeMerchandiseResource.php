@@ -9,37 +9,142 @@ use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class AttendeeMerchandiseResource extends Resource
 {
-    protected static ?string $model = AttendeeMerchandise::class;
+    protected static ?string $model =
+        AttendeeMerchandise::class;
 
     protected static string|BackedEnum|null $navigationIcon =
         Heroicon::OutlinedShoppingBag;
 
-    protected static ?string $navigationLabel = 'Merchandise Orders';
+    protected static ?string $navigationLabel =
+        'Merchandise Orders';
 
-    protected static ?string $modelLabel = 'Merchandise Order';
+    protected static ?string $modelLabel =
+        'Merchandise Order';
 
-    protected static ?string $pluralModelLabel = 'Merchandise Orders';
+    protected static ?string $pluralModelLabel =
+        'Merchandise Orders';
 
     protected static string|UnitEnum|null $navigationGroup =
         'Event Management';
 
     protected static ?int $navigationSort = 4;
 
-    protected static ?string $recordTitleAttribute = 'id';
+    protected static ?string $recordTitleAttribute =
+        'id';
 
     public static function table(Table $table): Table
     {
-        return AttendeeMerchandisesTable::configure($table);
+        return AttendeeMerchandisesTable::configure(
+            $table
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::shouldRegisterNavigation();
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canViewAny();
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canCreate();
+    }
+
+    public static function canEdit(
+        $record
+    ): bool {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canEdit(
+            $record
+        );
+    }
+
+    public static function canDelete(
+        $record
+    ): bool {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDelete(
+            $record
+        );
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDeleteAny();
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => ListAttendeeMerchandises::route('/'),
+            'index' =>
+                ListAttendeeMerchandises::route('/'),
         ];
     }
 }

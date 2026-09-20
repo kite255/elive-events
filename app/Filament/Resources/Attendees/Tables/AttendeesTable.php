@@ -3,14 +3,17 @@
 namespace App\Filament\Resources\Attendees\Tables;
 
 use App\Exports\AttendeesExport;
+use App\Filament\Pages\BadgePrintStation;
 use App\Filament\Resources\Attendees\AttendeeResource;
 use App\Services\BadgeGenerationService;
+use App\Services\QrTokenService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -20,8 +23,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Js;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Throwable;
+use ZipArchive;
 
 class AttendeesTable
 {
@@ -95,6 +101,37 @@ class AttendeesTable
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('registered_days')
+                    ->label('Registered Days')
+                    ->getStateUsing(function ($record): string {
+                        if (! $record->relationLoaded('eventDays')) {
+                            $record->load('eventDays');
+                        }
+
+                        if ($record->eventDays->isEmpty()) {
+                            return 'General event';
+                        }
+
+                        return $record->eventDays
+                            ->sortBy([
+                                ['event_date', 'asc'],
+                                ['display_order', 'asc'],
+                                ['id', 'asc'],
+                            ])
+                            ->map(function ($day): string {
+                                if ($day->event_date) {
+                                    return $day->name
+                                        . ' · '
+                                        . $day->event_date->format('d M');
+                                }
+
+                                return $day->name;
+                            })
+                            ->implode(', ');
+                    })
+                    ->wrap()
+                    ->toggleable(),
+
                 TextColumn::make('badgeType.name')
                     ->label('Badge Type')
                     ->badge()
@@ -154,10 +191,27 @@ class AttendeesTable
                     ->getStateUsing(fn ($record): bool => filled($record->public_token))
                     ->visible(fn (): bool => Schema::hasColumn('attendees', 'public_token')),
 
-                IconColumn::make('checked_in_at')
-                    ->label('Checked In')
-                    ->boolean()
-                    ->getStateUsing(fn ($record): bool => filled($record->checked_in_at)),
+                TextColumn::make('attendance_status')
+                    ->label('Attendance')
+                    ->badge()
+                    ->getStateUsing(
+                        fn ($record): string =>
+                            filled($record->checked_in_at)
+                                ? 'attended'
+                                : 'not_checked_in'
+                    )
+                    ->formatStateUsing(
+                        fn (string $state): string => match ($state) {
+                            'attended' => 'Attended',
+                            default => 'Not Checked In',
+                        }
+                    )
+                    ->color(
+                        fn (string $state): string => match ($state) {
+                            'attended' => 'success',
+                            default => 'gray',
+                        }
+                    ),
 
                 TextColumn::make('email')
                     ->label('Email')
@@ -168,7 +222,8 @@ class AttendeesTable
                 TextColumn::make('organization_name')
                     ->label('Organization')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->placeholder('—')
+                    ->toggleable(),
 
                 TextColumn::make('position')
                     ->label('Position')
@@ -218,6 +273,34 @@ class AttendeesTable
                     ->searchable()
                     ->preload(),
 
+                SelectFilter::make('event_day')
+                    ->label('Registered Day')
+                    ->relationship('eventDays', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('attendance')
+                    ->label('Attendance')
+                    ->options([
+                        'checked_in' => 'Attended',
+                        'not_checked_in' => 'Not Checked In',
+                    ])
+                    ->query(function ($query, array $data) {
+                        return match ($data['value'] ?? null) {
+                            'checked_in' =>
+                                $query->whereNotNull(
+                                    'attendees.checked_in_at'
+                                ),
+
+                            'not_checked_in' =>
+                                $query->whereNull(
+                                    'attendees.checked_in_at'
+                                ),
+
+                            default => $query,
+                        };
+                    }),
+
                 SelectFilter::make('badge_type')
                     ->relationship('badgeType', 'name')
                     ->searchable()
@@ -257,6 +340,37 @@ class AttendeesTable
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('view_attendee')
+                        ->label('View Attendee')
+                        ->icon('heroicon-o-user')
+                        ->color('gray')
+                        ->url(
+                            fn ($record): string =>
+                                AttendeeResource::getUrl(
+                                    'view',
+                                    ['record' => $record]
+                                )
+                        ),
+
+                    Action::make('badge_print_station')
+                        ->label('Badge Print Station')
+                        ->icon('heroicon-o-printer')
+                        ->color('primary')
+                        ->visible(
+                            fn ($record): bool =>
+                                ! (auth()->user()?->isTicketOrganizer() ?? false)
+                                && AttendeeResource::canManageBadge(
+                                    $record
+                                )
+                        )
+                        ->url(
+                            fn ($record): string =>
+                                BadgePrintStation::getUrl([
+                                    'attendee' =>
+                                        (int) $record->getKey(),
+                                ])
+                        ),
+
                     Action::make('open_public_page')
                         ->label('Open Public Page')
                         ->icon('heroicon-o-arrow-top-right-on-square')
@@ -459,11 +573,25 @@ class AttendeesTable
                         ->label('View QR')
                         ->icon('heroicon-o-qr-code')
                         ->color('primary')
-                        ->url(fn ($record): string => AttendeeResource::getUrl('qr-code', [
-                            'record' => $record,
-                        ])),
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canViewQrCode(
+                                    $record
+                                )
+                        )
+                        ->url(
+                            fn ($record): string =>
+                                AttendeeResource::getUrl(
+                                    'qr-code',
+                                    ['record' => $record]
+                                )
+                        ),
 
-                    EditAction::make(),
+                    EditAction::make()
+                        ->visible(
+                            fn ($record): bool =>
+                                AttendeeResource::canEdit($record)
+                        ),
                 ])
                     ->label('Actions')
                     ->icon('heroicon-m-ellipsis-vertical')
@@ -659,6 +787,205 @@ class AttendeesTable
                             );
                         }),
 
+
+                    BulkAction::make('download_qr_codes')
+                        ->label('Download QR Codes')
+                        ->icon('heroicon-o-qr-code')
+                        ->color('primary')
+                        ->form([
+                            Select::make('format')
+                                ->label('Choose Download Format')
+                                ->options([
+                                    'png' => 'PNG - Recommended',
+                                    'svg' => 'SVG - High Quality / Printing',
+                                ])
+                                ->default('png')
+                                ->required()
+                                ->native(false),
+                        ])
+                        ->modalHeading('Download QR Codes')
+                        ->modalDescription(
+                            'QR codes for all selected attendees will be packaged into a ZIP file.'
+                        )
+                        ->modalSubmitActionLabel('Download ZIP')
+                        ->modalCancelActionLabel('Cancel')
+                        ->action(function (Collection $records, array $data) {
+                            if ($records->isEmpty()) {
+                                Notification::make()
+                                    ->title('No attendees selected')
+                                    ->warning()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            $format = strtolower($data['format'] ?? 'png');
+
+                            if (! in_array($format, ['png', 'svg'], true)) {
+                                Notification::make()
+                                    ->title('Invalid QR format')
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            $temporaryDirectory = storage_path(
+                                'app/tmp/qr-downloads'
+                            );
+
+                            if (! is_dir($temporaryDirectory)) {
+                                mkdir(
+                                    $temporaryDirectory,
+                                    0755,
+                                    true
+                                );
+                            }
+
+                            $zipName = sprintf(
+                                'attendee-qr-codes-%s-%s.zip',
+                                now()->format('Y-m-d-His'),
+                                Str::lower(Str::random(6))
+                            );
+
+                            $zipPath = $temporaryDirectory
+                                . DIRECTORY_SEPARATOR
+                                . $zipName;
+
+                            $zip = new ZipArchive();
+
+                            $result = $zip->open(
+                                $zipPath,
+                                ZipArchive::CREATE | ZipArchive::OVERWRITE
+                            );
+
+                            if ($result !== true) {
+                                Notification::make()
+                                    ->title('Unable to create QR ZIP file')
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            $generated = 0;
+                            $failed = 0;
+
+                            foreach ($records as $attendee) {
+                                try {
+                                    $token = app(
+                                        QrTokenService::class
+                                    )->getTokenForAttendee(
+                                        $attendee
+                                    );
+
+                                    $checkInUrl = route(
+                                        'qr.check-in',
+                                        [
+                                            'token' => $token,
+                                        ]
+                                    );
+
+                                    $badgeNumber = filled($attendee->badge_number)
+                                        ? Str::slug($attendee->badge_number)
+                                        : 'attendee-' . $attendee->id;
+
+                                    $attendeeName = Str::slug(
+                                        $attendee->full_name ?: 'attendee'
+                                    );
+
+                                    $fileName = sprintf(
+                                        '%s-%s-%s-qr.%s',
+                                        $badgeNumber,
+                                        $attendeeName,
+                                        $attendee->id,
+                                        $format
+                                    );
+
+                                    if ($format === 'svg') {
+                                        $qrContent = QrCode::format('svg')
+                                            ->size(1000)
+                                            ->margin(1)
+                                            ->errorCorrection('H')
+                                            ->generate($checkInUrl);
+
+                                        $zip->addFromString(
+                                            $fileName,
+                                            (string) $qrContent
+                                        );
+
+                                        $generated++;
+
+                                        continue;
+                                    }
+
+                                    $qrContent = QrCode::format('png')
+                                        ->size(1000)
+                                        ->margin(1)
+                                        ->errorCorrection('H')
+                                        ->generate($checkInUrl);
+
+                                    $zip->addFromString(
+                                        $fileName,
+                                        $qrContent
+                                    );
+
+                                    $generated++;
+                                } catch (Throwable $e) {
+                                    report($e);
+                                    $failed++;
+                                }
+                            }
+
+                            $zip->close();
+
+                            if ($generated === 0) {
+                                if (file_exists($zipPath)) {
+                                    unlink($zipPath);
+                                }
+
+                                Notification::make()
+                                    ->title('QR generation failed')
+                                    ->body(
+                                        'No QR codes could be generated for the selected attendees.'
+                                    )
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            if ($failed > 0) {
+                                Notification::make()
+                                    ->title('QR ZIP prepared')
+                                    ->body(
+                                        "Generated: {$generated}. Failed: {$failed}."
+                                    )
+                                    ->warning()
+                                    ->send();
+                            }
+
+                            return response()->streamDownload(
+                                function () use ($zipPath): void {
+                                    $handle = fopen($zipPath, 'rb');
+
+                                    if ($handle !== false) {
+                                        fpassthru($handle);
+                                        fclose($handle);
+                                    }
+
+                                    if (file_exists($zipPath)) {
+                                        unlink($zipPath);
+                                    }
+                                },
+                                $zipName,
+                                [
+                                    'Content-Type' => 'application/zip',
+                                    'Cache-Control' => 'no-store, no-cache',
+                                ]
+                            );
+                        }),
+
                     BulkAction::make('mark_badges_printed')
                         ->label('Mark Badges Printed')
                         ->icon('heroicon-o-printer')
@@ -681,7 +1008,11 @@ class AttendeesTable
                                 ->send();
                         }),
 
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(
+                            fn (): bool =>
+                                AttendeeResource::canDeleteAny()
+                        ),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

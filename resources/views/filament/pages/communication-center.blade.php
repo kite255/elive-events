@@ -1,0 +1,1893 @@
+<x-filament-panels::page>
+    <style>
+        .elive-communication-center {
+            display: grid;
+            gap: 24px;
+        }
+
+        .elive-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .elive-stack {
+            display: grid;
+            gap: 24px;
+        }
+
+        .elive-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow:
+                0 1px 2px rgba(15, 23, 42, 0.03),
+                0 8px 24px rgba(15, 23, 42, 0.04);
+        }
+
+        .dark .elive-card {
+            background: rgba(24, 24, 27, 0.8);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-card-header {
+            padding: 20px 22px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .dark .elive-card-header {
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-card-title {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.3;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .dark .elive-card-title {
+            color: #ffffff;
+        }
+
+        .elive-card-description {
+            margin: 6px 0 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #6b7280;
+        }
+
+        .elive-card-body {
+            padding: 22px;
+        }
+
+        .elive-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .elive-field {
+            display: grid;
+            gap: 8px;
+        }
+
+        .elive-field-full {
+            grid-column: 1 / -1;
+        }
+
+        .elive-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #374151;
+        }
+
+        .dark .elive-label {
+            color: #e5e7eb;
+        }
+
+        .elive-required {
+            font-size: 11px;
+            font-weight: 600;
+            color: #9ca3af;
+        }
+
+        .elive-input,
+        .elive-select,
+        .elive-textarea {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            background: #ffffff;
+            color: #111827;
+            font-size: 14px;
+            outline: none;
+            transition:
+                border-color 0.15s ease,
+                box-shadow 0.15s ease,
+                background 0.15s ease;
+        }
+
+        .elive-input,
+        .elive-select {
+            min-height: 44px;
+            padding: 0 13px;
+        }
+
+        .elive-textarea {
+            min-height: 190px;
+            padding: 14px;
+            resize: vertical;
+            line-height: 1.65;
+        }
+
+        .elive-input:focus,
+        .elive-select:focus,
+        .elive-textarea:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+        }
+
+        .dark .elive-input,
+        .dark .elive-select,
+        .dark .elive-textarea {
+            background: rgba(255, 255, 255, 0.04);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .elive-help {
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .elive-error {
+            font-size: 12px;
+            color: #dc2626;
+        }
+
+        .elive-placeholder-box {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+        }
+
+        .elive-placeholder {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 9px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            color: #4b5563;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid #e5e7eb;
+        }
+
+        .dark .elive-placeholder {
+            background: rgba(255, 255, 255, 0.06);
+            color: #d1d5db;
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-message-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .elive-meta-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid #e5e7eb;
+            background: #fafafa;
+            color: #4b5563;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .dark .elive-meta-pill {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
+            color: #d1d5db;
+        }
+
+        .elive-test-box {
+            display: grid;
+            gap: 14px;
+            padding: 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            background: #fafafa;
+        }
+
+        .dark .elive-test-box {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-test-header {
+            display: grid;
+            gap: 4px;
+        }
+
+        .elive-test-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .dark .elive-test-title {
+            color: #ffffff;
+        }
+
+        .elive-test-description {
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .elive-test-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .elive-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .dark .elive-actions {
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-action-info {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .elive-button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .elive-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 40px;
+            padding: 0 15px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            font-size: 13px;
+            font-weight: 750;
+            cursor: pointer;
+            transition: 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .elive-btn-secondary {
+            background: #ffffff;
+            border-color: #d1d5db;
+            color: #374151;
+        }
+
+        .elive-btn-secondary:hover {
+            background: #f9fafb;
+        }
+
+        .dark .elive-btn-secondary {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: #e5e7eb;
+        }
+
+        .elive-btn-primary {
+            background: #4f46e5;
+            color: #ffffff;
+        }
+
+        .elive-btn-primary:hover {
+            background: #4338ca;
+        }
+
+        .elive-btn-test {
+            background: #111827;
+            color: #ffffff;
+        }
+
+        .elive-btn-test:hover {
+            background: #1f2937;
+        }
+
+        .dark .elive-btn-test {
+            background: #f9fafb;
+            color: #111827;
+        }
+
+        .elive-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .elive-stat-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .elive-stat-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 17px;
+            background: #fafafa;
+        }
+
+        .dark .elive-stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-stat-label {
+            font-size: 12px;
+            font-weight: 650;
+            color: #6b7280;
+        }
+
+        .elive-stat-value {
+            margin-top: 6px;
+            font-size: 30px;
+            line-height: 1;
+            font-weight: 900;
+            color: #111827;
+        }
+
+        .dark .elive-stat-value {
+            color: #ffffff;
+        }
+
+        .elive-stat-footer {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .elive-progress {
+            height: 7px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #e5e7eb;
+            margin-top: 12px;
+        }
+
+        .dark .elive-progress {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-progress-bar {
+            height: 100%;
+            border-radius: inherit;
+            background: #4f46e5;
+        }
+
+        .elive-summary {
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            display: grid;
+            gap: 11px;
+        }
+
+        .dark .elive-summary {
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .elive-summary-label {
+            color: #6b7280;
+        }
+
+        .elive-summary-value {
+            text-align: right;
+            font-weight: 750;
+            color: #111827;
+        }
+
+        .dark .elive-summary-value {
+            color: #ffffff;
+        }
+
+        .elive-summary-divider {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 2px 0;
+        }
+
+        .dark .elive-summary-divider {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-table-wrap {
+            overflow-x: auto;
+        }
+
+        .elive-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .elive-table th {
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #6b7280;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .dark .elive-table th {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-table td {
+            padding: 14px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+
+        .dark .elive-table td {
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .elive-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .elive-campaign-name {
+            font-weight: 750;
+            color: #111827;
+        }
+
+        .dark .elive-campaign-name {
+            color: #ffffff;
+        }
+
+        .elive-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 750;
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .elive-badge-queued {
+            background: #eef2ff;
+            color: #4338ca;
+        }
+
+        .elive-badge-processing {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
+        .elive-badge-completed {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .elive-badge-failed {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .elive-badge-draft {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .elive-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: #6b7280;
+        }
+
+        .elive-empty-title {
+            font-weight: 750;
+            color: #374151;
+            margin-bottom: 5px;
+        }
+
+        .dark .elive-empty-title {
+            color: #e5e7eb;
+        }
+
+        .elive-queue-note {
+            display: grid;
+            gap: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #4b5563;
+        }
+
+        .dark .elive-queue-note {
+            color: #d1d5db;
+        }
+
+        .elive-code {
+            display: inline-flex;
+            border-radius: 6px;
+            padding: 2px 6px;
+            background: #f3f4f6;
+            font-family: monospace;
+            font-size: 11px;
+        }
+
+        .dark .elive-code {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .elive-warning {
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #fde68a;
+            background: #fffbeb;
+            color: #92400e;
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .dark .elive-warning {
+            background: rgba(245, 158, 11, 0.08);
+            border-color: rgba(245, 158, 11, 0.22);
+            color: #fcd34d;
+        }
+
+
+        .elive-hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 22px;
+            border: 1px solid #dbeafe;
+            border-radius: 18px;
+            background:
+                linear-gradient(135deg, #eff6ff 0%, #ffffff 55%, #eef2ff 100%);
+        }
+
+        .dark .elive-hero {
+            border-color: rgba(59, 130, 246, 0.24);
+            background:
+                linear-gradient(135deg, rgba(30, 58, 138, 0.22), rgba(24, 24, 27, 0.92));
+        }
+
+        .elive-hero-title {
+            margin: 0;
+            font-size: clamp(22px, 3vw, 30px);
+            font-weight: 900;
+            color: #111827;
+            line-height: 1.15;
+        }
+
+        .dark .elive-hero-title {
+            color: #ffffff;
+        }
+
+        .elive-hero-text {
+            margin: 7px 0 0;
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .elive-live-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #ecfdf5;
+            color: #047857;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .elive-live-pill::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+        }
+
+        .elive-overview-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .elive-overview-card {
+            padding: 17px;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .dark .elive-overview-card {
+            background: rgba(24, 24, 27, 0.8);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .elive-overview-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #6b7280;
+            font-weight: 800;
+        }
+
+        .elive-overview-value {
+            margin-top: 6px;
+            font-size: 24px;
+            font-weight: 900;
+            color: #111827;
+        }
+
+        .dark .elive-overview-value {
+            color: #ffffff;
+        }
+
+        .elive-overview-help {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .elive-template-preview {
+            margin-top: 10px;
+            padding: 12px 14px;
+            border: 1px dashed #c7d2fe;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .dark .elive-template-preview {
+            border-color: rgba(129, 140, 248, 0.32);
+            background: rgba(255, 255, 255, 0.03);
+            color: #d1d5db;
+        }
+
+        .elive-status-success {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .elive-status-warning {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
+        .elive-status-danger {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .elive-status-gray {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .elive-selected-event {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 750;
+            color: #4f46e5;
+        }
+
+        .dark .elive-selected-event {
+            color: #a5b4fc;
+        }
+
+        @media (max-width: 1100px) {
+            .elive-overview-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .elive-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .elive-hero {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .elive-overview-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-field-full {
+                grid-column: auto;
+            }
+
+            .elive-test-row {
+                grid-template-columns: 1fr;
+            }
+
+            .elive-card-header,
+            .elive-card-body {
+                padding: 17px;
+            }
+
+            .elive-button-group {
+                width: 100%;
+            }
+
+            .elive-btn {
+                flex: 1;
+            }
+        }
+    </style>
+
+    @php
+        $events = $this->events();
+        $templates = $this->templates();
+        $categories = $this->categories();
+        $campaigns = $this->recentCampaigns();
+
+        $selectedEvent = $this->selectedEvent;
+        $selectedTemplate = $this->selectedTemplate;
+        $smsStats = $this->smsStats;
+        $campaignStats = $this->campaignStats;
+
+        $validRecipients = (int) ($preview['valid'] ?? 0);
+        $totalRecipients = (int) ($preview['total'] ?? 0);
+        $invalidRecipients = (int) ($preview['invalid'] ?? 0);
+
+        $validPercentage = $totalRecipients > 0
+            ? min(
+                100,
+                round(
+                    ($validRecipients / $totalRecipients) * 100
+                )
+            )
+            : 0;
+
+        $characterCount = (int) ($smsStats['characters'] ?? 0);
+        $segmentCount = (int) ($smsStats['segments'] ?? 0);
+        $estimatedSmsUnits = (int) ($smsStats['estimated_units'] ?? 0);
+
+        $canQueue =
+            filled($eventId)
+            && filled($campaignName)
+            && filled($message)
+            && $validRecipients > 0
+            && ! $this->isWhatsAppChannel()
+            && (
+                ! $this->isEmailChannel()
+                || filled($subject)
+            );
+    @endphp
+
+    <div class="elive-communication-center">
+
+        <section class="elive-hero">
+            <div>
+                <h2 class="elive-hero-title">
+                    Communication Center
+                </h2>
+
+                <p class="elive-hero-text">
+                    Build Email, SMS, and WhatsApp campaigns, preview recipients,
+                    send a test, then queue delivery through the communications worker.
+                </p>
+
+                @if ($selectedEvent)
+                    <div class="elive-selected-event">
+                        {{ $selectedEvent->name }}
+
+                        @if ($selectedEvent->organization)
+                            · {{ $selectedEvent->organization->name }}
+                        @endif
+                    </div>
+                @endif
+            </div>
+
+            <div class="elive-live-pill">
+                Communication Operations Ready
+            </div>
+        </section>
+
+        <section class="elive-overview-grid">
+            <div class="elive-overview-card">
+                <div class="elive-overview-label">Recent Campaigns</div>
+                <div class="elive-overview-value">
+                    {{ number_format($campaignStats['campaigns'] ?? 0) }}
+                </div>
+                <div class="elive-overview-help">
+                    Last campaigns visible to you
+                </div>
+            </div>
+
+            <div class="elive-overview-card">
+                <div class="elive-overview-label">Queued</div>
+                <div class="elive-overview-value">
+                    {{ number_format($campaignStats['queued'] ?? 0) }}
+                </div>
+                <div class="elive-overview-help">
+                    Messages queued for delivery
+                </div>
+            </div>
+
+            <div class="elive-overview-card">
+                <div class="elive-overview-label">Sent</div>
+                <div class="elive-overview-value">
+                    {{ number_format($campaignStats['sent'] ?? 0) }}
+                </div>
+                <div class="elive-overview-help">
+                    Provider-successful deliveries
+                </div>
+            </div>
+
+            <div class="elive-overview-card">
+                <div class="elive-overview-label">Failed</div>
+                <div class="elive-overview-value">
+                    {{ number_format($campaignStats['failed'] ?? 0) }}
+                </div>
+                <div class="elive-overview-help">
+                    Delivery failures requiring review
+                </div>
+            </div>
+        </section>
+
+        <div class="elive-grid">
+
+            {{-- LEFT SIDE --}}
+            <div class="elive-stack">
+
+                {{-- Campaign Builder --}}
+                <section class="elive-card">
+
+                    <div class="elive-card-header">
+                        <h2 class="elive-card-title">
+                            New Communication Campaign
+                        </h2>
+
+                        <p class="elive-card-description">
+                            Select the event, channel, audience, and template,
+                            then test and queue the campaign.
+                        </p>
+                    </div>
+
+                    <div class="elive-card-body">
+
+                        <div class="elive-form-grid">
+
+                            {{-- Event --}}
+                            <div class="elive-field">
+
+                                <label class="elive-label">
+                                    <span>Event</span>
+
+                                    <span class="elive-required">
+                                        Required
+                                    </span>
+                                </label>
+
+                                <select
+                                    wire:model.live="eventId"
+                                    class="elive-select"
+                                >
+                                    <option value="">
+                                        Select event
+                                    </option>
+
+                                    @foreach ($events as $event)
+                                        <option value="{{ $event->id }}">
+                                            {{ $event->name }}
+
+                                            @if ($event->organization)
+                                                — {{ $event->organization->name }}
+                                            @endif
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('eventId')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            {{-- Channel --}}
+                            <div class="elive-field">
+
+                                <label class="elive-label">
+                                    <span>Channel</span>
+
+                                    <span class="elive-required">
+                                        Required
+                                    </span>
+                                </label>
+
+                                <select
+                                    wire:model.live="channel"
+                                    class="elive-select"
+                                >
+                                    @foreach ($this->channelOptions() as $value => $label)
+                                        <option value="{{ $value }}">
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('channel')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+
+                            </div>
+
+                            {{-- Campaign Name --}}
+                            <div class="elive-field">
+
+                                <label class="elive-label">
+                                    <span>Campaign Name</span>
+
+                                    <span class="elive-required">
+                                        Required
+                                    </span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    wire:model="campaignName"
+                                    class="elive-input"
+                                    placeholder="Example: Event Reminder"
+                                >
+
+                                @error('campaignName')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            {{-- Audience --}}
+                            <div class="elive-field">
+
+                                <label class="elive-label">
+                                    Audience
+                                </label>
+
+                                <select
+                                    wire:model.live="audience"
+                                    class="elive-select"
+                                >
+                                    @foreach ($audienceOptions as $value => $label)
+                                        <option value="{{ $value }}">
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('audience')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            {{-- Category --}}
+                            <div class="elive-field">
+
+                                <label class="elive-label">
+                                    Attendee Category
+                                </label>
+
+                                <select
+                                    wire:model.live="categoryId"
+                                    class="elive-select"
+                                    @disabled(! $eventId)
+                                >
+                                    <option value="">
+                                        All categories
+                                    </option>
+
+                                    @foreach ($categories as $category)
+                                        <option value="{{ $category->id }}">
+                                            {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('categoryId')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+                            </div>
+
+                            {{-- Template --}}
+                            <div class="elive-field elive-field-full">
+
+                                <label class="elive-label">
+                                    Template Type
+                                </label>
+
+                                <select
+                                    wire:model.live="templateId"
+                                    class="elive-select"
+                                    @disabled(! $eventId)
+                                >
+                                    <option value="">
+                                        Write message manually
+                                    </option>
+
+                                    @foreach ($templates as $template)
+                                        <option value="{{ $template->id }}">
+                                            {{ $template->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                @error('templateId')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+
+                                <div class="elive-help">
+                                    Select a friendly template type for the chosen
+                                    channel, or write the message manually below.
+                                </div>
+
+                                @if ($selectedTemplate)
+                                    <div class="elive-template-preview">
+                                        <strong>{{ $selectedTemplate->name }}</strong>
+
+                                        {{ $selectedTemplate->body }}
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Email Subject --}}
+                            @if ($this->isEmailChannel())
+                                <div class="elive-field elive-field-full">
+
+                                    <label class="elive-label">
+                                        <span>Email Subject</span>
+
+                                        <span class="elive-required">
+                                            Required
+                                        </span>
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        wire:model="subject"
+                                        class="elive-input"
+                                        placeholder="Important Update – #EVENT_NAME#"
+                                    >
+
+                                    @error('subject')
+                                        <div class="elive-error">
+                                            {{ $message }}
+                                        </div>
+                                    @enderror
+
+                                    <div class="elive-help">
+                                        Placeholders such as
+                                        <strong>#EVENT_NAME#</strong>
+                                        are rendered for each attendee.
+                                    </div>
+
+                                </div>
+                            @endif
+
+                            {{-- Message --}}
+                            <div class="elive-field elive-field-full">
+
+                                <label class="elive-label">
+                                    <span>Message</span>
+
+                                    <span class="elive-required">
+                                        Required
+                                    </span>
+                                </label>
+
+                                <textarea
+                                    wire:model.live.debounce.300ms="message"
+                                    class="elive-textarea"
+                                    placeholder="Hello #NAME#, this is a reminder for #EVENT_NAME#..."
+                                ></textarea>
+
+                                @error('message')
+                                    <div class="elive-error">
+                                        {{ $message }}
+                                    </div>
+                                @enderror
+
+                                @if ($this->isSmsChannel())
+                                    <div class="elive-message-meta">
+
+                                        <span class="elive-meta-pill">
+                                            {{ number_format($characterCount) }}
+                                            characters
+                                        </span>
+
+                                        <span class="elive-meta-pill">
+                                            {{ number_format($segmentCount) }}
+                                            SMS segment{{ $segmentCount === 1 ? '' : 's' }}
+                                        </span>
+
+                                        <span class="elive-meta-pill">
+                                            {{ number_format($estimatedSmsUnits) }}
+                                            estimated SMS units
+                                        </span>
+
+                                    </div>
+                                @endif
+
+                                <div class="elive-help">
+                                    Personalize your message using placeholders.
+                                    Actual attendee values are inserted when the
+                                    campaign is processed.
+                                </div>
+
+                                <div class="elive-placeholder-box">
+
+                                    @foreach ([
+                                        '#NAME#',
+                                        '#PHONE#',
+                                        '#EMAIL#',
+                                        '#ORGANIZATION#',
+                                        '#POSITION#',
+                                        '#CATEGORY#',
+                                        '#PARTICIPANT_TYPE#',
+                                        '#BADGE_TYPE#',
+                                        '#BADGE_NUMBER#',
+                                        '#BADGE_LINK#',
+                                        '#EVENT_NAME#',
+                                        '#EVENT_VENUE#',
+                                        '#EVENT_DATE#',
+                                        '#EVENT_TIME#',
+                                        '#PUBLIC_LINK#',
+                                        '#REGISTRATION_LINK#',
+                                    ] as $placeholder)
+
+                                        <span class="elive-placeholder">
+                                            {{ $placeholder }}
+                                        </span>
+
+                                    @endforeach
+
+                                </div>
+
+                            </div>
+
+                            {{-- Test Communication --}}
+                            <div class="elive-field elive-field-full">
+
+                                <div class="elive-test-box">
+
+                                    <div class="elive-test-header">
+
+                                        <div class="elive-test-title">
+                                            @if ($this->isSmsChannel())
+                                                Send Test SMS
+                                            @elseif ($this->isEmailChannel())
+                                                Send Test Email
+                                            @else
+                                                WhatsApp Test
+                                            @endif
+                                        </div>
+
+                                        <div class="elive-test-description">
+                                            @if ($this->isSmsChannel())
+                                                Send the current SMS to one phone number before launching the campaign.
+                                            @elseif ($this->isEmailChannel())
+                                                Send the current branded eLive Events email to one address before launching the campaign.
+                                            @else
+                                                Bulk WhatsApp campaign sending is not enabled from this screen yet.
+                                            @endif
+                                        </div>
+
+                                    </div>
+
+                                    @if ($this->isSmsChannel())
+
+                                        @php
+                                            $canSendTestSms =
+                                                filled($eventId)
+                                                && filled($testPhone)
+                                                && filled($message);
+                                        @endphp
+
+                                        <div class="elive-test-row">
+
+                                            <div class="elive-field">
+
+                                                <label class="elive-label">
+                                                    Test Phone Number
+                                                </label>
+
+                                                <input
+                                                    type="tel"
+                                                    wire:model="testPhone"
+                                                    class="elive-input"
+                                                    placeholder="0768461644 or 255768461644"
+                                                >
+
+                                                @error('testPhone')
+                                                    <div class="elive-error">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                wire:click="sendTestSms"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendTestSms"
+                                                class="elive-btn elive-btn-test"
+                                                @disabled(! $canSendTestSms)
+                                            >
+                                                <span wire:loading.remove wire:target="sendTestSms">
+                                                    Send Test SMS
+                                                </span>
+
+                                                <span wire:loading wire:target="sendTestSms">
+                                                    Sending...
+                                                </span>
+                                            </button>
+
+                                        </div>
+
+                                        <div class="elive-help">
+                                            Tanzania numbers such as
+                                            <strong>0768461644</strong>
+                                            are normalized automatically.
+                                        </div>
+
+                                    @elseif ($this->isEmailChannel())
+
+                                        @php
+                                            $canSendTestEmail =
+                                                filled($eventId)
+                                                && filled($testEmail)
+                                                && filled($subject)
+                                                && filled($message);
+                                        @endphp
+
+                                        <div class="elive-test-row">
+
+                                            <div class="elive-field">
+
+                                                <label class="elive-label">
+                                                    Test Email Address
+                                                </label>
+
+                                                <input
+                                                    type="email"
+                                                    wire:model="testEmail"
+                                                    class="elive-input"
+                                                    placeholder="name@example.com"
+                                                >
+
+                                                @error('testEmail')
+                                                    <div class="elive-error">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
+
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                wire:click="sendTestEmail"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendTestEmail"
+                                                class="elive-btn elive-btn-test"
+                                                @disabled(! $canSendTestEmail)
+                                            >
+                                                <span wire:loading.remove wire:target="sendTestEmail">
+                                                    Send Test Email
+                                                </span>
+
+                                                <span wire:loading wire:target="sendTestEmail">
+                                                    Sending...
+                                                </span>
+                                            </button>
+
+                                        </div>
+
+                                        <div class="elive-help">
+                                            Test emails use the branded
+                                            <strong>eLive Events</strong>
+                                            HTML layout and do not create campaign recipients.
+                                        </div>
+
+                                    @else
+
+                                        <div class="elive-warning">
+                                            WhatsApp template campaigns will be connected in a later step.
+                                            Existing automatic WhatsApp registration confirmations remain unchanged.
+                                        </div>
+
+                                    @endif
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        {{-- Main Actions --}}
+                        <div class="elive-actions">
+
+                            <div class="elive-action-info">
+                                {{ number_format($validRecipients) }}
+                                valid recipient(s) currently eligible.
+                            </div>
+
+                            <div class="elive-button-group">
+
+                                <button
+                                    type="button"
+                                    wire:click="resetCampaign"
+                                    wire:loading.attr="disabled"
+                                    wire:target="resetCampaign"
+                                    class="elive-btn elive-btn-secondary"
+                                >
+                                    Reset
+                                </button>
+
+                                <button
+                                    type="button"
+                                    wire:click="refreshPreview"
+                                    wire:loading.attr="disabled"
+                                    wire:target="refreshPreview"
+                                    class="elive-btn elive-btn-secondary"
+                                    @disabled(! $eventId)
+                                >
+
+                                    <span
+                                        wire:loading.remove
+                                        wire:target="refreshPreview"
+                                    >
+                                        Refresh Preview
+                                    </span>
+
+                                    <span
+                                        wire:loading
+                                        wire:target="refreshPreview"
+                                    >
+                                        Refreshing...
+                                    </span>
+
+                                </button>
+
+                                <button
+                                    type="button"
+                                    wire:click="queueCampaign"
+                                    wire:loading.attr="disabled"
+                                    wire:target="queueCampaign"
+                                    class="elive-btn elive-btn-primary"
+                                    @disabled(! $canQueue)
+                                >
+
+                                    <span
+                                        wire:loading.remove
+                                        wire:target="queueCampaign"
+                                    >
+                                        Queue {{ $this->channelLabel() }} Campaign
+                                    </span>
+
+                                    <span
+                                        wire:loading
+                                        wire:target="queueCampaign"
+                                    >
+                                        Queuing...
+                                    </span>
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                </section>
+
+                {{-- Recent Campaigns --}}
+                <section class="elive-card">
+
+                    <div class="elive-card-header">
+
+                        <h2 class="elive-card-title">
+                            Recent Campaigns
+                        </h2>
+
+                        <p class="elive-card-description">
+                            Latest Email, SMS, and WhatsApp campaigns for events you manage.
+                        </p>
+
+                    </div>
+
+                    @if ($campaigns->isEmpty())
+
+                        <div class="elive-empty">
+
+                            <div class="elive-empty-title">
+                                No campaigns yet
+                            </div>
+
+                            <div>
+                                Your first communication campaign will appear here.
+                            </div>
+
+                        </div>
+
+                    @else
+
+                        <div class="elive-table-wrap">
+
+                            <table class="elive-table">
+
+                                <thead>
+                                    <tr>
+                                        <th>Campaign</th>
+                                        <th>Event</th>
+                                        <th>Template</th>
+                                        <th>Status</th>
+                                        <th>Recipients</th>
+                                        <th>Queued</th>
+                                        <th>Sent</th>
+                                        <th>Failed</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+
+                                    @foreach ($campaigns as $campaign)
+
+                                        @php
+                                            $statusTone = $this->campaignStatusTone(
+                                                $campaign->status
+                                            );
+
+                                            $statusLabel = $this->campaignStatusLabel(
+                                                $campaign->status
+                                            );
+                                        @endphp
+
+                                        <tr>
+
+                                            <td>
+
+                                                <div class="elive-campaign-name">
+                                                    {{ $campaign->name }}
+                                                </div>
+
+                                                <div class="elive-help">
+                                                    {{ strtoupper($campaign->channel) }}
+                                                </div>
+
+                                            </td>
+
+                                            <td>
+                                                {{ $campaign->event?->name ?? '—' }}
+                                            </td>
+
+                                            <td>
+                                                {{ $campaign->template?->name ?? 'Manual Message' }}
+                                            </td>
+
+                                            <td>
+
+                                                <span
+                                                    class="elive-badge elive-status-{{ $statusTone }}"
+                                                >
+                                                    {{ $statusLabel }}
+                                                </span>
+
+                                            </td>
+
+                                            <td>
+                                                {{ number_format($campaign->total_recipients ?? 0) }}
+                                            </td>
+
+                                            <td>
+                                                {{ number_format($campaign->queued_count ?? 0) }}
+                                            </td>
+
+                                            <td>
+                                                {{ number_format($campaign->sent_count ?? 0) }}
+                                            </td>
+
+                                            <td>
+                                                {{ number_format($campaign->failed_count ?? 0) }}
+                                            </td>
+
+                                        </tr>
+
+                                    @endforeach
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    @endif
+
+                </section>
+
+            </div>
+
+            {{-- RIGHT SIDE --}}
+            <aside class="elive-stack">
+
+                {{-- Recipient Preview --}}
+                <section class="elive-card">
+
+                    <div class="elive-card-header">
+
+                        <h2 class="elive-card-title">
+                            Recipient Preview
+                        </h2>
+
+                        <p class="elive-card-description">
+                            Verify your audience before sending.
+                        </p>
+
+                    </div>
+
+                    <div class="elive-card-body">
+
+                        <div class="elive-stat-grid">
+
+                            <div class="elive-stat-card">
+
+                                <div class="elive-stat-label">
+                                    Eligible attendees
+                                </div>
+
+                                <div class="elive-stat-value">
+                                    {{ number_format($totalRecipients) }}
+                                </div>
+
+                                <div class="elive-stat-footer">
+                                    Matches event and selected filters
+                                </div>
+
+                            </div>
+
+                            <div class="elive-stat-card">
+
+                                <div class="elive-stat-label">
+                                    Valid {{ $this->channelLabel() }} recipients
+                                </div>
+
+                                <div class="elive-stat-value">
+                                    {{ number_format($validRecipients) }}
+                                </div>
+
+                                <div class="elive-progress">
+
+                                    <div
+                                        class="elive-progress-bar"
+                                        style="width: {{ $validPercentage }}%"
+                                    ></div>
+
+                                </div>
+
+                                <div class="elive-stat-footer">
+                                    {{ $validPercentage }}% ready to send
+                                </div>
+
+                            </div>
+
+                            <div class="elive-stat-card">
+
+                                <div class="elive-stat-label">
+                                    Missing / invalid {{ $this->recipientLabel() }}
+                                </div>
+
+                                <div class="elive-stat-value">
+                                    {{ number_format($invalidRecipients) }}
+                                </div>
+
+                                <div class="elive-stat-footer">
+                                    These attendees will be skipped
+                                </div>
+
+                            </div>
+
+                            @if ($this->isSmsChannel())
+                                <div class="elive-stat-card">
+
+                                    <div class="elive-stat-label">
+                                        Estimated SMS units
+                                    </div>
+
+                                    <div class="elive-stat-value">
+                                        {{ number_format($estimatedSmsUnits) }}
+                                    </div>
+
+                                    <div class="elive-stat-footer">
+
+                                        {{ number_format($validRecipients) }}
+                                        recipients ×
+                                        {{ number_format($segmentCount) }}
+                                        segment{{ $segmentCount === 1 ? '' : 's' }}
+
+                                    </div>
+
+                                </div>
+                            @else
+                                <div class="elive-stat-card">
+
+                                    <div class="elive-stat-label">
+                                        Selected Channel
+                                    </div>
+
+                                    <div class="elive-stat-value" style="font-size:22px;">
+                                        {{ $this->channelLabel() }}
+                                    </div>
+
+                                    <div class="elive-stat-footer">
+                                        {{ number_format($validRecipients) }}
+                                        valid recipient(s)
+                                    </div>
+
+                                </div>
+                            @endif
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+                {{-- Campaign Summary --}}
+                <section class="elive-card">
+
+                    <div class="elive-card-header">
+                        <h2 class="elive-card-title">
+                            Campaign Summary
+                        </h2>
+                    </div>
+
+                    <div class="elive-card-body">
+
+                        <div class="elive-summary">
+
+                            <div class="elive-summary-row">
+
+                                <span class="elive-summary-label">
+                                    Channel
+                                </span>
+
+                                <span class="elive-summary-value">
+                                    {{ $this->channelLabel() }}
+                                </span>
+
+                            </div>
+
+                            <div class="elive-summary-row">
+
+                                <span class="elive-summary-label">
+                                    Audience
+                                </span>
+
+                                <span class="elive-summary-value">
+                                    {{ $audienceOptions[$audience] ?? str($audience)->replace('_', ' ')->headline() }}
+                                </span>
+
+                            </div>
+
+                            <div class="elive-summary-row">
+
+                                <span class="elive-summary-label">
+                                    Valid recipients
+                                </span>
+
+                                <span class="elive-summary-value">
+                                    {{ number_format($validRecipients) }}
+                                </span>
+
+                            </div>
+
+                            <div class="elive-summary-row">
+
+                                <span class="elive-summary-label">
+                                    Invalid / missing
+                                </span>
+
+                                <span class="elive-summary-value">
+                                    {{ number_format($invalidRecipients) }}
+                                </span>
+
+                            </div>
+
+                            @if ($this->isSmsChannel())
+
+                                <div class="elive-summary-divider"></div>
+
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Characters</span>
+                                    <span class="elive-summary-value">
+                                        {{ number_format($characterCount) }}
+                                    </span>
+                                </div>
+
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">SMS segments</span>
+                                    <span class="elive-summary-value">
+                                        {{ number_format($segmentCount) }}
+                                    </span>
+                                </div>
+
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Estimated SMS units</span>
+                                    <span class="elive-summary-value">
+                                        {{ number_format($estimatedSmsUnits) }}
+                                    </span>
+                                </div>
+
+                            @elseif ($this->isEmailChannel())
+
+                                <div class="elive-summary-divider"></div>
+
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Subject</span>
+                                    <span class="elive-summary-value">
+                                        {{ filled($subject) ? $subject : '—' }}
+                                    </span>
+                                </div>
+
+                                <div class="elive-summary-row">
+                                    <span class="elive-summary-label">Branding</span>
+                                    <span class="elive-summary-value">
+                                        eLive Events + Event Branding
+                                    </span>
+                                </div>
+
+                            @endif
+
+                        </div>
+
+                        @if ($this->isSmsChannel() && $segmentCount > 1)
+
+                            <div
+                                class="elive-warning"
+                                style="margin-top: 14px;"
+                            >
+                                This message is estimated to use
+                                <strong>
+                                    {{ number_format($segmentCount) }}
+                                    SMS segments
+                                </strong>
+                                per recipient. Shortening the message can
+                                reduce SMS usage and cost.
+                            </div>
+
+                        @endif
+
+                    </div>
+
+                </section>
+
+                {{-- Queue --}}
+                <section class="elive-card">
+
+                    <div class="elive-card-header">
+                        <h2 class="elive-card-title">
+                            Communication Queue
+                        </h2>
+                    </div>
+
+                    <div class="elive-card-body">
+
+                        <div class="elive-queue-note">
+
+                            <div>
+                                Bulk campaign messages are recorded in
+                                <span class="elive-code">
+                                    CommunicationLog
+                                </span>
+                                and processed asynchronously.
+                            </div>
+
+                            <div>
+                                Redis queue:
+                                <span class="elive-code">
+                                    communications
+                                </span>
+                            </div>
+
+                            <div>
+                                Worker:
+                                <span class="elive-code">
+                                    queue:work redis --queue=communications
+                                </span>
+                            </div>
+
+                            <div>
+                                Test SMS and Email messages are sent directly
+                                to the selected test recipient and do not create
+                                campaign recipients.
+                            </div>
+
+                            <div>
+                                Invalid recipients are skipped before they
+                                reach the selected communication provider.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+            </aside>
+
+        </div>
+
+    </div>
+</x-filament-panels::page>

@@ -11,7 +11,7 @@ class AttendeeRegistrationAnswer extends Model
         'event_id',
         'attendee_id',
         'event_registration_field_id',
-        'answer',
+        'value',
     ];
 
     public function event(): BelongsTo

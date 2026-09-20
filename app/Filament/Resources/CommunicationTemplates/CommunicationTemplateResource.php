@@ -17,31 +17,158 @@ use UnitEnum;
 
 class CommunicationTemplateResource extends Resource
 {
-    protected static ?string $model = CommunicationTemplate::class;
+    protected static ?string $model =
+        CommunicationTemplate::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
+    protected static string|BackedEnum|null $navigationIcon =
+        Heroicon::OutlinedChatBubbleLeftRight;
 
-    protected static ?string $recordTitleAttribute = 'name';
+    protected static ?string $recordTitleAttribute =
+        'name';
 
-    protected static ?string $navigationLabel = 'Message Templates';
+    protected static ?string $navigationLabel =
+        'Message Templates';
 
-    protected static ?string $modelLabel = 'Message Template';
+    protected static ?string $modelLabel =
+        'Message Template';
 
-    protected static ?string $pluralModelLabel = 'Message Templates';
+    protected static ?string $pluralModelLabel =
+        'Message Templates';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Registration & Communication';
+    protected static string|UnitEnum|null $navigationGroup =
+        'Registration & Communication';
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Schema $schema): Schema
+    /*
+    |--------------------------------------------------------------------------
+    | Ticket Organizer Access
+    |--------------------------------------------------------------------------
+    */
+
+    public static function shouldRegisterNavigation(): bool
     {
-        return CommunicationTemplateForm::configure($schema);
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::shouldRegisterNavigation();
     }
 
-    public static function table(Table $table): Table
+    public static function canViewAny(): bool
     {
-        return CommunicationTemplatesTable::configure($table);
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canViewAny();
     }
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canCreate();
+    }
+
+    public static function canEdit(
+        $record
+    ): bool {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canEdit(
+            $record
+        );
+    }
+
+    public static function canDelete(
+        $record
+    ): bool {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDelete(
+            $record
+        );
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            return false;
+        }
+
+        return parent::canDeleteAny();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Form / Table
+    |--------------------------------------------------------------------------
+    */
+
+    public static function form(
+        Schema $schema
+    ): Schema {
+        return CommunicationTemplateForm::configure(
+            $schema
+        );
+    }
+
+    public static function table(
+        Table $table
+    ): Table {
+        return CommunicationTemplatesTable::configure(
+            $table
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relations
+    |--------------------------------------------------------------------------
+    */
 
     public static function getRelations(): array
     {
@@ -50,12 +177,29 @@ class CommunicationTemplateResource extends Resource
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pages
+    |--------------------------------------------------------------------------
+    */
+
     public static function getPages(): array
     {
         return [
-            'index' => ListCommunicationTemplates::route('/'),
-            'create' => CreateCommunicationTemplate::route('/create'),
-            'edit' => EditCommunicationTemplate::route('/{record}/edit'),
+            'index' =>
+                ListCommunicationTemplates::route(
+                    '/'
+                ),
+
+            'create' =>
+                CreateCommunicationTemplate::route(
+                    '/create'
+                ),
+
+            'edit' =>
+                EditCommunicationTemplate::route(
+                    '/{record}/edit'
+                ),
         ];
     }
 }
