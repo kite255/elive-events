@@ -21,6 +21,9 @@ class CommunicationLog extends Model
     public const PURPOSE_TICKET_ACCESS_RECOVERY =
         'ticket_access_recovery';
 
+    public const PURPOSE_BADGE_RESEND =
+        'badge_resend';
+
     /*
     |--------------------------------------------------------------------------
     | Statuses
