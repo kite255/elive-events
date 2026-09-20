@@ -268,6 +268,14 @@ class EventForm
                         'Build the detailed page customers see before registering or buying tickets. Empty optional sections are hidden automatically.'
                     )
                     ->schema([
+                        Toggle::make('show_on_elive_website')
+                            ->label('Show on eLive Website')
+                            ->helperText(
+                                'When enabled, this event can appear in the public events section on elive.co.tz. Draft and cancelled events are never published there.'
+                            )
+                            ->default(false)
+                            ->columnSpanFull(),
+
                         TextInput::make('public_theme')
                             ->label('Event Theme')
                             ->placeholder('Revive Us Again, Lord')
