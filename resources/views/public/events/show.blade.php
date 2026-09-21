@@ -258,6 +258,38 @@
     $shareUrl = route('public.events.show', ['event' => $event->slug]);
     $shareText = $event->name
         . ($event->public_theme ? ' — ' . $event->public_theme : '');
+
+    $socialShareTitle = trim((string) $event->social_share_title)
+        ?: $event->name;
+
+    $socialShareDescription = trim((string) $event->social_share_description)
+        ?: Str::limit(
+            strip_tags((string) $event->description),
+            180
+        );
+
+    if ($socialShareDescription === '') {
+        $socialShareDescription = 'Event details, tickets and registration information from eLive Events.';
+    }
+
+    $socialShareImage = $event->social_share_image_path
+        ?: $event->registration_banner_image_path;
+
+    $socialShareImageUrl = null;
+
+    if ($socialShareImage) {
+        if (Str::startsWith($socialShareImage, ['http://', 'https://'])) {
+            $socialShareImageUrl = $socialShareImage;
+        } elseif (Str::startsWith($socialShareImage, ['storage/', '/storage/'])) {
+            $socialShareImageUrl = asset(ltrim($socialShareImage, '/'));
+        } else {
+            $socialShareImageUrl = asset('storage/' . ltrim($socialShareImage, '/'));
+        }
+    }
+
+    if (! $socialShareImageUrl) {
+        $socialShareImageUrl = asset('images/elive-social-share-default.png');
+    }
 @endphp
 
 <!DOCTYPE html>
@@ -272,6 +304,22 @@
         name="description"
         content="{{ Str::limit(strip_tags((string) $event->description), 155) ?: 'Event details and registration information.' }}"
     >
+
+    <link rel="canonical" href="{{ $shareUrl }}">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="eLive Events">
+    <meta property="og:title" content="{{ $socialShareTitle }}">
+    <meta property="og:description" content="{{ $socialShareDescription }}">
+    <meta property="og:url" content="{{ $shareUrl }}">
+    <meta property="og:image" content="{{ $socialShareImageUrl }}">
+    <meta property="og:image:secure_url" content="{{ $socialShareImageUrl }}">
+    <meta property="og:image:alt" content="{{ $socialShareTitle }}">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $socialShareTitle }}">
+    <meta name="twitter:description" content="{{ $socialShareDescription }}">
+    <meta name="twitter:image" content="{{ $socialShareImageUrl }}">
 
     <link rel="icon" href="{{ asset('favicon.ico') }}">
     <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
