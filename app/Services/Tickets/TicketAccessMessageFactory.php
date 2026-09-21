@@ -22,6 +22,7 @@ class TicketAccessMessageFactory
         $order->loadMissing([
             'event.ticketDeliveryEmailTemplate',
             'event.ticketDeliverySmsTemplate',
+            'items.ticketType',
         ]);
 
         $event = $order->event;
@@ -90,23 +91,75 @@ class TicketAccessMessageFactory
         TicketOrder $order,
         string $ticketsUrl
     ): array {
+        $event = $order->event;
+
+        $buyerName = trim((string) $order->buyer_name)
+            ?: 'Customer';
+
+        $eventName = trim((string) $event?->name)
+            ?: 'eLive Event';
+
+        $ticketCount = (string) ((int) $order->quantity);
+
+        $orderNumber = (string) $order->order_number;
+
+        $ticketTypes = $order->items
+            ->map(function ($item): ?string {
+                $name = trim(
+                    (string) $item->ticketType?->name
+                );
+
+                if ($name === '') {
+                    return null;
+                }
+
+                if ((int) $item->quantity > 1) {
+                    return $name
+                        . ' × '
+                        . (int) $item->quantity;
+                }
+
+                return $name;
+            })
+            ->filter()
+            ->implode(', ');
+
+        $ticketTypes = $ticketTypes !== ''
+            ? $ticketTypes
+            : 'Ticket';
+
+        $eventVenue = trim((string) $event?->venue);
+
+        $eventVenue = $eventVenue !== ''
+            ? $eventVenue
+            : 'Venue to be confirmed';
+
+        $eventDate = $event?->starts_at
+            ? $event->starts_at->format('d M Y')
+            : 'Date to be confirmed';
+
+        $eventTime = $event?->starts_at
+            ? $event->starts_at->format('h:i A')
+            : 'Time to be confirmed';
+
         return [
-            '{{buyer_name}}' =>
-                trim((string) $order->buyer_name)
-                ?: 'Customer',
+            // Existing ticket-template syntax.
+            '{{buyer_name}}' => $buyerName,
+            '{{event_name}}' => $eventName,
+            '{{ticket_count}}' => $ticketCount,
+            '{{order_number}}' => $orderNumber,
+            '{{tickets_url}}' => $ticketsUrl,
 
-            '{{event_name}}' =>
-                trim((string) $order->event?->name)
-                ?: 'eLive Event',
-
-            '{{ticket_count}}' =>
-                (string) ((int) $order->quantity),
-
-            '{{order_number}}' =>
-                (string) $order->order_number,
-
-            '{{tickets_url}}' =>
-                $ticketsUrl,
+            // Standard eLive communication-template syntax.
+            '#PURCHASER_NAME#' => $buyerName,
+            '#EVENT_NAME#' => $eventName,
+            '#ORDER_REFERENCE#' => $orderNumber,
+            '#TICKET_TYPE#' => $ticketTypes,
+            '#TICKET_COUNT#' => $ticketCount,
+            '#EVENT_DATE#' => $eventDate,
+            '#EVENT_TIME#' => $eventTime,
+            '#EVENT_VENUE#' => $eventVenue,
+            '#TICKET_LINK#' => $ticketsUrl,
         ];
     }
 
@@ -141,7 +194,7 @@ class TicketAccessMessageFactory
 
     private function defaultEmailSubject(): string
     {
-        return 'Your tickets for {{event_name}} are ready';
+        return 'Your tickets for #EVENT_NAME# are ready';
     }
 
     private function defaultEmailBody(): string
@@ -149,24 +202,36 @@ class TicketAccessMessageFactory
         return implode(
             PHP_EOL,
             [
-                'Hello {{buyer_name}},',
+                'Hello #PURCHASER_NAME#,',
                 '',
-                'Your payment has been confirmed and your tickets for {{event_name}} are ready.',
+                'Your payment has been confirmed, and your tickets for #EVENT_NAME# are ready.',
                 '',
-                'Number of tickets: {{ticket_count}}',
-                'Order: {{order_number}}',
+                'Order reference: #ORDER_REFERENCE#',
+                'Ticket type: #TICKET_TYPE#',
+                'Number of tickets: #TICKET_COUNT#',
+                'Event date: #EVENT_DATE#',
+                'Event time: #EVENT_TIME#',
+                'Venue: #EVENT_VENUE#',
                 '',
-                'Use the button below to view and download your tickets.',
+                'Use the secure link below to view and download your tickets:',
+                '#TICKET_LINK#',
+                '',
+                'Each ticket contains a unique QR code that will be scanned at the entrance.',
+                'Do not share your ticket link or QR codes publicly.',
+                '',
                 'We look forward to welcoming you.',
+                '',
+                'Kind regards,',
+                'eLive Events',
             ]
         );
     }
 
     private function defaultSmsBody(): string
     {
-        return 'eLive Events: Payment confirmed for {{event_name}}. '
-            . 'Your {{ticket_count}} ticket(s) are ready. '
-            . 'Order: {{order_number}}. '
-            . 'View tickets: {{tickets_url}}';
+        return 'eLive Events: Payment confirmed for #EVENT_NAME#. '
+            . 'Your #TICKET_COUNT# ticket(s) are ready. '
+            . 'Order: #ORDER_REFERENCE#. '
+            . 'View tickets: #TICKET_LINK#';
     }
 }
