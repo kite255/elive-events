@@ -273,6 +273,43 @@ class EventForm
                             ->placeholder('Revive Us Again, Lord')
                             ->maxLength(255),
 
+                        Section::make('Social Sharing')
+                            ->description(
+                                'Control how this event appears when its public link is shared on WhatsApp, Facebook and other social platforms.'
+                            )
+                            ->schema([
+                                FileUpload::make('social_share_image_path')
+                                    ->label('Social Share Image')
+                                    ->disk('public')
+                                    ->directory('events/social-share')
+                                    ->image()
+                                    ->imageEditor()
+                                    ->maxSize(5120)
+                                    ->helperText(
+                                        'Recommended size: 1200 × 630 px. If empty, the event banner is used as fallback.'
+                                    )
+                                    ->columnSpanFull(),
+
+                                TextInput::make('social_share_title')
+                                    ->label('Share Title')
+                                    ->maxLength(255)
+                                    ->helperText(
+                                        'Optional. Defaults to the event name.'
+                                    )
+                                    ->columnSpanFull(),
+
+                                Textarea::make('social_share_description')
+                                    ->label('Share Description')
+                                    ->rows(3)
+                                    ->maxLength(300)
+                                    ->helperText(
+                                        'Optional. Defaults to the event description.'
+                                    )
+                                    ->columnSpanFull(),
+                            ])
+                            ->collapsible()
+                            ->columnSpanFull(),
+
                         TextInput::make('venue_address')
                             ->label('Full Venue Address')
                             ->maxLength(255),
