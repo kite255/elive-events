@@ -317,6 +317,7 @@ return [
     |
     | - Automatic registration confirmation
     | - Digital badge delivery
+    | - Ticket access delivery
     |
     */
 
@@ -413,7 +414,8 @@ return [
         | WhatsApp Templates
         |----------------------------------------------------------------------
         |
-        | Currently only the registration confirmation template is enabled.
+        | Environment variables provide deploy-specific defaults. Event-level
+        | template selection can override these defaults when configured.
         |
         */
 
@@ -426,7 +428,7 @@ return [
 
             'ticket_access' => env(
                 'WHATSAPP_TEMPLATE_TICKET_ACCESS',
-                'concert_tickets_delivery_en'
+                'concert_ticket_order_delivery_en'
             ),
 
         ],
