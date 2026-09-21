@@ -287,9 +287,6 @@
         }
     }
 
-    if (! $socialShareImageUrl) {
-        $socialShareImageUrl = asset('images/elive-social-share-default.png');
-    }
 @endphp
 
 <!DOCTYPE html>
@@ -312,14 +309,18 @@
     <meta property="og:title" content="{{ $socialShareTitle }}">
     <meta property="og:description" content="{{ $socialShareDescription }}">
     <meta property="og:url" content="{{ $shareUrl }}">
-    <meta property="og:image" content="{{ $socialShareImageUrl }}">
-    <meta property="og:image:secure_url" content="{{ $socialShareImageUrl }}">
-    <meta property="og:image:alt" content="{{ $socialShareTitle }}">
+    @if ($socialShareImageUrl)
+        <meta property="og:image" content="{{ $socialShareImageUrl }}">
+        <meta property="og:image:secure_url" content="{{ $socialShareImageUrl }}">
+        <meta property="og:image:alt" content="{{ $socialShareTitle }}">
+    @endif
 
-    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:card" content="{{ $socialShareImageUrl ? 'summary_large_image' : 'summary' }}">
     <meta name="twitter:title" content="{{ $socialShareTitle }}">
     <meta name="twitter:description" content="{{ $socialShareDescription }}">
-    <meta name="twitter:image" content="{{ $socialShareImageUrl }}">
+    @if ($socialShareImageUrl)
+        <meta name="twitter:image" content="{{ $socialShareImageUrl }}">
+    @endif
 
     <link rel="icon" href="{{ asset('favicon.ico') }}">
     <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
