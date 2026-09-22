@@ -272,8 +272,8 @@
         $socialShareDescription = 'Event details, tickets and registration information from eLive Events.';
     }
 
-    $socialShareImage = $event->social_share_image_path
-        ?: $event->registration_banner_image_path;
+    $socialShareImage = $event->registration_banner_image_path
+        ?: $event->social_share_image_path;
 
     $socialShareImageUrl = null;
 
