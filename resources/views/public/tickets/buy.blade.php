@@ -47,6 +47,44 @@
     $displayCurrency =
         $ticketTypes->first()?->currency
         ?? 'TZS';
+
+    $shareUrl = route('public.tickets.buy', ['event' => $event->slug]);
+
+    $socialShareTitle = trim((string) $event->social_share_title)
+        ?: $event->name;
+
+    $socialShareDescription = trim((string) $event->social_share_description)
+        ?: Str::limit(
+            strip_tags((string) $event->description),
+            180
+        );
+
+    if ($socialShareDescription === '') {
+        $socialShareDescription = 'Tickets and event details from eLive Events.';
+    }
+
+    $socialShareImage = $event->social_share_image_path
+        ?: $event->registration_banner_image_path;
+
+    $socialShareImageUrl = null;
+
+    if ($socialShareImage) {
+        if (Str::startsWith($socialShareImage, ['http://', 'https://'])) {
+            $socialShareImageUrl = $socialShareImage;
+        } elseif (Str::startsWith($socialShareImage, ['storage/', '/storage/'])) {
+            $socialShareImageUrl = asset(ltrim($socialShareImage, '/'), true);
+        } else {
+            $socialShareImageUrl = asset('storage/' . ltrim($socialShareImage, '/'), true);
+        }
+
+        if (app()->environment('production')) {
+            $socialShareImageUrl = preg_replace(
+                '/^http:\/\//i',
+                'https://',
+                $socialShareImageUrl
+            );
+        }
+    }
 @endphp
 
 <!DOCTYPE html>
@@ -67,6 +105,28 @@
         name="description"
         content="Buy tickets for {{ $event->name }} securely through eLive Events."
     >
+
+    <link rel="canonical" href="{{ $shareUrl }}">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="eLive Events">
+    <meta property="og:title" content="{{ $socialShareTitle }}">
+    <meta property="og:description" content="{{ $socialShareDescription }}">
+    <meta property="og:url" content="{{ $shareUrl }}">
+    @if ($socialShareImageUrl)
+        <meta property="og:image" content="{{ $socialShareImageUrl }}">
+        <meta property="og:image:secure_url" content="{{ $socialShareImageUrl }}">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:image:alt" content="{{ $socialShareTitle }}">
+    @endif
+
+    <meta name="twitter:card" content="{{ $socialShareImageUrl ? 'summary_large_image' : 'summary' }}">
+    <meta name="twitter:title" content="{{ $socialShareTitle }}">
+    <meta name="twitter:description" content="{{ $socialShareDescription }}">
+    @if ($socialShareImageUrl)
+        <meta name="twitter:image" content="{{ $socialShareImageUrl }}">
+    @endif
 
     <link
         rel="icon"
