@@ -281,9 +281,19 @@
         if (Str::startsWith($socialShareImage, ['http://', 'https://'])) {
             $socialShareImageUrl = $socialShareImage;
         } elseif (Str::startsWith($socialShareImage, ['storage/', '/storage/'])) {
-            $socialShareImageUrl = asset(ltrim($socialShareImage, '/'));
+            $socialShareImageUrl = asset(ltrim($socialShareImage, '/'), true);
         } else {
-            $socialShareImageUrl = asset('storage/' . ltrim($socialShareImage, '/'));
+            $socialShareImageUrl = asset('storage/' . ltrim($socialShareImage, '/'), true);
+        }
+
+        // Social crawlers require an absolute public URL. Force HTTPS in
+        // production so WhatsApp/Facebook do not ignore the event image.
+        if (app()->environment('production')) {
+            $socialShareImageUrl = preg_replace(
+                '/^http:\/\//i',
+                'https://',
+                $socialShareImageUrl
+            );
         }
     }
 @endphp
@@ -311,6 +321,9 @@
     @if ($socialShareImageUrl)
         <meta property="og:image" content="{{ $socialShareImageUrl }}">
         <meta property="og:image:secure_url" content="{{ $socialShareImageUrl }}">
+        <meta property="og:image:type" content="image/jpeg">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
         <meta property="og:image:alt" content="{{ $socialShareTitle }}">
     @endif
 
