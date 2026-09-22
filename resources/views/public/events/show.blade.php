@@ -295,6 +295,12 @@
                 $socialShareImageUrl
             );
         }
+
+        // Bust stale social-preview caches whenever the event is updated.
+        // This keeps the public event URL unchanged while making the image
+        // resource look fresh to WhatsApp/Facebook/Twitter crawlers.
+        $socialShareImageUrl .= (str_contains($socialShareImageUrl, '?') ? '&' : '?')
+            . 'v=' . optional($event->updated_at)->timestamp;
     }
 @endphp
 
