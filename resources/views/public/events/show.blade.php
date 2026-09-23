@@ -2613,7 +2613,7 @@
         <section class="public-detail-section" aria-labelledby="speakers-heading">
             <div class="container">
                 <p class="public-detail-kicker">Meet the people</p>
-                <h2 id="speakers-heading" class="public-detail-heading">Speakers & Performers</h2>
+                <h2 id="speakers-heading" class="public-detail-heading">Speakers & Guest Singers</h2>
 
                 <div class="speaker-grid">
                     @foreach ($speakers as $speaker)
