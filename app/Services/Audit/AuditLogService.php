@@ -6,7 +6,6 @@ use App\Models\AuditLog;
 use App\Models\Event;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 class AuditLogService
@@ -92,7 +91,7 @@ class AuditLogService
             ->mapWithKeys(function ($value, $key): array {
                 $normalizedKey = Str::of((string) $key)->snake()->lower()->toString();
 
-                if (in_array($normalizedKey, self::SENSITIVE_KEYS, true)) {
+                if ($this->isSensitiveKey($normalizedKey)) {
                     return [];
                 }
 
@@ -103,5 +102,27 @@ class AuditLogService
                 return [$key => $value];
             })
             ->all();
+    }
+
+    private function isSensitiveKey(string $key): bool
+    {
+        if (in_array($key, self::SENSITIVE_KEYS, true)) {
+            return true;
+        }
+
+        if (str_contains($key, 'password')) {
+            return true;
+        }
+
+        if (
+            str_ends_with($key, '_secret')
+            || str_ends_with($key, '_token')
+            || str_ends_with($key, '_api_key')
+        ) {
+            return true;
+        }
+
+        return str_starts_with($key, 'qr_')
+            && (str_contains($key, 'token') || str_contains($key, 'hash') || str_contains($key, 'secret'));
     }
 }
