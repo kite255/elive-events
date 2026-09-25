@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ticket extends Model
 {
@@ -47,14 +48,7 @@ class Ticket extends Model
     {
         return [
             'price' => 'decimal:2',
-
-            /*
-             * Laravel transparently encrypts this before
-             * storing it and decrypts it when accessed.
-             */
-            'qr_token_encrypted' =>
-                'encrypted',
-
+            'qr_token_encrypted' => 'encrypted',
             'issued_at' => 'datetime',
             'used_at' => 'datetime',
             'cancelled_at' => 'datetime',
@@ -65,62 +59,51 @@ class Ticket extends Model
 
     public function event(): BelongsTo
     {
-        return $this->belongsTo(
-            Event::class
-        );
+        return $this->belongsTo(Event::class);
     }
 
     public function order(): BelongsTo
     {
-        return $this->belongsTo(
-            TicketOrder::class,
-            'ticket_order_id'
-        );
+        return $this->belongsTo(TicketOrder::class, 'ticket_order_id');
     }
 
     public function orderItem(): BelongsTo
     {
-        return $this->belongsTo(
-            TicketOrderItem::class,
-            'ticket_order_item_id'
-        );
+        return $this->belongsTo(TicketOrderItem::class, 'ticket_order_item_id');
     }
 
     public function ticketType(): BelongsTo
     {
-        return $this->belongsTo(
-            TicketType::class
-        );
+        return $this->belongsTo(TicketType::class);
     }
 
     public function attendee(): BelongsTo
     {
-        return $this->belongsTo(
-            Attendee::class
-        );
+        return $this->belongsTo(Attendee::class);
+    }
+
+    public function upgrades(): HasMany
+    {
+        return $this->hasMany(TicketUpgrade::class);
     }
 
     public function isUsable(): bool
     {
-        return $this->status
-            === self::STATUS_ISSUED;
+        return $this->status === self::STATUS_ISSUED;
     }
 
     public function isUsed(): bool
     {
-        return $this->status
-            === self::STATUS_USED;
+        return $this->status === self::STATUS_USED;
     }
 
     public function isCancelled(): bool
     {
-        return $this->status
-            === self::STATUS_CANCELLED;
+        return $this->status === self::STATUS_CANCELLED;
     }
 
     public function isRefunded(): bool
     {
-        return $this->status
-            === self::STATUS_REFUNDED;
+        return $this->status === self::STATUS_REFUNDED;
     }
 }
