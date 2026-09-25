@@ -17,7 +17,7 @@ class AuditLogTest extends TestCase
 
     public function test_audit_log_records_actor_event_subject_and_metadata(): void
     {
-        [$event, $order] = $this->makeOrder();
+        [, $event, $order] = $this->makeOrder();
         $admin = User::factory()->create(['is_super_admin' => true]);
 
         $log = app(AuditLogService::class)->record(
@@ -38,7 +38,7 @@ class AuditLogTest extends TestCase
 
     public function test_audit_log_redacts_sensitive_metadata_recursively(): void
     {
-        [, $order] = $this->makeOrder();
+        [, , $order] = $this->makeOrder();
         $admin = User::factory()->create(['is_super_admin' => true]);
 
         $log = app(AuditLogService::class)->record(
@@ -69,10 +69,16 @@ class AuditLogTest extends TestCase
 
     public function test_ticket_organizer_audit_scope_is_limited_to_assigned_events(): void
     {
-        [$assignedEvent, $assignedOrder] = $this->makeOrder('Assigned');
-        [, $otherOrder] = $this->makeOrder('Other');
+        [$organization, $assignedEvent, $assignedOrder] = $this->makeOrder('Assigned');
+        [, , $otherOrder] = $this->makeOrder('Other');
         $organizer = User::factory()->create(['is_super_admin' => false]);
 
+        $organization->users()->attach($organizer->id, [
+            'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+            'is_owner' => false,
+            'joined_at' => now(),
+        ]);
         $assignedEvent->assignUser($organizer, User::ORGANIZATION_ROLE_TICKET_ORGANIZER);
 
         app(AuditLogService::class)->record('ticket.access_resent', $assignedOrder, null);
@@ -115,6 +121,6 @@ class AuditLogTest extends TestCase
             'paid_at' => now(),
         ]);
 
-        return [$event, $order];
+        return [$organization, $event, $order];
     }
 }
