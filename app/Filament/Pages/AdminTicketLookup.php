@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\TicketType;
+use App\Models\User;
 use App\Services\Payments\TicketUpgradePaymentService;
 use App\Services\Tickets\AdminTicketLookupService;
 use App\Services\Tickets\ManualTicketResendService;
@@ -24,6 +25,8 @@ class AdminTicketLookup extends Page
 
     protected static ?string $slug = 'admin-ticket-lookup';
 
+    protected static ?int $navigationSort = 20;
+
     protected string $view = 'filament.pages.admin-ticket-lookup';
 
     public string $search = '';
@@ -36,6 +39,20 @@ class AdminTicketLookup extends Page
 
     /** @var array<int, array<int, string>> */
     public array $resendChannels = [];
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->isTicketOrganizer()
+            || $user->managedOrganizations()->exists()
+            || $user->eventManagerEvents()->exists();
+    }
 
     public function getHeading(): string | Htmlable | null
     {
