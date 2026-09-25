@@ -35,7 +35,7 @@ class TicketAccessMessageFactoryTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            'Order: ELV-MSG-001',
+            'Order reference: ELV-MSG-001',
             $messages['email_body']
         );
 
