@@ -4,10 +4,15 @@ namespace App\Filament\Resources\TicketOrders\Tables;
 
 use App\Models\Event;
 use App\Models\TicketOrder;
+use App\Services\Tickets\ManualTicketResendService;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use RuntimeException;
 
 class TicketOrdersTable
 {
@@ -42,9 +47,7 @@ class TicketOrdersTable
                 TextColumn::make('buyer_email')
                     ->label('Email')
                     ->searchable()
-                    ->toggleable(
-                        isToggledHiddenByDefault: true
-                    ),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('quantity')
                     ->label('Tickets')
@@ -55,9 +58,7 @@ class TicketOrdersTable
                     ->label('Items')
                     ->counts('items')
                     ->sortable()
-                    ->toggleable(
-                        isToggledHiddenByDefault: true
-                    ),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('tickets_count')
                     ->label('Issued')
@@ -67,18 +68,10 @@ class TicketOrdersTable
                 TextColumn::make('total')
                     ->label('Total')
                     ->formatStateUsing(
-                        fn (
-                            $state,
-                            TicketOrder $record
-                        ): string =>
-                            strtoupper(
-                                $record->currency
-                            )
+                        fn ($state, TicketOrder $record): string =>
+                            strtoupper($record->currency)
                             . ' '
-                            . number_format(
-                                (float) $state,
-                                2
-                            )
+                            . number_format((float) $state, 2)
                     )
                     ->sortable(),
 
@@ -86,65 +79,36 @@ class TicketOrdersTable
                     ->label('Status')
                     ->badge()
                     ->formatStateUsing(
-                        fn (string $state): string =>
-                            ucwords(
-                                str_replace(
-                                    '_',
-                                    ' ',
-                                    $state
-                                )
-                            )
+                        fn (string $state): string => ucwords(str_replace('_', ' ', $state))
                     )
-                    ->color(
-                        fn (string $state): string =>
-                            match ($state) {
-                                TicketOrder::STATUS_PAID =>
-                                    'success',
-
-                                TicketOrder::STATUS_PENDING =>
-                                    'warning',
-
-                                TicketOrder::STATUS_PROCESSING =>
-                                    'info',
-
-                                TicketOrder::STATUS_CANCELLED,
-                                TicketOrder::STATUS_EXPIRED =>
-                                    'danger',
-
-                                TicketOrder::STATUS_REFUNDED,
-                                TicketOrder::STATUS_PARTIALLY_REFUNDED =>
-                                    'gray',
-
-                                default =>
-                                    'gray',
-                            }
-                    )
+                    ->color(fn (string $state): string => match ($state) {
+                        TicketOrder::STATUS_PAID => 'success',
+                        TicketOrder::STATUS_PENDING => 'warning',
+                        TicketOrder::STATUS_PROCESSING => 'info',
+                        TicketOrder::STATUS_CANCELLED,
+                        TicketOrder::STATUS_EXPIRED => 'danger',
+                        TicketOrder::STATUS_REFUNDED,
+                        TicketOrder::STATUS_PARTIALLY_REFUNDED => 'gray',
+                        default => 'gray',
+                    })
                     ->sortable(),
 
                 TextColumn::make('paid_at')
                     ->label('Paid At')
-                    ->dateTime(
-                        'd M Y, H:i'
-                    )
+                    ->dateTime('d M Y, H:i')
                     ->placeholder('Not paid')
                     ->sortable(),
 
                 TextColumn::make('expires_at')
                     ->label('Expires At')
-                    ->dateTime(
-                        'd M Y, H:i'
-                    )
+                    ->dateTime('d M Y, H:i')
                     ->placeholder('—')
                     ->sortable()
-                    ->toggleable(
-                        isToggledHiddenByDefault: true
-                    ),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('created_at')
                     ->label('Created')
-                    ->dateTime(
-                        'd M Y, H:i'
-                    )
+                    ->dateTime('d M Y, H:i')
                     ->sortable()
                     ->toggleable(),
             ])
@@ -153,11 +117,9 @@ class TicketOrdersTable
                     ->label('Event')
                     ->options(
                         Event::query()
+                            ->accessibleBy(auth()->user())
                             ->orderBy('name')
-                            ->pluck(
-                                'name',
-                                'id'
-                            )
+                            ->pluck('name', 'id')
                     )
                     ->searchable()
                     ->preload(),
@@ -165,38 +127,66 @@ class TicketOrdersTable
                 SelectFilter::make('status')
                     ->label('Status')
                     ->options([
-                        TicketOrder::STATUS_PENDING =>
-                            'Pending',
-
-                        TicketOrder::STATUS_PROCESSING =>
-                            'Processing',
-
-                        TicketOrder::STATUS_PAID =>
-                            'Paid',
-
-                        TicketOrder::STATUS_CANCELLED =>
-                            'Cancelled',
-
-                        TicketOrder::STATUS_EXPIRED =>
-                            'Expired',
-
-                        TicketOrder::STATUS_REFUNDED =>
-                            'Refunded',
-
-                        TicketOrder::STATUS_PARTIALLY_REFUNDED =>
-                            'Partially Refunded',
+                        TicketOrder::STATUS_PENDING => 'Pending',
+                        TicketOrder::STATUS_PROCESSING => 'Processing',
+                        TicketOrder::STATUS_PAID => 'Paid',
+                        TicketOrder::STATUS_CANCELLED => 'Cancelled',
+                        TicketOrder::STATUS_EXPIRED => 'Expired',
+                        TicketOrder::STATUS_REFUNDED => 'Refunded',
+                        TicketOrder::STATUS_PARTIALLY_REFUNDED => 'Partially Refunded',
                     ]),
             ])
-            ->defaultSort(
-                'created_at',
-                'desc'
-            )
+            ->defaultSort('created_at', 'desc')
             ->recordActions([
+                Action::make('resend_ticket')
+                    ->label('Resend Ticket')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->visible(fn (TicketOrder $record): bool => $record->isPaid())
+                    ->modalHeading('Resend ticket access')
+                    ->modalDescription(function (TicketOrder $record): string {
+                        $contact = app(ManualTicketResendService::class)->maskedContact($record);
+
+                        return 'Recipient: ' . ($record->buyer_name ?: 'Customer')
+                            . ' · ' . $contact['phone']
+                            . ' · ' . $contact['email'];
+                    })
+                    ->schema([
+                        Select::make('channels')
+                            ->label('Delivery channels')
+                            ->multiple()
+                            ->options(fn (TicketOrder $record): array => app(ManualTicketResendService::class)->availableChannels($record))
+                            ->required(),
+                    ])
+                    ->action(function (TicketOrder $record, array $data): void {
+                        $user = auth()->user();
+
+                        if (! $user) {
+                            throw new RuntimeException('Authentication is required.');
+                        }
+
+                        try {
+                            $result = app(ManualTicketResendService::class)->queue(
+                                $record,
+                                $data['channels'] ?? [],
+                                $user
+                            );
+
+                            Notification::make()
+                                ->title('Ticket access queued')
+                                ->body('Queued via: ' . implode(', ', $result['queued']))
+                                ->success()
+                                ->send();
+                        } catch (RuntimeException $exception) {
+                            Notification::make()
+                                ->title('Ticket could not be resent')
+                                ->body($exception->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
                 EditAction::make()
-                    ->visible(
-                        fn (): bool =>
-                            ! auth()->user()?->isTicketOrganizer()
-                    ),
+                    ->visible(fn (): bool => ! auth()->user()?->isTicketOrganizer()),
             ]);
     }
 }

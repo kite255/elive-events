@@ -23,6 +23,8 @@ class PesapalService implements PaymentGateway
         $payment->loadMissing([
             'event',
             'attendee',
+            'ticketOrder',
+            'ticketUpgrade.order',
         ]);
 
         $notificationId =
@@ -36,16 +38,27 @@ class PesapalService implements PaymentGateway
             );
         }
 
-        $attendee =
-            $payment->attendee;
+        $attendee = $payment->attendee;
+        $order = $payment->ticketOrder
+            ?: $payment->ticketUpgrade?->order;
 
-        $name =
-            trim(
-                (string) (
-                    $attendee?->full_name
-                    ?? ''
-                )
-            );
+        $name = trim((string) (
+            $attendee?->full_name
+            ?: $order?->buyer_name
+            ?: ''
+        ));
+
+        $email = trim((string) (
+            $attendee?->email
+            ?: $order?->buyer_email
+            ?: ''
+        ));
+
+        $phone = trim((string) (
+            $attendee?->phone
+            ?: $order?->buyer_phone
+            ?: ''
+        ));
 
         $nameParts =
             preg_split(
@@ -106,16 +119,10 @@ class PesapalService implements PaymentGateway
 
             'billing_address' => [
                 'email_address' =>
-                    (string) (
-                        $attendee?->email
-                        ?? ''
-                    ),
+                    $email,
 
                 'phone_number' =>
-                    (string) (
-                        $attendee?->phone
-                        ?? ''
-                    ),
+                    $phone,
 
                 'country_code' =>
                     (string) config(
@@ -330,11 +337,6 @@ class PesapalService implements PaymentGateway
         return $data;
     }
 
-    /**
-     * Obtain and cache the Pesapal API bearer token.
-     *
-     * Pesapal tokens are short lived, so we cache for four minutes.
-     */
     public function token(): string
     {
         $environment =
