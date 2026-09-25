@@ -50,6 +50,26 @@
                         </div>
 
                         <div class="flex flex-wrap gap-2">
+                            @if ($row['payment_id'])
+                                <a
+                                    href="{{ \App\Filament\Resources\Payments\PaymentResource::getUrl('view', ['record' => $row['payment_id']]) }}"
+                                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                                >
+                                    View Payment
+                                </a>
+                            @endif
+
+                            @if (! empty($row['order_public_token']))
+                                <a
+                                    href="{{ route('public.ticket-orders.show', ['token' => $row['order_public_token']]) }}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                                >
+                                    View Order
+                                </a>
+                            @endif
+
                             @if ($row['can_resync'] && $row['payment_id'])
                                 <button
                                     type="button"
