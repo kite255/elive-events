@@ -24,7 +24,7 @@ class AuditLogResource extends Resource
 
     protected static ?string $navigationLabel = 'Audit Logs';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 110;
 
     public static function table(Table $table): Table
     {
