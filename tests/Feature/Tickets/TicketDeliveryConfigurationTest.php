@@ -9,7 +9,7 @@ class TicketDeliveryConfigurationTest extends TestCase
     public function test_ticket_delivery_whatsapp_template_is_configured(): void
     {
         $this->assertSame(
-            'concert_tickets_delivery_en',
+            'concert_ticket_order_delivery_en',
             config(
                 'services.whatsapp.templates.ticket_access'
             )
