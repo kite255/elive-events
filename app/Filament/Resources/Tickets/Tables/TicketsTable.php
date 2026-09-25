@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Tickets\Tables;
 
+use App\Filament\Resources\AuditLogs\AuditLogResource;
+use App\Filament\Resources\TicketCheckIns\TicketCheckInResource;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Models\TicketType;
@@ -257,6 +259,20 @@ class TicketsTable
                                 ->send();
                         }
                     }),
+
+                Action::make('check_in_history')
+                    ->label('View Check-in History')
+                    ->icon('heroicon-o-clock')
+                    ->url(fn (Ticket $record): string => TicketCheckInResource::getUrl('index', [
+                        'tableSearch' => $record->ticket_number,
+                    ])),
+
+                Action::make('audit_history')
+                    ->label('View Audit History')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->url(fn (Ticket $record): string => AuditLogResource::getUrl('index', [
+                        'tableSearch' => $record->order?->order_number ?: $record->ticket_number,
+                    ])),
             ]);
     }
 }
