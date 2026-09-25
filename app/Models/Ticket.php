@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -85,6 +86,35 @@ class Ticket extends Model
     public function upgrades(): HasMany
     {
         return $this->hasMany(TicketUpgrade::class);
+    }
+
+    public function checkIns(): HasMany
+    {
+        return $this->hasMany(TicketCheckIn::class);
+    }
+
+    public function scopeAccessibleBy(Builder $query, ?User $user): Builder
+    {
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        if ($user->isTicketOrganizer()) {
+            $eventIds = $user->assignedTicketingEventIds();
+
+            return $eventIds->isEmpty()
+                ? $query->whereRaw('1 = 0')
+                : $query->whereIn('event_id', $eventIds);
+        }
+
+        return $query->whereHas(
+            'event',
+            fn (Builder $eventQuery): Builder => $eventQuery->accessibleBy($user)
+        );
     }
 
     public function isUsable(): bool
