@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\TicketType;
 use App\Services\Payments\TicketUpgradePaymentService;
 use App\Services\Tickets\AdminTicketLookupService;
+use App\Services\Tickets\ManualTicketResendService;
 use App\Services\Tickets\TicketUpgradeService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -33,6 +34,9 @@ class AdminTicketLookup extends Page
     /** @var array<int, string> */
     public array $upgradeLinks = [];
 
+    /** @var array<int, array<int, string>> */
+    public array $resendChannels = [];
+
     public function getHeading(): string | Htmlable | null
     {
         return null;
@@ -47,6 +51,44 @@ class AdminTicketLookup extends Page
         }
 
         return app(AdminTicketLookupService::class)->search($user, $this->search);
+    }
+
+    public function resendTicket(int $ticketId): void
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            abort(403);
+        }
+
+        try {
+            $ticket = app(AdminTicketLookupService::class)
+                ->findAuthorizedTicket($user, $ticketId);
+
+            if (! $ticket->order) {
+                throw new RuntimeException('Ticket order is unavailable.');
+            }
+
+            $channels = $this->resendChannels[$ticketId] ?? [];
+
+            $result = app(ManualTicketResendService::class)->queue(
+                $ticket->order,
+                $channels,
+                $user
+            );
+
+            Notification::make()
+                ->title('Ticket access queued')
+                ->body('Queued via: ' . implode(', ', $result['queued']))
+                ->success()
+                ->send();
+        } catch (RuntimeException $exception) {
+            Notification::make()
+                ->title('Ticket could not be resent')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 
     public function createUpgrade(int $ticketId): void
