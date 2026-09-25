@@ -20,7 +20,7 @@ class TicketCapacityDashboard extends Page
 
     protected static ?string $slug = 'ticket-capacity-dashboard';
 
-    protected static ?int $navigationSort = 40;
+    protected static ?int $navigationSort = 35;
 
     protected string $view = 'filament.pages.ticket-capacity-dashboard';
 
