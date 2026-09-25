@@ -3,8 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Models\TicketType;
+use App\Models\User;
 use App\Services\Payments\TicketUpgradePaymentService;
 use App\Services\Tickets\AdminTicketLookupService;
+use App\Services\Tickets\ManualTicketResendService;
 use App\Services\Tickets\TicketUpgradeService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -23,6 +25,8 @@ class AdminTicketLookup extends Page
 
     protected static ?string $slug = 'admin-ticket-lookup';
 
+    protected static ?int $navigationSort = 20;
+
     protected string $view = 'filament.pages.admin-ticket-lookup';
 
     public string $search = '';
@@ -32,6 +36,23 @@ class AdminTicketLookup extends Page
 
     /** @var array<int, string> */
     public array $upgradeLinks = [];
+
+    /** @var array<int, array<int, string>> */
+    public array $resendChannels = [];
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->isTicketOrganizer()
+            || $user->managedOrganizations()->exists()
+            || $user->eventManagerEvents()->exists();
+    }
 
     public function getHeading(): string | Htmlable | null
     {
@@ -47,6 +68,44 @@ class AdminTicketLookup extends Page
         }
 
         return app(AdminTicketLookupService::class)->search($user, $this->search);
+    }
+
+    public function resendTicket(int $ticketId): void
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            abort(403);
+        }
+
+        try {
+            $ticket = app(AdminTicketLookupService::class)
+                ->findAuthorizedTicket($user, $ticketId);
+
+            if (! $ticket->order) {
+                throw new RuntimeException('Ticket order is unavailable.');
+            }
+
+            $channels = $this->resendChannels[$ticketId] ?? [];
+
+            $result = app(ManualTicketResendService::class)->queue(
+                $ticket->order,
+                $channels,
+                $user
+            );
+
+            Notification::make()
+                ->title('Ticket access queued')
+                ->body('Queued via: ' . implode(', ', $result['queued']))
+                ->success()
+                ->send();
+        } catch (RuntimeException $exception) {
+            Notification::make()
+                ->title('Ticket could not be resent')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 
     public function createUpgrade(int $ticketId): void

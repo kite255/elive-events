@@ -10,7 +10,8 @@ use Illuminate\Database\Eloquent\Builder;
 class AdminTicketLookupService
 {
     public function __construct(
-        protected TicketUpgradeService $ticketUpgradeService
+        protected TicketUpgradeService $ticketUpgradeService,
+        protected ManualTicketResendService $manualTicketResendService,
     ) {
     }
 
@@ -116,6 +117,10 @@ class AdminTicketLookupService
             }
         }
 
+        $resendChannels = $order?->isPaid()
+            ? $this->manualTicketResendService->availableChannels($order)
+            : [];
+
         return [
             'ticket_id' => $ticket->id,
             'event_id' => $event?->id,
@@ -137,6 +142,8 @@ class AdminTicketLookupService
             'paid_at' => $order?->paid_at,
             'can_upgrade' => $canUpgrade,
             'upgrade_targets' => $upgradeTargets,
+            'can_resend' => $order?->isPaid() && $resendChannels !== [],
+            'resend_channels' => $resendChannels,
             'order_url' => $order?->public_token
                 ? route('public.ticket-orders.show', ['token' => $order->public_token])
                 : null,

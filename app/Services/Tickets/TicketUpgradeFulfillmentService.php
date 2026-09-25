@@ -6,11 +6,18 @@ use App\Models\Payment;
 use App\Models\Ticket;
 use App\Models\TicketType;
 use App\Models\TicketUpgrade;
+use App\Services\Audit\AuditLogService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class TicketUpgradeFulfillmentService
 {
+    public function __construct(
+        private readonly TicketAvailabilityService $availabilityService,
+        private readonly AuditLogService $auditLogService,
+    ) {
+    }
+
     public function fulfill(Payment $payment): TicketUpgrade
     {
         if ($payment->status !== Payment::STATUS_COMPLETED) {
@@ -65,12 +72,9 @@ class TicketUpgradeFulfillmentService
                 throw new RuntimeException('Target ticket type is no longer available for this event.');
             }
 
-            $sold = Ticket::query()
-                ->where('ticket_type_id', $target->getKey())
-                ->whereNotIn('status', [Ticket::STATUS_CANCELLED, Ticket::STATUS_REFUNDED])
-                ->count();
+            $available = $this->availabilityService->availableQuantity($target);
 
-            if ($target->capacity !== null && $sold >= (int) $target->capacity) {
+            if ($available !== null && $available < 1) {
                 throw new RuntimeException(
                     'Upgrade payment completed, but the target ticket type is now sold out. Payment requires manual review or refund.'
                 );
@@ -87,6 +91,20 @@ class TicketUpgradeFulfillmentService
                 'status' => TicketUpgrade::STATUS_COMPLETED,
                 'completed_at' => now(),
             ]))->save();
+
+            $this->auditLogService->record(
+                'ticket.upgrade.completed',
+                $upgrade,
+                null,
+                [
+                    'ticket_number' => $ticket->ticket_number,
+                    'from_ticket_type_id' => $upgrade->from_ticket_type_id,
+                    'to_ticket_type_id' => $upgrade->to_ticket_type_id,
+                    'payment_reference' => $lockedPayment->reference,
+                    'amount' => (float) $upgrade->upgrade_amount,
+                    'currency' => $upgrade->currency,
+                ]
+            );
 
             return $upgrade->fresh(['ticket', 'fromTicketType', 'toTicketType', 'order']);
         }, attempts: 3);

@@ -7,12 +7,18 @@ use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Models\TicketUpgrade;
 use App\Models\User;
+use App\Services\Audit\AuditLogService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class TicketUpgradeService
 {
+    public function __construct(
+        private readonly AuditLogService $auditLogService,
+    ) {
+    }
+
     public function eligibleTargets(Ticket $ticket)
     {
         $ticket->loadMissing(['order', 'ticketType']);
@@ -73,7 +79,7 @@ class TicketUpgradeService
                 throw new RuntimeException('The target ticket type must cost more than the current ticket.');
             }
 
-            return TicketUpgrade::query()->create([
+            $upgrade = TicketUpgrade::query()->create([
                 'event_id' => $lockedTicket->event_id,
                 'ticket_order_id' => $lockedTicket->ticket_order_id,
                 'ticket_id' => $lockedTicket->getKey(),
@@ -89,6 +95,21 @@ class TicketUpgradeService
                 'initiated_at' => now(),
                 'expires_at' => now()->addDay(),
             ]);
+
+            $this->auditLogService->record(
+                'ticket.upgrade.created',
+                $upgrade,
+                $initiator,
+                [
+                    'ticket_number' => $lockedTicket->ticket_number,
+                    'from_ticket_type_id' => $upgrade->from_ticket_type_id,
+                    'to_ticket_type_id' => $upgrade->to_ticket_type_id,
+                    'amount' => (float) $upgrade->upgrade_amount,
+                    'currency' => $upgrade->currency,
+                ]
+            );
+
+            return $upgrade;
         });
     }
 

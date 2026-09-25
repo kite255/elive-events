@@ -38,7 +38,7 @@ class TicketTypeResource extends Resource
     protected static ?string $pluralModelLabel =
         'Ticket Types';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 80;
 
     public static function form(
         Schema $schema
@@ -56,12 +56,6 @@ class TicketTypeResource extends Resource
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Authorization
-    |--------------------------------------------------------------------------
-    */
-
     public static function canCreate(): bool
     {
         $user = auth()->user();
@@ -73,32 +67,26 @@ class TicketTypeResource extends Resource
         return parent::canCreate();
     }
 
-    public static function canEdit(
-        Model $record
-    ): bool {
+    public static function canEdit(Model $record): bool
+    {
         $user = auth()->user();
 
         if ($user?->isTicketOrganizer()) {
             return false;
         }
 
-        return parent::canEdit(
-            $record
-        );
+        return parent::canEdit($record);
     }
 
-    public static function canDelete(
-        Model $record
-    ): bool {
+    public static function canDelete(Model $record): bool
+    {
         $user = auth()->user();
 
         if ($user?->isTicketOrganizer()) {
             return false;
         }
 
-        return parent::canDelete(
-            $record
-        );
+        return parent::canDelete($record);
     }
 
     public static function canDeleteAny(): bool
@@ -112,47 +100,22 @@ class TicketTypeResource extends Resource
         return parent::canDeleteAny();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Query scoping
-    |--------------------------------------------------------------------------
-    */
-
     public static function getEloquentQuery(): Builder
     {
-        $query =
-            parent::getEloquentQuery();
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
 
-        $user =
-            auth()->user();
-
-        /*
-         * Super Admin and all non-Ticketing-Manager users
-         * keep their existing query behavior.
-         */
         if (! $user?->isTicketOrganizer()) {
             return $query;
         }
 
-        /*
-         * Ticketing Managers may only see Ticket Types
-         * belonging to events explicitly assigned to them.
-         *
-         * Organization membership alone is not enough.
-         */
-        $assignedEventIds =
-            $user->assignedTicketingEventIds();
+        $assignedEventIds = $user->assignedTicketingEventIds();
 
         if ($assignedEventIds->isEmpty()) {
-            return $query->whereRaw(
-                '1 = 0'
-            );
+            return $query->whereRaw('1 = 0');
         }
 
-        return $query->whereIn(
-            'event_id',
-            $assignedEventIds
-        );
+        return $query->whereIn('event_id', $assignedEventIds);
     }
 
     public static function getRelations(): array
@@ -163,16 +126,9 @@ class TicketTypeResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' =>
-                ListTicketTypes::route('/'),
-
-            'create' =>
-                CreateTicketType::route('/create'),
-
-            'edit' =>
-                EditTicketType::route(
-                    '/{record}/edit'
-                ),
+            'index' => ListTicketTypes::route('/'),
+            'create' => CreateTicketType::route('/create'),
+            'edit' => EditTicketType::route('/{record}/edit'),
         ];
     }
 }
