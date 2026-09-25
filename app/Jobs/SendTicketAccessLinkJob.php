@@ -22,12 +22,10 @@ class SendTicketAccessLinkJob implements ShouldQueue
     use Queueable;
 
     public int $tries = 3;
-
     public int $timeout = 60;
 
-    public function __construct(
-        public int $communicationLogId
-    ) {
+    public function __construct(public int $communicationLogId)
+    {
     }
 
     public function handle(
@@ -41,6 +39,8 @@ class SendTicketAccessLinkJob implements ShouldQueue
                 'ticketOrder.event.organization',
                 'ticketOrder.event.ticketDeliveryEmailTemplate',
                 'ticketOrder.event.ticketDeliverySmsTemplate',
+                'ticketUpgrade.fromTicketType',
+                'ticketUpgrade.toTicketType',
             ])
             ->find($this->communicationLogId);
 
@@ -54,70 +54,57 @@ class SendTicketAccessLinkJob implements ShouldQueue
             return;
         }
 
+        if (! $this->recipientStillBelongsToOrder($log, $order, $phoneNumberService)) {
+            return;
+        }
+
+        $upgrade = $log->purpose === CommunicationLog::PURPOSE_TICKET_UPGRADE_COMPLETED
+            ? $log->ticketUpgrade
+            : null;
+
         if (
-            ! $this->recipientStillBelongsToOrder(
-                $log,
-                $order,
-                $phoneNumberService
-            )
+            $log->purpose === CommunicationLog::PURPOSE_TICKET_UPGRADE_COMPLETED
+            && (! $upgrade || ! $upgrade->isCompleted())
         ) {
             return;
         }
 
-        $url = route(
-            'public.ticket-orders.show',
-            [
-                'token' => $order->public_token,
-            ]
-        );
+        $url = route('public.ticket-orders.show', [
+            'token' => $order->public_token,
+        ]);
 
-        $messages = $messageFactory->make(
-            $order,
-            $url
-        );
+        $messages = $messageFactory->make($order, $url, $upgrade);
 
         try {
             $log->markSending();
             $log->increment('attempt_count');
 
             $providerMessageId = match ($log->channel) {
-                CommunicationLog::CHANNEL_EMAIL =>
-                    $this->sendEmail(
-                        $log->recipient,
-                        $messages['email_subject'],
-                        $messages['email_body'],
-                        $order,
-                        $url
-                    ),
-
-                CommunicationLog::CHANNEL_SMS =>
-                    $this->sendSms(
-                        $log->recipient,
-                        $messages['sms_body'],
-                        $smsService
-                    ),
-
-                CommunicationLog::CHANNEL_WHATSAPP =>
-                    $this->sendWhatsApp(
-                        $log->recipient,
-                        $order,
-                        $whatsAppService
-                    ),
-
-                default =>
-                    throw new RuntimeException(
-                        'Unsupported ticket access delivery channel.'
-                    ),
+                CommunicationLog::CHANNEL_EMAIL => $this->sendEmail(
+                    $log->recipient,
+                    $messages['email_subject'],
+                    $messages['email_body'],
+                    $order,
+                    $url
+                ),
+                CommunicationLog::CHANNEL_SMS => $this->sendSms(
+                    $log->recipient,
+                    $messages['sms_body'],
+                    $smsService
+                ),
+                CommunicationLog::CHANNEL_WHATSAPP => $this->sendWhatsApp(
+                    $log->recipient,
+                    $order,
+                    $whatsAppService
+                ),
+                default => throw new RuntimeException(
+                    'Unsupported ticket access delivery channel.'
+                ),
             };
 
-            $log->markSent(
-                $providerMessageId
-            );
+            $log->markSent($providerMessageId);
         } catch (Throwable $exception) {
-            $log->markFailed(
-                $exception->getMessage()
-            );
-
+            $log->markFailed($exception->getMessage());
             throw $exception;
         }
     }
@@ -138,13 +125,8 @@ class SendTicketAccessLinkJob implements ShouldQueue
                 'event' => $order->event,
                 'ticketsUrl' => $ticketsUrl,
             ],
-            function (Message $message) use (
-                $recipient,
-                $subject
-            ): void {
-                $message
-                    ->to($recipient)
-                    ->subject($subject);
+            function (Message $message) use ($recipient, $subject): void {
+                $message->to($recipient)->subject($subject);
             }
         );
 
@@ -156,13 +138,9 @@ class SendTicketAccessLinkJob implements ShouldQueue
         string $message,
         SmsService $smsService
     ): ?string {
-        $result = $smsService->send(
-            $recipient,
-            $message
-        );
+        $result = $smsService->send($recipient, $message);
 
-        return $result['provider_message_id']
-            ?? null;
+        return $result['provider_message_id'] ?? null;
     }
 
     private function sendWhatsApp(
@@ -176,35 +154,25 @@ class SendTicketAccessLinkJob implements ShouldQueue
                 'services.whatsapp.templates.ticket_access',
                 'concert_tickets_delivery_en'
             ),
-            languageCode: config(
-                'services.whatsapp.default_language',
-                'en'
-            ),
+            languageCode: config('services.whatsapp.default_language', 'en'),
             bodyParameters: [
-                trim((string) $order->buyer_name)
-                    ?: 'Customer',
-                $order->event?->name
-                    ?? 'eLive Event',
+                trim((string) $order->buyer_name) ?: 'Customer',
+                $order->event?->name ?? 'eLive Event',
                 (string) ((int) $order->quantity),
                 (string) $order->order_number,
             ],
             imageUrl: null,
-            urlButtons: [
-                [
-                    'index' => 0,
-                    'value' => $order->public_token,
-                ],
-            ],
+            urlButtons: [[
+                'index' => 0,
+                'value' => $order->public_token,
+            ]],
         );
 
         if (! ($result['success'] ?? false)) {
-            throw new RuntimeException(
-                'WhatsApp provider did not confirm message submission.'
-            );
+            throw new RuntimeException('WhatsApp provider did not confirm message submission.');
         }
 
-        return $result['provider_message_id']
-            ?? null;
+        return $result['provider_message_id'] ?? null;
     }
 
     private function recipientStillBelongsToOrder(
@@ -213,70 +181,44 @@ class SendTicketAccessLinkJob implements ShouldQueue
         PhoneNumberService $phoneNumberService
     ): bool {
         if ($log->isEmail()) {
-            if (
-                blank($order->buyer_email)
-                || blank($log->recipient)
-            ) {
+            if (blank($order->buyer_email) || blank($log->recipient)) {
                 return false;
             }
 
             return hash_equals(
-                mb_strtolower(
-                    trim((string) $order->buyer_email)
-                ),
-                mb_strtolower(
-                    trim((string) $log->recipient)
-                )
+                mb_strtolower(trim((string) $order->buyer_email)),
+                mb_strtolower(trim((string) $log->recipient))
             );
         }
 
-        if (
-            ! $log->isSms()
-            && ! $log->isWhatsApp()
-        ) {
+        if (! $log->isSms() && ! $log->isWhatsApp()) {
             return false;
         }
 
         try {
-            $savedPhone = $phoneNumberService->normalize(
-                $order->buyer_phone
-            );
-
-            $logPhone = $phoneNumberService->normalize(
-                $log->recipient
-            );
+            $savedPhone = $phoneNumberService->normalize($order->buyer_phone);
+            $logPhone = $phoneNumberService->normalize($log->recipient);
         } catch (InvalidArgumentException) {
             return false;
         }
 
         return filled($savedPhone)
             && filled($logPhone)
-            && hash_equals(
-                $savedPhone,
-                $logPhone
-            );
+            && hash_equals($savedPhone, $logPhone);
     }
 
-    public function failed(
-        ?Throwable $exception
-    ): void {
-        $log = CommunicationLog::query()
-            ->find($this->communicationLogId);
+    public function failed(?Throwable $exception): void
+    {
+        $log = CommunicationLog::query()->find($this->communicationLogId);
 
         if (! $log || $log->isSent()) {
             return;
         }
 
-        $log->markFailed(
-            $exception?->getMessage()
-                ?: 'Ticket access delivery failed.'
-        );
+        $log->markFailed($exception?->getMessage() ?: 'Ticket access delivery failed.');
 
         if ($log->isWhatsApp()) {
-            app(TicketAccessDeliveryService::class)
-                ->queueSmsFallback(
-                    $log
-                );
+            app(TicketAccessDeliveryService::class)->queueSmsFallback($log);
         }
 
         if ($exception) {
