@@ -125,7 +125,15 @@ class PublicTicketUpgradePageTest extends TestCase
             ->assertSee('20,000')
             ->assertDontSee('jane.customer@example.com')
             ->assertDontSee('255712345678')
-            ->assertDontSee((string) $upgrade->ticket_id);
+            ->assertSee(
+                route(
+                    'tickets.upgrades.pay',
+                    ['token' => $upgrade->public_token]
+                ),
+                false
+            )
+            ->assertDontSee('ticket_id=')
+            ->assertDontSee('ticket_order_id=');
     }
 
     public function test_invalid_upgrade_token_returns_404(): void
