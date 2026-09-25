@@ -54,7 +54,12 @@ class PaymentReconciliationService
             ->where('event_id', $event->id)
             ->where('status', TicketOrder::STATUS_PAID)
             ->where('total', '>', 0)
-            ->whereHas('event.paymentSetting', fn ($query) => $query->where('payments_enabled', true))
+            ->whereHas(
+                'event.paymentSetting',
+                fn ($query) => $query
+                    ->where('payments_enabled', true)
+                    ->where('allow_manual_payment', false)
+            )
             ->whereDoesntHave('payments', fn ($query) => $query->where('status', Payment::STATUS_COMPLETED))
             ->withCount('tickets')
             ->latest('id')
