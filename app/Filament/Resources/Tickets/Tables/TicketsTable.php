@@ -7,11 +7,14 @@ use App\Models\Ticket;
 use App\Models\TicketType;
 use App\Services\Tickets\ManualTicketResendService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Js;
 use RuntimeException;
 
@@ -41,6 +44,31 @@ class TicketsTable
                             (string) ($state ?: $record->holder_name ?: '—')
                     )
                     ->searchable(),
+
+                TextColumn::make('holder_name')
+                    ->label('Holder Name')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('order.buyer_phone')
+                    ->label('Buyer Phone')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('order.buyer_email')
+                    ->label('Buyer Email')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('holder_phone')
+                    ->label('Holder Phone')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('holder_email')
+                    ->label('Holder Email')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('ticketType.name')
                     ->label('Ticket Type')
@@ -77,14 +105,11 @@ class TicketsTable
                     })
                     ->sortable(),
 
-                TextColumn::make('used_at')
+                TextColumn::make('check_in_status')
                     ->label('Check-in')
-                    ->formatStateUsing(
-                        fn ($state): string => $state ? 'Checked In' : 'Not Checked In'
-                    )
+                    ->state(fn (Ticket $record): string => $record->used_at ? 'Checked In' : 'Not Checked In')
                     ->badge()
-                    ->color(fn ($state): string => $state ? 'success' : 'gray')
-                    ->sortable(),
+                    ->color(fn (string $state): string => $state === 'Checked In' ? 'success' : 'gray'),
 
                 TextColumn::make('used_at')
                     ->label('Checked In At')
@@ -135,12 +160,24 @@ class TicketsTable
                         'checked_in' => 'Checked In',
                         'not_checked_in' => 'Not Checked In',
                     ])
-                    ->query(function ($query, array $data) {
+                    ->query(function (Builder $query, array $data): Builder {
                         return match ($data['value'] ?? null) {
                             'checked_in' => $query->whereNotNull('used_at'),
                             'not_checked_in' => $query->whereNull('used_at'),
                             default => $query,
                         };
+                    }),
+
+                Filter::make('issued_at')
+                    ->label('Issue Date')
+                    ->schema([
+                        DatePicker::make('from')->label('From'),
+                        DatePicker::make('until')->label('Until'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when($data['from'] ?? null, fn (Builder $q, $date): Builder => $q->whereDate('issued_at', '>=', $date))
+                            ->when($data['until'] ?? null, fn (Builder $q, $date): Builder => $q->whereDate('issued_at', '<=', $date));
                     }),
             ])
             ->defaultSort('issued_at', 'desc')
