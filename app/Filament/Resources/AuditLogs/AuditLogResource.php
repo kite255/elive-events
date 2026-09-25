@@ -5,6 +5,7 @@ namespace App\Filament\Resources\AuditLogs;
 use App\Filament\Resources\AuditLogs\Pages\ListAuditLogs;
 use App\Filament\Resources\AuditLogs\Tables\AuditLogsTable;
 use App\Models\AuditLog;
+use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -28,6 +29,20 @@ class AuditLogResource extends Resource
     public static function table(Table $table): Table
     {
         return AuditLogsTable::configure($table);
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->isTicketOrganizer()
+            || $user->managedOrganizations()->exists()
+            || $user->eventManagerEvents()->exists();
     }
 
     public static function getEloquentQuery(): Builder
