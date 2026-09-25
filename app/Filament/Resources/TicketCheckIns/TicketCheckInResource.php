@@ -28,7 +28,7 @@ class TicketCheckInResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Check-in History';
 
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 60;
 
     public static function table(Table $table): Table
     {
