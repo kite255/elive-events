@@ -5,12 +5,15 @@ namespace App\Filament\Resources\Tickets\Tables;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Models\TicketType;
+use App\Services\Tickets\ManualTicketResendService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Js;
+use RuntimeException;
 
 class TicketsTable
 {
@@ -169,6 +172,53 @@ class TicketsTable
                             ->body(route('public.tickets.show', ['token' => $record->public_token]))
                             ->success()
                             ->send();
+                    }),
+
+                Action::make('resend_ticket')
+                    ->label('Resend Ticket')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->visible(fn (Ticket $record): bool => $record->order?->isPaid() ?? false)
+                    ->modalHeading('Resend ticket access')
+                    ->modalDescription(function (Ticket $record): string {
+                        $contact = app(ManualTicketResendService::class)->maskedContact($record->order);
+
+                        return 'Recipient: ' . ($record->order?->buyer_name ?: $record->holder_name ?: 'Customer')
+                            . ' · ' . $contact['phone']
+                            . ' · ' . $contact['email'];
+                    })
+                    ->schema([
+                        Select::make('channels')
+                            ->label('Delivery channels')
+                            ->multiple()
+                            ->options(fn (Ticket $record): array => app(ManualTicketResendService::class)->availableChannels($record->order))
+                            ->required(),
+                    ])
+                    ->action(function (Ticket $record, array $data): void {
+                        $user = auth()->user();
+
+                        if (! $user || ! $record->order) {
+                            throw new RuntimeException('Ticket order is unavailable.');
+                        }
+
+                        try {
+                            $result = app(ManualTicketResendService::class)->queue(
+                                $record->order,
+                                $data['channels'] ?? [],
+                                $user
+                            );
+
+                            Notification::make()
+                                ->title('Ticket access queued')
+                                ->body('Queued via: ' . implode(', ', $result['queued']))
+                                ->success()
+                                ->send();
+                        } catch (RuntimeException $exception) {
+                            Notification::make()
+                                ->title('Ticket could not be resent')
+                                ->body($exception->getMessage())
+                                ->danger()
+                                ->send();
+                        }
                     }),
             ]);
     }
