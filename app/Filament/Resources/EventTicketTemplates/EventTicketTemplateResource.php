@@ -36,7 +36,7 @@ class EventTicketTemplateResource extends Resource
     protected static ?string $pluralModelLabel =
         'Event Ticket Templates';
 
-    protected static ?int $navigationSort = 31;
+    protected static ?int $navigationSort = 100;
 
     public static function form(
         Schema $schema
