@@ -23,6 +23,7 @@ class Payment extends Model
         'event_id',
         'attendee_id',
         'ticket_order_id',
+        'ticket_upgrade_id',
         'payment_gateway_id',
         'reference',
         'provider_reference',
@@ -78,6 +79,13 @@ class Payment extends Model
     {
         return $this->belongsTo(
             TicketOrder::class
+        );
+    }
+
+    public function ticketUpgrade(): BelongsTo
+    {
+        return $this->belongsTo(
+            TicketUpgrade::class
         );
     }
 
