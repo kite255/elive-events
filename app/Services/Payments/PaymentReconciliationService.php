@@ -72,6 +72,7 @@ class PaymentReconciliationService
                 'provider_status' => null,
                 'order_id' => $order->id,
                 'order_reference' => $order->order_number,
+                'order_public_token' => $order->public_token,
                 'order_status' => $order->status,
                 'expected_amount' => (float) $order->total,
                 'actual_amount' => null,
@@ -123,6 +124,10 @@ class PaymentReconciliationService
 
         if (! $payment->isCompleted()) {
             throw new RuntimeException('Only verified completed payments can be fulfilled.');
+        }
+
+        if ($payment->isFulfilled()) {
+            throw new RuntimeException('This payment has already been fulfilled.');
         }
 
         $updated = $this->fulfillmentService->fulfill($payment);
@@ -252,6 +257,7 @@ class PaymentReconciliationService
             'provider_status' => data_get($payment->metadata, 'pesapal_status'),
             'order_id' => $order?->id,
             'order_reference' => $payment->ticketUpgrade?->reference ?? $order?->order_number,
+            'order_public_token' => $order?->public_token,
             'order_status' => $payment->ticketUpgrade?->status ?? $order?->status,
             'expected_amount' => $expectedAmount,
             'actual_amount' => (float) $payment->amount,
