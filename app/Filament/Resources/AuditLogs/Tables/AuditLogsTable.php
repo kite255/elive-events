@@ -2,9 +2,13 @@
 
 namespace App\Filament\Resources\AuditLogs\Tables;
 
+use App\Models\AuditLog;
+use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class AuditLogsTable
 {
@@ -46,7 +50,12 @@ class AuditLogsTable
             ])
             ->filters([
                 SelectFilter::make('action')
-                    ->options(fn (): array => \App\Models\AuditLog::query()->distinct()->orderBy('action')->pluck('action', 'action')->all())
+                    ->options(fn (): array => AuditLog::query()
+                        ->accessibleBy(auth()->user())
+                        ->distinct()
+                        ->orderBy('action')
+                        ->pluck('action', 'action')
+                        ->all())
                     ->searchable(),
                 SelectFilter::make('event_id')
                     ->label('Event')
@@ -58,6 +67,27 @@ class AuditLogsTable
                     ->relationship('actor', 'name')
                     ->searchable()
                     ->preload(),
+                SelectFilter::make('subject_type')
+                    ->label('Resource')
+                    ->options(fn (): array => AuditLog::query()
+                        ->accessibleBy(auth()->user())
+                        ->distinct()
+                        ->orderBy('subject_type')
+                        ->pluck('subject_type')
+                        ->mapWithKeys(fn (string $type): array => [$type => class_basename($type)])
+                        ->all())
+                    ->searchable(),
+                Filter::make('created_at')
+                    ->label('Date Range')
+                    ->schema([
+                        DatePicker::make('from')->label('From'),
+                        DatePicker::make('until')->label('Until'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when($data['from'] ?? null, fn (Builder $q, $date): Builder => $q->whereDate('created_at', '>=', $date))
+                            ->when($data['until'] ?? null, fn (Builder $q, $date): Builder => $q->whereDate('created_at', '<=', $date));
+                    }),
             ])
             ->defaultSort('created_at', 'desc');
     }
