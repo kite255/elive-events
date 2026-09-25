@@ -1,0 +1,175 @@
+<?php
+
+namespace App\Filament\Resources\Tickets\Tables;
+
+use App\Models\Event;
+use App\Models\Ticket;
+use App\Models\TicketType;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
+use Illuminate\Support\Js;
+
+class TicketsTable
+{
+    public static function configure(Table $table): Table
+    {
+        return $table
+            ->columns([
+                TextColumn::make('ticket_number')
+                    ->label('Ticket Number')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->weight('bold'),
+
+                TextColumn::make('event.name')
+                    ->label('Event')
+                    ->searchable()
+                    ->sortable()
+                    ->limit(35),
+
+                TextColumn::make('order.buyer_name')
+                    ->label('Buyer / Holder')
+                    ->formatStateUsing(
+                        fn ($state, Ticket $record): string =>
+                            (string) ($state ?: $record->holder_name ?: '—')
+                    )
+                    ->searchable(),
+
+                TextColumn::make('ticketType.name')
+                    ->label('Ticket Type')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('order.order_number')
+                    ->label('Order')
+                    ->searchable()
+                    ->copyable()
+                    ->placeholder('—'),
+
+                TextColumn::make('price')
+                    ->label('Price')
+                    ->formatStateUsing(
+                        fn ($state, Ticket $record): string =>
+                            strtoupper((string) ($record->currency ?: 'TZS'))
+                            . ' '
+                            . number_format((float) $state, 2)
+                    )
+                    ->sortable(),
+
+                TextColumn::make('status')
+                    ->badge()
+                    ->formatStateUsing(
+                        fn (?string $state): string =>
+                            str((string) $state)->replace('_', ' ')->headline()->toString()
+                    )
+                    ->color(fn (?string $state): string => match ($state) {
+                        Ticket::STATUS_ISSUED => 'success',
+                        Ticket::STATUS_USED => 'info',
+                        Ticket::STATUS_CANCELLED, Ticket::STATUS_REFUNDED => 'gray',
+                        default => 'gray',
+                    })
+                    ->sortable(),
+
+                TextColumn::make('used_at')
+                    ->label('Check-in')
+                    ->formatStateUsing(
+                        fn ($state): string => $state ? 'Checked In' : 'Not Checked In'
+                    )
+                    ->badge()
+                    ->color(fn ($state): string => $state ? 'success' : 'gray')
+                    ->sortable(),
+
+                TextColumn::make('used_at')
+                    ->label('Checked In At')
+                    ->dateTime('d M Y, H:i')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('issued_at')
+                    ->label('Issued At')
+                    ->dateTime('d M Y, H:i')
+                    ->placeholder('—')
+                    ->sortable(),
+            ])
+            ->filters([
+                SelectFilter::make('event_id')
+                    ->label('Event')
+                    ->options(
+                        Event::query()
+                            ->accessibleBy(auth()->user())
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                    )
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('ticket_type_id')
+                    ->label('Ticket Type')
+                    ->options(
+                        TicketType::query()
+                            ->whereHas('event', fn ($query) => $query->accessibleBy(auth()->user()))
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                    )
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('status')
+                    ->options([
+                        Ticket::STATUS_ISSUED => 'Issued',
+                        Ticket::STATUS_USED => 'Used',
+                        Ticket::STATUS_CANCELLED => 'Cancelled',
+                        Ticket::STATUS_REFUNDED => 'Refunded',
+                    ]),
+
+                SelectFilter::make('check_in_state')
+                    ->label('Check-in')
+                    ->options([
+                        'checked_in' => 'Checked In',
+                        'not_checked_in' => 'Not Checked In',
+                    ])
+                    ->query(function ($query, array $data) {
+                        return match ($data['value'] ?? null) {
+                            'checked_in' => $query->whereNotNull('used_at'),
+                            'not_checked_in' => $query->whereNull('used_at'),
+                            default => $query,
+                        };
+                    }),
+            ])
+            ->defaultSort('issued_at', 'desc')
+            ->recordActions([
+                Action::make('view_ticket')
+                    ->label('View Ticket')
+                    ->icon('heroicon-o-eye')
+                    ->url(fn (Ticket $record): string => route('public.tickets.show', ['token' => $record->public_token]))
+                    ->openUrlInNewTab()
+                    ->visible(fn (Ticket $record): bool => filled($record->public_token)),
+
+                Action::make('view_order')
+                    ->label('View Order')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->url(fn (Ticket $record): string => route('public.ticket-orders.show', ['token' => $record->order?->public_token]))
+                    ->openUrlInNewTab()
+                    ->visible(fn (Ticket $record): bool => filled($record->order?->public_token)),
+
+                Action::make('copy_ticket_link')
+                    ->label('Copy Secure Link')
+                    ->icon('heroicon-o-clipboard-document')
+                    ->visible(fn (Ticket $record): bool => filled($record->public_token))
+                    ->extraAttributes(fn (Ticket $record): array => [
+                        'x-on:click' => 'navigator.clipboard.writeText(' . Js::from(route('public.tickets.show', ['token' => $record->public_token])) . ')',
+                    ])
+                    ->action(function (Ticket $record): void {
+                        Notification::make()
+                            ->title('Secure ticket link copied')
+                            ->body(route('public.tickets.show', ['token' => $record->public_token]))
+                            ->success()
+                            ->send();
+                    }),
+            ]);
+    }
+}
