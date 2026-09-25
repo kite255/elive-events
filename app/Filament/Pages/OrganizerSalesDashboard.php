@@ -21,9 +21,25 @@ class OrganizerSalesDashboard extends Page
 
     protected static ?string $slug = 'organizer-sales-dashboard';
 
+    protected static ?int $navigationSort = 30;
+
     protected string $view = 'filament.pages.organizer-sales-dashboard';
 
     public ?int $selectedEventId = null;
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->isTicketOrganizer()
+            || $user->managedOrganizations()->exists()
+            || $user->eventManagerEvents()->exists();
+    }
 
     public function mount(): void
     {
@@ -71,6 +87,7 @@ class OrganizerSalesDashboard extends Page
         }
 
         return Event::query()
+            ->accessibleBy($user)
             ->orderByDesc('starts_at')
             ->get()
             ->filter(fn (Event $event): bool => $user->canViewEventReports($event))
@@ -93,7 +110,7 @@ class OrganizerSalesDashboard extends Page
 
         $user = Auth::user();
 
-        if ($user instanceof User && ! $this->canUserViewEvent($user, $event)) {
+        if (! $user instanceof User || ! $this->canUserViewEvent($user, $event)) {
             return $this->emptyMetrics();
         }
 
