@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Models\AuditLog;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\Payment;
@@ -152,6 +153,12 @@ class TicketUpgradeFulfillmentTest extends TestCase
         $this->assertSame($data['regular']->id, $data['item']->ticket_type_id);
         $this->assertSame(TicketUpgrade::STATUS_COMPLETED, $data['upgrade']->status);
         $this->assertNotNull($data['upgrade']->completed_at);
+        $this->assertDatabaseHas('audit_logs', [
+            'event_id' => $data['event']->id,
+            'action' => 'ticket.upgrade.completed',
+            'subject_type' => TicketUpgrade::class,
+            'subject_id' => $data['upgrade']->id,
+        ]);
     }
 
     public function test_fulfillment_is_idempotent(): void
@@ -164,6 +171,13 @@ class TicketUpgradeFulfillmentTest extends TestCase
 
         $this->assertSame($data['vip']->id, $data['ticket']->fresh()->ticket_type_id);
         $this->assertSame(1, TicketUpgrade::query()->whereKey($data['upgrade']->id)->count());
+        $this->assertSame(
+            1,
+            AuditLog::query()
+                ->where('action', 'ticket.upgrade.completed')
+                ->where('subject_id', $data['upgrade']->id)
+                ->count()
+        );
     }
 
     public function test_used_ticket_cannot_be_fulfilled(): void
@@ -208,5 +222,16 @@ class TicketUpgradeFulfillmentTest extends TestCase
         app(TicketUpgradeFulfillmentService::class)->fulfill($data['payment']);
 
         $this->assertSame($data['regular']->id, $data['ticket']->fresh()->ticket_type_id);
+    }
+
+    public function test_zero_capacity_target_uses_unlimited_capacity_semantics(): void
+    {
+        $data = $this->scenario();
+        $data['vip']->update(['capacity' => 0]);
+
+        app(TicketUpgradeFulfillmentService::class)->fulfill($data['payment']);
+
+        $this->assertSame($data['vip']->id, $data['ticket']->fresh()->ticket_type_id);
+        $this->assertSame(TicketUpgrade::STATUS_COMPLETED, $data['upgrade']->fresh()->status);
     }
 }
