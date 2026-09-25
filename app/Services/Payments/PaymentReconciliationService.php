@@ -30,6 +30,8 @@ class PaymentReconciliationService
                     ->orWhereNotNull('ticket_upgrade_id');
             })
             ->with([
+                'event',
+                'attendee',
                 'ticketOrder.tickets',
                 'ticketUpgrade.order',
                 'ticketUpgrade.ticket',
@@ -51,6 +53,8 @@ class PaymentReconciliationService
         $ordersWithoutCompletedPayments = TicketOrder::query()
             ->where('event_id', $event->id)
             ->where('status', TicketOrder::STATUS_PAID)
+            ->where('total', '>', 0)
+            ->whereHas('event.paymentSetting', fn ($query) => $query->where('payments_enabled', true))
             ->whereDoesntHave('payments', fn ($query) => $query->where('status', Payment::STATUS_COMPLETED))
             ->withCount('tickets')
             ->latest('id')
@@ -235,7 +239,7 @@ class PaymentReconciliationService
             ?? ($payment->ticketUpgrade?->ticket ? 1 : 0);
         $expectedTickets = $payment->ticketOrder
             ? (int) $payment->ticketOrder->quantity
-            : ($payment->ticketUpgrade_id ? 1 : null);
+            : ($payment->ticket_upgrade_id ? 1 : null);
 
         return [
             'payment_id' => $payment->id,
