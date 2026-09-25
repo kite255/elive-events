@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Tickets;
 use App\Filament\Resources\Tickets\Pages\ListTickets;
 use App\Filament\Resources\Tickets\Tables\TicketsTable;
 use App\Models\Ticket;
+use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -30,6 +31,20 @@ class TicketResource extends Resource
     public static function table(Table $table): Table
     {
         return TicketsTable::configure($table);
+    }
+
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->isTicketOrganizer()
+            || $user->managedOrganizations()->exists()
+            || $user->eventManagerEvents()->exists();
     }
 
     public static function getEloquentQuery(): Builder
