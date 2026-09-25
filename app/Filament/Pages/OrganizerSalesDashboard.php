@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\Tickets\OrganizerSalesMetricsService;
+use App\Services\Tickets\TicketUpgradeMetricsService;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
@@ -12,20 +13,15 @@ use UnitEnum;
 
 class OrganizerSalesDashboard extends Page
 {
-    protected static ?string $navigationLabel =
-        'Sales Dashboard';
+    protected static ?string $navigationLabel = 'Sales Dashboard';
 
-    protected static string|UnitEnum|null $navigationGroup =
-        'Ticketing';
+    protected static string|UnitEnum|null $navigationGroup = 'Ticketing';
 
-    protected static ?string $title =
-        'Organizer Sales Dashboard';
+    protected static ?string $title = 'Organizer Sales Dashboard';
 
-    protected static ?string $slug =
-        'organizer-sales-dashboard';
+    protected static ?string $slug = 'organizer-sales-dashboard';
 
-    protected string $view =
-        'filament.pages.organizer-sales-dashboard';
+    protected string $view = 'filament.pages.organizer-sales-dashboard';
 
     public ?int $selectedEventId = null;
 
@@ -33,31 +29,15 @@ class OrganizerSalesDashboard extends Page
     {
         $events = $this->eventOptions();
 
-        if (
-            $this->selectedEventId === null
-            && count($events) > 0
-        ) {
-            $this->selectedEventId =
-                (int) array_key_first($events);
+        if ($this->selectedEventId === null && count($events) > 0) {
+            $this->selectedEventId = (int) array_key_first($events);
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Page Heading
-    |--------------------------------------------------------------------------
-    */
 
     public function getHeading(): string|Htmlable|null
     {
         return null;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Event Options
-    |--------------------------------------------------------------------------
-    */
 
     public function eventOptions(): array
     {
@@ -71,60 +51,33 @@ class OrganizerSalesDashboard extends Page
             return Event::query()
                 ->orderByDesc('starts_at')
                 ->pluck('name', 'id')
-                ->mapWithKeys(
-                    fn ($name, $id) => [
-                        (int) $id => $name,
-                    ]
-                )
+                ->mapWithKeys(fn ($name, $id) => [(int) $id => $name])
                 ->toArray();
         }
 
         if ($user->isTicketOrganizer()) {
-            $assignedEventIds =
-                $user->assignedTicketingEventIds();
+            $assignedEventIds = $user->assignedTicketingEventIds();
 
             if ($assignedEventIds->isEmpty()) {
                 return [];
             }
 
             return Event::query()
-                ->whereIn(
-                    'id',
-                    $assignedEventIds
-                )
+                ->whereIn('id', $assignedEventIds)
                 ->orderByDesc('starts_at')
                 ->pluck('name', 'id')
-                ->mapWithKeys(
-                    fn ($name, $id) => [
-                        (int) $id => $name,
-                    ]
-                )
+                ->mapWithKeys(fn ($name, $id) => [(int) $id => $name])
                 ->toArray();
         }
 
         return Event::query()
             ->orderByDesc('starts_at')
             ->get()
-            ->filter(
-                fn (Event $event): bool =>
-                    $user->canViewEventReports(
-                        $event
-                    )
-            )
+            ->filter(fn (Event $event): bool => $user->canViewEventReports($event))
             ->pluck('name', 'id')
-            ->mapWithKeys(
-                fn ($name, $id) => [
-                    (int) $id => $name,
-                ]
-            )
+            ->mapWithKeys(fn ($name, $id) => [(int) $id => $name])
             ->toArray();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Sales Metrics
-    |--------------------------------------------------------------------------
-    */
 
     public function salesMetrics(): array
     {
@@ -132,8 +85,7 @@ class OrganizerSalesDashboard extends Page
             return $this->emptyMetrics();
         }
 
-        $event = Event::query()
-            ->find($this->selectedEventId);
+        $event = Event::query()->find($this->selectedEventId);
 
         if (! $event) {
             return $this->emptyMetrics();
@@ -141,31 +93,18 @@ class OrganizerSalesDashboard extends Page
 
         $user = Auth::user();
 
-        if (
-            $user instanceof User
-            && ! $this->canUserViewEvent(
-                $user,
-                $event
-            )
-        ) {
+        if ($user instanceof User && ! $this->canUserViewEvent($user, $event)) {
             return $this->emptyMetrics();
         }
 
-        return app(
-            OrganizerSalesMetricsService::class
-        )->forEvent($event);
+        return array_merge(
+            app(OrganizerSalesMetricsService::class)->forEvent($event),
+            app(TicketUpgradeMetricsService::class)->forEvent($event)
+        );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Authorization
-    |--------------------------------------------------------------------------
-    */
-
-    protected function canUserViewEvent(
-        User $user,
-        Event $event
-    ): bool {
+    protected function canUserViewEvent(User $user, Event $event): bool
+    {
         if ($user->isSuperAdmin()) {
             return true;
         }
@@ -173,23 +112,12 @@ class OrganizerSalesDashboard extends Page
         if ($user->isTicketOrganizer()) {
             return $user
                 ->assignedTicketingEvents()
-                ->where(
-                    'events.id',
-                    $event->id
-                )
+                ->where('events.id', $event->id)
                 ->exists();
         }
 
-        return $user->canViewEventReports(
-            $event
-        );
+        return $user->canViewEventReports($event);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Empty Metrics
-    |--------------------------------------------------------------------------
-    */
 
     protected function emptyMetrics(): array
     {
@@ -199,6 +127,11 @@ class OrganizerSalesDashboard extends Page
             'pending_orders' => 0,
             'expired_orders' => 0,
             'tickets_sold' => 0,
+            'completed_upgrades' => 0,
+            'pending_upgrades' => 0,
+            'upgrade_revenue' => 0,
+            'upgrade_net_payable' => 0,
+            'upgrade_paths' => [],
             'currency' => 'TZS',
             'sales_by_ticket_type' => [],
             'recent_orders' => [],
