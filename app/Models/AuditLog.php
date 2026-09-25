@@ -69,16 +69,9 @@ class AuditLog extends Model
                 : $query->whereIn('event_id', $ids);
         }
 
-        return $query->whereHas('event', function (Builder $eventQuery) use ($user): void {
-            $eventQuery->where(function (Builder $q) use ($user): void {
-                $q->whereHas('users', function (Builder $staffQuery) use ($user): void {
-                    $staffQuery->where('users.id', $user->id)
-                        ->where('event_user.status', Event::STAFF_STATUS_ACTIVE);
-                })->orWhereHas('organization.users', function (Builder $memberQuery) use ($user): void {
-                    $memberQuery->where('users.id', $user->id)
-                        ->where('organization_user.status', User::ORGANIZATION_STATUS_ACTIVE);
-                });
-            });
-        });
+        return $query->whereHas(
+            'event',
+            fn (Builder $eventQuery): Builder => $eventQuery->accessibleBy($user)
+        );
     }
 }
