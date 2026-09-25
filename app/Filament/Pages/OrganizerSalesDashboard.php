@@ -110,7 +110,7 @@ class OrganizerSalesDashboard extends Page
 
         $user = Auth::user();
 
-        if (! $user instanceof User || ! $this->canUserViewEvent($user, $event)) {
+        if ($user instanceof User && ! $this->canUserViewEvent($user, $event)) {
             return $this->emptyMetrics();
         }
 
