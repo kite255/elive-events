@@ -65,6 +65,23 @@ class DonationCampaign extends Model
                 $campaign->currency = 'TZS';
             }
 
+            foreach ([
+                'show_goal',
+                'show_amount_raised',
+                'show_percentage',
+                'show_donor_count',
+                'donor_wall_enabled',
+                'is_public',
+            ] as $booleanDefault) {
+                if ($campaign->{$booleanDefault} === null) {
+                    $campaign->{$booleanDefault} = false;
+                }
+            }
+
+            if ($campaign->allow_custom_amount === null) {
+                $campaign->allow_custom_amount = true;
+            }
+
             $campaign->currency = strtoupper((string) $campaign->currency);
         });
     }
