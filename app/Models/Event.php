@@ -642,6 +642,11 @@ class Event extends Model
         return $this->hasMany(TicketOrder::class);
     }
 
+    public function donationCampaigns(): HasMany
+    {
+        return $this->hasMany(DonationCampaign::class);
+    }
+
     public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);
