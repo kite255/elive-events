@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DonationCampaign;
+use App\Services\Donations\DonationMetricsService;
 use Illuminate\Contracts\View\View;
 
 class PublicDonationCampaignController extends Controller
@@ -20,7 +21,7 @@ class PublicDonationCampaignController extends Controller
         ]);
     }
 
-    public function show(string $campaign): View
+    public function show(string $campaign, DonationMetricsService $metricsService): View
     {
         $campaign = DonationCampaign::query()
             ->publicActive()
@@ -37,6 +38,7 @@ class PublicDonationCampaignController extends Controller
 
         return view('public.donations.show', [
             'campaign' => $campaign,
+            'metrics' => $metricsService->forCampaign($campaign),
         ]);
     }
 }
