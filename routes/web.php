@@ -9,6 +9,7 @@ use App\Http\Controllers\Payments\PesapalIpnController;
 use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicDonationCampaignController;
 use App\Http\Controllers\PublicDonationController;
+use App\Http\Controllers\PublicDonationStatusController;
 use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicTicketController;
@@ -492,6 +493,16 @@ Route::get(
 )
     ->middleware('throttle:120,1')
     ->name('public.donations.index');
+
+Route::get(
+    '/donations/status/{token}',
+    [
+        PublicDonationStatusController::class,
+        'show',
+    ]
+)
+    ->middleware('throttle:120,1')
+    ->name('public.donations.status');
 
 Route::get(
     '/donations/{campaign}',
