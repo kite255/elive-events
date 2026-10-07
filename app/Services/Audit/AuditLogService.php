@@ -20,6 +20,12 @@ class AuditLogService
         'consumer_secret',
         'password',
         'webhook_secret',
+        'proof_path',
+        'public_token',
+        'private_token',
+        'provider_secret',
+        'gateway_secret',
+        'client_secret',
     ];
 
     public function record(
@@ -118,6 +124,8 @@ class AuditLogService
             str_ends_with($key, '_secret')
             || str_ends_with($key, '_token')
             || str_ends_with($key, '_api_key')
+            || str_contains($key, 'credential')
+            || str_contains($key, 'proof_path')
         ) {
             return true;
         }
