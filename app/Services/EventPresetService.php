@@ -202,7 +202,7 @@ class EventPresetService
 
             'health_event' => [
                 'ticketing' => false,
-                'registration' => true,
+                'registration' => false,
                 'sessions' => true,
                 'professional_fields' => false,
                 'badges' => false,
@@ -546,7 +546,7 @@ class EventPresetService
                 'registration_require_badge_type' => false,
                 'schedule_mode' => 'single_day',
                 'sessions_enabled' => true,
-                'session_registration_enabled' => true,
+                'session_registration_enabled' => false,
                 'session_check_in_enabled' => true,
             ],
 
