@@ -8,6 +8,7 @@ use App\Http\Controllers\Payments\PesapalCallbackController;
 use App\Http\Controllers\Payments\PesapalIpnController;
 use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicDonationCampaignController;
+use App\Http\Controllers\PublicDonationController;
 use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicTicketController;
@@ -501,6 +502,16 @@ Route::get(
 )
     ->middleware('throttle:120,1')
     ->name('public.donations.show');
+
+Route::post(
+    '/donations/{campaign}',
+    [
+        PublicDonationController::class,
+        'store',
+    ]
+)
+    ->middleware('throttle:20,10')
+    ->name('public.donations.store');
 
 
 /*
