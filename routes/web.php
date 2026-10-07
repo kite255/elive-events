@@ -7,6 +7,7 @@ use App\Http\Controllers\Payments\PaymentController;
 use App\Http\Controllers\Payments\PesapalCallbackController;
 use App\Http\Controllers\Payments\PesapalIpnController;
 use App\Http\Controllers\PublicAttendeeController;
+use App\Http\Controllers\PublicDonationCampaignController;
 use App\Http\Controllers\PublicEventCommunicationController;
 use App\Http\Controllers\PublicRegistrationController;
 use App\Http\Controllers\PublicTicketController;
@@ -474,6 +475,33 @@ Route::post(
     ->name(
         'public.ticket-recovery.store'
     );
+
+/*
+|--------------------------------------------------------------------------
+| Public Donations
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/donations',
+    [
+        PublicDonationCampaignController::class,
+        'index',
+    ]
+)
+    ->middleware('throttle:120,1')
+    ->name('public.donations.index');
+
+Route::get(
+    '/donations/{campaign}',
+    [
+        PublicDonationCampaignController::class,
+        'show',
+    ]
+)
+    ->middleware('throttle:120,1')
+    ->name('public.donations.show');
+
 
 /*
 |--------------------------------------------------------------------------
