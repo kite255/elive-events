@@ -25,6 +25,7 @@ class PesapalService implements PaymentGateway
             'attendee',
             'ticketOrder',
             'ticketUpgrade.order',
+            'donation',
         ]);
 
         $notificationId =
@@ -42,21 +43,26 @@ class PesapalService implements PaymentGateway
         $order = $payment->ticketOrder
             ?: $payment->ticketUpgrade?->order;
 
+        $donation = $payment->donation;
+
         $name = trim((string) (
             $attendee?->full_name
             ?: $order?->buyer_name
+            ?: $donation?->donor_name
             ?: ''
         ));
 
         $email = trim((string) (
             $attendee?->email
             ?: $order?->buyer_email
+            ?: $donation?->donor_email
             ?: ''
         ));
 
         $phone = trim((string) (
             $attendee?->phone
             ?: $order?->buyer_phone
+            ?: $donation?->donor_phone
             ?: ''
         ));
 

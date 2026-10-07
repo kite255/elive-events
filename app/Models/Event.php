@@ -59,6 +59,7 @@ class Event extends Model
         'ends_at',
         'capacity',
         'status',
+        'show_on_elive_website',
 
         'schedule_mode',
         'registration_allow_day_selection',
@@ -127,6 +128,7 @@ class Event extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'capacity' => 'integer',
+            'show_on_elive_website' => 'boolean',
             'ministry_years' => 'integer',
             'group_members_count' => 'integer',
             'public_highlights' => 'array',
@@ -638,6 +640,11 @@ class Event extends Model
     public function ticketOrders(): HasMany
     {
         return $this->hasMany(TicketOrder::class);
+    }
+
+    public function donationCampaigns(): HasMany
+    {
+        return $this->hasMany(DonationCampaign::class);
     }
 
     public function tickets(): HasMany

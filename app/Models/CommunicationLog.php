@@ -13,6 +13,7 @@ class CommunicationLog extends Model
     public const PURPOSE_TICKET_ACCESS_RECOVERY = 'ticket_access_recovery';
     public const PURPOSE_TICKET_UPGRADE_COMPLETED = 'ticket_upgrade_completed';
     public const PURPOSE_BADGE_RESEND = 'badge_resend';
+    public const PURPOSE_DONATION_CONFIRMATION = 'donation_confirmation';
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_QUEUED = 'queued';
@@ -30,6 +31,7 @@ class CommunicationLog extends Model
         'attendee_id',
         'ticket_order_id',
         'ticket_upgrade_id',
+        'donation_id',
         'communication_campaign_id',
         'purpose',
         'channel',
@@ -75,6 +77,11 @@ class CommunicationLog extends Model
     public function ticketUpgrade(): BelongsTo
     {
         return $this->belongsTo(TicketUpgrade::class);
+    }
+
+    public function donation(): BelongsTo
+    {
+        return $this->belongsTo(Donation::class);
     }
 
     public function campaign(): BelongsTo

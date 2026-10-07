@@ -281,6 +281,11 @@ class Organization extends Model
         return $this->hasMany(Event::class);
     }
 
+    public function donationCampaigns(): HasMany
+    {
+        return $this->hasMany(DonationCampaign::class);
+    }
+
 
     public function ticketTemplates(): HasMany
     {

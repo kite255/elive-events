@@ -205,6 +205,11 @@
     $ticketSalesEnabled = (bool) ($ticketSettings?->ticket_sales_enabled);
     $ticketUrl = route('public.tickets.buy', ['event' => $event->slug]);
 
+    $supportCampaign = $event->donationCampaigns()
+        ->publicActive()
+        ->orderByDesc('id')
+        ->first();
+
     $finiteRemainingSeats = $publicTicketTypes
         ->map(fn ($ticketType) => $ticketType->remainingCapacity())
         ->filter(fn ($remaining) => $remaining !== null);
@@ -224,6 +229,10 @@
     $seatStatValue = $seatAvailabilityLabel
         ?: ($event->capacity ? number_format($event->capacity) : null);
     $seatStatLabel = $seatAvailabilityLabel ? 'Seats Available' : 'Total Capacity';
+
+    $supportUrl = $supportCampaign
+        ? route('public.donations.show', ['campaign' => $supportCampaign->slug])
+        : null;
 
     $gallery = collect($event->public_gallery ?? [])
         ->filter(fn ($item) => filled($item['image_path'] ?? null));
@@ -302,7 +311,6 @@
         $socialShareImageUrl .= (str_contains($socialShareImageUrl, '?') ? '&' : '?')
             . 'v=' . optional($event->updated_at)->timestamp;
     }
-
 @endphp
 
 <!DOCTYPE html>
@@ -2523,7 +2531,18 @@
         </section>
     @endif
 
-    @if ($gallery->isNotEmpty())
+    @if ($supportCampaign)
+    <section class="container" style="margin-top: 28px; margin-bottom: 28px;">
+        <a
+            href="{{ $supportUrl }}"
+            style="display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:10px;background:#161943;color:#fff;font-weight:700;"
+        >
+            Support this event
+        </a>
+    </section>
+@endif
+
+@if ($gallery->isNotEmpty())
         <section class="public-detail-section alt" aria-labelledby="gallery-heading">
             <div class="container">
                 <p class="public-detail-kicker">Moments</p>

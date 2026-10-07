@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Models\DonationCampaign;
 use App\Models\Event;
 use App\Models\Payment;
 use App\Models\TicketOrder;
@@ -93,6 +94,44 @@ class PaymentReconciliationService
                     'message' => 'Order is marked paid but no completed payment is linked to it.',
                 ]],
             ]);
+        }
+
+        return $rows->values();
+    }
+
+
+    public function issuesForDonationCampaign(
+        DonationCampaign $campaign
+    ): Collection {
+        $rows = collect();
+
+        $payments = Payment::query()
+            ->whereNotNull('donation_id')
+            ->whereHas(
+                'donation',
+                fn ($query) => $query
+                    ->where('donation_campaign_id', $campaign->id)
+            )
+            ->with([
+                'donation.campaign',
+                'gateway',
+            ])
+            ->latest('id')
+            ->get();
+
+        foreach ($payments as $payment) {
+            $issues = $this->issuesForPayment($payment);
+
+            if ($issues === []) {
+                continue;
+            }
+
+            $rows->push(
+                $this->donationPaymentRow(
+                    $payment,
+                    $issues
+                )
+            );
         }
 
         return $rows->values();
@@ -238,6 +277,13 @@ class PaymentReconciliationService
             ];
         }
 
+        if ($payment->donation_id && $payment->donation) {
+            return [
+                (float) $payment->donation->amount,
+                strtoupper((string) $payment->donation->currency),
+            ];
+        }
+
         return [null, null];
     }
 
@@ -273,6 +319,47 @@ class PaymentReconciliationService
             'fulfilled_at' => $payment->fulfilled_at,
             'can_resync' => filled($payment->provider_tracking_id) && $payment->payment_method !== 'free',
             'can_retry_fulfillment' => $payment->isCompleted() && ! $payment->isFulfilled(),
+            'issues' => $issues,
+        ];
+    }
+
+
+    private function donationPaymentRow(
+        Payment $payment,
+        array $issues
+    ): array {
+        [$expectedAmount, $expectedCurrency] =
+            $this->expectedFinancials($payment);
+
+        $donation = $payment->donation;
+
+        return [
+            'payment_id' => $payment->id,
+            'reference' => $payment->reference,
+            'provider_tracking_id' => $payment->provider_tracking_id,
+            'donation_id' => $donation?->id,
+            'donation_reference' => $donation?->reference,
+            'campaign_id' => $donation?->donation_campaign_id,
+            'campaign_title' => $donation?->campaign?->title ?? '—',
+            'customer' => $donation?->donor_name ?: 'Donor',
+            'local_status' => $payment->status,
+            'provider_status' => data_get(
+                $payment->metadata,
+                'pesapal_status'
+            ),
+            'expected_amount' => $expectedAmount,
+            'actual_amount' => (float) $payment->amount,
+            'expected_currency' => $expectedCurrency,
+            'actual_currency' => strtoupper(
+                (string) $payment->currency
+            ),
+            'fulfilled_at' => $payment->fulfilled_at,
+            'can_resync' => filled(
+                $payment->provider_tracking_id
+            ) && $payment->payment_method !== 'free',
+            'can_retry_fulfillment' =>
+                $payment->isCompleted()
+                && ! $payment->isFulfilled(),
             'issues' => $issues,
         ];
     }
