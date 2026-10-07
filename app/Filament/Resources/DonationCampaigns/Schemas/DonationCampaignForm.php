@@ -6,7 +6,9 @@ use App\Models\DonationCampaign;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\User;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
@@ -56,7 +58,72 @@ class DonationCampaignForm
                         ->maxLength(255),
 
                     Textarea::make('description')
-                        ->rows(5),
+                        ->rows(5)
+                        ->columnSpanFull(),
+
+                    Section::make('Standalone Campaign Details')
+                        ->description(
+                            'Use these fields when this campaign represents the public page for an occasion or cause and does not need a separate Event record.'
+                        )
+                        ->schema([
+                            DateTimePicker::make('starts_at')
+                                ->label('Date & Start Time')
+                                ->seconds(false),
+
+                            DateTimePicker::make('ends_at')
+                                ->label('End Date & Time')
+                                ->seconds(false)
+                                ->afterOrEqual('starts_at'),
+
+                            TextInput::make('venue')
+                                ->label('Venue')
+                                ->maxLength(255),
+
+                            TextInput::make('venue_address')
+                                ->label('Venue Address')
+                                ->maxLength(255),
+
+                            TextInput::make('map_url')
+                                ->label('Map Link')
+                                ->url()
+                                ->maxLength(2048)
+                                ->columnSpanFull(),
+
+                            TextInput::make('organizer_contact_phone')
+                                ->label('Organizer Phone')
+                                ->tel()
+                                ->maxLength(40),
+
+                            TextInput::make('organizer_contact_email')
+                                ->label('Organizer Email')
+                                ->email()
+                                ->maxLength(255),
+
+                            Repeater::make('public_highlights')
+                                ->label('Highlights / Activities')
+                                ->schema([
+                                    TextInput::make('value')
+                                        ->label('Value')
+                                        ->placeholder('Free')
+                                        ->required()
+                                        ->maxLength(100),
+                                    TextInput::make('label')
+                                        ->label('Label')
+                                        ->placeholder('Health Screenings')
+                                        ->required()
+                                        ->maxLength(100),
+                                ])
+                                ->columns(2)
+                                ->defaultItems(0)
+                                ->reorderable()
+                                ->collapsible()
+                                ->cloneable()
+                                ->addActionLabel('Add Highlight')
+                                ->columnSpanFull(),
+                        ])
+                        ->columns(2)
+                        ->collapsible()
+                        ->columnSpanFull(),
 
                     FileUpload::make('banner_image_path')
                         ->label('Banner')
