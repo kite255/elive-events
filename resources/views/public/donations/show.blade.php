@@ -39,6 +39,51 @@
         @endif
 
         @if (
+            ! (
+                $campaign->payment_mode === \App\Models\DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT
+                && $campaign->direct_payment_behavior === \App\Models\DonationCampaign::DIRECT_BEHAVIOR_DISPLAY_ONLY
+            )
+            && (
+                $campaign->show_goal
+                || $campaign->show_amount_raised
+                || $campaign->show_percentage
+                || $campaign->show_donor_count
+            )
+        )
+            <section style="margin-bottom:28px;border:1px solid #e5e7eb;border-radius:14px;padding:20px;">
+                <h2>Campaign Progress</h2>
+
+                @if ($campaign->show_amount_raised)
+                    <p>
+                        <strong>Amount Raised:</strong>
+                        {{ $campaign->currency }} {{ number_format((float) $metrics['amount_raised']) }}
+                    </p>
+                @endif
+
+                @if ($campaign->show_goal && $metrics['goal_amount'] !== null)
+                    <p>
+                        <strong>Goal:</strong>
+                        {{ $campaign->currency }} {{ number_format((float) $metrics['goal_amount']) }}
+                    </p>
+                @endif
+
+                @if ($campaign->show_percentage && $metrics['percentage'] !== null)
+                    <p>
+                        <strong>Progress:</strong>
+                        {{ rtrim(rtrim(number_format((float) $metrics['percentage'], 2, '.', ''), '0'), '.') }}%
+                    </p>
+                @endif
+
+                @if ($campaign->show_donor_count)
+                    <p>
+                        <strong>Donors:</strong>
+                        {{ number_format((int) $metrics['donor_count']) }}
+                    </p>
+                @endif
+            </section>
+        @endif
+
+        @if (
             $campaign->payment_mode === \App\Models\DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT
             && $campaign->direct_payment_behavior === \App\Models\DonationCampaign::DIRECT_BEHAVIOR_DISPLAY_ONLY
         )
