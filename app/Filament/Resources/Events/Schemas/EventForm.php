@@ -83,6 +83,14 @@ class EventForm
             );
     }
 
+    private static function showDonations(Get $get): bool
+    {
+        return self::advanced($get)
+            || EventPresetService::usesDonations(
+                self::eventType($get)
+            );
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -543,10 +551,17 @@ class EventForm
                                         'cultural_event' =>
                                             'Festival mode focuses on ticketing and performances or activities. Registration can be enabled through Advanced Features when required.',
 
-                                        'church_event',
-                                        'community_event',
+                                        'church_event' =>
+                                            'Church mode focuses on registration, attendance days, programs or services, communications, and badges. Fundraising remains optional.',
+
+                                        'community_event' =>
+                                            'Community mode focuses on participant registration and activities. Badges, ticketing, and fundraising remain optional unless the event needs them.',
+
                                         'charity_event' =>
-                                            'Community mode focuses on participant registration, multi-day attendance, programs or sessions, communication, and badges.',
+                                            'Charity / fundraising mode focuses on campaign support, donations, activities, communication, and optional participant registration.',
+
+                                        'health_event' =>
+                                            'Health / wellness mode focuses on participant registration, screenings or activities, public event information, communications, and linked donation campaigns. Ticketing and professional fields stay hidden by default.',
 
                                         'bonanza',
                                         'sports_event',
@@ -574,6 +589,30 @@ class EventForm
                             ->dehydrated(false)
                             ->columnSpanFull(),
                     ])
+                    ->collapsible(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Donations / Fundraising
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make('Donations / Fundraising')
+                    ->description(
+                        'Use donation campaigns when this event accepts financial or in-kind support.'
+                    )
+                    ->schema([
+                        Placeholder::make('donation_campaign_information')
+                            ->label('Donation Campaigns')
+                            ->content(
+                                'After saving the event, create or manage its campaign under Donations → Campaigns and link the campaign to this event. Campaigns can include payment instructions, progress, donor tracking, and a public image gallery.'
+                            )
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(
+                        fn (Get $get): bool =>
+                            self::showDonations($get)
+                    )
                     ->collapsible(),
 
                 /*
