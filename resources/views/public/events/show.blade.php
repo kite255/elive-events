@@ -2846,6 +2846,10 @@
                 Events
             </a>
 
+            <a href="{{ route('public.donations.index') }}">
+                Donations
+            </a>
+
             <a href="{{ route('home') }}#contact">
                 Contact
             </a>
