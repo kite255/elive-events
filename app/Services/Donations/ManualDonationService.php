@@ -6,6 +6,7 @@ use App\Models\Donation;
 use App\Models\DonationManualSubmission;
 use App\Models\DonationPaymentMethod;
 use App\Models\User;
+use App\Services\Audit\AuditLogService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,8 @@ use Illuminate\Validation\ValidationException;
 class ManualDonationService
 {
     public function __construct(
-        protected DonationAuthorizationService $authorizationService
+        protected DonationAuthorizationService $authorizationService,
+        protected AuditLogService $auditLogService
     ) {
     }
 
@@ -85,10 +87,28 @@ class ManualDonationService
                     ]
                 );
 
+            $beforeStatus = $donation->status;
+
             $donation->forceFill([
                 'status' => Donation::STATUS_AWAITING_VERIFICATION,
                 'completed_at' => null,
             ])->save();
+
+            $this->auditLogService->record(
+                'donation.manual.submitted',
+                $donation->fresh(),
+                null,
+                [
+                    'payment_method_id' => $paymentMethod->id,
+                    'transaction_reference' => $reference,
+                ],
+                [
+                    'status' => $beforeStatus,
+                ],
+                [
+                    'status' => Donation::STATUS_AWAITING_VERIFICATION,
+                ]
+            );
 
             return $submission;
         });
@@ -133,6 +153,7 @@ class ManualDonationService
                 ]);
             }
 
+            $beforeStatus = $lockedDonation->status;
             $now = now();
 
             $lockedDonation->forceFill([
@@ -146,7 +167,24 @@ class ManualDonationService
                 'rejection_reason' => null,
             ])->save();
 
-            return $lockedDonation->fresh();
+            $freshDonation = $lockedDonation->fresh();
+
+            $this->auditLogService->record(
+                'donation.manual.approved',
+                $freshDonation,
+                $user,
+                [
+                    'manual_submission_id' => $submission->id,
+                ],
+                [
+                    'status' => $beforeStatus,
+                ],
+                [
+                    'status' => Donation::STATUS_COMPLETED,
+                ]
+            );
+
+            return $freshDonation;
         });
     }
 
@@ -193,6 +231,8 @@ class ManualDonationService
                 ]);
             }
 
+            $beforeStatus = $lockedDonation->status;
+
             $lockedDonation->forceFill([
                 'status' => Donation::STATUS_REJECTED,
                 'completed_at' => null,
@@ -204,7 +244,25 @@ class ManualDonationService
                 'rejection_reason' => $reason,
             ])->save();
 
-            return $lockedDonation->fresh();
+            $freshDonation = $lockedDonation->fresh();
+
+            $this->auditLogService->record(
+                'donation.manual.rejected',
+                $freshDonation,
+                $user,
+                [
+                    'manual_submission_id' => $submission->id,
+                    'reason' => $reason,
+                ],
+                [
+                    'status' => $beforeStatus,
+                ],
+                [
+                    'status' => Donation::STATUS_REJECTED,
+                ]
+            );
+
+            return $freshDonation;
         });
     }
 }
