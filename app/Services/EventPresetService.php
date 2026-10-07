@@ -192,7 +192,7 @@ class EventPresetService
 
             'charity_event' => [
                 'ticketing' => false,
-                'registration' => true,
+                'registration' => false,
                 'sessions' => true,
                 'professional_fields' => false,
                 'badges' => false,
