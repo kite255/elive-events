@@ -24,7 +24,7 @@
 
         @if ($campaign->banner_image_path)
             <img
-                src="{{ IlluminateSupportStr::startsWith($campaign->banner_image_path, ['http://','https://'])
+                src="{{ \Illuminate\Support\Str::startsWith($campaign->banner_image_path, ['http://','https://'])
                     ? $campaign->banner_image_path
                     : asset('storage/' . ltrim($campaign->banner_image_path, '/')) }}"
                 alt="{{ $campaign->title }}"
@@ -39,8 +39,8 @@
         @endif
 
         @if (
-            $campaign->payment_mode === AppModelsDonationCampaign::PAYMENT_MODE_CLIENT_DIRECT
-            && $campaign->direct_payment_behavior === AppModelsDonationCampaign::DIRECT_BEHAVIOR_DISPLAY_ONLY
+            $campaign->payment_mode === \App\Models\DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT
+            && $campaign->direct_payment_behavior === \App\Models\DonationCampaign::DIRECT_BEHAVIOR_DISPLAY_ONLY
         )
             <section>
                 <h2>How to contribute</h2>
