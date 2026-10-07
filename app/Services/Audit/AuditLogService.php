@@ -71,6 +71,28 @@ class AuditLogService
             }
         }
 
+        if (method_exists($subject, 'campaign')) {
+            $subject->loadMissing('campaign.event');
+
+            $campaignEventId = data_get(
+                $subject,
+                'campaign.event_id'
+            );
+
+            if ($campaignEventId) {
+                return (int) $campaignEventId;
+            }
+
+            $campaignEvent = data_get(
+                $subject,
+                'campaign.event'
+            );
+
+            if ($campaignEvent instanceof Event) {
+                return (int) $campaignEvent->getKey();
+            }
+        }
+
         return null;
     }
 
@@ -124,7 +146,6 @@ class AuditLogService
             str_ends_with($key, '_secret')
             || str_ends_with($key, '_token')
             || str_ends_with($key, '_api_key')
-            || str_contains($key, 'credential')
             || str_contains($key, 'proof_path')
         ) {
             return true;
