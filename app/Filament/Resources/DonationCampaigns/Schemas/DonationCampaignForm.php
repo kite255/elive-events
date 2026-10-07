@@ -65,6 +65,19 @@ class DonationCampaignForm
                         ->directory('donations/campaigns')
                         ->maxSize(4096),
 
+                    FileUpload::make('gallery_image_paths')
+                        ->label('Campaign Gallery')
+                        ->helperText('Upload additional campaign posters, donation wishlists, translated artwork, or supporting images.')
+                        ->image()
+                        ->multiple()
+                        ->reorderable()
+                        ->appendFiles()
+                        ->disk('public')
+                        ->directory('donations/campaigns/gallery')
+                        ->maxFiles(8)
+                        ->maxSize(4096)
+                        ->columnSpanFull(),
+
                     Select::make('status')
                         ->options([
                             DonationCampaign::STATUS_DRAFT => 'Draft',

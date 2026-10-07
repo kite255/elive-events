@@ -266,6 +266,31 @@
             background: #F8FAFC;
         }
 
+        .gallery-section {
+            margin-top: 30px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .gallery-item {
+            overflow: hidden;
+            display: block;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            background: #F8FAFC;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
         .progress-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0,1fr));
@@ -440,7 +465,8 @@
             .content-card,
             .side-card { padding:22px; }
 
-            .progress-grid { grid-template-columns:1fr; }
+            .progress-grid,
+            .gallery-grid { grid-template-columns:1fr; }
 
             .footer-inner {
                 padding:24px 0;
@@ -532,6 +558,40 @@
                     <div class="campaign-description">{{ $campaign->description }}</div>
                 @else
                     <div class="campaign-description">Support this fundraising campaign through eLive Events.</div>
+                @endif
+
+                @if (! empty($campaign->gallery_image_paths))
+                    <section class="gallery-section">
+                        <p class="section-eyebrow">Campaign Gallery</p>
+                        <h2 class="section-title">Campaign posters and updates</h2>
+
+                        <div class="gallery-grid">
+                            @foreach ($campaign->gallery_image_paths as $imagePath)
+                                @php
+                                    $galleryImageUrl = Str::startsWith($imagePath, ['http://', 'https://'])
+                                        ? $imagePath
+                                        : (
+                                            Str::startsWith($imagePath, ['storage/', '/storage/'])
+                                                ? asset(ltrim($imagePath, '/'))
+                                                : asset('storage/' . ltrim($imagePath, '/'))
+                                        );
+                                @endphp
+
+                                <a
+                                    href="{{ $galleryImageUrl }}"
+                                    class="gallery-item"
+                                    target="_blank"
+                                    rel="noopener"
+                                >
+                                    <img
+                                        src="{{ $galleryImageUrl }}"
+                                        alt="{{ $campaign->title }} campaign image"
+                                        loading="lazy"
+                                    >
+                                </a>
+                            @endforeach
+                        </div>
+                    </section>
                 @endif
 
                 @if ($showProgress)
