@@ -41,7 +41,7 @@ class EventPresetServiceCategoryFeaturesTest extends TestCase
         $this->assertTrue($charity['donations']);
         $this->assertFalse($charity['ticketing']);
 
-        $this->assertTrue($health['registration']);
+        $this->assertFalse($health['registration']);
         $this->assertTrue($health['sessions']);
         $this->assertTrue($health['donations']);
         $this->assertFalse($health['professional_fields']);
@@ -50,7 +50,7 @@ class EventPresetServiceCategoryFeaturesTest extends TestCase
         $this->assertFalse($concert['registration']);
     }
 
-    public function test_health_event_preset_is_registration_and_activity_focused(): void
+    public function test_health_event_preset_is_activity_and_donation_focused_without_registration(): void
     {
         $preset = EventPresetService::preset('health_event');
 
@@ -58,7 +58,7 @@ class EventPresetServiceCategoryFeaturesTest extends TestCase
         $this->assertFalse($preset['registration_show_organization']);
         $this->assertTrue($preset['registration_show_category']);
         $this->assertTrue($preset['sessions_enabled']);
-        $this->assertTrue($preset['session_registration_enabled']);
+        $this->assertFalse($preset['session_registration_enabled']);
         $this->assertFalse($preset['registration_require_email']);
         $this->assertSame('single_day', $preset['schedule_mode']);
     }

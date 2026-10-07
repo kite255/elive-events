@@ -91,6 +91,18 @@ class EventForm
             );
     }
 
+    private static function showForTypes(
+        Get $get,
+        array $eventTypes
+    ): bool {
+        return self::advanced($get)
+            || in_array(
+                self::eventType($get),
+                $eventTypes,
+                true
+            );
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -340,14 +352,36 @@ class EventForm
                             ->numeric()
                             ->integer()
                             ->minValue(0)
-                            ->maxValue(999),
+                            ->maxValue(999)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showForTypes(
+                                        $get,
+                                        [
+                                            'church_event',
+                                            'concert',
+                                            'cultural_event',
+                                        ]
+                                    )
+                            ),
 
                         TextInput::make('group_members_count')
                             ->label('Group Members')
                             ->numeric()
                             ->integer()
                             ->minValue(0)
-                            ->maxValue(9999),
+                            ->maxValue(9999)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showForTypes(
+                                        $get,
+                                        [
+                                            'concert',
+                                            'cultural_event',
+                                            'church_event',
+                                        ]
+                                    )
+                            ),
 
                         Repeater::make('public_highlights')
                             ->label('Additional Highlights')
@@ -415,7 +449,34 @@ class EventForm
                             ->reorderable()
                             ->collapsible()
                             ->addActionLabel('Add Speaker or Performer')
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showForTypes(
+                                        $get,
+                                        [
+                                            'conference',
+                                            'seminar',
+                                            'workshop',
+                                            'training',
+                                            'corporate_event',
+                                            'meeting',
+                                            'networking_event',
+                                            'product_launch',
+                                            'exhibition',
+                                            'expo',
+                                            'trade_fair',
+                                            'concert',
+                                            'cultural_event',
+                                            'church_event',
+                                            'graduation',
+                                            'vip_ceremony',
+                                            'government_event',
+                                            'webinar',
+                                            'hybrid_event',
+                                        ]
+                                    )
+                            ),
 
                         Repeater::make('public_faqs')
                             ->label('Frequently Asked Questions')
@@ -438,23 +499,80 @@ class EventForm
 
                         Textarea::make('dress_code')
                             ->label('Dress Code')
-                            ->rows(3),
+                            ->rows(3)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showForTypes(
+                                        $get,
+                                        [
+                                            'wedding',
+                                            'send_off',
+                                            'engagement',
+                                            'birthday',
+                                            'graduation',
+                                            'vip_ceremony',
+                                            'government_event',
+                                            'concert',
+                                            'cultural_event',
+                                        ]
+                                    )
+                            ),
 
                         Textarea::make('seating_policy')
                             ->label('Seating Information')
-                            ->rows(3),
+                            ->rows(3)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showForTypes(
+                                        $get,
+                                        [
+                                            'wedding',
+                                            'send_off',
+                                            'engagement',
+                                            'birthday',
+                                            'graduation',
+                                            'vip_ceremony',
+                                            'government_event',
+                                            'concert',
+                                            'festival',
+                                            'cultural_event',
+                                        ]
+                                    )
+                            ),
 
                         Textarea::make('age_restriction')
                             ->label('Age Restrictions')
-                            ->rows(3),
+                            ->rows(3)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showForTypes(
+                                        $get,
+                                        [
+                                            'concert',
+                                            'festival',
+                                            'cultural_event',
+                                            'sports_event',
+                                            'tournament',
+                                            'bonanza',
+                                        ]
+                                    )
+                            ),
 
                         Textarea::make('ticket_policy')
                             ->label('Ticket and Entry Policy')
-                            ->rows(3),
+                            ->rows(3)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showTicketing($get)
+                            ),
 
                         Textarea::make('refund_policy')
                             ->label('Cancellation / Refund Policy')
-                            ->rows(3),
+                            ->rows(3)
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    self::showTicketing($get)
+                            ),
 
                         TextInput::make('organizer_contact_email')
                             ->label('Public Contact Email')
@@ -561,7 +679,7 @@ class EventForm
                                             'Charity / fundraising mode focuses on campaign support, donations, activities, communication, and optional participant registration.',
 
                                         'health_event' =>
-                                            'Health / wellness mode focuses on participant registration, screenings or activities, public event information, communications, and linked donation campaigns. Ticketing and professional fields stay hidden by default.',
+                                            'Health / wellness mode focuses on screenings or activities, public event information, communications, and linked donation campaigns. Registration, ticketing, badges, and professional fields stay hidden by default.',
 
                                         'bonanza',
                                         'sports_event',
