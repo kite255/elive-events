@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Donation extends Model
@@ -80,6 +81,11 @@ class Donation extends Model
     public function manualSubmission(): HasOne
     {
         return $this->hasOne(DonationManualSubmission::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     public function scopeAccessibleBy(Builder $query, ?User $user): Builder
