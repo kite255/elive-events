@@ -64,6 +64,7 @@ class EventPresetService
             'badges' => false,
             'guest_rsvp' => false,
             'donations' => false,
+            'public_health_fields' => false,
         ];
 
         return match ($eventType) {
@@ -81,6 +82,7 @@ class EventPresetService
                 'badges' => false,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -104,6 +106,7 @@ class EventPresetService
                 'badges' => true,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -126,6 +129,7 @@ class EventPresetService
                 'badges' => true,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -143,6 +147,7 @@ class EventPresetService
                 'badges' => false,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -162,6 +167,7 @@ class EventPresetService
                 'badges' => false,
                 'guest_rsvp' => true,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -178,6 +184,7 @@ class EventPresetService
                 'badges' => true,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             'community_event' => [
@@ -188,6 +195,7 @@ class EventPresetService
                 'badges' => false,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             'charity_event' => [
@@ -198,6 +206,7 @@ class EventPresetService
                 'badges' => false,
                 'guest_rsvp' => false,
                 'donations' => true,
+                'public_health_fields' => false,
             ],
 
             'health_event' => [
@@ -208,6 +217,7 @@ class EventPresetService
                 'badges' => false,
                 'guest_rsvp' => false,
                 'donations' => true,
+                'public_health_fields' => true,
             ],
 
             /*
@@ -226,6 +236,7 @@ class EventPresetService
                 'badges' => true,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -244,6 +255,7 @@ class EventPresetService
                 'badges' => true,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -260,6 +272,7 @@ class EventPresetService
                 'badges' => false,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             'hybrid_event' => [
@@ -270,6 +283,7 @@ class EventPresetService
                 'badges' => true,
                 'guest_rsvp' => false,
                 'donations' => false,
+                'public_health_fields' => false,
             ],
 
             default => $default,
@@ -330,6 +344,14 @@ class EventPresetService
         return self::featureProfile(
             $eventType
         )['donations'];
+    }
+
+    public static function usesPublicHealthFields(
+        ?string $eventType
+    ): bool {
+        return self::featureProfile(
+            $eventType
+        )['public_health_fields'];
     }
 
     public static function preset(?string $eventType): array
