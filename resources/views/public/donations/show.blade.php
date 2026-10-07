@@ -1,4 +1,5 @@
 @php
+    use Illuminate\Support\Carbon;
     use Illuminate\Support\Str;
 
     $bannerUrl = null;
@@ -258,6 +259,71 @@
             white-space: pre-line;
         }
 
+        .campaign-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 22px;
+        }
+
+        .campaign-meta-card {
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            background: #F8FAFC;
+        }
+
+        .campaign-meta-label {
+            display: block;
+            color: #64748B;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        .campaign-meta-value {
+            display: block;
+            margin-top: 6px;
+            color: var(--elive-navy);
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+
+        .campaign-meta-value a {
+            color: var(--elive-blue);
+        }
+
+        .highlights-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 16px;
+        }
+
+        .highlight-card {
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            background: #FFFFFF;
+        }
+
+        .highlight-value {
+            display: block;
+            color: var(--elive-navy);
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .highlight-label {
+            display: block;
+            margin-top: 4px;
+            color: #64748B;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
         .progress-card {
             margin-top: 28px;
             padding: 22px;
@@ -466,7 +532,9 @@
             .side-card { padding:22px; }
 
             .progress-grid,
-            .gallery-grid { grid-template-columns:1fr; }
+            .gallery-grid,
+            .campaign-meta-grid,
+            .highlights-grid { grid-template-columns:1fr; }
 
             .footer-inner {
                 padding:24px 0;
@@ -558,6 +626,102 @@
                     <div class="campaign-description">{{ $campaign->description }}</div>
                 @else
                     <div class="campaign-description">Support this fundraising campaign through eLive Events.</div>
+                @endif
+
+                @if (
+                    $campaign->starts_at
+                    || $campaign->venue
+                    || $campaign->venue_address
+                    || $campaign->organizer_contact_phone
+                    || $campaign->organizer_contact_email
+                    || $campaign->map_url
+                )
+                    <section class="gallery-section">
+                        <p class="section-eyebrow">Campaign details</p>
+                        <h2 class="section-title">When and where</h2>
+
+                        <div class="campaign-meta-grid">
+                            @if ($campaign->starts_at)
+                                <div class="campaign-meta-card">
+                                    <span class="campaign-meta-label">Date & Time</span>
+                                    <span class="campaign-meta-value">
+                                        {{ Carbon::parse($campaign->starts_at)->format('j M Y') }}
+                                        · {{ Carbon::parse($campaign->starts_at)->format('g:i A') }}
+                                        @if ($campaign->ends_at)
+                                            - {{ Carbon::parse($campaign->ends_at)->format('g:i A') }}
+                                        @endif
+                                    </span>
+                                </div>
+                            @endif
+
+                            @if ($campaign->venue)
+                                <div class="campaign-meta-card">
+                                    <span class="campaign-meta-label">Venue</span>
+                                    <span class="campaign-meta-value">{{ $campaign->venue }}</span>
+                                </div>
+                            @endif
+
+                            @if ($campaign->venue_address)
+                                <div class="campaign-meta-card">
+                                    <span class="campaign-meta-label">Address</span>
+                                    <span class="campaign-meta-value">{{ $campaign->venue_address }}</span>
+                                </div>
+                            @endif
+
+                            @if ($campaign->organizer_contact_phone)
+                                <div class="campaign-meta-card">
+                                    <span class="campaign-meta-label">Contact Phone</span>
+                                    <span class="campaign-meta-value">
+                                        <a href="tel:{{ $campaign->organizer_contact_phone }}">
+                                            {{ $campaign->organizer_contact_phone }}
+                                        </a>
+                                    </span>
+                                </div>
+                            @endif
+
+                            @if ($campaign->organizer_contact_email)
+                                <div class="campaign-meta-card">
+                                    <span class="campaign-meta-label">Contact Email</span>
+                                    <span class="campaign-meta-value">
+                                        <a href="mailto:{{ $campaign->organizer_contact_email }}">
+                                            {{ $campaign->organizer_contact_email }}
+                                        </a>
+                                    </span>
+                                </div>
+                            @endif
+
+                            @if ($campaign->map_url)
+                                <div class="campaign-meta-card">
+                                    <span class="campaign-meta-label">Location</span>
+                                    <span class="campaign-meta-value">
+                                        <a href="{{ $campaign->map_url }}" target="_blank" rel="noopener">
+                                            View Map
+                                        </a>
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
+                    </section>
+                @endif
+
+                @if (! empty($campaign->public_highlights))
+                    <section class="gallery-section">
+                        <p class="section-eyebrow">Highlights</p>
+                        <h2 class="section-title">What to expect</h2>
+
+                        <div class="highlights-grid">
+                            @foreach ($campaign->public_highlights as $highlight)
+                                <div class="highlight-card">
+                                    @if (filled($highlight['value'] ?? null))
+                                        <span class="highlight-value">{{ $highlight['value'] }}</span>
+                                    @endif
+                                    @if (filled($highlight['label'] ?? null))
+                                        <span class="highlight-label">{{ $highlight['label'] }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
                 @endif
 
                 @if (! empty($campaign->gallery_image_paths))
