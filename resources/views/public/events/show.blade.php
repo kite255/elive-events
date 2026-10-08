@@ -2634,96 +2634,17 @@
     @endif
 
     @if ($supportCampaign)
-        <section class="event-support-section" aria-labelledby="support-event-heading">
-            <div class="container event-support-shell">
-                <article class="event-support-main">
-                    <p class="public-detail-kicker">Support This Event</p>
-                    <h2 id="support-event-heading" class="event-support-title">
-                        {{ $supportCampaign->title }}
-                    </h2>
-
-                    @if ($supportCampaign->description)
-                        <div class="event-support-description">
-                            {{ $supportCampaign->description }}
-                        </div>
-                    @endif
-
-                    @if ($supportGallery->isNotEmpty())
-                        <div class="event-support-gallery">
-                            @foreach ($supportGallery as $imagePath)
-                                @php
-                                    $supportGalleryUrl = Str::startsWith(
-                                        $imagePath,
-                                        ['http://', 'https://']
-                                    )
-                                        ? $imagePath
-                                        : (
-                                            Str::startsWith(
-                                                $imagePath,
-                                                ['storage/', '/storage/']
-                                            )
-                                                ? asset(ltrim($imagePath, '/'))
-                                                : asset('storage/' . ltrim($imagePath, '/'))
-                                        );
-                                @endphp
-
-                                <a
-                                    href="{{ $supportGalleryUrl }}"
-                                    target="_blank"
-                                    rel="noopener"
-                                >
-                                    <img
-                                        src="{{ $supportGalleryUrl }}"
-                                        alt="{{ $supportCampaign->title }} campaign image"
-                                        loading="lazy"
-                                    >
-                                </a>
-                            @endforeach
-                        </div>
-                    @endif
-                </article>
-
-                <aside class="event-support-payment">
-                    <p class="public-detail-kicker">How to contribute</p>
-                    <h2 class="section-title">Support the campaign</h2>
-
-                    @forelse ($supportPaymentMethods as $method)
-                        <article class="event-support-method">
-                            <h3>{{ $method->provider_name }}</h3>
-
-                            @if ($method->account_name)
-                                <p>
-                                    <strong>Account Name:</strong>
-                                    {{ $method->account_name }}
-                                </p>
-                            @endif
-
-                            @if ($method->account_number_or_phone)
-                                <p>
-                                    <strong>Account / Phone:</strong>
-                                    {{ $method->account_number_or_phone }}
-                                </p>
-                            @endif
-
-                            @if ($method->instructions)
-                                <p>{{ $method->instructions }}</p>
-                            @endif
-                        </article>
-                    @empty
-                        <p class="event-support-description">
-                            Contribution instructions have not been published yet.
-                        </p>
-                    @endforelse
-
-                    <p class="event-support-description" style="font-size:13px;">
-                        Funds are sent according to the campaign payment instructions.
-                    </p>
-                </aside>
+        <section class="public-detail-section alt" aria-labelledby="support-event-heading">
+            <div class="container">
+                @include('public.donations.partials.campaign-module', [
+                    'campaign' => $supportCampaign,
+                    'embedded' => true,
+                ])
             </div>
         </section>
     @endif
 
-@if ($gallery->isNotEmpty())
+    @if ($gallery->isNotEmpty())
         <section class="public-detail-section alt" aria-labelledby="gallery-heading">
             <div class="container">
                 <p class="public-detail-kicker">Moments</p>
