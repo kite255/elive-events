@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use App\Models\Event;
+use App\Services\EventPresetService;
 use App\Filament\Resources\BadgeTemplates\BadgeTemplateResource;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -24,8 +26,16 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
+use Illuminate\Database\Eloquent\Model;
+
 class BadgeTemplatesRelationManager extends RelationManager
 {
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return $ownerRecord instanceof Event
+            && (EventPresetService::usesBadges($ownerRecord->event_type));
+    }
+
     protected static string $relationship = 'badgeTemplates';
 
     protected static ?string $title = 'Badge Templates';
