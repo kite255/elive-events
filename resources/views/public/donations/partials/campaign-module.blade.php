@@ -36,6 +36,285 @@
     );
 @endphp
 
+<style>
+    .donation-module {
+        width: 100%;
+    }
+
+    .donation-module-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 24px;
+        align-items: start;
+    }
+
+    .donation-module-main,
+    .donation-module-side {
+        background: #FFFFFF;
+        border: 1px solid #E6E8EF;
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+    }
+
+    .donation-module-main {
+        padding: 28px;
+    }
+
+    .donation-module-side {
+        padding: 24px;
+        position: sticky;
+        top: 98px;
+    }
+
+    .donation-module-kicker {
+        margin: 0 0 8px;
+        color: #FF9800;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+    }
+
+    .donation-module-title {
+        margin: 0;
+        color: #161943;
+        font-size: 28px;
+        line-height: 1.15;
+        letter-spacing: -.025em;
+    }
+
+    .donation-module-side h3,
+    .donation-donor-wall h3 {
+        margin: 0;
+        color: #161943;
+        font-size: 20px;
+    }
+
+    .donation-module-description {
+        margin-top: 14px;
+        color: #475569;
+        font-size: 15px;
+        line-height: 1.75;
+        white-space: pre-line;
+    }
+
+    .donation-progress-grid,
+    .donation-donor-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .donation-stat,
+    .donation-donor {
+        padding: 14px;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        background: #F8FAFC;
+    }
+
+    .donation-stat span,
+    .donation-donor span {
+        display: block;
+        color: #64748B;
+        font-size: 12px;
+    }
+
+    .donation-stat strong,
+    .donation-donor strong {
+        display: block;
+        margin-top: 5px;
+        color: #161943;
+        font-size: 17px;
+    }
+
+    .donation-gallery {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+    }
+
+    .donation-gallery a {
+        overflow: hidden;
+        display: block;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        background: #F8FAFC;
+    }
+
+    .donation-gallery img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .donation-donor-wall,
+    .donation-direct-options {
+        margin-top: 26px;
+        padding-top: 22px;
+        border-top: 1px solid #E8EDF4;
+    }
+
+    .donation-payment-method {
+        margin-top: 12px;
+        padding: 15px;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        background: #F8FAFC;
+    }
+
+    .donation-payment-method > strong {
+        color: #161943;
+        font-size: 15px;
+    }
+
+    .donation-payment-method p {
+        margin: 6px 0;
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .donation-note,
+    .donation-success,
+    .donation-error {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .donation-note {
+        background: #FFF7ED;
+        color: #9A3412;
+    }
+
+    .donation-success {
+        background: #F0FDF4;
+        color: #166534;
+    }
+
+    .donation-error {
+        background: #FEF2F2;
+        color: #991B1B;
+    }
+
+    .donation-error p {
+        margin: 0;
+    }
+
+    .donation-error p + p {
+        margin-top: 4px;
+    }
+
+    .donation-suggested {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .donation-amount-choice {
+        min-height: 38px;
+        padding: 0 12px;
+        border: 1px solid #CBD5E1;
+        border-radius: 10px;
+        background: #FFFFFF;
+        color: #161943;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .donation-amount-choice:hover {
+        border-color: #007AB2;
+        color: #007AB2;
+    }
+
+    .donation-form {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+    }
+
+    .donation-form label {
+        display: grid;
+        gap: 6px;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .donation-form input[type="text"],
+    .donation-form input[type="email"],
+    .donation-form input[type="number"] {
+        width: 100%;
+        min-height: 44px;
+        padding: 0 12px;
+        border: 1px solid #CBD5E1;
+        border-radius: 10px;
+        background: #FFFFFF;
+        color: #0F172A;
+        font: inherit;
+        font-weight: 500;
+    }
+
+    .donation-check {
+        display: flex !important;
+        grid-template-columns: none !important;
+        align-items: flex-start;
+        gap: 9px !important;
+        font-weight: 600 !important;
+    }
+
+    .donation-check input {
+        margin-top: 2px;
+    }
+
+    .donation-submit {
+        min-height: 46px;
+        border: 0;
+        border-radius: 11px;
+        background: #161943;
+        color: #FFFFFF;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .donation-submit:hover {
+        background: #007AB2;
+    }
+
+    @media (max-width: 900px) {
+        .donation-module-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .donation-module-side {
+            position: static;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .donation-module-main,
+        .donation-module-side {
+            padding: 20px;
+        }
+
+        .donation-progress-grid,
+        .donation-donor-grid,
+        .donation-gallery {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
 <section class="donation-module {{ $embedded ? 'donation-module-embedded' : '' }}" aria-labelledby="donation-module-heading">
     <div class="donation-module-grid">
         <article class="donation-module-main">
