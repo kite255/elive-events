@@ -113,6 +113,7 @@ class EventDonationIntegrationTest extends TestCase
 
         Donation::query()->create([
             'donation_campaign_id' => $campaign->id,
+            'reference' => 'ELV-DON-TEST-0001',
             'donor_name' => 'Public Supporter',
             'amount' => 20000,
             'currency' => 'TZS',
