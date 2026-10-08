@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use App\Models\Event;
+use App\Services\EventPresetService;
 use App\Models\EventMerchandise;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -26,10 +28,17 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 
 class MerchandiseRelationManager extends RelationManager
 {
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return $ownerRecord instanceof Event
+            && (EventPresetService::usesRegistration($ownerRecord->event_type) || EventPresetService::usesTicketing($ownerRecord->event_type));
+    }
+
     protected static string $relationship = 'merchandise';
 
     protected static ?string $title = 'Event Merchandise';

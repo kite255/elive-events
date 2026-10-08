@@ -45,11 +45,11 @@ class PublicDonationDesignTest extends TestCase
         $response->assertSee(route('public.donations.show', ['campaign' => $campaign->slug]), false);
     }
 
-    public function test_events_directory_displays_active_public_support_campaigns(): void
+    public function test_events_directory_stays_focused_on_events_without_duplicate_campaign_cards(): void
     {
         [$organization, $event] = $this->makeOrganizationAndEvent();
 
-        $visible = DonationCampaign::query()->create([
+        DonationCampaign::query()->create([
             'organization_id' => $organization->id,
             'event_id' => $event->id,
             'title' => 'Support Our Event',
@@ -60,24 +60,13 @@ class PublicDonationDesignTest extends TestCase
             'is_public' => true,
         ]);
 
-        DonationCampaign::query()->create([
-            'organization_id' => $organization->id,
-            'title' => 'Hidden Draft Campaign',
-            'status' => DonationCampaign::STATUS_DRAFT,
-            'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
-            'direct_payment_behavior' => DonationCampaign::DIRECT_BEHAVIOR_DISPLAY_ONLY,
-            'currency' => 'TZS',
-            'is_public' => true,
-        ]);
-
         $response = $this->get(route('public.events.index'));
 
         $response->assertOk();
-        $response->assertSee('Support Campaigns');
-        $response->assertSee('Support Our Event');
-        $response->assertSee('Donation Campaign');
-        $response->assertSee(route('public.donations.show', ['campaign' => $visible->slug]), false);
-        $response->assertDontSee('Hidden Draft Campaign');
+        $response->assertSee('Public Donation Event');
+        $response->assertDontSee('Support Campaigns');
+        $response->assertDontSee('Support Our Event');
+        $response->assertDontSee('Donation Campaign');
     }
 
     public function test_donation_detail_uses_the_same_public_navigation(): void

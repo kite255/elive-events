@@ -99,20 +99,37 @@ class PublicDonationCampaignTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_event_page_links_to_active_public_linked_campaign(): void
+    public function test_event_page_embeds_active_public_linked_campaign(): void
     {
         [$organization, $event] = $this->makeOrganizationAndEvent();
 
         $campaign = $this->makeCampaign($organization, $event, 'Support This Event', [
             'status' => DonationCampaign::STATUS_ACTIVE,
             'is_public' => true,
+            'description' => 'Support the work connected to this event.',
+        ]);
+
+        DonationPaymentMethod::query()->create([
+            'donation_campaign_id' => $campaign->id,
+            'type' => 'bank',
+            'provider_name' => 'CRDB Bank',
+            'account_name' => 'Event Support Account',
+            'account_number_or_phone' => '1234567890',
+            'enabled' => true,
+            'sort_order' => 1,
         ]);
 
         $response = $this->get(route('public.events.show', ['event' => $event->slug]));
 
         $response->assertOk();
-        $response->assertSee('Support this event');
-        $response->assertSee(route('public.donations.show', ['campaign' => $campaign->slug]), false);
+        $response->assertSee('Support This Event');
+        $response->assertSee('Support the work connected to this event.');
+        $response->assertSee('CRDB Bank');
+        $response->assertSee('1234567890');
+        $response->assertDontSee(
+            route('public.donations.show', ['campaign' => $campaign->slug]),
+            false
+        );
     }
 
     private function makeOrganizationAndEvent(): array

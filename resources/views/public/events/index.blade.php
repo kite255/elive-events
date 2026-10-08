@@ -134,12 +134,6 @@
         ->get()
         ->groupBy('event_id');
 
-    $supportCampaigns = \App\Models\DonationCampaign::query()
-        ->publicActive()
-        ->with(['organization', 'event'])
-        ->latest('id')
-        ->limit(6)
-        ->get();
 @endphp
 
 
@@ -1361,9 +1355,12 @@
 
                                     @else
 
-                                        <span class="ended-label">
-                                            Registration Closed
-                                        </span>
+                                        <a
+                                            href="{{ $eventDetailsUrl }}"
+                                            class="register-btn"
+                                        >
+                                            View Event
+                                        </a>
 
                                     @endif
 
@@ -1396,105 +1393,6 @@
         </div>
     </section>
 
-    @if ($supportCampaigns->isNotEmpty())
-        <section class="events-section" style="padding-top:0;">
-            <div class="container">
-                <div class="results-bar" style="display:flex;align-items:end;justify-content:space-between;gap:20px;">
-                    <div>
-                        <p class="eyebrow">Giving</p>
-                        <h2 style="margin:8px 0 0;color:var(--elive-navy);font-size:30px;line-height:1.1;">Support Campaigns</h2>
-                        <p style="margin:9px 0 0;color:var(--elive-muted);font-size:14px;">
-                            Support active causes and fundraising campaigns managed through eLive Events.
-                        </p>
-                    </div>
-
-                    <a href="{{ route('public.donations.index') }}" class="register-btn">
-                        View All Campaigns
-                    </a>
-                </div>
-
-                <div class="events-grid">
-                    @foreach ($supportCampaigns as $campaign)
-                        @php
-                            $campaignUrl = route('public.donations.show', ['campaign' => $campaign->slug]);
-                            $campaignImageUrl = null;
-
-                            if ($campaign->banner_image_path) {
-                                if (Str::startsWith($campaign->banner_image_path, ['http://', 'https://'])) {
-                                    $campaignImageUrl = $campaign->banner_image_path;
-                                } elseif (Str::startsWith($campaign->banner_image_path, ['storage/', '/storage/'])) {
-                                    $campaignImageUrl = asset(ltrim($campaign->banner_image_path, '/'));
-                                } else {
-                                    $campaignImageUrl = asset('storage/' . ltrim($campaign->banner_image_path, '/'));
-                                }
-                            }
-
-                            $campaignDescription = trim(strip_tags((string) $campaign->description));
-                        @endphp
-
-                        <article class="event-card">
-                            <a href="{{ $campaignUrl }}" class="event-card-media" aria-label="View {{ $campaign->title }}">
-                                @if ($campaignImageUrl)
-                                    <img
-                                        src="{{ $campaignImageUrl }}"
-                                        alt="{{ $campaign->title }}"
-                                        class="event-card-image"
-                                    >
-                                @else
-                                    <div class="event-card-fallback"></div>
-                                @endif
-
-                                <span class="status-badge upcoming">
-                                    Donation Campaign
-                                </span>
-                            </a>
-
-                            <div class="event-card-body">
-                                <h2 class="event-card-title">
-                                    <a href="{{ $campaignUrl }}">
-                                        {{ $campaign->title }}
-                                    </a>
-                                </h2>
-
-                                <div class="event-meta">
-                                    @if ($campaign->organization)
-                                        <div class="meta-item">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                                <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h6M9 14h6M9 18h6"/>
-                                            </svg>
-                                            <span>{{ $campaign->organization->name }}</span>
-                                        </div>
-                                    @endif
-
-                                    @if ($campaign->event)
-                                        <div class="meta-item">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                                <rect x="3" y="5" width="18" height="16" rx="2"/>
-                                                <path d="M16 3v4M8 3v4M3 10h18"/>
-                                            </svg>
-                                            <span>{{ $campaign->event->name }}</span>
-                                        </div>
-                                    @endif
-                                </div>
-
-                                @if ($campaignDescription !== '')
-                                    <p class="event-description">
-                                        {{ Str::limit($campaignDescription, 105) }}
-                                    </p>
-                                @endif
-
-                                <div class="event-card-actions">
-                                    <a href="{{ $campaignUrl }}" class="register-btn">
-                                        Support Campaign
-                                    </a>
-                                </div>
-                            </div>
-                        </article>
-                    @endforeach
-                </div>
-            </div>
-        </section>
-    @endif
 
 </main>
 
