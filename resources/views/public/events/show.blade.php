@@ -210,6 +210,16 @@
         ->orderByDesc('id')
         ->first();
 
+    $supportPaymentMethods = $supportCampaign
+        ? $supportCampaign->paymentMethods()
+            ->where('enabled', true)
+            ->get()
+        : collect();
+
+    $supportGallery = collect(
+        $supportCampaign?->gallery_image_paths ?? []
+    )->filter();
+
     $finiteRemainingSeats = $publicTicketTypes
         ->map(fn ($ticketType) => $ticketType->remainingCapacity())
         ->filter(fn ($remaining) => $remaining !== null);
@@ -1723,6 +1733,93 @@
             background: var(--elive-blue);
         }
 
+        .event-support-section {
+            padding: 44px 0;
+            background: #FFF9F0;
+            border-top: 1px solid #F2E3C7;
+            border-bottom: 1px solid #F2E3C7;
+        }
+
+        .event-support-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 340px;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .event-support-main,
+        .event-support-payment {
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 20px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, .05);
+        }
+
+        .event-support-main {
+            padding: 28px;
+        }
+
+        .event-support-payment {
+            padding: 24px;
+        }
+
+        .event-support-title {
+            margin: 0;
+            color: var(--elive-navy);
+            font-size: 28px;
+            line-height: 1.15;
+        }
+
+        .event-support-description {
+            margin: 14px 0 0;
+            color: #475569;
+            font-size: 15px;
+            line-height: 1.75;
+            white-space: pre-line;
+        }
+
+        .event-support-method {
+            margin-top: 14px;
+            padding: 15px;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            background: #F8FAFC;
+        }
+
+        .event-support-method h3 {
+            margin: 0 0 8px;
+            color: var(--elive-navy);
+            font-size: 16px;
+        }
+
+        .event-support-method p {
+            margin: 5px 0;
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .event-support-gallery {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 22px;
+        }
+
+        .event-support-gallery a {
+            overflow: hidden;
+            display: block;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            background: #F8FAFC;
+        }
+
+        .event-support-gallery img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
         @media (prefers-reduced-motion: reduce) {
             html {
                 scroll-behavior: auto;
@@ -1738,7 +1835,8 @@
         }
 
         @media (max-width: 900px) {
-            .details-grid {
+            .details-grid,
+            .event-support-shell {
                 grid-template-columns: 1fr;
             }
 
@@ -1755,6 +1853,10 @@
 
             .gallery-item {
                 flex-basis: calc((100% - 20px) / 2);
+            }
+
+            .event-support-gallery {
+                grid-template-columns: 1fr;
             }
 
             .policy-grid .detail-card {
@@ -2532,15 +2634,94 @@
     @endif
 
     @if ($supportCampaign)
-    <section class="container" style="margin-top: 28px; margin-bottom: 28px;">
-        <a
-            href="{{ $supportUrl }}"
-            style="display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:10px;background:#161943;color:#fff;font-weight:700;"
-        >
-            Support this event
-        </a>
-    </section>
-@endif
+        <section class="event-support-section" aria-labelledby="support-event-heading">
+            <div class="container event-support-shell">
+                <article class="event-support-main">
+                    <p class="public-detail-kicker">Support This Event</p>
+                    <h2 id="support-event-heading" class="event-support-title">
+                        {{ $supportCampaign->title }}
+                    </h2>
+
+                    @if ($supportCampaign->description)
+                        <div class="event-support-description">
+                            {{ $supportCampaign->description }}
+                        </div>
+                    @endif
+
+                    @if ($supportGallery->isNotEmpty())
+                        <div class="event-support-gallery">
+                            @foreach ($supportGallery as $imagePath)
+                                @php
+                                    $supportGalleryUrl = Str::startsWith(
+                                        $imagePath,
+                                        ['http://', 'https://']
+                                    )
+                                        ? $imagePath
+                                        : (
+                                            Str::startsWith(
+                                                $imagePath,
+                                                ['storage/', '/storage/']
+                                            )
+                                                ? asset(ltrim($imagePath, '/'))
+                                                : asset('storage/' . ltrim($imagePath, '/'))
+                                        );
+                                @endphp
+
+                                <a
+                                    href="{{ $supportGalleryUrl }}"
+                                    target="_blank"
+                                    rel="noopener"
+                                >
+                                    <img
+                                        src="{{ $supportGalleryUrl }}"
+                                        alt="{{ $supportCampaign->title }} campaign image"
+                                        loading="lazy"
+                                    >
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </article>
+
+                <aside class="event-support-payment">
+                    <p class="public-detail-kicker">How to contribute</p>
+                    <h2 class="section-title">Support the campaign</h2>
+
+                    @forelse ($supportPaymentMethods as $method)
+                        <article class="event-support-method">
+                            <h3>{{ $method->provider_name }}</h3>
+
+                            @if ($method->account_name)
+                                <p>
+                                    <strong>Account Name:</strong>
+                                    {{ $method->account_name }}
+                                </p>
+                            @endif
+
+                            @if ($method->account_number_or_phone)
+                                <p>
+                                    <strong>Account / Phone:</strong>
+                                    {{ $method->account_number_or_phone }}
+                                </p>
+                            @endif
+
+                            @if ($method->instructions)
+                                <p>{{ $method->instructions }}</p>
+                            @endif
+                        </article>
+                    @empty
+                        <p class="event-support-description">
+                            Contribution instructions have not been published yet.
+                        </p>
+                    @endforelse
+
+                    <p class="event-support-description" style="font-size:13px;">
+                        Funds are sent according to the campaign payment instructions.
+                    </p>
+                </aside>
+            </div>
+        </section>
+    @endif
 
 @if ($gallery->isNotEmpty())
         <section class="public-detail-section alt" aria-labelledby="gallery-heading">
