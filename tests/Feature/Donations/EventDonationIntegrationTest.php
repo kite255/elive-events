@@ -2,8 +2,13 @@
 
 namespace Tests\Feature\Donations;
 
+use App\Filament\Resources\Events\RelationManagers\AttendeesRelationManager;
+use App\Filament\Resources\Events\RelationManagers\BadgeTypesRelationManager;
+use App\Filament\Resources\Events\RelationManagers\CheckInsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\DonationCampaignsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\DonationsRelationManager;
+use App\Filament\Resources\Events\RelationManagers\RegistrationFieldsRelationManager;
+use App\Filament\Resources\Events\RelationManagers\SessionsRelationManager;
 use App\Models\Donation;
 use App\Models\DonationCampaign;
 use App\Models\DonationPaymentMethod;
@@ -52,6 +57,22 @@ class EventDonationIntegrationTest extends TestCase
         );
         $this->assertFalse(
             DonationsRelationManager::canViewForRecord($conference, '')
+        );
+
+        $this->assertTrue(
+            SessionsRelationManager::canViewForRecord($healthEvent, '')
+        );
+        $this->assertFalse(
+            AttendeesRelationManager::canViewForRecord($healthEvent, '')
+        );
+        $this->assertFalse(
+            RegistrationFieldsRelationManager::canViewForRecord($healthEvent, '')
+        );
+        $this->assertFalse(
+            BadgeTypesRelationManager::canViewForRecord($healthEvent, '')
+        );
+        $this->assertFalse(
+            CheckInsRelationManager::canViewForRecord($healthEvent, '')
         );
     }
 
