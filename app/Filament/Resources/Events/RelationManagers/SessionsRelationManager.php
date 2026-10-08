@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use App\Models\Event;
+use App\Services\EventPresetService;
 use App\Models\EventDay;
 use App\Models\EventSession;
 use Filament\Actions\CreateAction;
@@ -20,9 +22,16 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class SessionsRelationManager extends RelationManager
 {
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return $ownerRecord instanceof Event
+            && (EventPresetService::usesSessions($ownerRecord->event_type));
+    }
+
     protected static string $relationship = 'sessions';
 
     protected static ?string $title = 'Sessions / Activities';
