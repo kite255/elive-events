@@ -28,10 +28,11 @@ class PublicDonationController extends Controller
             $request->validated()
         );
 
-        return redirect()
-            ->route('public.donations.show', [
-                'campaign' => $campaign->slug,
-            ])
+        $redirectRoute = $campaign->event_id
+            ? route('public.events.show', ['event' => $campaign->event->slug])
+            : route('public.donations.show', ['campaign' => $campaign->slug]);
+
+        return redirect($redirectRoute)
             ->with('status', 'Donation details received.');
     }
 }
