@@ -284,6 +284,15 @@
         .gallery-item { flex: 0 0 clamp(240px, 36vw, 390px); }
         .gallery-item img { height: 240px !important; object-fit: cover; }
         .gallery-hint { color: var(--elive-muted); font-size: 13px; }
+        .gallery-heading { display:flex; align-items:end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+        .gallery-controls { display:flex; gap:10px; }
+        .gallery-control { display:inline-flex; align-items:center; justify-content:center; height:44px; width:44px; border:1px solid #CBD5E1; background:white; border-radius:50%; color:var(--elive-navy); font-size:22px; cursor:pointer; }
+        .gallery-control:hover, .gallery-control:focus-visible { border-color:var(--elive-blue); background:#EFF8FC; outline-offset:2px; }
+        .gallery-control:disabled { opacity:.35; cursor:not-allowed; }
+        .gallery-section { min-width:0; }
+        .details-grid > * { min-width:0; }
+        .contact-value { overflow-wrap:anywhere; }
+        .contact-org-name { font-weight:800; color:var(--elive-navy); margin-top:14px; }
         .donate-link { display: inline-flex; padding: 12px 20px; margin-top: 18px; border-radius: 10px; background: var(--elive-orange); color: var(--elive-navy); font-weight: 800; }
         .contact-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
         .contact-links a { border: 1px solid #DCE4EE; padding: 11px 16px; border-radius: 10px; color: var(--elive-blue); font-weight: 700; }
@@ -478,7 +487,16 @@
             .side-card { padding:22px; }
 
             .progress-grid { grid-template-columns:1fr; }
-            .gallery-item { flex-basis: 82vw; }
+            .gallery-item { flex-basis: min(82vw, 330px); }
+            .hero-title { font-size:clamp(26px, 8vw, 38px); overflow-wrap:anywhere; }
+            .hero-content { left:18px; right:18px; bottom:20px; }
+            .hero-visual, .hero-image, .hero-fallback { height:380px; min-height:380px; }
+            .content-card, .side-card { padding:18px; border-radius:16px; }
+            .gallery-section { padding:0 2px; }
+            .contact-links { flex-direction:column; }
+            .contact-links a { text-align:center; }
+            .section-title { font-size:22px; }
+            .donate-link { min-height:44px; }
 
             .footer-inner {
                 padding:24px 0;
@@ -609,8 +627,18 @@
 
                 @if (! empty($campaign->gallery_image_paths))
                     <section class="gallery-section">
-                        <p class="section-eyebrow">Campaign Gallery</p>
-                        <h2 class="section-title">Campaign posters and updates</h2>
+                        <div class="gallery-heading">
+                            <div>
+                                <p class="section-eyebrow">Campaign Gallery</p>
+                                <h2 class="section-title">Campaign posters and updates</h2>
+                            </div>
+                            @if (count($campaign->gallery_image_paths) > 1)
+                                <div class="gallery-controls" aria-label="Gallery navigation">
+                                    <button type="button" class="gallery-control" id="gallery-prev" aria-label="Previous photos">←</button>
+                                    <button type="button" class="gallery-control" id="gallery-next" aria-label="Next photos">→</button>
+                                </div>
+                            @endif
+                        </div>
 
                         <div class="gallery-grid" id="campaign-gallery" tabindex="0" aria-label="Campaign images, scroll horizontally">
                             <div class="gallery-group">
@@ -683,15 +711,20 @@
                 <p class="section-eyebrow">Enquiries</p>
                 <h2 class="section-title">Contact the campaign organizer</h2>
                 <p class="side-copy">Questions about this campaign? Contact the organizer directly.</p>
+                @if ($campaign->organization)
+                    <p class="contact-org-name">{{ $campaign->organization->name }}</p>
+                @endif
                 <div class="contact-links">
                     @if ($campaign->organization?->contact_phone)
-                        <a href="tel:{{ preg_replace('/[^+0-9]/', '', $campaign->organization->contact_phone) }}">Call organizer</a>
+                        <a class="contact-value" href="tel:{{ preg_replace('/[^+0-9]/', '', $campaign->organization->contact_phone) }}">Call: {{ $campaign->organization->contact_phone }}</a>
                     @endif
                     @if ($campaign->organization?->contact_email)
-                        <a href="mailto:{{ $campaign->organization->contact_email }}">Email organizer</a>
+                        <a class="contact-value" href="mailto:{{ $campaign->organization->contact_email }}">Email: {{ $campaign->organization->contact_email }}</a>
                     @endif
-                    <a href="{{ route('home') }}#contact">Contact eLive</a>
                 </div>
+                @unless ($campaign->organization?->contact_phone || $campaign->organization?->contact_email)
+                    <p class="side-copy">The organizer has not published contact details yet.</p>
+                @endunless
             </section>
         </div>
     </section>
@@ -718,6 +751,17 @@
             duplicate.setAttribute('aria-hidden', 'true');
             duplicate.querySelectorAll('a').forEach(a => { a.tabIndex = -1; });
             gallery.appendChild(duplicate);
+            const previousButton = document.getElementById('gallery-prev');
+            const nextButton = document.getElementById('gallery-next');
+            const scrollByCard = (direction) => {
+                const item = first.querySelector('.gallery-item');
+                const distance = item ? item.getBoundingClientRect().width + 16 : gallery.clientWidth * .8;
+                const cycle = duplicate.offsetLeft - first.offsetLeft;
+                if (direction < 0 && gallery.scrollLeft <= 2 && cycle > 0) gallery.scrollLeft += cycle;
+                gallery.scrollBy({ left: distance * direction, behavior: 'smooth' });
+            };
+            previousButton?.addEventListener('click', () => scrollByCard(-1));
+            nextButton?.addEventListener('click', () => scrollByCard(1));
             const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
             let pause = false;
             let previous = 0;
@@ -737,6 +781,12 @@
             gallery.addEventListener('focusout', () => { pause = false; });
             gallery.addEventListener('touchstart', () => { pause = true; }, { passive: true });
             gallery.addEventListener('touchend', () => { pause = false; }, { passive: true });
+            gallery.addEventListener('keydown', (event) => {
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    scrollByCard(event.key === 'ArrowRight' ? 1 : -1);
+                }
+            });
             requestAnimationFrame(tick);
         }
         const button = document.getElementById('mobile-menu-button');
