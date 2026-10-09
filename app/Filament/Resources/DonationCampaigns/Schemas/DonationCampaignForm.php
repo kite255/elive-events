@@ -85,6 +85,21 @@ class DonationCampaignForm
                 ])
                 ->columns(2),
 
+            Section::make('Campaign Enquiries')
+                ->description('Contact details for this campaign only. Leave the phone blank to use the organizer contact details.')
+                ->schema([
+                    TextInput::make('enquiry_label')
+                        ->label('Contact heading')
+                        ->placeholder('Item Donations & Enquiries')
+                        ->maxLength(150),
+                    TextInput::make('enquiry_phone')
+                        ->label('Contact phone / WhatsApp')
+                        ->tel()
+                        ->placeholder('0755927444')
+                        ->maxLength(30),
+                ])
+                ->columns(2),
+
             Section::make('Payment')
                 ->schema([
                     Select::make('payment_mode')
