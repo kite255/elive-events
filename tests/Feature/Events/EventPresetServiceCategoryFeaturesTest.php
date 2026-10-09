@@ -15,14 +15,6 @@ class EventPresetServiceCategoryFeaturesTest extends TestCase
         );
     }
 
-    public function test_charity_and_health_events_enable_donations_by_default(): void
-    {
-        $this->assertTrue(EventPresetService::usesDonations('charity_event'));
-        $this->assertTrue(EventPresetService::usesDonations('health_event'));
-        $this->assertFalse(EventPresetService::usesDonations('church_event'));
-        $this->assertFalse(EventPresetService::usesDonations('concert'));
-    }
-
     public function test_event_categories_have_distinct_feature_profiles(): void
     {
         $church = EventPresetService::featureProfile('church_event');
@@ -37,20 +29,17 @@ class EventPresetServiceCategoryFeaturesTest extends TestCase
 
         $this->assertTrue($church['badges']);
         $this->assertFalse($community['badges']);
-
-        $this->assertTrue($charity['donations']);
         $this->assertFalse($charity['ticketing']);
 
         $this->assertFalse($health['registration']);
         $this->assertTrue($health['sessions']);
-        $this->assertTrue($health['donations']);
         $this->assertFalse($health['professional_fields']);
 
         $this->assertTrue($concert['ticketing']);
         $this->assertFalse($concert['registration']);
     }
 
-    public function test_health_event_preset_is_activity_and_donation_focused_without_registration(): void
+    public function test_health_event_preset_is_activity_focused_without_registration(): void
     {
         $preset = EventPresetService::preset('health_event');
 
