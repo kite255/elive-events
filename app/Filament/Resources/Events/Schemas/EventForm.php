@@ -43,6 +43,12 @@ class EventForm
             );
     }
 
+    private static function showDonations(Get $get): bool
+    {
+        return self::advanced($get)
+            || self::eventType($get) === 'charity_event';
+    }
+
     private static function showRegistration(Get $get): bool
     {
         return self::advanced($get)
@@ -715,7 +721,7 @@ class EventForm
                         Placeholder::make('donation_campaign_information')
                             ->label('Donation Campaigns')
                             ->content(
-                                'After saving the event, create or manage its campaign under Donations → Campaigns and link the campaign to this event. Campaigns can include payment instructions, progress, donor tracking, and a public image gallery.'
+                                'Create or manage a separate fundraising campaign under Donations → Campaigns. Campaigns can include payment instructions, progress, donor tracking, and a public image gallery.'
                             )
                             ->columnSpanFull(),
                     ])
