@@ -537,10 +537,6 @@
                             @if ($campaign->organization)
                                 <span>{{ $campaign->organization->name }}</span>
                             @endif
-
-                            @if ($campaign->event)
-                                <span>Linked to {{ $campaign->event->name }}</span>
-                            @endif
                         </div>
                     </div>
                 </div>
