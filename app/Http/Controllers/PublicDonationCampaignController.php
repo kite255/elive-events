@@ -12,7 +12,7 @@ class PublicDonationCampaignController extends Controller
     {
         $campaigns = DonationCampaign::query()
             ->publicActive()
-            ->with(['organization', 'event'])
+            ->with('organization')
             ->latest('id')
             ->paginate(12);
 
