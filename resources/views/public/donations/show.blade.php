@@ -218,7 +218,7 @@
 
         .details-grid {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 360px;
+            grid-template-columns: minmax(0, 1fr);
             gap: 26px;
             align-items: start;
         }
@@ -271,11 +271,23 @@
         }
 
         .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            display: flex;
             gap: 16px;
+            overflow-x: auto;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: thin;
             margin-top: 16px;
+            padding-bottom: 12px;
         }
+        .gallery-group { display: flex; flex: 0 0 auto; gap: 16px; }
+        .gallery-grid:focus-visible { outline: 3px solid var(--elive-blue); }
+        .gallery-item { flex: 0 0 clamp(240px, 36vw, 390px); }
+        .gallery-item img { height: 240px !important; object-fit: cover; }
+        .gallery-hint { color: var(--elive-muted); font-size: 13px; }
+        .donate-link { display: inline-flex; padding: 12px 20px; margin-top: 18px; border-radius: 10px; background: var(--elive-orange); color: var(--elive-navy); font-weight: 800; }
+        .contact-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+        .contact-links a { border: 1px solid #DCE4EE; padding: 11px 16px; border-radius: 10px; color: var(--elive-blue); font-weight: 700; }
+        #payment-methods, #contact-enquiry { scroll-margin-top: 100px; }
 
         .gallery-item {
             overflow: hidden;
@@ -465,8 +477,8 @@
             .content-card,
             .side-card { padding:22px; }
 
-            .progress-grid,
-            .gallery-grid { grid-template-columns:1fr; }
+            .progress-grid { grid-template-columns:1fr; }
+            .gallery-item { flex-basis: 82vw; }
 
             .footer-inner {
                 padding:24px 0;
@@ -538,6 +550,7 @@
                                 <span>{{ $campaign->organization->name }}</span>
                             @endif
                         </div>
+                        <a href="#payment-methods" class="donate-link">Donate Now ↓</a>
                     </div>
                 </div>
             </article>
@@ -554,40 +567,6 @@
                     <div class="campaign-description">{{ $campaign->description }}</div>
                 @else
                     <div class="campaign-description">Support this fundraising campaign through eLive Events.</div>
-                @endif
-
-                @if (! empty($campaign->gallery_image_paths))
-                    <section class="gallery-section">
-                        <p class="section-eyebrow">Campaign Gallery</p>
-                        <h2 class="section-title">Campaign posters and updates</h2>
-
-                        <div class="gallery-grid">
-                            @foreach ($campaign->gallery_image_paths as $imagePath)
-                                @php
-                                    $galleryImageUrl = Str::startsWith($imagePath, ['http://', 'https://'])
-                                        ? $imagePath
-                                        : (
-                                            Str::startsWith($imagePath, ['storage/', '/storage/'])
-                                                ? asset(ltrim($imagePath, '/'))
-                                                : asset('storage/' . ltrim($imagePath, '/'))
-                                        );
-                                @endphp
-
-                                <a
-                                    href="{{ $galleryImageUrl }}"
-                                    class="gallery-item"
-                                    target="_blank"
-                                    rel="noopener"
-                                >
-                                    <img
-                                        src="{{ $galleryImageUrl }}"
-                                        alt="{{ $campaign->title }} campaign image"
-                                        loading="lazy"
-                                    >
-                                </a>
-                            @endforeach
-                        </div>
-                    </section>
                 @endif
 
                 @if ($showProgress)
@@ -628,7 +607,44 @@
                 @endif
             </article>
 
-            <aside class="side-card">
+                @if (! empty($campaign->gallery_image_paths))
+                    <section class="gallery-section">
+                        <p class="section-eyebrow">Campaign Gallery</p>
+                        <h2 class="section-title">Campaign posters and updates</h2>
+
+                        <div class="gallery-grid" id="campaign-gallery" tabindex="0" aria-label="Campaign images, scroll horizontally">
+                            <div class="gallery-group">
+                            @foreach ($campaign->gallery_image_paths as $imagePath)
+                                @php
+                                    $galleryImageUrl = Str::startsWith($imagePath, ['http://', 'https://'])
+                                        ? $imagePath
+                                        : (
+                                            Str::startsWith($imagePath, ['storage/', '/storage/'])
+                                                ? asset(ltrim($imagePath, '/'))
+                                                : asset('storage/' . ltrim($imagePath, '/'))
+                                        );
+                                @endphp
+
+                                <a
+                                    href="{{ $galleryImageUrl }}"
+                                    class="gallery-item"
+                                    target="_blank"
+                                    rel="noopener"
+                                >
+                                    <img
+                                        src="{{ $galleryImageUrl }}"
+                                        alt="{{ $campaign->title }} campaign image"
+                                        loading="lazy"
+                                    >
+                                </a>
+                            @endforeach
+                            </div>
+                        </div>
+                        <p class="gallery-hint">Swipe or scroll to see more photos.</p>
+                    </section>
+                @endif
+
+            <aside class="side-card" id="payment-methods">
                 @if ($displayOnly)
                     <h2>How to contribute</h2>
                     <p class="side-copy">Payment is made directly to the campaign organizer using the details below.</p>
@@ -663,6 +679,20 @@
                     </p>
                 @endif
             </aside>
+            <section class="content-card" id="contact-enquiry">
+                <p class="section-eyebrow">Enquiries</p>
+                <h2 class="section-title">Contact the campaign organizer</h2>
+                <p class="side-copy">Questions about this campaign? Contact the organizer directly.</p>
+                <div class="contact-links">
+                    @if ($campaign->organization?->contact_phone)
+                        <a href="tel:{{ preg_replace('/[^+0-9]/', '', $campaign->organization->contact_phone) }}">Call organizer</a>
+                    @endif
+                    @if ($campaign->organization?->contact_email)
+                        <a href="mailto:{{ $campaign->organization->contact_email }}">Email organizer</a>
+                    @endif
+                    <a href="{{ route('home') }}#contact">Contact eLive</a>
+                </div>
+            </section>
         </div>
     </section>
 </main>
@@ -681,6 +711,34 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const gallery = document.getElementById('campaign-gallery');
+        if (gallery && gallery.querySelectorAll('.gallery-item').length > 1) {
+            const first = gallery.querySelector('.gallery-group');
+            const duplicate = first.cloneNode(true);
+            duplicate.setAttribute('aria-hidden', 'true');
+            duplicate.querySelectorAll('a').forEach(a => { a.tabIndex = -1; });
+            gallery.appendChild(duplicate);
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+            let pause = false;
+            let previous = 0;
+            function tick(now) {
+                if (!pause && !reducedMotion.matches && document.visibilityState === 'visible') {
+                    const delta = previous ? Math.min(now - previous, 50) : 0;
+                    gallery.scrollLeft += delta * .035;
+                    const width = duplicate.offsetLeft - first.offsetLeft;
+                    if (width > 0 && gallery.scrollLeft >= width) gallery.scrollLeft -= width;
+                }
+                previous = now;
+                requestAnimationFrame(tick);
+            }
+            gallery.addEventListener('mouseenter', () => { pause = true; });
+            gallery.addEventListener('mouseleave', () => { pause = false; });
+            gallery.addEventListener('focusin', () => { pause = true; });
+            gallery.addEventListener('focusout', () => { pause = false; });
+            gallery.addEventListener('touchstart', () => { pause = true; }, { passive: true });
+            gallery.addEventListener('touchend', () => { pause = false; }, { passive: true });
+            requestAnimationFrame(tick);
+        }
         const button = document.getElementById('mobile-menu-button');
         const menu = document.getElementById('mobile-menu');
 
