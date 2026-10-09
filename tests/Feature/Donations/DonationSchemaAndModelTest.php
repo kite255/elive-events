@@ -6,7 +6,6 @@ use App\Models\Donation;
 use App\Models\DonationCampaign;
 use App\Models\DonationManualSubmission;
 use App\Models\DonationPaymentMethod;
-use App\Models\Event;
 use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -21,7 +20,6 @@ class DonationSchemaAndModelTest extends TestCase
         $this->assertTrue(Schema::hasColumns('donation_campaigns', [
             'id',
             'organization_id',
-            'event_id',
             'title',
             'slug',
             'description',
@@ -128,16 +126,8 @@ class DonationSchemaAndModelTest extends TestCase
             'slug' => 'donation-organization-' . uniqid(),
         ]);
 
-        $event = Event::query()->create([
-            'organization_id' => $organization->id,
-            'name' => 'Donation Event',
-            'slug' => 'donation-event-' . uniqid(),
-            'status' => Event::STATUS_ACTIVE,
-        ]);
-
         $first = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
             'title' => 'Church Building Fund',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
@@ -163,7 +153,6 @@ class DonationSchemaAndModelTest extends TestCase
         $this->assertFalse($first->donor_wall_enabled);
         $this->assertCount(0, $first->donations);
         $this->assertTrue($first->organization->is($organization));
-        $this->assertTrue($first->event->is($event));
     }
 
     public function test_donation_generates_opaque_public_token_and_relationships(): void
