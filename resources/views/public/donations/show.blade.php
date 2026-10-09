@@ -728,21 +728,32 @@
                 @endif
             </aside>
             <section class="content-card" id="contact-enquiry">
+                @php
+                    $campaignPhone = trim((string) ($campaign->enquiry_phone ?? ''));
+                    $contactPhone = $campaignPhone !== '' ? $campaignPhone : ($campaign->organization?->contact_phone ?? null);
+                    $dialPhone = preg_replace('/[^+0-9]/', '', (string) $contactPhone);
+                    $whatsappPhone = preg_replace('/\D/', '', (string) $contactPhone);
+                    if (str_starts_with($whatsappPhone, '0')) {
+                        $whatsappPhone = '255' . substr($whatsappPhone, 1);
+                    }
+                    $contactLabel = trim((string) ($campaign->enquiry_label ?? '')) ?: 'Contact the campaign organizer';
+                @endphp
                 <p class="section-eyebrow">Enquiries</p>
-                <h2 class="section-title">Contact the campaign organizer</h2>
+                <h2 class="section-title">{{ $contactLabel }}</h2>
                 <p class="side-copy">Questions about this campaign? Contact the organizer directly.</p>
                 @if ($campaign->organization)
                     <p class="contact-org-name">{{ $campaign->organization->name }}</p>
                 @endif
                 <div class="contact-links">
-                    @if ($campaign->organization?->contact_phone)
-                        <a class="contact-value" href="tel:{{ preg_replace('/[^+0-9]/', '', $campaign->organization->contact_phone) }}">Call: {{ $campaign->organization->contact_phone }}</a>
+                    @if ($contactPhone)
+                        <a class="contact-value" href="tel:{{ $dialPhone }}">Call: {{ $contactPhone }}</a>
+                        <a class="contact-value" href="https://wa.me/{{ $whatsappPhone }}" target="_blank" rel="noopener noreferrer">WhatsApp: {{ $contactPhone }}</a>
                     @endif
                     @if ($campaign->organization?->contact_email)
                         <a class="contact-value" href="mailto:{{ $campaign->organization->contact_email }}">Email: {{ $campaign->organization->contact_email }}</a>
                     @endif
                 </div>
-                @unless ($campaign->organization?->contact_phone || $campaign->organization?->contact_email)
+                @unless ($contactPhone || $campaign->organization?->contact_email)
                     <p class="side-copy">The organizer has not published contact details yet.</p>
                 @endunless
             </section>
