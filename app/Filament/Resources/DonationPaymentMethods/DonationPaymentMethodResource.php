@@ -59,8 +59,7 @@ class DonationPaymentMethodResource extends Resource
         }
 
         return $user->isSuperAdmin()
-            || $user->managedOrganizations()->exists()
-            || $user->eventManagerEvents()->exists();
+            || $user->managedOrganizations()->exists();
     }
 
     public static function canCreate(): bool
