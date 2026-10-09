@@ -706,7 +706,12 @@
                             @endif
 
                             @if ($method->account_number_or_phone)
-                                <p><strong>Account / Phone:</strong> {{ $method->account_number_or_phone }}</p>
+                                <p><strong>{{ match ($method->type) {
+                                    'bank' => 'Account Number',
+                                    'mobile_money' => 'Phone Number',
+                                    'custom' => $method->account_identifier_type === 'phone' ? 'Phone Number' : 'Account Number',
+                                    default => 'Account / Phone',
+                                } }}:</strong> {{ $method->account_number_or_phone }}</p>
                             @endif
 
                             @if ($method->instructions)

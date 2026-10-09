@@ -8,6 +8,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class DonationPaymentMethodForm
@@ -28,7 +29,8 @@ class DonationPaymentMethodForm
                     'bank' => 'Bank',
                     'custom' => 'Custom',
                 ])
-                ->required(),
+                ->required()
+                ->live(),
 
             TextInput::make('provider_name')
                 ->label('Provider / Bank')
@@ -38,8 +40,24 @@ class DonationPaymentMethodForm
             TextInput::make('account_name')
                 ->maxLength(255),
 
+            Select::make('account_identifier_type')
+                ->label('Custom payment detail type')
+                ->options([
+                    'account' => 'Account Number',
+                    'phone' => 'Phone Number',
+                ])
+                ->default('account')
+                ->visible(fn (Get $get): bool => $get('type') === 'custom')
+                ->required(fn (Get $get): bool => $get('type') === 'custom')
+                ->live(),
+
             TextInput::make('account_number_or_phone')
-                ->label('Account Number / Phone')
+                ->label(fn (Get $get): string => match ($get('type')) {
+                    'bank' => 'Account Number',
+                    'mobile_money' => 'Phone Number',
+                    'custom' => $get('account_identifier_type') === 'phone' ? 'Phone Number' : 'Account Number',
+                    default => 'Account Number / Phone Number',
+                })
                 ->maxLength(255),
 
             Textarea::make('instructions')
