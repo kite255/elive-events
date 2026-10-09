@@ -279,10 +279,10 @@
             margin-top: 16px;
             padding-bottom: 12px;
         }
-        .gallery-group { display: flex; flex: 0 0 auto; gap: 16px; }
+        .gallery-group { display: flex; flex: 0 0 auto; gap: 20px; }
         .gallery-grid:focus-visible { outline: 3px solid var(--elive-blue); }
-        .gallery-item { flex: 0 0 clamp(240px, 36vw, 390px); }
-        .gallery-item img { height: 240px !important; object-fit: cover; }
+        .gallery-item { flex: 0 0 calc((min(1180px, 100vw - 40px) - 40px) / 3); min-height:260px; }
+        .gallery-item img { height: 260px !important; object-fit: cover; }
         .gallery-hint { color: var(--elive-muted); font-size: 13px; }
         .gallery-heading { display:flex; align-items:end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
         .gallery-controls { display:flex; gap:10px; }
@@ -290,6 +290,20 @@
         .gallery-control:hover, .gallery-control:focus-visible { border-color:var(--elive-blue); background:#EFF8FC; outline-offset:2px; }
         .gallery-control:disabled { opacity:.35; cursor:not-allowed; }
         .gallery-section { min-width:0; }
+        .gallery-grid { scrollbar-width:none; touch-action:pan-x; cursor:grab; }
+        .gallery-grid::-webkit-scrollbar { display:none; }
+        .gallery-grid:active { cursor:grabbing; }
+        body.gallery-lightbox-open { overflow:hidden; }
+        .gallery-lightbox[hidden] { display:none; }
+        .gallery-lightbox { position:fixed; inset:0; z-index:2000; background:rgba(11,31,58,.96); display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:12px; padding:20px; }
+        .gallery-lightbox-toolbar { display:flex; justify-content:flex-end; }
+        .gallery-lightbox-button { display:grid; place-items:center; width:46px; height:46px; border:1px solid rgba(255,255,255,.3); border-radius:50%; background:rgba(255,255,255,.12); color:white; font-size:28px; cursor:pointer; }
+        .gallery-lightbox-stage { display:grid; place-items:center; position:relative; min-height:0; }
+        .gallery-lightbox-image { max-width:min(1180px,calc(100vw - 150px)); max-height:calc(100vh - 160px); object-fit:contain; border-radius:14px; }
+        .gallery-lightbox-previous,.gallery-lightbox-next { position:absolute; top:50%; transform:translateY(-50%); }
+        .gallery-lightbox-previous { left:4px; }
+        .gallery-lightbox-next { right:4px; }
+        .gallery-lightbox-footer { color:white; text-align:center; }
         .details-grid > * { min-width:0; }
         .contact-value { overflow-wrap:anywhere; }
         .contact-org-name { font-weight:800; color:var(--elive-navy); margin-top:14px; }
@@ -421,6 +435,7 @@
         .footer-links a:hover { color:#FFFFFF; }
 
         @media (max-width: 900px) {
+            .gallery-item { flex-basis:calc((min(1180px, 100vw - 40px) - 20px) / 2); }
             .details-grid { grid-template-columns:1fr; }
             .side-card { position:static; }
         }
@@ -487,7 +502,13 @@
             .side-card { padding:22px; }
 
             .progress-grid { grid-template-columns:1fr; }
-            .gallery-item { flex-basis: min(82vw, 330px); }
+            .gallery-item { flex-basis:calc(100vw - 28px); }
+            .gallery-item img { height:230px !important; }
+            .gallery-lightbox { padding:12px; }
+            .gallery-lightbox-image { max-width:calc(100vw - 24px); max-height:calc(100vh - 170px); }
+            .gallery-lightbox-previous,.gallery-lightbox-next { top:auto; bottom:4px; transform:none; }
+            .gallery-lightbox-previous { left:calc(50% - 58px); }
+            .gallery-lightbox-next { right:calc(50% - 58px); }
             .hero-title { font-size:clamp(26px, 8vw, 38px); overflow-wrap:anywhere; }
             .hero-content { left:18px; right:18px; bottom:20px; }
             .hero-visual, .hero-image, .hero-fallback { height:380px; min-height:380px; }
@@ -656,8 +677,7 @@
                                 <a
                                     href="{{ $galleryImageUrl }}"
                                     class="gallery-item"
-                                    target="_blank"
-                                    rel="noopener"
+                                    data-donation-gallery-photo
                                 >
                                     <img
                                         src="{{ $galleryImageUrl }}"
@@ -729,7 +749,15 @@
         </div>
     </section>
 </main>
-
+<div class="gallery-lightbox" id="donation-lightbox" role="dialog" aria-modal="true" aria-label="Campaign photo viewer" hidden>
+    <div class="gallery-lightbox-toolbar"><button type="button" class="gallery-lightbox-button" id="lightbox-close" aria-label="Close photo viewer">×</button></div>
+    <div class="gallery-lightbox-stage" id="lightbox-stage">
+        <button type="button" class="gallery-lightbox-button gallery-lightbox-previous" id="lightbox-prev" aria-label="Previous photo">‹</button>
+        <img class="gallery-lightbox-image" id="lightbox-image" src="" alt="">
+        <button type="button" class="gallery-lightbox-button gallery-lightbox-next" id="lightbox-next" aria-label="Next photo">›</button>
+    </div>
+    <div class="gallery-lightbox-footer" id="lightbox-count"></div>
+</div>
 <footer class="site-footer">
     <div class="container footer-inner">
         <p>© {{ date('Y') }} eLive Events. All rights reserved.</p>
@@ -788,6 +816,49 @@
                 }
             });
             requestAnimationFrame(tick);
+        }
+        const lightbox = document.getElementById('donation-lightbox');
+        const photos = Array.from(gallery?.querySelector('.gallery-group')?.querySelectorAll('.gallery-item') || []);
+        if (lightbox && photos.length) {
+            const image = document.getElementById('lightbox-image');
+            const counter = document.getElementById('lightbox-count');
+            let active = 0, focusOrigin = null, touchX = null;
+            const render = () => {
+                image.src = photos[active].href;
+                image.alt = photos[active].querySelector('img')?.alt || 'Campaign photo';
+                counter.textContent = (active + 1) + ' / ' + photos.length;
+            };
+            const move = direction => { active = (active + direction + photos.length) % photos.length; render(); };
+            const close = () => {
+                if (lightbox.hidden) return;
+                lightbox.hidden = true;
+                image.removeAttribute('src');
+                document.body.classList.remove('gallery-lightbox-open');
+                focusOrigin?.focus();
+            };
+            photos.forEach((photo,index) => photo.addEventListener('click', e => {
+                e.preventDefault(); focusOrigin=photo; active=index; render();
+                lightbox.hidden=false; document.body.classList.add('gallery-lightbox-open');
+                document.getElementById('lightbox-close').focus();
+            }));
+            document.getElementById('lightbox-close').addEventListener('click',close);
+            document.getElementById('lightbox-prev').addEventListener('click',()=>move(-1));
+            document.getElementById('lightbox-next').addEventListener('click',()=>move(1));
+            lightbox.addEventListener('click',e=>{if(e.target===lightbox)close();});
+            document.addEventListener('keydown',e=>{
+                if(lightbox.hidden)return;
+                if(e.key==='Escape')close();
+                if(e.key==='ArrowLeft')move(-1);
+                if(e.key==='ArrowRight')move(1);
+            });
+            const stage=document.getElementById('lightbox-stage');
+            stage.addEventListener('touchstart',e=>{touchX=e.changedTouches[0]?.clientX ?? null;},{passive:true});
+            stage.addEventListener('touchend',e=>{
+                if(touchX===null)return;
+                const dx=(e.changedTouches[0]?.clientX ?? touchX)-touchX;
+                if(Math.abs(dx)>50)move(dx<0?1:-1);
+                touchX=null;
+            },{passive:true});
         }
         const button = document.getElementById('mobile-menu-button');
         const menu = document.getElementById('mobile-menu');
