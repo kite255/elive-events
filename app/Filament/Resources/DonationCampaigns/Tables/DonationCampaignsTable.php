@@ -17,7 +17,6 @@ class DonationCampaignsTable
             ->columns([
                 TextColumn::make('title')->searchable()->sortable()->weight('bold'),
                 TextColumn::make('organization.name')->label('Organization')->sortable(),
-                TextColumn::make('event.name')->label('Event')->placeholder('—')->sortable(),
                 TextColumn::make('payment_mode')->label('Payment Mode')->badge(),
                 TextColumn::make('status')->badge()->sortable(),
                 TextColumn::make('currency')->sortable(),
