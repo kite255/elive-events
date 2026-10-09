@@ -547,6 +547,13 @@
                     </a>
 
                     <a
+                        href="{{ route('public.donations.index') }}"
+                        class="text-sm font-medium text-slate-600 transition-colors duration-200 hover:text-elive-navy"
+                    >
+                        Donations
+                    </a>
+
+                    <a
                         href="#contact"
                         class="text-sm font-medium text-slate-600 transition-colors duration-200 hover:text-elive-navy"
                     >
@@ -621,6 +628,13 @@
                         class="rounded-lg px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-elive-navy"
                     >
                         Events
+                    </a>
+
+                    <a
+                        href="{{ route('public.donations.index') }}"
+                        class="rounded-lg px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-elive-navy"
+                    >
+                        Donations
                     </a>
 
                     <a
