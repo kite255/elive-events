@@ -30,6 +30,8 @@ class DonationCampaign extends Model
         'description',
         'banner_image_path',
         'gallery_image_paths',
+        'enquiry_label',
+        'enquiry_phone',
         'status',
         'payment_mode',
         'direct_payment_behavior',
