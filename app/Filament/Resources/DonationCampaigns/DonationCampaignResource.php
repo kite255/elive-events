@@ -47,7 +47,7 @@ class DonationCampaignResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['organization', 'event'])
+            ->with('organization')
             ->accessibleBy(auth()->user());
     }
 
@@ -63,8 +63,7 @@ class DonationCampaignResource extends Resource
             return true;
         }
 
-        return $user->managedOrganizations()->exists()
-            || $user->eventManagerEvents()->exists();
+        return $user->managedOrganizations()->exists();
     }
 
     public static function canCreate(): bool
