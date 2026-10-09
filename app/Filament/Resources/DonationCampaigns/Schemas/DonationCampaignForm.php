@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\DonationCampaigns\Schemas;
 
 use App\Models\DonationCampaign;
-use App\Models\Event;
 use App\Models\Organization;
 use App\Models\User;
 use Filament\Forms\Components\FileUpload;
@@ -13,7 +12,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -31,15 +29,6 @@ class DonationCampaignForm
                         ->preload()
                         ->required()
                         ->live(),
-
-                    Select::make('event_id')
-                        ->label('Linked Event')
-                        ->options(fn (Get $get): array => self::eventOptions(
-                            $get('organization_id') ? (int) $get('organization_id') : null
-                        ))
-                        ->searchable()
-                        ->preload()
-                        ->nullable(),
 
                     TextInput::make('title')
                         ->required()
@@ -179,45 +168,13 @@ class DonationCampaignForm
 
         if (! $user->isSuperAdmin()) {
             $managedIds = $user->managedOrganizations()->pluck('organizations.id');
-            $eventOrganizationIds = $user->eventManagerEvents()->pluck('events.organization_id');
-
-            $ids = $managedIds
-                ->merge($eventOrganizationIds)
-                ->unique()
-                ->values();
+            $ids = $managedIds->unique()->values();
 
             if ($ids->isEmpty()) {
                 return [];
             }
 
             $query->whereIn('id', $ids);
-        }
-
-        return $query->pluck('name', 'id')
-            ->mapWithKeys(fn ($name, $id) => [(int) $id => $name])
-            ->toArray();
-    }
-
-    public static function eventOptions(?int $organizationId): array
-    {
-        $user = auth()->user();
-
-        if (! $user instanceof User || ! $organizationId) {
-            return [];
-        }
-
-        $query = Event::query()
-            ->where('organization_id', $organizationId)
-            ->orderBy('name');
-
-        if (! $user->isSuperAdmin() && ! $user->canManageOrganization($organizationId)) {
-            $eventIds = $user->eventManagerEvents()->pluck('events.id');
-
-            if ($eventIds->isEmpty()) {
-                return [];
-            }
-
-            $query->whereIn('id', $eventIds);
         }
 
         return $query->pluck('name', 'id')
