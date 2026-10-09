@@ -500,16 +500,6 @@
                                             <span>{{ $campaign->organization->name }}</span>
                                         </div>
                                     @endif
-
-                                    @if ($campaign->event)
-                                        <div class="meta-item">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                                <rect x="3" y="5" width="18" height="16" rx="2"/>
-                                                <path d="M16 3v4M8 3v4M3 10h18"/>
-                                            </svg>
-                                            <span>{{ $campaign->event->name }}</span>
-                                        </div>
-                                    @endif
                                 </div>
 
                                 @if ($description !== '')
