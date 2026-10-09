@@ -36,6 +36,7 @@ class PaymentFulfillmentService
                     'attendee.event.paymentSetting',
                     'ticketOrder',
                     'ticketUpgrade',
+                    'donation',
                 ])
                 ->lockForUpdate()
                 ->findOrFail($payment->getKey());
@@ -66,6 +67,13 @@ class PaymentFulfillmentService
                 return $payment->fresh(['ticketUpgrade']);
             }
 
+            if ($payment->donation_id) {
+                $this->fulfillDonationPayment($payment);
+                $this->markPaymentFulfilled($payment);
+
+                return $payment->fresh(['donation']);
+            }
+
             if ($payment->ticket_order_id) {
                 $this->fulfillTicketPayment($payment);
                 $this->markPaymentFulfilled($payment);
@@ -81,11 +89,37 @@ class PaymentFulfillmentService
                 return $payment->fresh(['attendee']);
             }
 
-            throw new RuntimeException('Payment has no attendee, ticket order, or ticket upgrade to fulfill.');
+            throw new RuntimeException('Payment has no attendee, ticket order, ticket upgrade, or donation to fulfill.');
         } catch (Throwable $exception) {
             report($exception);
             throw $exception;
         }
+    }
+
+    private function fulfillDonationPayment(Payment $payment): void
+    {
+        DB::transaction(function () use ($payment): void {
+            $donation = \App\Models\Donation::query()
+                ->lockForUpdate()
+                ->findOrFail($payment->donation_id);
+
+            if ((string) $donation->currency !== (string) $payment->currency) {
+                throw new RuntimeException('Donation payment currency does not match the donation currency.');
+            }
+
+            if (bccomp((string) $donation->amount, (string) $payment->amount, 2) !== 0) {
+                throw new RuntimeException('Donation payment amount does not match the donation amount.');
+            }
+
+            if ($donation->status === \App\Models\Donation::STATUS_COMPLETED) {
+                return;
+            }
+
+            $donation->forceFill([
+                'status' => \App\Models\Donation::STATUS_COMPLETED,
+                'completed_at' => $donation->completed_at ?? $payment->paid_at ?? now(),
+            ])->save();
+        }, attempts: 3);
     }
 
     private function fulfillTicketPayment(Payment $payment): void

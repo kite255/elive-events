@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use App\Models\Event;
+use App\Services\EventPresetService;
 use App\Filament\Pages\BadgePrintStation;
 use App\Filament\Resources\Attendees\AttendeeResource;
 use App\Services\BadgeDeliveryService;
@@ -24,12 +26,19 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema as DbSchema;
 use Illuminate\Support\Js;
 use Throwable;
 
 class AttendeesRelationManager extends RelationManager
 {
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return $ownerRecord instanceof Event
+            && (EventPresetService::usesRegistration($ownerRecord->event_type) || EventPresetService::usesGuestRsvp($ownerRecord->event_type));
+    }
+
     protected static string $relationship = 'attendees';
 
     protected static ?string $title = 'Event Attendees';

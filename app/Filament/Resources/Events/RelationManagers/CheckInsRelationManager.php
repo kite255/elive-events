@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Events\RelationManagers;
 
+use App\Models\Event;
+use App\Services\EventPresetService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -14,8 +16,16 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
+use Illuminate\Database\Eloquent\Model;
+
 class CheckInsRelationManager extends RelationManager
 {
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return $ownerRecord instanceof Event
+            && (EventPresetService::usesRegistration($ownerRecord->event_type) || EventPresetService::usesBadges($ownerRecord->event_type) || EventPresetService::usesTicketing($ownerRecord->event_type));
+    }
+
     protected static string $relationship = 'checkIns';
 
     protected static ?string $title = 'Check-ins';

@@ -28,6 +28,7 @@ class EventPresetService
             'church_event' => 'Church Event',
             'community_event' => 'Community Event',
             'charity_event' => 'Charity / Fundraising Event',
+            'health_event' => 'Health / Wellness Event',
 
             'bonanza' => 'Bonanza',
             'sports_event' => 'Sports Event',
@@ -62,6 +63,7 @@ class EventPresetService
             'professional_fields' => false,
             'badges' => false,
             'guest_rsvp' => false,
+            'public_health_fields' => false,
         ];
 
         return match ($eventType) {
@@ -78,6 +80,7 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -100,6 +103,7 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -121,6 +125,7 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -137,6 +142,7 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -155,6 +161,7 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => true,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -163,15 +170,44 @@ class EventPresetService
             |--------------------------------------------------------------------------
             */
 
-            'church_event',
-            'community_event',
-            'charity_event' => [
+            'church_event' => [
                 'ticketing' => false,
                 'registration' => true,
                 'sessions' => true,
                 'professional_fields' => false,
                 'badges' => true,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
+            ],
+
+            'community_event' => [
+                'ticketing' => false,
+                'registration' => true,
+                'sessions' => true,
+                'professional_fields' => false,
+                'badges' => false,
+                'guest_rsvp' => false,
+                'public_health_fields' => false,
+            ],
+
+            'charity_event' => [
+                'ticketing' => false,
+                'registration' => false,
+                'sessions' => true,
+                'professional_fields' => false,
+                'badges' => false,
+                'guest_rsvp' => false,
+                'public_health_fields' => false,
+            ],
+
+            'health_event' => [
+                'ticketing' => false,
+                'registration' => false,
+                'sessions' => true,
+                'professional_fields' => false,
+                'badges' => false,
+                'guest_rsvp' => false,
+                'public_health_fields' => true,
             ],
 
             /*
@@ -189,6 +225,7 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => true,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -206,6 +243,7 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             /*
@@ -221,6 +259,7 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => false,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             'hybrid_event' => [
@@ -230,6 +269,7 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
+                'public_health_fields' => false,
             ],
 
             default => $default,
@@ -282,6 +322,14 @@ class EventPresetService
         return self::featureProfile(
             $eventType
         )['guest_rsvp'];
+    }
+
+    public static function usesPublicHealthFields(
+        ?string $eventType
+    ): bool {
+        return self::featureProfile(
+            $eventType
+        )['public_health_fields'];
     }
 
     public static function preset(?string $eventType): array
@@ -422,33 +470,83 @@ class EventPresetService
                 'session_check_in_enabled' => true,
             ],
 
-            'church_event',
-            'community_event',
-            'charity_event' => [
+            'church_event' => [
                 'registration_is_open' => false,
-
                 'registration_show_phone' => true,
                 'registration_require_phone' => true,
-
                 'registration_show_email' => false,
                 'registration_require_email' => false,
-
                 'registration_show_organization' => true,
                 'registration_require_organization' => false,
-
                 'registration_show_position' => false,
                 'registration_require_position' => false,
-
                 'registration_show_category' => true,
                 'registration_require_category' => false,
-
                 'registration_show_badge_type' => false,
                 'registration_require_badge_type' => false,
-
                 'schedule_mode' => 'multi_day',
-
                 'sessions_enabled' => true,
                 'session_registration_enabled' => true,
+                'session_check_in_enabled' => true,
+            ],
+
+            'community_event' => [
+                'registration_is_open' => false,
+                'registration_show_phone' => true,
+                'registration_require_phone' => true,
+                'registration_show_email' => false,
+                'registration_require_email' => false,
+                'registration_show_organization' => false,
+                'registration_require_organization' => false,
+                'registration_show_position' => false,
+                'registration_require_position' => false,
+                'registration_show_category' => true,
+                'registration_require_category' => false,
+                'registration_show_badge_type' => false,
+                'registration_require_badge_type' => false,
+                'schedule_mode' => 'single_day',
+                'sessions_enabled' => true,
+                'session_registration_enabled' => true,
+                'session_check_in_enabled' => true,
+            ],
+
+            'charity_event' => [
+                'registration_is_open' => false,
+                'registration_show_phone' => true,
+                'registration_require_phone' => true,
+                'registration_show_email' => false,
+                'registration_require_email' => false,
+                'registration_show_organization' => false,
+                'registration_require_organization' => false,
+                'registration_show_position' => false,
+                'registration_require_position' => false,
+                'registration_show_category' => true,
+                'registration_require_category' => false,
+                'registration_show_badge_type' => false,
+                'registration_require_badge_type' => false,
+                'schedule_mode' => 'single_day',
+                'sessions_enabled' => true,
+                'session_registration_enabled' => false,
+                'session_check_in_enabled' => false,
+            ],
+
+            'health_event' => [
+                'registration_is_open' => false,
+                'registration_show_phone' => true,
+                'registration_require_phone' => true,
+                'registration_show_email' => true,
+                'registration_require_email' => false,
+                'registration_show_organization' => false,
+                'registration_require_organization' => false,
+                'registration_show_position' => false,
+                'registration_require_position' => false,
+                'registration_show_category' => true,
+                'registration_require_category' => false,
+                'registration_show_badge_type' => false,
+                'registration_require_badge_type' => false,
+                'schedule_mode' => 'single_day',
+                'sessions_enabled' => true,
+                'session_registration_enabled' => false,
                 'session_check_in_enabled' => true,
             ],
 
@@ -568,14 +666,36 @@ class EventPresetService
                 'additional' => 'Additional Participant Information',
             ],
 
-            'church_event',
-            'community_event',
-            'charity_event' => [
+            'church_event' => [
                 'personal' => 'Personal Details',
                 'professional' => 'Church / Ministry Details',
                 'attendance' => 'Attendance Days',
                 'sessions' => 'Programs & Services',
                 'additional' => 'Additional Information',
+            ],
+
+            'community_event' => [
+                'personal' => 'Participant Details',
+                'professional' => 'Community Information',
+                'attendance' => 'Attendance',
+                'sessions' => 'Activities / Programs',
+                'additional' => 'Additional Information',
+            ],
+
+            'charity_event' => [
+                'personal' => 'Participant / Supporter Details',
+                'professional' => 'Supporter Information',
+                'attendance' => 'Attendance',
+                'sessions' => 'Campaign Activities',
+                'additional' => 'Additional Information',
+            ],
+
+            'health_event' => [
+                'personal' => 'Participant Details',
+                'professional' => 'Health Event Information',
+                'attendance' => 'Attendance',
+                'sessions' => 'Health Activities / Screenings',
+                'additional' => 'Additional Participant Information',
             ],
 
             'wedding',

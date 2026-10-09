@@ -133,6 +133,7 @@
         ->orderBy('id')
         ->get()
         ->groupBy('event_id');
+
 @endphp
 
 
@@ -893,6 +894,10 @@
                     Events
                 </a>
 
+                <a href="{{ route('public.donations.index') }}" class="nav-link">
+                    Donations
+                </a>
+
                 <a href="{{ route('home') }}#contact" class="nav-link">
                     Contact
                 </a>
@@ -951,6 +956,13 @@
                     aria-current="page"
                 >
                     Events
+                </a>
+
+                <a
+                    href="{{ route('public.donations.index') }}"
+                    class="mobile-nav-link"
+                >
+                    Donations
                 </a>
 
                 <a
@@ -1343,9 +1355,12 @@
 
                                     @else
 
-                                        <span class="ended-label">
-                                            Registration Closed
-                                        </span>
+                                        <a
+                                            href="{{ $eventDetailsUrl }}"
+                                            class="register-btn"
+                                        >
+                                            View Event
+                                        </a>
 
                                     @endif
 
@@ -1378,6 +1393,7 @@
         </div>
     </section>
 
+
 </main>
 
 
@@ -1391,6 +1407,10 @@
         <div class="footer-links">
             <a href="{{ route('home') }}">
                 Home
+            </a>
+
+            <a href="{{ route('public.donations.index') }}">
+                Donations
             </a>
 
             <a href="{{ route('home') }}#contact">

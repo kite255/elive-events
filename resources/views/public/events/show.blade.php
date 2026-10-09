@@ -1729,9 +1729,7 @@
         }
 
         @media (max-width: 900px) {
-            .details-grid {
-                grid-template-columns: 1fr;
-            }
+            .details-grid
 
             .info-card {
                 position: static;
@@ -2824,6 +2822,10 @@
 
             <a href="{{ route('public.events.index') }}">
                 Events
+            </a>
+
+            <a href="{{ route('public.donations.index') }}">
+                Donations
             </a>
 
             <a href="{{ route('home') }}#contact">
