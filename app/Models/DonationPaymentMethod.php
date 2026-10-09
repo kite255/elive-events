@@ -14,6 +14,7 @@ class DonationPaymentMethod extends Model
         'provider_name',
         'account_name',
         'account_number_or_phone',
+        'account_identifier_type',
         'instructions',
         'enabled',
         'sort_order',
