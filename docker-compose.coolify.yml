@@ -17,7 +17,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   scheduler:
@@ -36,7 +36,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   worker-communications:
@@ -61,7 +61,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   worker-communications-email:
@@ -86,7 +86,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   worker-communications-sms:
@@ -111,7 +111,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   worker-communications-whatsapp:
@@ -136,7 +136,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   worker-badges:
@@ -161,7 +161,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   worker-payments:
@@ -186,7 +186,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   worker-default:
@@ -211,7 +211,7 @@ services:
 
     depends_on:
       - postgres
-      - redis
+      - elive-events-redis
 
 
   nginx:
@@ -245,17 +245,10 @@ services:
       - elive_postgres_data:/var/lib/postgresql/data
 
 
-  redis:
+  elive-events-redis:
     image: redis:7-alpine
 
     restart: unless-stopped
-
-    # Use a unique DNS alias on the application network so Laravel never
-    # resolves the shared Coolify Redis service when both networks are attached.
-    networks:
-      default:
-        aliases:
-          - elive-events-redis
 
 
 volumes:
