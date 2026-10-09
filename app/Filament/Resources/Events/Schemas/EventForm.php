@@ -83,14 +83,6 @@ class EventForm
             );
     }
 
-    private static function showDonations(Get $get): bool
-    {
-        return self::advanced($get)
-            || EventPresetService::usesDonations(
-                self::eventType($get)
-            );
-    }
-
     private static function showForTypes(
         Get $get,
         array $eventTypes
@@ -670,16 +662,16 @@ class EventForm
                                             'Festival mode focuses on ticketing and performances or activities. Registration can be enabled through Advanced Features when required.',
 
                                         'church_event' =>
-                                            'Church mode focuses on registration, attendance days, programs or services, communications, and badges. Fundraising remains optional.',
+                                            'Church mode focuses on registration, attendance days, programs or services, communications, and badges.',
 
                                         'community_event' =>
-                                            'Community mode focuses on participant registration and activities. Badges, ticketing, and fundraising remain optional unless the event needs them.',
+                                            'Community mode focuses on participant registration and activities. Badges and ticketing remain optional unless the event needs them.',
 
                                         'charity_event' =>
-                                            'Charity / fundraising mode focuses on campaign support, donations, activities, communication, and optional participant registration.',
+                                            'Charity mode focuses on activities, communication, and optional participant registration.',
 
                                         'health_event' =>
-                                            'Health / wellness mode focuses on screenings or activities, public event information, communications, and linked donation campaigns. Registration, ticketing, badges, and professional fields stay hidden by default.',
+                                            'Health / wellness mode focuses on screenings or activities, public event information, and communications. Registration, ticketing, badges, and professional fields stay hidden by default.',
 
                                         'bonanza',
                                         'sports_event',
