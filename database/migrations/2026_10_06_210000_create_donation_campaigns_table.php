@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('donation_campaigns', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('event_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title');
             $table->string('slug');
             $table->text('description')->nullable();
@@ -35,7 +34,6 @@ return new class extends Migration
 
             $table->unique(['organization_id', 'slug']);
             $table->index(['status', 'is_public']);
-            $table->index(['event_id', 'status']);
         });
     }
 
