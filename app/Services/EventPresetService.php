@@ -63,7 +63,6 @@ class EventPresetService
             'professional_fields' => false,
             'badges' => false,
             'guest_rsvp' => false,
-            'donations' => false,
             'public_health_fields' => false,
         ];
 
@@ -81,7 +80,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -105,7 +103,6 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -128,7 +125,6 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -146,7 +142,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -166,7 +161,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => true,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -183,7 +177,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => true,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -194,7 +187,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -205,7 +197,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => false,
-                'donations' => true,
                 'public_health_fields' => false,
             ],
 
@@ -216,7 +207,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => false,
                 'guest_rsvp' => false,
-                'donations' => true,
                 'public_health_fields' => true,
             ],
 
@@ -235,7 +225,6 @@ class EventPresetService
                 'professional_fields' => false,
                 'badges' => true,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -254,7 +243,6 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -271,7 +259,6 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => false,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -282,7 +269,6 @@ class EventPresetService
                 'professional_fields' => true,
                 'badges' => true,
                 'guest_rsvp' => false,
-                'donations' => false,
                 'public_health_fields' => false,
             ],
 
@@ -336,14 +322,6 @@ class EventPresetService
         return self::featureProfile(
             $eventType
         )['guest_rsvp'];
-    }
-
-    public static function usesDonations(
-        ?string $eventType
-    ): bool {
-        return self::featureProfile(
-            $eventType
-        )['donations'];
     }
 
     public static function usesPublicHealthFields(
