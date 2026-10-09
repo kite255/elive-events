@@ -45,6 +45,7 @@ class DonationPaymentMethodForm
                 ->options([
                     'account' => 'Account Number',
                     'phone' => 'Phone Number',
+                    'lipa' => 'LIPA Number',
                 ])
                 ->default('account')
                 ->visible(fn (Get $get): bool => $get('type') === 'custom')
@@ -55,7 +56,11 @@ class DonationPaymentMethodForm
                 ->label(fn (Get $get): string => match ($get('type')) {
                     'bank' => 'Account Number',
                     'mobile_money' => 'Phone Number',
-                    'custom' => $get('account_identifier_type') === 'phone' ? 'Phone Number' : 'Account Number',
+                    'custom' => match ($get('account_identifier_type')) {
+                        'phone' => 'Phone Number',
+                        'lipa' => 'LIPA Number',
+                        default => 'Account Number',
+                    },
                     default => 'Account Number / Phone Number',
                 })
                 ->maxLength(255),
