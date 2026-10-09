@@ -28,7 +28,6 @@ class PublicDonationCampaignController extends Controller
             ->where('slug', $campaign)
             ->with([
                 'organization',
-                'event',
                 'paymentMethods' => fn ($query) => $query
                     ->where('enabled', true)
                     ->orderBy('sort_order')
