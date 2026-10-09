@@ -37,10 +37,6 @@ class DonationReportService
                     ->orWhereNull('direct_payment_behavior');
             });
 
-        if (! empty($filters['event_id'])) {
-            $campaignIds->where('event_id', (int) $filters['event_id']);
-        }
-
         $ids = $campaignIds->pluck('id');
 
         if ($ids->isEmpty()) {
