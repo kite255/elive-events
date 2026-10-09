@@ -15,8 +15,6 @@ use App\Filament\Resources\Events\RelationManagers\CheckInPointsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\CheckInsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\CommunicationsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\DaysRelationManager;
-use App\Filament\Resources\Events\RelationManagers\DonationCampaignsRelationManager;
-use App\Filament\Resources\Events\RelationManagers\DonationsRelationManager;
 use App\Filament\Resources\Events\RelationManagers\EventStaffRelationManager;
 use App\Filament\Resources\Events\RelationManagers\MerchandiseOrdersRelationManager;
 use App\Filament\Resources\Events\RelationManagers\MerchandiseRelationManager;
@@ -301,8 +299,6 @@ class EventResource extends Resource
             AttendeesRelationManager::class,
             AttendeeCategoriesRelationManager::class,
             DaysRelationManager::class,
-            DonationCampaignsRelationManager::class,
-            DonationsRelationManager::class,
             SessionsRelationManager::class,
             MerchandiseRelationManager::class,
             MerchandiseOrdersRelationManager::class,
