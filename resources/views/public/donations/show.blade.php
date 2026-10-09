@@ -709,7 +709,11 @@
                                 <p><strong>{{ match ($method->type) {
                                     'bank' => 'Account Number',
                                     'mobile_money' => 'Phone Number',
-                                    'custom' => $method->account_identifier_type === 'phone' ? 'Phone Number' : 'Account Number',
+                                    'custom' => match ($method->account_identifier_type) {
+                                        'phone' => 'Phone Number',
+                                        'lipa' => 'LIPA Number',
+                                        default => 'Account Number',
+                                    },
                                     default => 'Account / Phone',
                                 } }}:</strong> {{ $method->account_number_or_phone }}</p>
                             @endif
