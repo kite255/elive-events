@@ -37,7 +37,6 @@ class ManualDonationVerification extends Page
             && (
                 $user->isSuperAdmin()
                 || $user->managedOrganizations()->exists()
-                || $user->eventManagerEvents()->exists()
             );
     }
 
