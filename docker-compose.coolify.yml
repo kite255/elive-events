@@ -250,6 +250,13 @@ services:
 
     restart: unless-stopped
 
+    # Use a unique DNS alias on the application network so Laravel never
+    # resolves the shared Coolify Redis service when both networks are attached.
+    networks:
+      default:
+        aliases:
+          - elive-events-redis
+
 
 volumes:
   elive_postgres_data:
