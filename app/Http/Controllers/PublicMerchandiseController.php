@@ -67,6 +67,7 @@ class PublicMerchandiseController extends Controller
                 'total_tzs' => $price * (int) $data['quantity'],
                 'fulfillment_method' => 'event_pickup',
                 'status' => 'pending_payment',
+                'expires_at' => now()->addMinutes(15),
             ]);
         });
 
