@@ -44,6 +44,11 @@ if (config('database.default') !== 'pgsql' ||
     exit(2);
 }
 
+$variantId = isset($argv[3]) ? (int) $argv[3] : null;
+if ($variantId !== null && $variantId > 0) {
+    $request->merge(['merchandise_variant_id' => $variantId]);
+}
+
 file_put_contents($marker, 'ready');
 $response = $kernel->handle($request);
 echo 'HTTP_STATUS:' . $response->getStatusCode() . PHP_EOL;
