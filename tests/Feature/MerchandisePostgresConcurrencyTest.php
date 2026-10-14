@@ -31,7 +31,7 @@ class MerchandisePostgresConcurrencyTest extends TestCase
             $this->fail('Refusing concurrency test on any database other than the isolated local PostgreSQL test database.');
         }
 
-        $organization = Organization::query()->create(['name' => 'Concurrent Shop Test']);
+        $organization = Organization::query()->create(['name' => 'Concurrent Shop Test ' . Str::lower(Str::random(12))]);
         $event = Event::query()->create([
             'organization_id' => $organization->id,
             'name' => 'Concurrent Test Event',
