@@ -88,6 +88,7 @@ class MerchandiseIndependentStockTest extends TestCase
             'expires_at' => now()->subMinute(),
         ]);
         Payment::query()->create([
+            'organization_id' => $event->organization_id,
             'event_id' => $event->id,
             'merchandise_order_id' => $order->id,
             'reference' => 'PAY-' . Str::upper(Str::random(14)),
