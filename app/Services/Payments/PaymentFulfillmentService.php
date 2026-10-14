@@ -114,6 +114,8 @@ class PaymentFulfillmentService
                 throw new RuntimeException('Merchandise payment does not match the order.');
             }
 
+            // A completed gateway payment is not proof that the reservation
+            // still owns stock. Late payments must be reviewed or refunded.
             if ($order->status === 'paid') {
                 return;
             }
