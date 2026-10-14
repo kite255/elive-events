@@ -12,6 +12,7 @@ return new class extends Migration {
             $table->foreignId('event_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('slug');
+            $table->string('category')->default('other');
             $table->text('description')->nullable();
             $table->string('image_path')->nullable();
             $table->unsignedBigInteger('price_tzs')->nullable();
@@ -32,8 +33,8 @@ return new class extends Migration {
             $table->string('buyer_name');
             $table->string('buyer_phone');
             $table->string('buyer_email')->nullable();
-            $table->string('color');
-            $table->string('size', 12);
+            $table->string('color')->nullable();
+            $table->string('size', 100)->nullable();
             $table->unsignedSmallInteger('quantity');
             $table->unsignedBigInteger('unit_price_tzs');
             $table->unsignedBigInteger('total_tzs');
