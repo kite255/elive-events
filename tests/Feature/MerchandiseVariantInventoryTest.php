@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AttendeeMerchandise;
 use App\Models\Event;
+use App\Models\Organization;
 use App\Models\EventMerchandise;
 use App\Models\MerchandiseOrder;
 use App\Models\MerchandiseProduct;
@@ -19,7 +20,9 @@ class MerchandiseVariantInventoryTest extends TestCase
 
     private function variantWithPublicOrder(int $quantity, string $status, ?\DateTimeInterface $expiresAt): MerchandiseVariant
     {
+        $organization = Organization::query()->create(['name' => 'Merchandise Test Organization']);
         $event = Event::query()->create([
+            'organization_id' => $organization->id,
             'name' => 'Inventory Test Event',
             'slug' => 'inventory-test-' . Str::lower(Str::random(8)),
             'status' => 'active',
