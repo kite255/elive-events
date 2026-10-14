@@ -12,7 +12,7 @@ class CreateMerchandiseProduct extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        abort_unless(MerchandiseProductResource::accessibleEvents()->whereKey($data['event_id'])->exists(), 403);
+        abort_unless(\App\Models\Event::query()->find($data['event_id'])?->canBeManagedBy(auth()->user()) === true, 403);
 
         return $data;
     }
