@@ -36,8 +36,8 @@ class PublicMerchandiseController extends Controller
             'buyer_name' => ['required', 'string', 'max:150'],
             'buyer_phone' => ['required', 'string', 'max:30'],
             'buyer_email' => ['nullable', 'email', 'max:254'],
-            'color' => [empty($product->colors) ? 'nullable' : 'required', 'string', Rule::in($product->colors ?? [])],
-            'size' => [empty($product->sizes) ? 'nullable' : 'required', 'string', Rule::in($product->sizes ?? [])],
+            'color' => [($product->event_merchandise_id || empty($product->colors)) ? 'nullable' : 'required', 'string', Rule::in($product->colors ?? [])],
+            'size' => [($product->event_merchandise_id || empty($product->sizes)) ? 'nullable' : 'required', 'string', Rule::in($product->sizes ?? [])],
             'quantity' => ['required', 'integer', 'min:1', 'max:20'],
             'merchandise_variant_id' => ['nullable', 'integer'],
             'fulfillment_method' => ['required', Rule::in(['event_pickup'])],
@@ -47,7 +47,7 @@ class PublicMerchandiseController extends Controller
         $order = DB::transaction(function () use ($product, $event, $data): MerchandiseOrder {
             $current = MerchandiseProduct::query()->lockForUpdate()->findOrFail($product->id);
             abort_unless($current->event_id === $event->id && $current->is_active && $current->price_tzs !== null, 422);
-            abort_unless((empty($current->colors) || in_array($data['color'] ?? null, $current->colors, true)) && (empty($current->sizes) || in_array($data['size'] ?? null, $current->sizes, true)), 422);
+            abort_unless($current->event_merchandise_id || ((empty($current->colors) || in_array($data['color'] ?? null, $current->colors, true)) && (empty($current->sizes) || in_array($data['size'] ?? null, $current->sizes, true))), 422);
             $price = (int) $current->price_tzs;
             abort_unless($price > 0 && $price <= 100000000, 422);
             // Linked attendee merchandise requires shared variant reservations before checkout.
