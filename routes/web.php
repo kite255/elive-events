@@ -20,6 +20,7 @@ use App\Http\Controllers\PublicTicketViewController;
 use App\Http\Controllers\QrVerificationController;
 use App\Http\Controllers\TicketScannerController;
 use App\Models\Event;
+use App\Http\Controllers\PublicMerchandiseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -524,6 +525,13 @@ Route::post(
     ->middleware('throttle:20,10')
     ->name('public.donations.store');
 
+
+Route::get('/events/{event:slug}/merchandise', [PublicMerchandiseController::class, 'index'])
+    ->name('public.merchandise.index');
+Route::post('/events/{event:slug}/merchandise/{product}', [PublicMerchandiseController::class, 'store'])
+    ->middleware('throttle:10,1')->name('public.merchandise.store');
+Route::get('/merchandise/orders/{token}', [PublicMerchandiseController::class, 'showOrder'])
+    ->middleware('throttle:60,1')->name('public.merchandise.orders.show');
 
 /*
 |--------------------------------------------------------------------------
