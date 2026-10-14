@@ -492,6 +492,11 @@
                                 </h2>
 
                                 <div class="campaign-meta">
+                                    @if ($campaign->event)
+                                        <div class="meta-item">
+                                            <span>Event: {{ $campaign->event->name }}</span>
+                                        </div>
+                                    @endif
                                     @if ($campaign->organization)
                                         <div class="meta-item">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
