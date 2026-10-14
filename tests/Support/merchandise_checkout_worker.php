@@ -16,6 +16,15 @@ if (getenv('APP_ENV') !== 'testing' ||
     exit(2);
 }
 
+$path = $argv[1] ?? '';
+$marker = $argv[2] ?? '';
+if (! str_starts_with($path, '/events/') || ! str_contains($path, '/merchandise/') || ! $marker) {
+    exit(2);
+}
+
+// Signal process startup before bootstrapping Laravel, which may query the DB.
+file_put_contents($marker, 'started');
+
 $app = require dirname(__DIR__, 2) . '/bootstrap/app.php';
 $kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
@@ -23,12 +32,6 @@ $kernel->bootstrap();
 if (config('database.default') !== 'pgsql' ||
     config('database.connections.pgsql.database') !== $expectedDatabase) {
     fwrite(STDERR, "Actual database configuration mismatch.\n");
-    exit(2);
-}
-
-$path = $argv[1] ?? '';
-$marker = $argv[2] ?? '';
-if (! str_starts_with($path, '/events/') || ! str_contains($path, '/merchandise/') || ! $marker) {
     exit(2);
 }
 
