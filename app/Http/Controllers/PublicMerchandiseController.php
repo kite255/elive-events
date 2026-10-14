@@ -16,7 +16,7 @@ class PublicMerchandiseController extends Controller
 {
     public function index(Event $event): View
     {
-        abort_if(in_array($event->status, ['draft', 'cancelled'], true), 404);
+        abort_if(in_array($event->status, ['draft', 'cancelled'], true) || ! $event->merchandise_section_enabled, 404);
 
         return view('public.merchandise.index', [
             'event' => $event,
