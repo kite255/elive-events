@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\MerchandiseOrder;
 use App\Models\MerchandiseProduct;
+use App\Models\MerchandiseVariant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +29,7 @@ class PublicMerchandiseController extends Controller
 
     public function store(Request $request, Event $event, MerchandiseProduct $product): RedirectResponse
     {
-        abort_if(in_array($event->status, ['draft', 'cancelled'], true), 404);
+        abort_if(in_array($event->status, ['draft', 'cancelled'], true) || ! $event->merchandise_section_enabled, 404);
         abort_unless($product->event_id === $event->id && $product->is_active && $product->price_tzs !== null, 404);
 
         $data = $request->validate([
@@ -38,6 +39,7 @@ class PublicMerchandiseController extends Controller
             'color' => [empty($product->colors) ? 'nullable' : 'required', 'string', Rule::in($product->colors ?? [])],
             'size' => [empty($product->sizes) ? 'nullable' : 'required', 'string', Rule::in($product->sizes ?? [])],
             'quantity' => ['required', 'integer', 'min:1', 'max:20'],
+            'merchandise_variant_id' => ['nullable', 'integer'],
             'fulfillment_method' => ['required', Rule::in(['event_pickup'])],
         ]);
 
@@ -49,19 +51,33 @@ class PublicMerchandiseController extends Controller
             $price = (int) $current->price_tzs;
             abort_unless($price > 0 && $price <= 100000000, 422);
             // Linked attendee merchandise requires shared variant reservations before checkout.
-            abort_if($current->event_merchandise_id !== null, 409, 'Shared-inventory checkout is not enabled yet.');
-            abort_unless($current->stock_quantity >= (int) $data['quantity'], 422, 'Insufficient stock.');
-            $current->decrement('stock_quantity', (int) $data['quantity']);
+            $variant = null;
+            if ($current->event_merchandise_id !== null) {
+                abort_unless(filled($data['merchandise_variant_id'] ?? null), 422, 'Select a merchandise variant.');
+                $variant = MerchandiseVariant::query()->lockForUpdate()
+                    ->where('event_merchandise_id', $current->event_merchandise_id)
+                    ->findOrFail($data['merchandise_variant_id']);
+                abort_unless($variant->is_active && $variant->merchandise?->isSelectionOpen(), 422);
+                abort_unless($variant->currency === 'TZS', 422, 'Only TZS variants are supported.');
+                abort_unless($variant->remainingQuantity() >= (int) $data['quantity'], 422, 'Insufficient variant stock.');
+                $price = (int) $variant->price;
+                abort_unless($price > 0 && $price <= 100000000, 422);
+            }
+            if ($variant === null) {
+                abort_unless($current->stock_quantity >= (int) $data['quantity'], 422, 'Insufficient stock.');
+                $current->decrement('stock_quantity', (int) $data['quantity']);
+            }
             return MerchandiseOrder::create([
                 'event_id' => $event->id,
                 'merchandise_product_id' => $current->id,
+                'merchandise_variant_id' => $variant?->id,
                 'public_token' => Str::random(48),
                 'order_number' => 'ELV-MER-' . strtoupper(Str::random(12)),
                 'buyer_name' => $data['buyer_name'],
                 'buyer_phone' => $data['buyer_phone'],
                 'buyer_email' => $data['buyer_email'] ?? null,
-                'color' => $data['color'] ?? null,
-                'size' => $data['size'] ?? null,
+                'color' => $variant?->color_name ?? ($data['color'] ?? null),
+                'size' => $variant?->size ?? ($data['size'] ?? null),
                 'quantity' => $data['quantity'],
                 'unit_price_tzs' => $price,
                 'total_tzs' => $price * (int) $data['quantity'],
