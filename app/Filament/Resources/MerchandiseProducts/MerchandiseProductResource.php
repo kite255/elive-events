@@ -36,7 +36,7 @@ class MerchandiseProductResource extends Resource
 
     public static function accessibleEvents(): Builder
     {
-        return Event::query()->accessibleBy(auth()->user())->whereHas('organization', fn (Builder $q) => $q);
+        return Event::query()->accessibleBy(auth()->user());
     }
 
     public static function form(Schema $schema): Schema
