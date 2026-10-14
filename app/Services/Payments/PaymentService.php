@@ -701,6 +701,13 @@ class PaymentService
             $response
         );
 
+        if ($payment->merchandise_order_id) {
+            $order = MerchandiseOrder::query()->find($payment->merchandise_order_id);
+            if (! $order) {
+                throw new RuntimeException('Merchandise order is missing.');
+            }
+        }
+
         $gatewayStatus =
             strtoupper(
                 trim(
