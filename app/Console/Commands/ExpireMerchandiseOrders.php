@@ -23,14 +23,14 @@ class ExpireMerchandiseOrders extends Command
                     if (! $order || $order->status !== 'pending_payment' || ! $order->expires_at || $order->expires_at->isFuture()) {
                         return;
                     }
-                    if ($order->merchandise_variant_id !== null) {
-                        // Do not release shared inventory until shared reservation accounting is implemented.
-                        return;
+                    if ($order->merchandise_variant_id === null) {
+                        $product = MerchandiseProduct::query()->lockForUpdate()->find($order->merchandise_product_id);
+                        if ($product) {
+                            $product->increment('stock_quantity', $order->quantity);
+                        }
                     }
-                    $product = MerchandiseProduct::query()->lockForUpdate()->find($order->merchandise_product_id);
-                    if ($product) {
-                        $product->increment('stock_quantity', $order->quantity);
-                    }
+                    // Linked variant availability is calculated from active order statuses.
+                    // Expiring the order releases its commitment without altering physical stock.
                     $order->update(['status' => 'expired']);
                     $count++;
                 });
