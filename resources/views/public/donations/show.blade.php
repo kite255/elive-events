@@ -589,7 +589,7 @@
                                 <span>{{ $campaign->organization->name }}</span>
                             @endif
                         </div>
-                        <a href="#payment-methods" class="donate-link">Donate Now ↓</a>
+                        <a href="#payment-methods" class="donate-link">{{ $campaign->payment_mode === \App\Models\DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT && $campaign->direct_payment_behavior === \App\Models\DonationCampaign::DIRECT_BEHAVIOR_DISPLAY_ONLY ? 'View payment details ↓' : 'Donate Now ↓' }}</a>
                     </div>
                 </div>
             </article>
