@@ -23,7 +23,7 @@ class MerchandiseOrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->whereHas('event', fn (Builder $q) => $q->accessibleBy(auth()->user()));
+        return parent::getEloquentQuery()->whereHas('event', fn (Builder $q) => $q->accessibleBy(auth()->user()))->whereIn('event_id', Event::query()->accessibleBy(auth()->user())->get()->filter(fn (Event $event) => $event->canBeManagedBy(auth()->user()))->pluck('id'));
     }
 
     public static function canViewAny(): bool
