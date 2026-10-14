@@ -60,7 +60,8 @@ class DonationResource extends Resource
         }
 
         return $user->isSuperAdmin()
-            || $user->managedOrganizations()->exists();
+            || $user->managedOrganizations()->exists()
+            || $user->eventManagerEvents()->exists();
     }
 
     public static function canView(Model $record): bool
