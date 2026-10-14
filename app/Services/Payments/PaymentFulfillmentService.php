@@ -57,6 +57,12 @@ class PaymentFulfillmentService
         }
 
         try {
+            if ($payment->merchandise_order_id) {
+                $this->fulfillMerchandisePayment($payment);
+                $this->markPaymentFulfilled($payment);
+                return $payment->fresh(['merchandiseOrder']);
+            }
+
             if ($payment->ticket_upgrade_id) {
                 $upgrade = $this->ticketUpgradeFulfillmentService->fulfill($payment);
 
@@ -94,6 +100,33 @@ class PaymentFulfillmentService
             report($exception);
             throw $exception;
         }
+    }
+
+    private function fulfillMerchandisePayment(Payment $payment): void
+    {
+        DB::transaction(function () use ($payment): void {
+            $order = \App\Models\MerchandiseOrder::query()
+                ->lockForUpdate()->findOrFail($payment->merchandise_order_id);
+
+            if ((int) $order->event_id !== (int) $payment->event_id
+                || bccomp((string) $order->total_tzs, (string) $payment->amount, 2) !== 0
+                || strtoupper((string) $payment->currency) !== 'TZS') {
+                throw new RuntimeException('Merchandise payment does not match the order.');
+            }
+
+            if ($order->status === 'paid') {
+                return;
+            }
+
+            // A late payment must not silently consume stock reallocated
+            // after the customer's reservation expired.
+            if ($order->status !== 'pending_payment'
+                || ! $order->expires_at || $order->expires_at->isPast()) {
+                throw new RuntimeException('Merchandise reservation expired. Payment requires manual review or refund.');
+            }
+
+            $order->update(['status' => 'paid']);
+        }, attempts: 3);
     }
 
     private function fulfillDonationPayment(Payment $payment): void
