@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MerchandiseOrder extends Model
 {
-    protected $fillable = ['event_id', 'merchandise_product_id', 'public_token', 'order_number', 'buyer_name', 'buyer_phone', 'buyer_email', 'color', 'size', 'quantity', 'unit_price_tzs', 'total_tzs', 'fulfillment_method', 'status'];
+    protected $fillable = ['event_id', 'merchandise_variant_id', 'merchandise_product_id', 'public_token', 'order_number', 'buyer_name', 'buyer_phone', 'buyer_email', 'color', 'size', 'quantity', 'unit_price_tzs', 'total_tzs', 'fulfillment_method', 'status'];
+
+    public function inventoryVariant(): BelongsTo
+    {
+        return $this->belongsTo(MerchandiseVariant::class, 'merchandise_variant_id');
+    }
 
     public function event(): BelongsTo
     {
