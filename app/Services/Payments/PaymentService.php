@@ -768,6 +768,17 @@ class PaymentService
             }
         }
 
+        // An unfinished Pesapal checkout must never be interpreted as paid.
+        // Expired merchandise reservations can still receive late provider
+        // confirmations, which fulfillment must route to manual review.
+        if ($gatewayStatus === 'PENDING' && $payment->merchandise_order_id) {
+            $merchandiseOrder = MerchandiseOrder::query()->find($payment->merchandise_order_id);
+            if ($merchandiseOrder && ($merchandiseOrder->status === 'expired'
+                || ($merchandiseOrder->expires_at && $merchandiseOrder->expires_at->isPast()))) {
+                $localStatus = Payment::STATUS_EXPIRED;
+            }
+        }
+
         $transitionedToCompleted =
             DB::transaction(
                 function () use (
