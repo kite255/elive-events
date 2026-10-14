@@ -43,6 +43,11 @@ class MerchandiseProductResource extends Resource
     {
         return $schema->components([
             Select::make('event_id')->label('Event')->options(fn () => static::accessibleEvents()->get()->filter(fn (Event $event) => $event->canBeManagedBy(auth()->user()))->pluck('name', 'id')->all())->searchable()->required(),
+            Select::make('event_merchandise_id')
+                ->label('Existing event merchandise (optional)')
+                ->helperText('Link an existing attendee merchandise item. Linked products cannot accept new public reservations until shared-stock checkout is completed.')
+                ->options(fn () => \App\Models\EventMerchandise::query()->whereIn('event_id', static::accessibleEvents()->pluck('id'))->get()->filter(fn ($item) => $item->event?->canBeManagedBy(auth()->user()))->pluck('name', 'id')->all())
+                ->searchable(),
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('slug')->required()->maxLength(255)->helperText('Unique within this event.'),
             Select::make('category')->options([
