@@ -25,6 +25,7 @@ class DonationCampaign extends Model
 
     protected $fillable = [
         'organization_id',
+        'event_id',
         'title',
         'slug',
         'description',
@@ -92,6 +93,7 @@ class DonationCampaign extends Model
     {
         return [
             'organization_id' => 'integer',
+            'event_id' => 'integer',
             'minimum_amount' => 'decimal:2',
             'suggested_amounts' => 'array',
             'gallery_image_paths' => 'array',
@@ -110,6 +112,11 @@ class DonationCampaign extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(Event::class);
     }
 
     public function donations(): HasMany
@@ -143,12 +150,20 @@ class DonationCampaign extends Model
 
         $managedOrganizationIds = $user->managedOrganizations()
             ->pluck('organizations.id');
+        $managedEventIds = $user->eventManagerEvents()->pluck('events.id');
 
-        if ($managedOrganizationIds->isEmpty()) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        return $query->whereIn('organization_id', $managedOrganizationIds);
+        return $query->where(function (Builder $campaigns) use ($managedOrganizationIds, $managedEventIds): void {
+            if ($managedOrganizationIds->isNotEmpty()) {
+                $campaigns->whereIn('organization_id', $managedOrganizationIds);
+            }
+            if ($managedEventIds->isNotEmpty()) {
+                $method = $managedOrganizationIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                $campaigns->{$method}('event_id', $managedEventIds);
+            }
+            if ($managedOrganizationIds->isEmpty() && $managedEventIds->isEmpty()) {
+                $campaigns->whereRaw('1 = 0');
+            }
+        });
     }
 
     public function canBeManagedBy(User $user): bool
@@ -164,7 +179,10 @@ class DonationCampaign extends Model
         ) {
             return true;
         }
-        return false;
+        return $this->event_id !== null
+            && $user->eventManagerEvents()
+                ->where('events.id', $this->event_id)
+                ->exists();
     }
 
     private static function generateUniqueSlug(string $title, int $organizationId): string
