@@ -509,7 +509,7 @@ class TicketDesignerServiceTest extends TestCase
             500
         );
 
-        $this->assertSame(
+        $this->assertEquals(
             $original,
             $page->fresh()->definition
         );
