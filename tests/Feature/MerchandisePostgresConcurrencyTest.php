@@ -85,7 +85,8 @@ class MerchandisePostgresConcurrencyTest extends TestCase
             while (microtime(true) < $deadline && count(array_filter($markers, 'file_exists')) < 2) {
                 usleep(25000);
             }
-            $this->assertCount(2, array_filter($markers, 'file_exists'), 'Both checkout workers must start.');
+            $diagnostics = implode("\n", array_map(fn (Process $process) => $process->getErrorOutput() . $process->getOutput(), $workers));
+            $this->assertCount(2, array_filter($markers, 'file_exists'), 'Both checkout workers must start. ' . $diagnostics);
 
             DB::commit();
             $lockHeld = false;
