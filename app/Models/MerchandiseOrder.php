@@ -16,6 +16,11 @@ class MerchandiseOrder extends Model
         return $this->belongsTo(MerchandiseVariant::class, 'merchandise_variant_id');
     }
 
+    public function payment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Payment::class);
+    }
+
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
