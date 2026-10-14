@@ -54,6 +54,7 @@ class MerchandiseProductResource extends Resource
             TextInput::make('price_tzs')->label('Price (TZS)')->numeric()->minValue(1)->required(),
             TagsInput::make('colors')->label('Available colours')->helperText('Optional; leave blank for products without colour options.'),
             TagsInput::make('sizes')->label('Available sizes / options')->helperText('Optional; leave blank for products without sizes.'),
+            TextInput::make('stock_quantity')->label('Available stock')->numeric()->minValue(0)->required()->default(0),
             TextInput::make('sort_order')->numeric()->default(0)->minValue(0),
             Toggle::make('is_active')->label('Published for ordering')->default(false),
         ]);
@@ -66,6 +67,7 @@ class MerchandiseProductResource extends Resource
             TextColumn::make('name')->searchable(),
             TextColumn::make('category')->badge(),
             TextColumn::make('price_tzs')->label('TZS')->numeric(),
+            TextColumn::make('stock_quantity')->label('Stock')->numeric(),
             IconColumn::make('is_active')->boolean(),
         ])->recordActions([EditAction::make()])->headerActions([CreateAction::make()]);
     }
