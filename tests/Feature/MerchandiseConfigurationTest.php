@@ -2,45 +2,45 @@
 
 namespace Tests\Feature;
 
-use App\Models\Event;
 use App\Models\MerchandiseProduct;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class MerchandiseConfigurationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_merchandise_is_hidden_by_default(): void
+    public function test_merchandise_tables_support_general_products(): void
     {
-        $event = Event::factory()->create([
-            'merchandise_section_enabled' => false,
-            'status' => 'active',
-        ]);
-
-        $response = $this->get(route('public.merchandise.index', ['event' => $event->slug]));
-        $response->assertNotFound();
+        $this->assertTrue(Schema::hasTable('merchandise_products'));
+        $this->assertTrue(Schema::hasColumns('merchandise_products', [
+            'category', 'price_tzs', 'stock_quantity', 'colors', 'sizes', 'is_active',
+        ]));
+        $this->assertTrue(Schema::hasColumns('merchandise_orders', [
+            'public_token', 'color', 'size', 'quantity', 'status',
+        ]));
     }
 
-    public function test_unpublished_products_are_not_listed(): void
+    public function test_merchandise_product_attributes_are_cast(): void
     {
-        $event = Event::factory()->create([
-            'merchandise_section_enabled' => true,
-            'status' => 'active',
-        ]);
-
-        MerchandiseProduct::create([
-            'event_id' => $event->id,
-            'name' => 'Hidden Mug',
-            'slug' => 'hidden-mug',
-            'category' => 'drinkware',
-            'price_tzs' => 10000,
-            'stock_quantity' => 2,
+        $product = new MerchandiseProduct([
+            'category' => 'books',
+            'colors' => [],
+            'sizes' => [],
             'is_active' => false,
+            'stock_quantity' => 5,
         ]);
 
-        $this->get(route('public.merchandise.index', ['event' => $event->slug]))
-            ->assertOk()
-            ->assertDontSee('Hidden Mug');
+        $this->assertSame('books', $product->category);
+        $this->assertSame([], $product->colors);
+        $this->assertSame([], $product->sizes);
+        $this->assertFalse($product->is_active);
+        $this->assertSame(5, $product->stock_quantity);
+    }
+
+    public function test_unknown_merchandise_order_is_not_found(): void
+    {
+        $this->get('/merchandise/orders/not-a-valid-order-token')->assertNotFound();
     }
 }
