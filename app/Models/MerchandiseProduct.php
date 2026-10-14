@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MerchandiseProduct extends Model
 {
-    protected $fillable = ['event_id', 'name', 'slug', 'category', 'description', 'image_path', 'price_tzs', 'colors', 'sizes', 'is_active', 'sort_order'];
+    protected $fillable = ['event_id', 'name', 'slug', 'category', 'description', 'image_path', 'price_tzs', 'colors', 'sizes', 'is_active', 'sort_order', 'stock_quantity'];
 
     protected function casts(): array
     {
-        return ['colors' => 'array', 'sizes' => 'array', 'is_active' => 'boolean', 'price_tzs' => 'integer'];
+        return ['colors' => 'array', 'sizes' => 'array', 'is_active' => 'boolean', 'price_tzs' => 'integer', 'stock_quantity' => 'integer'];
     }
 
     public function event(): BelongsTo
