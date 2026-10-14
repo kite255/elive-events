@@ -63,7 +63,8 @@ class DonationCampaignResource extends Resource
             return true;
         }
 
-        return $user->managedOrganizations()->exists();
+        return $user->managedOrganizations()->exists()
+            || $user->eventManagerEvents()->exists();
     }
 
     public static function canCreate(): bool
