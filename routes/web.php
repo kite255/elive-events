@@ -530,6 +530,8 @@ Route::get('/events/{event:slug}/merchandise', [PublicMerchandiseController::cla
     ->name('public.merchandise.index');
 Route::post('/events/{event:slug}/merchandise/{product}', [PublicMerchandiseController::class, 'store'])
     ->middleware('throttle:10,1')->name('public.merchandise.store');
+Route::post('/merchandise/orders/{token}/pay', [PublicMerchandiseController::class, 'payOrder'])
+    ->middleware('throttle:10,1')->name('public.merchandise.orders.pay');
 Route::get('/merchandise/orders/{token}', [PublicMerchandiseController::class, 'showOrder'])
     ->middleware('throttle:60,1')->name('public.merchandise.orders.show');
 
