@@ -61,6 +61,7 @@ class MerchandiseVariant extends Model
             ->whereIn('status', [
                 'selected',
                 'reserved',
+                'paid',
                 'distributed',
             ]);
     }
@@ -71,6 +72,7 @@ class MerchandiseVariant extends Model
             ->whereIn('status', [
                 'selected',
                 'reserved',
+                'paid',
             ]);
     }
 
@@ -123,10 +125,28 @@ class MerchandiseVariant extends Model
             ->sum('quantity');
     }
 
+    public function publicShopOrders(): HasMany
+    {
+        return $this->hasMany(MerchandiseOrder::class, 'merchandise_variant_id');
+    }
+
+    public function publicCommittedQuantity(): int
+    {
+        return (int) $this->publicShopOrders()
+            ->where(function (Builder $query): void {
+                $query->where('status', 'paid')
+                    ->orWhere(function (Builder $pending): void {
+                        $pending->where('status', 'pending_payment')
+                            ->where('expires_at', '>', now());
+                    });
+            })->sum('quantity');
+    }
+
     public function committedQuantity(): int
     {
         return $this->expectedQuantity()
-            + $this->distributedQuantity();
+            + $this->distributedQuantity()
+            + $this->publicCommittedQuantity();
     }
 
     public function remainingQuantity(): int
