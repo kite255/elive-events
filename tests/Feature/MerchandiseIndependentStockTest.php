@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Event;
+use App\Models\Organization;
 use App\Models\MerchandiseOrder;
 use App\Models\MerchandiseProduct;
 use App\Models\Payment;
@@ -16,7 +17,9 @@ class MerchandiseIndependentStockTest extends TestCase
 
     public function test_expiring_unlinked_order_restores_stock_once(): void
     {
+        $organization = Organization::query()->create(['name' => 'Merchandise Test Organization']);
         $event = Event::query()->create([
+            'organization_id' => $organization->id,
             'name' => 'Test Merchandise Event',
             'slug' => 'shop-' . Str::lower(Str::random(8)),
             'status' => 'active',
@@ -56,7 +59,9 @@ class MerchandiseIndependentStockTest extends TestCase
 
     public function test_completed_gateway_payment_prevents_expiry_stock_release(): void
     {
+        $organization = Organization::query()->create(['name' => 'Merchandise Test Organization']);
         $event = Event::query()->create([
+            'organization_id' => $organization->id,
             'name' => 'Gateway Safety Event',
             'slug' => 'gateway-' . Str::lower(Str::random(8)),
             'status' => 'active',
@@ -99,7 +104,9 @@ class MerchandiseIndependentStockTest extends TestCase
 
     public function test_paid_order_does_not_expire_or_restore_stock(): void
     {
+        $organization = Organization::query()->create(['name' => 'Merchandise Test Organization']);
         $event = Event::query()->create([
+            'organization_id' => $organization->id,
             'name' => 'Paid Test Event',
             'slug' => 'paid-' . Str::lower(Str::random(8)),
             'status' => 'active',
