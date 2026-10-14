@@ -6,6 +6,8 @@ use App\Models\Event;
 use App\Models\MerchandiseOrder;
 use App\Models\MerchandiseProduct;
 use App\Models\MerchandiseVariant;
+use App\Services\Payments\PaymentService;
+use RuntimeException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,9 +92,28 @@ class PublicMerchandiseController extends Controller
         return redirect()->route('public.merchandise.orders.show', $order->public_token);
     }
 
+    public function payOrder(string $token, PaymentService $paymentService): RedirectResponse
+    {
+        $order = MerchandiseOrder::query()->where('public_token', $token)->firstOrFail();
+
+        if ($order->status !== 'pending_payment' || ! $order->expires_at || $order->expires_at->isPast()) {
+            return redirect()->route('public.merchandise.orders.show', $token)
+                ->with('payment_error', 'This reservation is no longer available for payment.');
+        }
+
+        try {
+            $payment = $paymentService->createForMerchandiseOrder($order);
+        } catch (RuntimeException $exception) {
+            return redirect()->route('public.merchandise.orders.show', $token)
+                ->with('payment_error', 'Payment is currently unavailable. Please try again or contact the organizer.');
+        }
+
+        return redirect()->route('payments.pay', ['payment' => $payment->reference]);
+    }
+
     public function showOrder(string $token): View
     {
-        $order = MerchandiseOrder::query()->with(['event', 'product'])
+        $order = MerchandiseOrder::query()->with(['event', 'product', 'payment'])
             ->where('public_token', $token)->firstOrFail();
 
         return view('public.merchandise.order', compact('order'));
