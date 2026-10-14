@@ -2712,6 +2712,36 @@
         </section>
     @endif
 
+    @php
+        $campaigns = \App\Models\DonationCampaign::query()
+            ->where('event_id', $event->id)
+            ->where('organization_id', $event->organization_id)
+            ->publicActive()
+            ->with(['paymentMethods' => fn ($query) => $query->where('enabled', true)])
+            ->get();
+    @endphp
+    @if ($campaigns->isNotEmpty())
+        <section class="public-detail-section" aria-labelledby="donation-heading">
+            <div class="container">
+                <p class="public-detail-kicker">Support this event</p>
+                <h2 class="public-detail-heading" id="donation-heading">Event Donations</h2>
+                <div class="detail-card-grid">
+                    @foreach ($campaigns as $campaign)
+                        <article class="detail-card">
+                            <h3>{{ $campaign->title }}</h3>
+                            @if ($campaign->description)
+                                <p>{{ $campaign->description }}</p>
+                            @endif
+                            @foreach ($campaign->paymentMethods as $method)
+                                <p>{{ $method->provider_name }}: {{ $method->account_name }} — {{ $method->account_number_or_phone }}</p>
+                            @endforeach
+                        </article>
+                    @endforeach
+                </div>
+            </div>
+        </section>
+    @endif
+
     <section class="public-detail-section alt" aria-labelledby="organizer-heading">
         <div class="container">
             <p class="public-detail-kicker">Stay connected</p>
