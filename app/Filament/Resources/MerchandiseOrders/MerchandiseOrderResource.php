@@ -54,6 +54,8 @@ class MerchandiseOrderResource extends Resource
             TextColumn::make('quantity')->numeric(),
             TextColumn::make('total_tzs')->label('Total (TZS)')->numeric(),
             TextColumn::make('status')->badge(),
+            TextColumn::make('payment.status')->label('Gateway Status')->badge()->placeholder('No payment'),
+            TextColumn::make('payment.fulfilled_at')->label('Fulfilled')->dateTime()->placeholder('Pending review')->toggleable(),
             TextColumn::make('created_at')->dateTime()->sortable(),
         ]);
     }
