@@ -48,6 +48,8 @@ class PublicMerchandiseController extends Controller
             abort_unless((empty($current->colors) || in_array($data['color'] ?? null, $current->colors, true)) && (empty($current->sizes) || in_array($data['size'] ?? null, $current->sizes, true)), 422);
             $price = (int) $current->price_tzs;
             abort_unless($price > 0 && $price <= 100000000, 422);
+            // Linked attendee merchandise requires shared variant reservations before checkout.
+            abort_if($current->event_merchandise_id !== null, 409, 'Shared-inventory checkout is not enabled yet.');
             abort_unless($current->stock_quantity >= (int) $data['quantity'], 422, 'Insufficient stock.');
             $current->decrement('stock_quantity', (int) $data['quantity']);
             return MerchandiseOrder::create([
