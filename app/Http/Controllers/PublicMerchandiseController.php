@@ -57,7 +57,7 @@ class PublicMerchandiseController extends Controller
                 $variant = MerchandiseVariant::query()->lockForUpdate()
                     ->where('event_merchandise_id', $current->event_merchandise_id)
                     ->findOrFail($data['merchandise_variant_id']);
-                abort_unless($variant->is_active && $variant->merchandise?->isSelectionOpen(), 422);
+                abort_unless($variant->is_active && $variant->merchandise?->is_active, 422);
                 abort_unless($variant->currency === 'TZS', 422, 'Only TZS variants are supported.');
                 abort_unless($variant->remainingQuantity() >= (int) $data['quantity'], 422, 'Insufficient variant stock.');
                 $price = (int) $variant->price;
