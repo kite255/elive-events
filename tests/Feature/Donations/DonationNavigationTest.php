@@ -62,7 +62,7 @@ class DonationNavigationTest extends TestCase
         }
     }
 
-    public function test_assigned_event_manager_gets_donation_navigation_for_assigned_event(): void
+    public function test_event_manager_without_organization_admin_role_cannot_access_independent_donation_navigation(): void
     {
         $organization = Organization::query()->create([
             'name' => 'Manager Navigation Organization',
@@ -90,8 +90,8 @@ class DonationNavigationTest extends TestCase
 
         $this->actingAs($manager);
 
-        $this->assertTrue(DonationCampaignResource::shouldRegisterNavigation());
-        $this->assertTrue(DonationPaymentMethodResource::shouldRegisterNavigation());
+        $this->assertFalse(DonationCampaignResource::shouldRegisterNavigation());
+        $this->assertFalse(DonationPaymentMethodResource::shouldRegisterNavigation());
 
         foreach ([
             'App\\Filament\\Resources\\Donations\\DonationResource',
@@ -100,7 +100,7 @@ class DonationNavigationTest extends TestCase
             'App\\Filament\\Pages\\DonationPaymentReconciliation',
         ] as $class) {
             $this->assertTrue(class_exists($class));
-            $this->assertTrue($class::shouldRegisterNavigation());
+            $this->assertFalse($class::shouldRegisterNavigation());
         }
     }
 
