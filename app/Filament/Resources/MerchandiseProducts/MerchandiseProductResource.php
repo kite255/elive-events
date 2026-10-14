@@ -36,13 +36,13 @@ class MerchandiseProductResource extends Resource
 
     public static function accessibleEvents(): Builder
     {
-        return Event::query()->accessibleBy(auth()->user());
+        return Event::query()->accessibleBy(auth()->user())->whereHas('organization', fn (Builder $q) => $q);
     }
 
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('event_id')->label('Event')->options(fn () => static::accessibleEvents()->pluck('name', 'id')->all())->searchable()->required(),
+            Select::make('event_id')->label('Event')->options(fn () => static::accessibleEvents()->get()->filter(fn (Event $event) => $event->canBeManagedBy(auth()->user()))->pluck('name', 'id')->all())->searchable()->required(),
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('slug')->required()->maxLength(255)->helperText('Unique within this event.'),
             Select::make('category')->options([
@@ -77,7 +77,7 @@ class MerchandiseProductResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user() instanceof User && static::accessibleEvents()->exists();
+        return auth()->user() instanceof User && static::accessibleEvents()->get()->contains(fn (Event $event) => $event->canBeManagedBy(auth()->user()));
     }
 
     public static function canCreate(): bool
@@ -87,7 +87,7 @@ class MerchandiseProductResource extends Resource
 
     public static function canView(Model $record): bool
     {
-        return $record instanceof MerchandiseProduct && static::getEloquentQuery()->whereKey($record->id)->exists();
+        return $record instanceof MerchandiseProduct && $record->event?->canBeManagedBy(auth()->user()) === true;
     }
 
     public static function canEdit(Model $record): bool
