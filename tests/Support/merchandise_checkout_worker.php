@@ -26,6 +26,15 @@ if (! str_starts_with($path, '/events/') || ! str_contains($path, '/merchandise/
 file_put_contents($marker, 'started');
 
 $app = require dirname(__DIR__, 2) . '/bootstrap/app.php';
+$request = Request::create($path, 'POST', [
+    'buyer_name' => 'Concurrent Buyer',
+    'buyer_phone' => '255700000000',
+    'quantity' => 1,
+    'fulfillment_method' => 'event_pickup',
+], [], [], ['HTTP_ACCEPT' => 'application/json']);
+
+// Routing may resolve during bootstrap, so bind the request first.
+$app->instance('request', $request);
 $kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
 
@@ -34,13 +43,6 @@ if (config('database.default') !== 'pgsql' ||
     fwrite(STDERR, "Actual database configuration mismatch.\n");
     exit(2);
 }
-
-$request = Request::create($path, 'POST', [
-    'buyer_name' => 'Concurrent Buyer',
-    'buyer_phone' => '255700000000',
-    'quantity' => 1,
-    'fulfillment_method' => 'event_pickup',
-], [], [], ['HTTP_ACCEPT' => 'application/json']);
 
 file_put_contents($marker, 'ready');
 $response = $kernel->handle($request);
