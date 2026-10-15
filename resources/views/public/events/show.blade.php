@@ -1729,7 +1729,9 @@
         }
 
         @media (max-width: 900px) {
-            .details-grid
+            .details-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
 
             .info-card {
                 position: static;
