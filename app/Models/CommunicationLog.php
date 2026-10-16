@@ -32,6 +32,7 @@ class CommunicationLog extends Model
         'ticket_order_id',
         'ticket_upgrade_id',
         'donation_id',
+        'merchandise_order_id',
         'communication_campaign_id',
         'purpose',
         'channel',

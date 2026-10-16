@@ -21,18 +21,18 @@ class AttendeeMerchandiseResource extends Resource
         Heroicon::OutlinedShoppingBag;
 
     protected static ?string $navigationLabel =
-        'Merchandise Orders';
+        'Attendee Merchandise';
 
     protected static ?string $modelLabel =
-        'Merchandise Order';
+        'Attendee Merchandise';
 
     protected static ?string $pluralModelLabel =
         'Merchandise Orders';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Event Management';
+        'Merchandise Management';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute =
         'id';
@@ -44,6 +44,15 @@ class AttendeeMerchandiseResource extends Resource
         );
     }
 
+    private static function isRestrictedOrganizationOwner(): bool
+    {
+        $user = Auth::user();
+
+        return $user && ! $user->isSuperAdmin()
+            && ($user->ownedOrganizations()->exists()
+                || $user->activeOrganizations()->wherePivot('role', \App\Models\User::ORGANIZATION_ROLE_OWNER)->exists());
+    }
+
     public static function shouldRegisterNavigation(): bool
     {
         $user = Auth::user();
@@ -52,7 +61,7 @@ class AttendeeMerchandiseResource extends Resource
             return false;
         }
 
-        if ($user->isTicketOrganizer()) {
+        if ($user->isTicketOrganizer() || static::isRestrictedOrganizationOwner()) {
             return false;
         }
 

@@ -60,6 +60,12 @@ class PaymentFulfillmentService
             if ($payment->merchandise_order_id) {
                 $this->fulfillMerchandisePayment($payment);
                 $this->markPaymentFulfilled($payment);
+                try {
+                    app(\App\Services\MerchandisePurchaseNotificationService::class)
+                        ->queueForPayment($payment->fresh());
+                } catch (\Throwable $notificationException) {
+                    report($notificationException);
+                }
                 return $payment->fresh(['merchandiseOrder']);
             }
 
