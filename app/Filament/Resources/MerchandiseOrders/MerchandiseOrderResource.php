@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\MerchandiseOrder;
 use App\Models\User;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -62,12 +64,49 @@ class MerchandiseOrderResource extends Resource
             TextColumn::make('product.name')->label('Product'),
             TextColumn::make('buyer_name')->label('Customer')->searchable(),
             TextColumn::make('buyer_phone')->label('Phone')->copyable(),
+            TextColumn::make('color')->label('Colour')->placeholder('—'),
+            TextColumn::make('size')->placeholder('—'),
             TextColumn::make('quantity')->numeric(),
             TextColumn::make('total_tzs')->label('Total (TZS)')->numeric(),
-            TextColumn::make('status')->badge(),
+            TextColumn::make('status')->label('Payment status')->badge(),
+            TextColumn::make('fulfillment_status')->label('Collection')->badge()->color(fn (?string $state) => match ($state) {
+                'collected' => 'success', 'ready_for_pickup' => 'info', default => 'warning',
+            })->formatStateUsing(fn (?string $state) => match ($state) {
+                'collected' => 'Collected', 'ready_for_pickup' => 'Ready for pickup', default => 'Not ready',
+            }),
             TextColumn::make('payment.status')->label('Gateway Status')->badge()->placeholder('No payment'),
             TextColumn::make('payment.fulfilled_at')->label('Fulfilled')->dateTime()->placeholder('Pending review')->toggleable(),
+            TextColumn::make('collected_at')->label('Collected at')->dateTime()->placeholder('—')->toggleable(),
             TextColumn::make('created_at')->dateTime()->sortable(),
+        ])
+        ->defaultSort('created_at', 'desc')
+        ->filters([
+            SelectFilter::make('status')->label('Payment status')->options([
+                'paid' => 'Paid', 'pending_payment' => 'Pending payment',
+                'expired' => 'Expired',
+            ]),
+            SelectFilter::make('fulfillment_status')->label('Collection status')->options([
+                'not_ready' => 'Not ready', 'ready_for_pickup' => 'Ready for pickup',
+                'collected' => 'Collected',
+            ]),
+        ])
+        ->recordActions([
+            Action::make('ready_for_pickup')->label('Mark ready for pickup')
+                ->icon('heroicon-o-check-circle')->requiresConfirmation()
+                ->visible(fn (MerchandiseOrder $record): bool => $record->status === 'paid'
+                    && $record->fulfillment_status === 'not_ready')
+                ->action(fn (MerchandiseOrder $record) => $record->newQuery()
+                    ->whereKey($record->id)->where('status', 'paid')
+                    ->where('fulfillment_status', 'not_ready')
+                    ->update(['fulfillment_status' => 'ready_for_pickup'])),
+            Action::make('collected')->label('Mark collected')
+                ->icon('heroicon-o-shopping-bag')->requiresConfirmation()
+                ->visible(fn (MerchandiseOrder $record): bool => $record->status === 'paid'
+                    && $record->fulfillment_status === 'ready_for_pickup')
+                ->action(fn (MerchandiseOrder $record) => $record->newQuery()
+                    ->whereKey($record->id)->where('status', 'paid')
+                    ->where('fulfillment_status', 'ready_for_pickup')
+                    ->update(['fulfillment_status' => 'collected', 'collected_at' => now()])),
         ]);
     }
 
