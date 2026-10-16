@@ -62,7 +62,7 @@ class PaymentFulfillmentService
                 $this->markPaymentFulfilled($payment);
                 try {
                     app(\App\Services\MerchandisePurchaseNotificationService::class)
-                        ->queueForPayment($payment);
+                        ->queueForPayment($payment->fresh());
                 } catch (\Throwable $notificationException) {
                     report($notificationException);
                 }
