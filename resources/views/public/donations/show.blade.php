@@ -589,7 +589,7 @@
                                 <span>{{ $campaign->organization->name }}</span>
                             @endif
                         </div>
-                        <a href="#payment-methods" class="donate-link">Donate Now ↓</a>
+                        <a href="#payment-methods" class="donate-link">View payment details ↓</a>
                     </div>
                 </div>
             </article>

@@ -54,7 +54,7 @@ class DonationReportsTest extends TestCase
         $this->assertSame(0, $summary['awaiting_verification_count']);
     }
 
-    public function test_organization_summary_is_scoped_to_that_organization_and_optional_event(): void
+    public function test_organization_summary_includes_own_campaigns_but_excludes_other_organizations(): void
     {
         [$organization, $eventA, $campaignA] = $this->makeCampaign();
 
@@ -67,7 +67,6 @@ class DonationReportsTest extends TestCase
 
         $campaignB = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $eventB->id,
             'title' => 'Second Donation Campaign',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_PLATFORM,
@@ -100,13 +99,9 @@ class DonationReportsTest extends TestCase
         $this->assertSame('30000.00', $organizationSummary['completed_amount']);
         $this->assertSame(2, $organizationSummary['completed_count']);
 
-        $eventSummary = $service->summaryForOrganization(
-            $organization,
-            ['event_id' => $eventA->id]
-        );
-
-        $this->assertSame('10000.00', $eventSummary['completed_amount']);
-        $this->assertSame(1, $eventSummary['completed_count']);
+        $otherOrganizationSummary = $service->summaryForOrganization($otherOrganization);
+        $this->assertSame('999999.00', $otherOrganizationSummary['completed_amount']);
+        $this->assertSame(1, $otherOrganizationSummary['completed_count']);
     }
 
     private function makeCampaign(array $overrides = []): array
@@ -125,7 +120,6 @@ class DonationReportsTest extends TestCase
 
         $campaign = DonationCampaign::query()->create(array_merge([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
             'title' => 'Donation Report Campaign',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_HYBRID,

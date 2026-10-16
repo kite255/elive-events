@@ -113,6 +113,7 @@ class Event extends Model
         'ticket_delivery_sms_template_id',
 
         'show_merchandise_images',
+        'merchandise_section_enabled',
 
         'payment_method',
         'payment_account_name',
@@ -174,6 +175,7 @@ class Event extends Model
             'ticket_delivery_sms_template_id' => 'integer',
 
             'show_merchandise_images' => 'boolean',
+            'merchandise_section_enabled' => 'boolean',
         ];
     }
 

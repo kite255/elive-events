@@ -99,7 +99,7 @@ class PublicDonationCampaignTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_event_page_embeds_active_public_linked_campaign(): void
+    public function test_independent_campaign_is_not_embedded_on_event_page(): void
     {
         [$organization, $event] = $this->makeOrganizationAndEvent();
 
@@ -122,10 +122,10 @@ class PublicDonationCampaignTest extends TestCase
         $response = $this->get(route('public.events.show', ['event' => $event->slug]));
 
         $response->assertOk();
-        $response->assertSee('Support This Event');
-        $response->assertSee('Support the work connected to this event.');
-        $response->assertSee('CRDB Bank');
-        $response->assertSee('1234567890');
+        $response->assertDontSee('Support This Event');
+        $response->assertDontSee('Support the work connected to this event.');
+        $response->assertDontSee('CRDB Bank');
+        $response->assertDontSee('1234567890');
         $response->assertDontSee(
             route('public.donations.show', ['campaign' => $campaign->slug]),
             false
@@ -158,7 +158,6 @@ class PublicDonationCampaignTest extends TestCase
     ): DonationCampaign {
         return DonationCampaign::query()->create(array_merge([
             'organization_id' => $organization->id,
-            'event_id' => $event?->id,
             'title' => $title,
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,

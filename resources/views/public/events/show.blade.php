@@ -2493,6 +2493,17 @@
         </section>
     @endif
 
+    @if ($event->merchandise_section_enabled && \App\Models\MerchandiseProduct::query()->where('event_id', $event->id)->where('is_active', true)->whereNotNull('price_tzs')->exists())
+        <section class="public-detail-section alt" aria-labelledby="merchandise-heading">
+            <div class="container">
+                <p class="public-detail-kicker">Official Collection</p>
+                <h2 id="merchandise-heading" class="public-detail-heading">Shop Merchandise</h2>
+                <p>Explore official event merchandise, including clothing, accessories, music and more.</p>
+                <p><a class="public-action" href="{{ route('public.merchandise.index', ['event' => $event->slug]) }}">Explore Merchandise</a></p>
+            </div>
+        </section>
+    @endif
+
     @if ($sessions->isNotEmpty())
         <section class="public-detail-section" aria-labelledby="programme-heading">
             <div class="container">
