@@ -32,8 +32,8 @@
         .section-heading{color:var(--elive-navy);font-size:25px;margin:0 0 24px;letter-spacing:-.02em}
         .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:24px;align-items:start}
         .card{overflow:hidden;background:#fff;border:1px solid var(--elive-border);border-radius:20px;box-shadow:0 12px 30px rgba(15,23,42,.05)}
-        .product-image{background:#F1F5F9;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center}
-        .product-image img{width:100%;height:100%;object-fit:contain}
+        .product-image{background:#F1F5F9;height:240px;padding:16px;display:flex;align-items:center;justify-content:center}
+        .product-image img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
         .image-placeholder{color:#94A3B8;font-size:14px;font-weight:700}
         .card-body{padding:24px}
         .category{color:var(--elive-blue);text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:800;margin:0 0 9px}
