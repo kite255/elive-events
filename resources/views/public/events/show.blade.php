@@ -2498,7 +2498,7 @@
             <div class="container">
                 <p class="public-detail-kicker">Official Collection</p>
                 <h2 id="merchandise-heading" class="public-detail-heading">Shop Merchandise</h2>
-                <p>Explore official event merchandise, including clothing, accessories, music and more.</p>
+                <p>{{ filled($event->merchandise_shop_description) ? $event->merchandise_shop_description : 'Explore official event merchandise, discover your favourite items, and reserve yours today.' }}</p>
                 <p><a class="public-action" href="{{ route('public.merchandise.index', ['event' => $event->slug]) }}">Explore Merchandise</a></p>
             </div>
         </section>
