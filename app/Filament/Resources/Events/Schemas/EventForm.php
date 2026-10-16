@@ -299,6 +299,22 @@ class EventForm
                             ->placeholder('Revive Us Again, Lord')
                             ->maxLength(255),
 
+                        Section::make('Merchandise Shop')
+                            ->description('Choose whether this event shows its merchandise shop. Products and prices must be configured separately.')
+                            ->schema([
+                                Toggle::make('merchandise_section_enabled')
+                                    ->label('Show Merchandise Shop')
+                                    ->helperText('Optional. When disabled, merchandise is hidden from this event.')
+                                    ->default(false),
+                                Textarea::make('merchandise_shop_description')
+                                    ->label('Merchandise Shop Description')
+                                    ->helperText('Optional. Leave blank to use the general event merchandise description.')
+                                    ->placeholder('Explore official event merchandise, discover your favourite items, and reserve yours today.')
+                                    ->rows(3)
+                                    ->maxLength(500),
+                            ])
+                            ->collapsible(),
+
                         Section::make('Social Sharing')
                             ->description(
                                 'Control how this event appears when its public link is shared on WhatsApp, Facebook and other social platforms.'
