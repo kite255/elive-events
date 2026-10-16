@@ -44,6 +44,15 @@ class AttendeeMerchandiseResource extends Resource
         );
     }
 
+    private static function isRestrictedOrganizationOwner(): bool
+    {
+        $user = Auth::user();
+
+        return $user && ! $user->isSuperAdmin()
+            && ($user->ownedOrganizations()->exists()
+                || $user->activeOrganizations()->wherePivot('role', \App\Models\User::ORGANIZATION_ROLE_OWNER)->exists());
+    }
+
     public static function shouldRegisterNavigation(): bool
     {
         $user = Auth::user();
@@ -52,7 +61,7 @@ class AttendeeMerchandiseResource extends Resource
             return false;
         }
 
-        if ($user->isTicketOrganizer()) {
+        if ($user->isTicketOrganizer() || static::isRestrictedOrganizationOwner()) {
             return false;
         }
 
