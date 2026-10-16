@@ -114,6 +114,7 @@ class Event extends Model
 
         'show_merchandise_images',
         'merchandise_section_enabled',
+        'merchandise_shop_description',
 
         'payment_method',
         'payment_account_name',

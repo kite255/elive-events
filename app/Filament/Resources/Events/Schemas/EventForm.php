@@ -306,6 +306,12 @@ class EventForm
                                     ->label('Show Merchandise Shop')
                                     ->helperText('Optional. When disabled, merchandise is hidden from this event.')
                                     ->default(false),
+                                Textarea::make('merchandise_shop_description')
+                                    ->label('Merchandise Shop Description')
+                                    ->helperText('Optional. Leave blank to use the general event merchandise description.')
+                                    ->placeholder('Explore official event merchandise, discover your favourite items, and reserve yours today.')
+                                    ->rows(3)
+                                    ->maxLength(500),
                             ])
                             ->collapsible(),
 
