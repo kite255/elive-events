@@ -22,22 +22,32 @@ class MerchandiseOrderResource extends Resource
     protected static ?int $navigationSort = 2;
     protected static ?string $navigationLabel = 'Shop Orders';
 
+    private static function canManageMerchandiseFor(Event $event): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $event->canBeManagedBy($user)
+            && ($user->isSuperAdmin() || ! ($user->isOrganizationOwner($event->organization_id)
+                || $user->hasOrganizationRole($event->organization_id, User::ORGANIZATION_ROLE_OWNER)));
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->whereHas('event', fn (Builder $q) => $q->accessibleBy(auth()->user()))->whereIn('event_id', Event::query()->accessibleBy(auth()->user())->get()->filter(fn (Event $event) => $event->canBeManagedBy(auth()->user()))->pluck('id'));
+        return parent::getEloquentQuery()->whereIn('event_id', Event::query()->accessibleBy(auth()->user())->get()->filter(fn (Event $event) => static::canManageMerchandiseFor($event))->pluck('id'));
     }
 
     public static function canViewAny(): bool
     {
         return auth()->user() instanceof User
             && Event::query()->accessibleBy(auth()->user())->get()
-                ->contains(fn (Event $event) => $event->canBeManagedBy(auth()->user()));
+                ->contains(fn (Event $event) => static::canManageMerchandiseFor($event));
     }
 
     public static function canView(Model $record): bool
     {
         return $record instanceof MerchandiseOrder
-            && $record->event?->canBeManagedBy(auth()->user()) === true;
+            && ($record->event && static::canManageMerchandiseFor($record->event));
     }
 
     public static function canCreate(): bool { return false; }
