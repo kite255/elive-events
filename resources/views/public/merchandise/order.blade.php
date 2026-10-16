@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Merchandise Order | eLive Events</title>
+    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="stylesheet" href="{{ asset('css/creato-font.css') }}">
     <style>
         :root { --navy:#161943; --blue:#007AB2; --orange:#FF9800; --muted:#64748b; --border:#e2e8f0; }
         * { box-sizing:border-box; }
@@ -12,8 +14,8 @@
         .shell { max-width:1050px; margin:0 auto; padding:0 22px; }
         .topbar { background:#fff; border-bottom:1px solid var(--border); }
         .topbar-inner { display:flex; align-items:center; justify-content:space-between; min-height:76px; gap:15px; }
-        .brand { font-size:24px; font-weight:850; color:var(--navy); text-decoration:none; letter-spacing:-.6px; }
-        .brand span { color:var(--orange); }
+        .brand { display:inline-flex; align-items:center; text-decoration:none; }
+        .brand img { display:block; height:48px; width:auto; max-width:180px; object-fit:contain; }
         .toplink { text-decoration:none; font-size:14px; font-weight:700; }
         .page { padding-top:48px; padding-bottom:70px; }
         .eyebrow { color:#e57d00; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1.6px; margin:0 0 10px; }
@@ -46,14 +48,14 @@
         .pay-button:hover { background:#00618e; }
         .secure { text-align:center; font-size:12px; color:var(--muted); margin:13px 0 0; line-height:1.5; }
         .back { display:inline-flex; gap:8px; align-items:center; margin-top:25px; text-decoration:none; font-weight:750; font-size:14px; }
-        @media(max-width:720px) { .topbar-inner { min-height:65px; } .page { padding-top:30px; } .layout { grid-template-columns:1fr; } .panel { padding:20px; } }
+        @media(max-width:720px) { .topbar-inner { min-height:65px; } .brand img { height:40px; } .page { padding-top:30px; } .layout { grid-template-columns:1fr; } .panel { padding:20px; } }
         @media(max-width:420px) { .shell { padding:0 14px; } .product-photo { flex-basis:110px; height:110px; } .product-name { font-size:15px; } .details { gap:16px 12px; } .summary-total strong { font-size:23px; } }
     </style>
 </head>
 <body>
     <header class="topbar">
         <div class="shell topbar-inner">
-            <a class="brand" href="{{ url('/') }}">eLive<span>.</span> Events</a>
+            <a class="brand" href="{{ route('home') }}" aria-label="eLive Events home"><img src="{{ asset('eLive-Logo.png') }}" alt="eLive Events"></a>
             <a class="toplink" href="{{ route('public.events.show', $order->event) }}">&larr; Back to event</a>
         </div>
     </header>
