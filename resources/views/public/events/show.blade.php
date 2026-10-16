@@ -1354,6 +1354,53 @@
         .stock-low { background: #FEF3C7; color: #92400E; }
         .stock-out { background: #FEE2E2; color: #991B1B; }
 
+        .merchandise-preview-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+            margin: 24px 0;
+            max-width: 980px;
+        }
+        .merchandise-preview-card {
+            display: block;
+            overflow: hidden;
+            border: 1px solid var(--elive-border);
+            border-radius: 16px;
+            background: #FFFFFF;
+            text-decoration: none;
+            transition: box-shadow .2s ease, transform .2s ease;
+        }
+        .merchandise-preview-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, .10);
+        }
+        .merchandise-preview-photo {
+            height: 210px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #F1F5F9;
+            overflow: hidden;
+        }
+        .merchandise-preview-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .merchandise-preview-photo span { color: var(--elive-muted); font-size: 13px; }
+        .merchandise-preview-info { padding: 14px 16px 16px; }
+        .merchandise-preview-info h3 {
+            margin: 0 0 6px;
+            color: var(--elive-navy);
+            font-size: 17px;
+            line-height: 1.3;
+        }
+        .merchandise-preview-info strong { color: var(--elive-navy); font-size: 15px; }
+        @media (max-width: 600px) {
+            .merchandise-preview-grid { grid-template-columns: 1fr; }
+            .merchandise-preview-photo { height: 200px; }
+        }
+
         .public-action,
         .share-link {
             display: inline-flex;
@@ -2494,12 +2541,39 @@
     @endif
 
     @if ($event->merchandise_section_enabled && \App\Models\MerchandiseProduct::query()->where('event_id', $event->id)->where('is_active', true)->whereNotNull('price_tzs')->exists())
+        @php
+            $featuredMerchandise = \App\Models\MerchandiseProduct::query()
+                ->where('event_id', $event->id)
+                ->where('is_active', true)
+                ->whereNotNull('price_tzs')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->limit(2)
+                ->get();
+        @endphp
         <section class="public-detail-section alt" aria-labelledby="merchandise-heading">
             <div class="container">
                 <p class="public-detail-kicker">Official Collection</p>
                 <h2 id="merchandise-heading" class="public-detail-heading">Shop Merchandise</h2>
                 <p>{{ filled($event->merchandise_shop_description) ? $event->merchandise_shop_description : 'Explore official event merchandise, discover your favourite items, and reserve yours today.' }}</p>
-                <p><a class="public-action" href="{{ route('public.merchandise.index', ['event' => $event->slug]) }}">Explore Merchandise</a></p>
+                <div class="merchandise-preview-grid">
+                    @foreach ($featuredMerchandise as $product)
+                        <a class="merchandise-preview-card" href="{{ route('public.merchandise.index', ['event' => $event->slug]) }}" aria-label="Shop {{ $product->name }}">
+                            <div class="merchandise-preview-photo">
+                                @if ($product->image_path)
+                                    <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($product->image_path) }}" alt="{{ $product->name }}" loading="lazy">
+                                @else
+                                    <span>Official Merchandise</span>
+                                @endif
+                            </div>
+                            <div class="merchandise-preview-info">
+                                <h3>{{ $product->name }}</h3>
+                                <strong>TZS {{ number_format($product->price_tzs) }}</strong>
+                            </div>
+                        </a>
+                    @endforeach
+                </div>
+                <a class="public-action" href="{{ route('public.merchandise.index', ['event' => $event->slug]) }}">Shop Official Merchandise &rarr;</a>
             </div>
         </section>
     @endif
