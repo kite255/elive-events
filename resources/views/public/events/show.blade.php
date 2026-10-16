@@ -1403,8 +1403,11 @@
             }
             .merchandise-preview-photo { aspect-ratio: 4 / 3; }
             .merchandise-preview-info { padding: 10px; }
-            .merchandise-preview-info h3 { font-size: 13px; line-height: 1.35; }
-            .merchandise-preview-info strong { font-size: 13px; }
+            .merchandise-section .public-detail-heading { font-size: 26px; line-height: 1.2; }
+            .merchandise-section .container > p:not(.public-detail-kicker) { font-size: 14px; line-height: 1.6; }
+            .merchandise-preview-info h3 { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+            .merchandise-preview-info strong { font-size: 13px; font-weight: 800; }
+            .merchandise-section .public-action { font-size: 12px; }
         }
 
         .public-action,
@@ -2557,7 +2560,7 @@
                 ->limit(2)
                 ->get();
         @endphp
-        <section class="public-detail-section alt" aria-labelledby="merchandise-heading">
+        <section class="public-detail-section alt merchandise-section" aria-labelledby="merchandise-heading">
             <div class="container">
                 <p class="public-detail-kicker">Official Collection</p>
                 <h2 id="merchandise-heading" class="public-detail-heading">Shop Merchandise</h2>
