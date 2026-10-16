@@ -1397,8 +1397,14 @@
         }
         .merchandise-preview-info strong { color: var(--elive-navy); font-size: 15px; }
         @media (max-width: 600px) {
-            .merchandise-preview-grid { grid-template-columns: 1fr; }
+            .merchandise-preview-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
             .merchandise-preview-photo { aspect-ratio: 4 / 3; }
+            .merchandise-preview-info { padding: 10px; }
+            .merchandise-preview-info h3 { font-size: 13px; line-height: 1.35; }
+            .merchandise-preview-info strong { font-size: 13px; }
         }
 
         .public-action,
