@@ -11,7 +11,7 @@ if (getenv('APP_ENV') !== 'testing' ||
     getenv('DB_CONNECTION') !== 'pgsql' ||
     getenv('DB_DATABASE') !== $expectedDatabase ||
     getenv('DB_HOST') !== '127.0.0.1' ||
-    getenv('DB_PORT') !== '5433') {
+    ! in_array(getenv('DB_PORT'), ['5433', '5435'], true)) {
     fwrite(STDERR, "Unsafe database configuration.\n");
     exit(2);
 }

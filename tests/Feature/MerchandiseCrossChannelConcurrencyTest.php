@@ -23,7 +23,7 @@ class MerchandiseCrossChannelConcurrencyTest extends TestCase
             $this->markTestSkipped('PostgreSQL integration test only.');
         }
         if (($cfg['host'] ?? '') !== '127.0.0.1'
-            || (string) ($cfg['port'] ?? '') !== '5433'
+            || ! in_array((string) ($cfg['port'] ?? ''), ['5433', '5435'], true)
             || ($cfg['database'] ?? '') !== 'elive_merchandise_test') {
             $this->fail('Unsafe database: only the disposable local PostgreSQL test database is permitted.');
         }
@@ -77,7 +77,7 @@ class MerchandiseCrossChannelConcurrencyTest extends TestCase
                 'APP_ENV' => 'testing',
                 'DB_CONNECTION' => 'pgsql',
                 'DB_HOST' => '127.0.0.1',
-                'DB_PORT' => '5433',
+                'DB_PORT' => (string) $cfg['port'],
                 'DB_DATABASE' => 'elive_merchandise_test',
                 'DB_USERNAME' => (string) $cfg['username'],
                 'DB_PASSWORD' => (string) $cfg['password'],

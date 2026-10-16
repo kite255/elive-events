@@ -28,7 +28,7 @@ class MerchandisePostgresConcurrencyTest extends TestCase
 
         $connection = config('database.connections.pgsql');
         if (($connection['database'] ?? null) !== 'elive_merchandise_test'
-            || (string) ($connection['port'] ?? '') !== '5433'
+            || ! in_array((string) ($connection['port'] ?? ''), ['5433', '5435'], true)
             || ($connection['host'] ?? null) !== '127.0.0.1') {
             $this->fail('Refusing concurrency test on any database other than the isolated local PostgreSQL test database.');
         }
@@ -66,7 +66,7 @@ class MerchandisePostgresConcurrencyTest extends TestCase
                 'APP_ENV' => 'testing',
                 'DB_CONNECTION' => 'pgsql',
                 'DB_HOST' => '127.0.0.1',
-                'DB_PORT' => '5433',
+                'DB_PORT' => (string) $config['port'],
                 'DB_DATABASE' => 'elive_merchandise_test',
                 'DB_USERNAME' => (string) $config['username'],
                 'DB_PASSWORD' => (string) $config['password'],
@@ -133,7 +133,7 @@ class MerchandisePostgresConcurrencyTest extends TestCase
 
         $connection = config('database.connections.pgsql');
         if (($connection['database'] ?? null) !== 'elive_merchandise_test'
-            || (string) ($connection['port'] ?? '') !== '5433'
+            || ! in_array((string) ($connection['port'] ?? ''), ['5433', '5435'], true)
             || ($connection['host'] ?? null) !== '127.0.0.1') {
             $this->fail('Refusing to run outside the isolated local PostgreSQL database.');
         }
@@ -185,7 +185,7 @@ class MerchandisePostgresConcurrencyTest extends TestCase
                 'APP_ENV' => 'testing',
                 'DB_CONNECTION' => 'pgsql',
                 'DB_HOST' => '127.0.0.1',
-                'DB_PORT' => '5433',
+                'DB_PORT' => (string) $config['port'],
                 'DB_DATABASE' => 'elive_merchandise_test',
                 'DB_USERNAME' => (string) $config['username'],
                 'DB_PASSWORD' => (string) $config['password'],
