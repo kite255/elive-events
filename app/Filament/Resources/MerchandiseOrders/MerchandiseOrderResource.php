@@ -76,6 +76,7 @@ class MerchandiseOrderResource extends Resource
             }),
             TextColumn::make('payment.status')->label('Gateway Status')->badge()->placeholder('No payment'),
             TextColumn::make('payment.fulfilled_at')->label('Fulfilled')->dateTime()->placeholder('Pending review')->toggleable(),
+            TextColumn::make('collected_at')->label('Collected at')->dateTime()->placeholder('—')->toggleable(),
             TextColumn::make('created_at')->dateTime()->sortable(),
         ])
         ->defaultSort('created_at', 'desc')
@@ -105,7 +106,7 @@ class MerchandiseOrderResource extends Resource
                 ->action(fn (MerchandiseOrder $record) => $record->newQuery()
                     ->whereKey($record->id)->where('status', 'paid')
                     ->where('fulfillment_status', 'ready_for_pickup')
-                    ->update(['fulfillment_status' => 'collected'])),
+                    ->update(['fulfillment_status' => 'collected', 'collected_at' => now()])),
         ]);
     }
 
