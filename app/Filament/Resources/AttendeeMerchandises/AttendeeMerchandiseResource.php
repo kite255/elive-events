@@ -21,18 +21,18 @@ class AttendeeMerchandiseResource extends Resource
         Heroicon::OutlinedShoppingBag;
 
     protected static ?string $navigationLabel =
-        'Merchandise Orders';
+        'Attendee Merchandise';
 
     protected static ?string $modelLabel =
-        'Merchandise Order';
+        'Attendee Merchandise';
 
     protected static ?string $pluralModelLabel =
         'Merchandise Orders';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Event Management';
+        'Merchandise Management';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute =
         'id';
