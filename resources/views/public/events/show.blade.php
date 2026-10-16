@@ -1375,7 +1375,7 @@
             box-shadow: 0 12px 28px rgba(15, 23, 42, .10);
         }
         .merchandise-preview-photo {
-            height: 210px;
+            aspect-ratio: 4 / 3;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1398,7 +1398,7 @@
         .merchandise-preview-info strong { color: var(--elive-navy); font-size: 15px; }
         @media (max-width: 600px) {
             .merchandise-preview-grid { grid-template-columns: 1fr; }
-            .merchandise-preview-photo { height: 200px; }
+            .merchandise-preview-photo { aspect-ratio: 4 / 3; }
         }
 
         .public-action,
