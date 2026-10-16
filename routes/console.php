@@ -142,3 +142,5 @@ Schedule::command(
     ->dailyAt('04:00')
     ->timezone(config('app.timezone'))
     ->withoutOverlapping();
+
+Schedule::command('merchandise:expire-orders')->everyMinute()->withoutOverlapping();

@@ -47,6 +47,7 @@ class PaymentController extends Controller
             'gateway',
             'ticketOrder',
             'ticketUpgrade',
+            'merchandiseOrder',
         ]);
 
         if (
@@ -61,6 +62,7 @@ class PaymentController extends Controller
                     'gateway',
                     'ticketOrder',
                     'ticketUpgrade',
+                    'merchandiseOrder',
                 ]);
             } catch (Throwable $exception) {
                 report($exception);
@@ -71,8 +73,13 @@ class PaymentController extends Controller
                     'gateway',
                     'ticketOrder',
                     'ticketUpgrade',
+                    'merchandiseOrder',
                 ]);
             }
+        }
+
+        if ($payment->merchandiseOrder) {
+            return redirect()->route('public.merchandise.orders.show', $payment->merchandiseOrder->public_token);
         }
 
         if ($payment->ticketUpgrade) {
@@ -87,7 +94,7 @@ class PaymentController extends Controller
 
     private function redirectAfterPayment(Payment $payment): RedirectResponse
     {
-        $payment->loadMissing('ticketUpgrade');
+        $payment->loadMissing(['ticketUpgrade', 'merchandiseOrder']);
 
         if ($payment->ticketUpgrade) {
             return redirect()->route(

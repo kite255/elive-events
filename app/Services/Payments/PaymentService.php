@@ -5,6 +5,7 @@ namespace App\Services\Payments;
 use App\Contracts\PaymentGateway as PaymentGatewayContract;
 use App\Jobs\FulfillCompletedPayment;
 use App\Models\Attendee;
+use App\Models\MerchandiseOrder;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Models\PaymentTransaction;
@@ -355,6 +356,46 @@ class PaymentService
     }
 
     /**
+     * Create the gateway payment record for an active merchandise reservation.
+     * No gateway request is made here.
+     */
+    public function createForMerchandiseOrder(MerchandiseOrder $order): Payment
+    {
+        return DB::transaction(function () use ($order): Payment {
+            $locked = MerchandiseOrder::query()->lockForUpdate()->findOrFail($order->id);
+            if ($locked->status !== 'pending_payment' || ! $locked->expires_at || $locked->expires_at->isPast()) {
+                throw new RuntimeException('Merchandise reservation is no longer available.');
+            }
+
+            $existing = Payment::query()->where('merchandise_order_id', $locked->id)->first();
+            if ($existing) {
+                return $existing;
+            }
+
+            $event = $locked->event;
+            if (! $event || ! $event->organization_id) {
+                throw new RuntimeException('Merchandise event or organization is missing.');
+            }
+
+            $gateway = $this->defaultGatewayForOrganization((int) $event->organization_id);
+
+            return Payment::create([
+                'organization_id' => $event->organization_id,
+                'event_id' => $event->id,
+                'merchandise_order_id' => $locked->id,
+                'payment_gateway_id' => $gateway->id,
+                'reference' => $this->referenceService->generate($event),
+                'amount' => $locked->total_tzs,
+                'currency' => 'TZS',
+                'status' => Payment::STATUS_PENDING,
+                'description' => 'Merchandise order ' . $locked->order_number,
+                'initiated_at' => now(),
+                'metadata' => ['payment_purpose' => 'merchandise_order'],
+            ]);
+        }, attempts: 3);
+    }
+
+    /**
      * Submit the local payment to its configured gateway.
      */
     public function start(
@@ -364,6 +405,14 @@ class PaymentService
             throw new RuntimeException(
                 'This payment is already completed.'
             );
+        }
+
+        if ($payment->merchandise_order_id) {
+            $order = MerchandiseOrder::query()->find($payment->merchandise_order_id);
+            if (! $order || $order->status !== 'pending_payment'
+                || ! $order->expires_at || $order->expires_at->isPast()) {
+                throw new RuntimeException('Merchandise reservation has expired or is unavailable.');
+            }
         }
 
         /*
@@ -652,6 +701,13 @@ class PaymentService
             $response
         );
 
+        if ($payment->merchandise_order_id) {
+            $order = MerchandiseOrder::query()->find($payment->merchandise_order_id);
+            if (! $order) {
+                throw new RuntimeException('Merchandise order is missing.');
+            }
+        }
+
         $gatewayStatus =
             strtoupper(
                 trim(
@@ -709,6 +765,17 @@ class PaymentService
             ) {
                 $localStatus =
                     Payment::STATUS_EXPIRED;
+            }
+        }
+
+        // An unfinished Pesapal checkout must never be interpreted as paid.
+        // Expired merchandise reservations can still receive late provider
+        // confirmations, which fulfillment must route to manual review.
+        if ($gatewayStatus === 'PENDING' && $payment->merchandise_order_id) {
+            $merchandiseOrder = MerchandiseOrder::query()->find($payment->merchandise_order_id);
+            if ($merchandiseOrder && ($merchandiseOrder->status === 'expired'
+                || ($merchandiseOrder->expires_at && $merchandiseOrder->expires_at->isPast()))) {
+                $localStatus = Payment::STATUS_EXPIRED;
             }
         }
 
