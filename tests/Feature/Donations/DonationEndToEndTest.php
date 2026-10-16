@@ -28,8 +28,7 @@ class DonationEndToEndTest extends TestCase
 
         $campaign = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
-            'title' => 'Display Only Campaign',
+                        'title' => 'Display Only Campaign',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
             'direct_payment_behavior' => DonationCampaign::DIRECT_BEHAVIOR_DISPLAY_ONLY,
@@ -58,8 +57,7 @@ class DonationEndToEndTest extends TestCase
 
         $campaign = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
-            'title' => 'Tracked Direct Campaign',
+                        'title' => 'Tracked Direct Campaign',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
             'direct_payment_behavior' => DonationCampaign::DIRECT_BEHAVIOR_TRACKED,
@@ -136,8 +134,7 @@ class DonationEndToEndTest extends TestCase
 
         $campaign = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
-            'title' => 'Platform Campaign',
+                        'title' => 'Platform Campaign',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_PLATFORM,
             'currency' => 'TZS',
@@ -182,32 +179,13 @@ class DonationEndToEndTest extends TestCase
         );
     }
 
-    public function test_event_manager_cannot_access_unassigned_campaign_even_with_numeric_id(): void
+    public function test_event_manager_cannot_manage_independent_organization_campaign_without_admin_role(): void
     {
-        [$organization, $assignedEvent] =
-            $this->organizationAndEvent();
+        [$organization, $event] = $this->organizationAndEvent();
 
-        $otherEvent = Event::query()->create([
+        $campaign = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'name' => 'Unassigned Donation Event',
-            'slug' => 'unassigned-donation-event-' . uniqid(),
-            'status' => Event::STATUS_ACTIVE,
-        ]);
-
-        $assignedCampaign = DonationCampaign::query()->create([
-            'organization_id' => $organization->id,
-            'event_id' => $assignedEvent->id,
-            'title' => 'Assigned Campaign',
-            'status' => DonationCampaign::STATUS_ACTIVE,
-            'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
-            'direct_payment_behavior' => DonationCampaign::DIRECT_BEHAVIOR_TRACKED,
-            'currency' => 'TZS',
-        ]);
-
-        $unassignedCampaign = DonationCampaign::query()->create([
-            'organization_id' => $organization->id,
-            'event_id' => $otherEvent->id,
-            'title' => 'Unassigned Campaign',
+            'title' => 'Independent Campaign',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
             'direct_payment_behavior' => DonationCampaign::DIRECT_BEHAVIOR_TRACKED,
@@ -215,38 +193,15 @@ class DonationEndToEndTest extends TestCase
         ]);
 
         $manager = User::factory()->create();
+        $organization->attachUser($manager, User::ORGANIZATION_ROLE_MEMBER);
+        $event->assignUser($manager, User::ORGANIZATION_ROLE_EVENT_MANAGER);
 
-        $organization->attachUser(
-            $manager,
-            User::ORGANIZATION_ROLE_MEMBER
-        );
-
-        $assignedEvent->assignUser(
-            $manager,
-            User::ORGANIZATION_ROLE_EVENT_MANAGER
-        );
-
-        $authorization =
-            app(DonationAuthorizationService::class);
-
-        $this->assertTrue(
-            $authorization->canManageCampaign(
-                $manager,
-                $assignedCampaign
-            )
-        );
-
-        $this->assertFalse(
-            $authorization->canManageCampaign(
-                $manager,
-                $unassignedCampaign
-            )
-        );
-
+        $authorization = app(DonationAuthorizationService::class);
+        $this->assertFalse($authorization->canManageCampaign($manager, $campaign));
         $this->assertNull(
             DonationCampaign::query()
                 ->accessibleBy($manager)
-                ->whereKey($unassignedCampaign->id)
+                ->whereKey($campaign->id)
                 ->first()
         );
     }

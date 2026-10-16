@@ -50,7 +50,7 @@ class DonationAuditTest extends TestCase
             ->first();
 
         $this->assertNotNull($submitted);
-        $this->assertSame($event->id, $submitted->event_id);
+        $this->assertNull($submitted->event_id);
         $this->assertSame($donation->reference, $submitted->reference);
         $this->assertNull($submitted->actor_id);
         $this->assertSame($method->id, $submitted->metadata['payment_method_id']);
@@ -58,7 +58,7 @@ class DonationAuditTest extends TestCase
 
         $this->assertNotNull($approved);
         $this->assertSame($admin->id, $approved->actor_id);
-        $this->assertSame($event->id, $approved->event_id);
+        $this->assertNull($approved->event_id);
         $this->assertSame(Donation::STATUS_AWAITING_VERIFICATION, $approved->before_data['status']);
         $this->assertSame(Donation::STATUS_COMPLETED, $approved->after_data['status']);
         $this->assertSame($submission->id, $approved->metadata['manual_submission_id']);
@@ -95,7 +95,7 @@ class DonationAuditTest extends TestCase
 
         $this->assertNotNull($audit);
         $this->assertSame($admin->id, $audit->actor_id);
-        $this->assertSame($event->id, $audit->event_id);
+        $this->assertNull($audit->event_id);
         $this->assertSame(Donation::STATUS_AWAITING_VERIFICATION, $audit->before_data['status']);
         $this->assertSame(Donation::STATUS_REJECTED, $audit->after_data['status']);
         $this->assertSame('Could not verify transaction.', $audit->metadata['reason']);
@@ -151,8 +151,7 @@ class DonationAuditTest extends TestCase
 
         $campaign = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
-            'title' => 'Donation Audit Campaign',
+                        'title' => 'Donation Audit Campaign',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
             'direct_payment_behavior' => DonationCampaign::DIRECT_BEHAVIOR_TRACKED,

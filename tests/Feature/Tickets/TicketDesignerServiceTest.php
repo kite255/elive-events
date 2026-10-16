@@ -255,7 +255,8 @@ class TicketDesignerServiceTest extends TestCase
             $definition
         );
 
-        $this->assertSame(
+        // JSON object property order is not significant.
+        $this->assertEquals(
             $definition,
             $saved->fresh()->definition
         );
@@ -508,7 +509,7 @@ class TicketDesignerServiceTest extends TestCase
             500
         );
 
-        $this->assertSame(
+        $this->assertEquals(
             $original,
             $page->fresh()->definition
         );

@@ -18,7 +18,6 @@ class PublicDonationDesignTest extends TestCase
 
         $campaign = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
             'title' => 'Community Education Fund',
             'description' => 'Help us provide learning materials and scholarships.',
             'banner_image_path' => 'donations/community-education.jpg',
@@ -39,7 +38,7 @@ class PublicDonationDesignTest extends TestCase
         $response->assertSee('Contact');
         $response->assertSee('Support a Campaign');
         $response->assertSee('Community Education Fund');
-        $response->assertSee('Public Donation Event');
+        $response->assertDontSee('Public Donation Event');
         $response->assertSee('storage/donations/community-education.jpg', false);
         $response->assertSee('Support Campaign');
         $response->assertSee(route('public.donations.show', ['campaign' => $campaign->slug]), false);
@@ -51,7 +50,6 @@ class PublicDonationDesignTest extends TestCase
 
         DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
             'title' => 'Support Our Event',
             'status' => DonationCampaign::STATUS_ACTIVE,
             'payment_mode' => DonationCampaign::PAYMENT_MODE_CLIENT_DIRECT,
@@ -75,7 +73,6 @@ class PublicDonationDesignTest extends TestCase
 
         $campaign = DonationCampaign::query()->create([
             'organization_id' => $organization->id,
-            'event_id' => $event->id,
             'title' => 'Church Building Fund',
             'description' => 'Help us complete the next phase of construction.',
             'banner_image_path' => 'donations/church-building.jpg',

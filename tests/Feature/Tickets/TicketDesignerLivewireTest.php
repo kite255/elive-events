@@ -1249,7 +1249,8 @@ public function test_delete_with_unknown_selection_does_not_remove_elements(): v
             $page->definition['version']
         );
 
-        $this->assertSame(
+        // JSON object key order is not significant; element list order is.
+        $this->assertEquals(
             $elements,
             $page->definition['elements']
         );
