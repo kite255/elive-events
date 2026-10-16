@@ -35,6 +35,16 @@ class MerchandiseProductResource extends Resource
     protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'Shop Products';
 
+    private static function canManageMerchandiseFor(Event $event): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $event->canBeManagedBy($user)
+            && ($user->isSuperAdmin() || ! ($user->isOrganizationOwner($event->organization_id)
+                || $user->hasOrganizationRole($event->organization_id, User::ORGANIZATION_ROLE_OWNER)));
+    }
+
     public static function accessibleEvents(): Builder
     {
         return Event::query()->accessibleBy(auth()->user());
@@ -43,7 +53,7 @@ class MerchandiseProductResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('event_id')->label('Event')->options(fn () => static::accessibleEvents()->get()->filter(fn (Event $event) => $event->canBeManagedBy(auth()->user()))->pluck('name', 'id')->all())->searchable()->required(),
+            Select::make('event_id')->label('Event')->options(fn () => static::accessibleEvents()->get()->filter(fn (Event $event) => static::canManageMerchandiseFor($event))->pluck('name', 'id')->all())->searchable()->required(),
             Select::make('event_merchandise_id')
                 ->label('Existing event merchandise (optional)')
                 ->helperText('Link an existing attendee merchandise item. Linked products cannot accept new public reservations until shared-stock checkout is completed.')
@@ -80,7 +90,7 @@ class MerchandiseProductResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->whereHas('event', fn (Builder $query) => $query->accessibleBy(auth()->user()));
+        return parent::getEloquentQuery()->whereIn('event_id', static::accessibleEvents()->get()->filter(fn (Event $event) => static::canManageMerchandiseFor($event))->pluck('id'));
     }
 
     public static function canViewAny(): bool
@@ -95,7 +105,7 @@ class MerchandiseProductResource extends Resource
 
     public static function canView(Model $record): bool
     {
-        return $record instanceof MerchandiseProduct && $record->event?->canBeManagedBy(auth()->user()) === true;
+        return $record instanceof MerchandiseProduct && ($record->event && static::canManageMerchandiseFor($record->event));
     }
 
     public static function canEdit(Model $record): bool
