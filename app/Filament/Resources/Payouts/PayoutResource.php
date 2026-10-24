@@ -21,6 +21,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
 class PayoutResource extends Resource
@@ -93,6 +94,19 @@ class PayoutResource extends Resource
             TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
             TextColumn::make('paid_at')->dateTime('d M Y H:i')->placeholder('Not paid'),
         ])->recordActions([
+            Action::make('history')->label('History')->icon('heroicon-o-clock')
+                ->modalHeading('Payout audit history')
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Close')
+                ->modalContent(fn (EventPayoutRequest $record) => view('filament.payouts.audit-history', [
+                    'entries' => DB::table('event_payout_audits')
+                        ->leftJoin('users', 'users.id', '=', 'event_payout_audits.actor_id')
+                        ->where('event_payout_request_id', $record->getKey())
+                        ->orderBy('event_payout_audits.id')
+                        ->get(['event_payout_audits.action', 'event_payout_audits.from_status',
+                            'event_payout_audits.to_status', 'event_payout_audits.note',
+                            'event_payout_audits.created_at', 'users.name as actor_name']),
+                ])),
             Action::make('approve')->label('Approve')->icon('heroicon-o-check')->color('success')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
                 ->requiresConfirmation()
