@@ -86,6 +86,7 @@ class EventPayoutReviewService
                 'note' => 'Transfer reference: '.trim($transferReference),
                 'created_at' => now(),
             ]);
+            $this->notifyRequesterAfterCommit($locked);
 
             return $locked;
         });
@@ -107,7 +108,7 @@ class EventPayoutReviewService
                         $record->status,
                     ));
                 }
-            } catch (\\Throwable $exception) {
+            } catch (\Throwable $exception) {
                 Log::warning('Payout status notification failed', [
                     'payout_request_id' => $requestId,
                     'error' => $exception->getMessage(),
