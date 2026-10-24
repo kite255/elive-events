@@ -33,11 +33,11 @@ class ListPayouts extends ListRecords
                 ->visible(fn (): bool => PayoutResource::canViewAny())
                 ->action(fn () => app(EventFinanceCsvExportService::class)->download(auth()->user())),
             Action::make('requestPayout')
-                ->label('Request Payout (Unavailable)')
+                ->label('Request Payout')
                 ->icon('heroicon-o-plus')
                 ->visible(fn (): bool => PayoutResource::canViewAny())
-                ->disabled()
-                ->tooltip('Requests are disabled until reconciled funds are available.')
+                ->disabled(fn (): bool => ! config('finance.payout_requests_enabled', false))
+                ->tooltip(fn (): string => config('finance.payout_requests_enabled', false) ? 'Request funds verified by the platform.' : 'Requests are disabled pending independent settlement review.')
                 ->schema([
                     Select::make('event_id')
                         ->label('Event')
