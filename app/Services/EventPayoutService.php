@@ -91,7 +91,7 @@ class EventPayoutService
                 throw ValidationException::withMessages(['amount' => 'Amount exceeds reconciled available balance.']);
             }
 
-            return EventPayoutRequest::query()->create([
+            $request = EventPayoutRequest::query()->create([
                 'event_id' => $event->getKey(),
                 'requested_by' => $user->getKey(),
                 'reference' => 'ELV-PO-'.strtoupper(Str::random(16)),
@@ -100,6 +100,16 @@ class EventPayoutService
                 'destination_type' => $destinationType,
                 'destination_details' => trim($destinationDetails),
             ]);
+            DB::table('event_payout_audits')->insert([
+                'event_payout_request_id' => $request->getKey(),
+                'actor_id' => $user->getKey(),
+                'action' => 'requested',
+                'from_status' => null,
+                'to_status' => EventPayoutRequest::REQUESTED,
+                'created_at' => now(),
+            ]);
+
+            return $request;
         });
     }
 }
