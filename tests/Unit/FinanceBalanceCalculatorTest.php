@@ -24,13 +24,13 @@ class FinanceBalanceCalculatorTest extends TestCase
 
     public function test_invalid_precision_is_rejected(): void
     {
-        $this->expectException(\\InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
         FinanceBalanceCalculator::summarize('10.001', '0', '0');
     }
 
     public function test_negative_amount_is_rejected(): void
     {
-        $this->expectException(\\InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
         FinanceBalanceCalculator::summarize('-1.00', '0', '0');
     }
 
