@@ -20,7 +20,7 @@ class EventFinanceCsvExportService
 
         return response()->streamDownload(function () use ($events): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Event ID', 'Event', 'Paid Orders', 'Refunded Orders', 'Refunded Payments', 'Net Ticket Earnings (TZS)', 'Recorded Payouts (TZS)', 'Reserved Requests (TZS)', 'Indicative Balance (TZS)', 'Overallocated (TZS)', 'Cleared Funds Verified']);
+            fputcsv($out, ['Event ID', 'Event', 'Paid Orders', 'Refunded Orders', 'Refunded Payments', 'Net Ticket Earnings (TZS)', 'Manually Attested Cleared Funds (TZS)', 'Manual Refund/Chargeback Reversals (TZS)', 'Recorded Payouts (TZS)', 'Reserved Requests (TZS)', 'Indicative Balance (TZS)', 'Overallocated (TZS)', 'Cleared Funds Verified']);
             $reconciliation = app(EventFinanceReconciliationService::class);
             $events->orderBy('events.id')->chunkById(100, function ($batch) use ($out, $reconciliation): void {
                 foreach ($batch as $event) {
@@ -30,7 +30,8 @@ class EventFinanceCsvExportService
                         $event->id, $safeName, $report['paid_orders'],
                         $report['refunded_or_partially_refunded_orders'],
                         $report['refunded_or_partially_refunded_payments'],
-                        $report['net_ticket_earnings'], $report['recorded_payouts'],
+                        $report['net_ticket_earnings'], $report['manually_attested_cleared_funds'],
+                        $report['manually_attested_reversals'], $report['recorded_payouts'],
                         $report['reserved_requests'], $report['indicative_unallocated_balance'],
                         $report['overallocated_amount'], 'No',
                     ]);
