@@ -6,6 +6,7 @@ use App\Filament\Resources\Payouts\PayoutResource;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\EventPayoutService;
+use App\Services\EventFinanceCsvExportService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -26,6 +27,11 @@ class ListPayouts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('downloadFinanceReport')
+                ->label('Export Event Finance CSV')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->visible(fn (): bool => PayoutResource::canViewAny())
+                ->action(fn () => app(EventFinanceCsvExportService::class)->download(auth()->user())),
             Action::make('requestPayout')
                 ->label('Request Payout (Unavailable)')
                 ->icon('heroicon-o-plus')
