@@ -4,6 +4,12 @@ namespace App\Filament\Pages;
 
 use App\Models\Event;
 use App\Models\User;
+use App\Services\EventFinanceClearanceService;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use App\Services\EventFinanceReconciliationService;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -80,4 +86,48 @@ class EventFinanceReport extends Page
 
         return app(EventFinanceReconciliationService::class)->inspect($this->eventId);
     }
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('recordClearance')
+                ->label('Record Verified Funds / Reversal')
+                ->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true)
+                ->schema([
+                    Select::make('event_id')->label('Event')
+                        ->options(fn (): array => Event::query()->orderBy('name')->pluck('name', 'id')->all())
+                        ->default(fn () => $this->eventId)->searchable()->required(),
+                    Select::make('entry_type')->label('Entry type')
+                        ->options([
+                            'settlement' => 'Verified organizer-allocated cleared funds',
+                            'refund' => 'Refund / repayment adjustment',
+                            'chargeback' => 'Chargeback adjustment',
+                        ])->required(),
+                    TextInput::make('amount')->label('Amount (TZS)')->numeric()->minValue(0.01)->required(),
+                    TextInput::make('external_reference')->label('Bank or provider statement reference')
+                        ->maxLength(255)->required(),
+                    Textarea::make('verification_note')->label('How the statement was verified')
+                        ->minLength(12)->maxLength(2000)->required(),
+                ])
+                ->requiresConfirmation()
+                ->action(function (array $data): void {
+                    $actor = auth()->user();
+
+                    if (! $actor instanceof User || ! $actor->isSuperAdmin()) {
+                        abort(403);
+                    }
+
+                    $event = Event::query()->findOrFail((int) $data['event_id']);
+
+                    app(EventFinanceClearanceService::class)->record(
+                        $event, $actor, $data['entry_type'],
+                        (string) $data['amount'], $data['external_reference'],
+                        $data['verification_note'],
+                    );
+
+                    $this->eventId = $event->id;
+                    Notification::make()->title('Verified finance entry recorded')->success()->send();
+                }),
+        ];
+    }
+
 }
