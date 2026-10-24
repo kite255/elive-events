@@ -5,6 +5,7 @@ namespace Tests\Feature\Finance;
 use App\Filament\Resources\Payouts\PayoutResource;
 use App\Filament\Widgets\OrganizerFinanceOverview;
 use App\Models\Event;
+use App\Models\EventPayoutRequest;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,5 +65,21 @@ class FinanceVisibilityTest extends TestCase
         )->pluck('events.id')->all();
         $this->assertContains($eventA->id, $scopedEvents);
         $this->assertNotContains($eventB->id, $scopedEvents);
+
+        $payoutA = EventPayoutRequest::query()->create([
+            'event_id' => $eventA->id, 'requested_by' => $owner->id,
+            'reference' => 'SCOPE-A-'.uniqid(), 'amount' => '100.00',
+            'destination_type' => 'bank', 'destination_details' => 'Test account A',
+        ]);
+        $payoutB = EventPayoutRequest::query()->create([
+            'event_id' => $eventB->id, 'requested_by' => $owner->id,
+            'reference' => 'SCOPE-B-'.uniqid(), 'amount' => '100.00',
+            'destination_type' => 'bank', 'destination_details' => 'Test account B',
+        ]);
+        $visiblePayouts = PayoutResource::getEloquentQuery()->pluck('event_payout_requests.id')->all();
+        $this->assertContains($payoutA->id, $visiblePayouts);
+        $this->assertNotContains($payoutB->id, $visiblePayouts);
+        $this->assertTrue(PayoutResource::canView($payoutA));
+        $this->assertFalse(PayoutResource::canView($payoutB));
     }
 }
