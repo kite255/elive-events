@@ -60,6 +60,12 @@ class EventPayoutService
             throw ValidationException::withMessages(['destination' => 'A valid destination is required.']);
         }
 
+        // Do not permit payout requests against unverified cash balances.
+        // This is deliberately disabled until a reconciled settlement ledger exists.
+        throw ValidationException::withMessages([
+            'amount' => 'Payout requests are unavailable until funds are reconciled and approved for disbursement.',
+        ]);
+
         return DB::transaction(function () use ($event, $user, $amount, $destinationType, $destinationDetails) {
             // Lock the parent event to serialize concurrent requests for its balance.
             Event::query()->whereKey($event->getKey())->lockForUpdate()->firstOrFail();
