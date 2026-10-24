@@ -44,15 +44,14 @@ class EventFinanceReconciliationService
             ->whereIn('status', [EventPayoutRequest::REQUESTED, EventPayoutRequest::APPROVED])
             ->sum('amount');
 
+        $balance = FinanceBalanceCalculator::summarize($net, $paidOut, $reserved);
+
         return [
             'paid_orders' => (clone $paid)->count(),
             'completed_payment_attempts' => $completedPayments,
             'refunded_or_partially_refunded_orders' => $exceptions,
             'refunded_or_partially_refunded_payments' => $refundedPayments,
-            'net_ticket_earnings' => round($net, 2),
-            'recorded_payouts' => round($paidOut, 2),
-            'reserved_requests' => round($reserved, 2),
-            'indicative_unallocated_balance' => round(max(0, $net - $paidOut - $reserved), 2),
+            ...$balance,
             'cleared_funds_verified' => false,
             'payouts_enabled' => false,
             'requires_manual_reconciliation' => true,
