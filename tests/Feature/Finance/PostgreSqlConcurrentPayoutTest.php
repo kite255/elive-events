@@ -9,75 +9,91 @@ use App\Models\User;
 use App\Services\EventFinanceClearanceService;
 use App\Services\EventPayoutService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
- * Uses real separate PostgreSQL connections. Do not use RefreshDatabase:
- * its wrapping transaction would hide fixture rows from the child process.
+ * Separate PHP processes provide independent database sockets.
+ * Do not use RefreshDatabase: its transaction hides fixtures from the child.
  */
 class PostgreSqlConcurrentPayoutTest extends TestCase
 {
-    public function test_two_connections_cannot_reserve_more_than_the_cleared_balance(): void
+    public function test_concurrent_requests_cannot_overallocate_cleared_funds(): void
     {
-        if (DB::getDriverName() !== 'pgsql' || ! function_exists('pcntl_fork')) {
-            $this->markTestSkipped('Requires PostgreSQL and pcntl.');
+        if (DB::getDriverName() !== 'pgsql' || ! function_exists('proc_open')) {
+            $this->markTestSkipped('Requires PostgreSQL and proc_open.');
         }
 
         config(['finance.payout_requests_enabled' => true]);
         $admin = User::factory()->create(['is_super_admin' => true]);
-        $org = Organization::query()->create(['name' => 'Payout Concurrency '.uniqid()]);
+        $org = Organization::query()->create(['name' => 'Payout Race '.uniqid()]);
         $event = Event::query()->create([
-            'organization_id' => $org->id, 'name' => 'Concurrency Event',
-            'slug' => 'payout-concurrency-'.uniqid(), 'status' => Event::STATUS_ACTIVE,
+            'organization_id' => $org->id, 'name' => 'Concurrent Payout',
+            'slug' => 'payout-race-'.uniqid(), 'status' => Event::STATUS_ACTIVE,
         ]);
         TicketOrder::query()->create([
-            'event_id' => $event->id, 'order_number' => 'CONCURRENT-'.uniqid(),
+            'event_id' => $event->id, 'order_number' => 'RACE-'.uniqid(),
             'buyer_name' => 'Buyer', 'buyer_phone' => '255700000111',
             'quantity' => 1, 'subtotal' => 100, 'total' => 100,
             'gross_amount' => 100, 'organizer_net_amount' => 100,
-            'currency' => 'TZS', 'status' => TicketOrder::STATUS_PAID, 'paid_at' => now(),
+            'currency' => 'TZS', 'status' => TicketOrder::STATUS_PAID,
+            'paid_at' => now(),
         ]);
         app(EventFinanceClearanceService::class)->record(
             $event, $admin, 'settlement', '100.00',
-            'CONCURRENT-SETTLEMENT-'.uniqid(), 'Verified independent test settlement'
+            'RACE-SETTLEMENT-'.uniqid(), 'Independent statement checked'
         );
 
-        $resultPath = tempnam(sys_get_temp_dir(), 'payout-race-');
+        $script = <<<'PHP'
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+config(['finance.payout_requests_enabled' => true]);
+$event = \App\Models\Event::findOrFail((int) $argv[1]);
+$admin = \App\Models\User::findOrFail((int) $argv[2]);
+try {
+    app(\App\Services\EventPayoutService::class)->request($event, $admin, 60.0, 'bank', 'Independent account');
+    echo 'accepted';
+} catch (\Illuminate\Validation\ValidationException $exception) {
+    echo 'rejected';
+}
+PHP;
+
         DB::beginTransaction();
+        $process = null;
+        $pipes = [];
         try {
-            // Parent holds the same event lock used by the payout request service.
             Event::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+            $process = proc_open(
+                [PHP_BINARY, '-r', $script, (string) $event->id, (string) $admin->id],
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+                base_path()
+            );
+            $this->assertIsResource($process);
+            fclose($pipes[0]);
 
-            $childPid = pcntl_fork();
-            if ($childPid === -1) {
-                $this->fail('Could not start a second PostgreSQL connection process.');
-            }
-
-            if ($childPid === 0) {
-                DB::disconnect();
-                try {
-                    app(EventPayoutService::class)->request($event, $admin, 60.00, 'bank', 'Concurrent test account');
-                    file_put_contents($resultPath, 'accepted');
-                } catch (ValidationException $exception) {
-                    file_put_contents($resultPath, 'rejected');
-                } catch (\Throwable $exception) {
-                    file_put_contents($resultPath, 'error:'.get_class($exception).':'.$exception->getMessage());
-                }
-                exit(0);
-            }
-
-            // The first reservation commits before the second connection is released.
-            app(EventPayoutService::class)->request($event, $admin, 60.00, 'bank', 'Primary test account');
+            // First reservation becomes visible before the other connection acquires the lock.
+            app(EventPayoutService::class)->request($event, $admin, 60.0, 'bank', 'Primary account');
             DB::commit();
-            pcntl_waitpid($childPid, $status);
-            $this->assertSame('rejected', file_get_contents($resultPath));
+
+            $output = stream_get_contents($pipes[1]);
+            $errors = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exit = proc_close($process);
+            $process = null;
+
+            $this->assertSame(0, $exit, $errors);
+            $this->assertSame('rejected', $output, $errors);
             $this->assertSame(1, DB::table('event_payout_requests')->where('event_id', $event->id)->count());
         } finally {
             if (DB::transactionLevel() > 0) {
                 DB::rollBack();
             }
-            @unlink($resultPath);
+            if (is_resource($process)) {
+                proc_terminate($process);
+                proc_close($process);
+            }
         }
     }
 }
