@@ -57,7 +57,7 @@ class PlatformFinanceOverview extends StatsOverviewWidget
                 ->description('Payment processing fees; not platform income')
                 ->icon('heroicon-o-credit-card'),
 
-            Stat::make('Organizer net earnings', 'TZS '.number_format($organizerNet, 2))
+            Stat::make('Organizer net ticket earnings', 'TZS '.number_format($organizerNet, 2))
                 ->description('After recorded ticket-sale deductions; not unpaid payout balance')
                 ->icon('heroicon-o-wallet'),
         ];
