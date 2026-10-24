@@ -34,6 +34,18 @@ class FinanceBalanceCalculatorTest extends TestCase
         FinanceBalanceCalculator::summarize('-1.00', '0', '0');
     }
 
+    public function test_scientific_notation_is_rejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        FinanceBalanceCalculator::summarize('1e3', '0', '0');
+    }
+
+    public function test_one_cent_can_remain_unallocated(): void
+    {
+        $result = FinanceBalanceCalculator::summarize('0.01', '0', '0');
+        $this->assertEqualsWithDelta(0.01, $result['indicative_unallocated_balance'], 0.00001);
+    }
+
     public function test_fractional_amounts_are_processed_in_cents(): void
     {
         $result = FinanceBalanceCalculator::summarize('0.30', '0.10', '0.20');
