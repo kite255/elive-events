@@ -22,9 +22,17 @@ jobs:
           extensions: mbstring, pdo_sqlite, sqlite3, intl, gd, zip, bcmath
           coverage: none
           tools: composer:v2
+      - name: Install ticket rendering system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librsvg2-bin
+          test -x /usr/bin/rsvg-convert
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
       - name: Prepare Laravel test environment
+        env:
+          TZ: Africa/Dar_es_Salaam
+          APP_TIMEZONE: Africa/Dar_es_Salaam
         run: |
           cp .env.example .env
           php artisan key:generate
