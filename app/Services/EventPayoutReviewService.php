@@ -27,11 +27,21 @@ class EventPayoutReviewService
                 throw ValidationException::withMessages(['review' => 'This request has already been reviewed.']);
             }
 
+            $previousStatus = $locked->status;
             $locked->status = $approve ? EventPayoutRequest::APPROVED : EventPayoutRequest::REJECTED;
             $locked->reviewed_by = $reviewer->getKey();
             $locked->review_note = $note;
             $locked->reviewed_at = now();
             $locked->save();
+            DB::table('event_payout_audits')->insert([
+                'event_payout_request_id' => $locked->getKey(),
+                'actor_id' => $reviewer->getKey(),
+                'action' => $approve ? 'approved' : 'rejected',
+                'from_status' => $previousStatus,
+                'to_status' => $locked->status,
+                'note' => $note,
+                'created_at' => now(),
+            ]);
 
             return $locked;
         });
@@ -46,7 +56,7 @@ class EventPayoutReviewService
             throw ValidationException::withMessages(['transfer' => 'Administrator and transfer reference required.']);
         }
 
-        return DB::transaction(function () use ($request, $transferReference): EventPayoutRequest {
+        return DB::transaction(function () use ($request, $reviewer, $transferReference): EventPayoutRequest {
             Event::query()->whereKey($request->event_id)->lockForUpdate()->firstOrFail();
             $locked = EventPayoutRequest::query()->whereKey($request->getKey())->lockForUpdate()->firstOrFail();
 
@@ -58,10 +68,20 @@ class EventPayoutReviewService
                 throw ValidationException::withMessages(['transfer' => 'Transfer reference already recorded.']);
             }
 
+            $previousStatus = $locked->status;
             $locked->status = EventPayoutRequest::PAID;
             $locked->paid_at = now();
             $locked->transfer_reference = trim($transferReference);
             $locked->save();
+            DB::table('event_payout_audits')->insert([
+                'event_payout_request_id' => $locked->getKey(),
+                'actor_id' => $reviewer->getKey(),
+                'action' => 'paid',
+                'from_status' => $previousStatus,
+                'to_status' => $locked->status,
+                'note' => 'Transfer reference: '.trim($transferReference),
+                'created_at' => now(),
+            ]);
 
             return $locked;
         });
