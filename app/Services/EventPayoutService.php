@@ -7,6 +7,8 @@ use App\Models\EventPayoutRequest;
 use App\Models\Payment;
 use App\Models\TicketOrder;
 use App\Models\User;
+use App\Notifications\EventPayoutStatusNotification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -114,6 +116,19 @@ class EventPayoutService
                 'to_status' => EventPayoutRequest::REQUESTED,
                 'created_at' => now(),
             ]);
+
+            DB::afterCommit(function () use ($request, $event, $user): void {
+                try {
+                    $user->notify(new EventPayoutStatusNotification(
+                        $request->reference, $event->name, EventPayoutRequest::REQUESTED
+                    ));
+                } catch (\Throwable $exception) {
+                    Log::warning('Payout request notification failed', [
+                        'payout_request_id' => $request->getKey(),
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            });
 
             return $request;
         });
