@@ -27,6 +27,9 @@
                 @foreach([
                     'Paid ticket orders' => number_format($report['paid_orders']),
                     'Net ticket earnings' => 'TZS '.number_format($report['net_ticket_earnings'], 2),
+                    'Manually attested cleared funds' => 'TZS '.number_format($report['manually_attested_cleared_funds'], 2),
+                    'Recorded refund / chargeback reversals' => 'TZS '.number_format($report['manually_attested_reversals'], 2),
+                    'Clearance-limited indicative balance' => 'TZS '.number_format($report['indicative_clearance_limited_balance'], 2),
                     'Recorded payouts' => 'TZS '.number_format($report['recorded_payouts'], 2),
                     'Pending requests' => 'TZS '.number_format($report['reserved_requests'], 2),
                     'Indicative unallocated balance' => 'TZS '.number_format($report['indicative_unallocated_balance'], 2),
