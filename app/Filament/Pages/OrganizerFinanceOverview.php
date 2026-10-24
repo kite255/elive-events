@@ -20,6 +20,8 @@ class OrganizerFinanceOverview extends Page
 
     protected static ?string $slug = 'my-finance';
 
+    protected static ?int $navigationSort = 1;
+
     protected string $view =
         'filament.pages.organizer-finance-overview';
 
