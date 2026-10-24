@@ -93,5 +93,5 @@ jobs:
           php artisan key:generate
       - name: Validate migrations on PostgreSQL
         run: php artisan migrate --force
-      - name: Run payout security tests on PostgreSQL
-        run: php artisan test --filter='PayoutReviewAuthorizationTest|PayoutRequestSettlementGuardTest'
+      - name: Run finance integration tests on PostgreSQL
+        run: php artisan test --filter='FinanceVisibilityTest|PayoutAuditTest|EventFinanceClearanceTest|ReconciledPayoutRequestTest|PayoutReviewAuthorizationTest|PayoutRequestSettlementGuardTest'
