@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Event;
 use App\Models\EventPayoutRequest;
 use App\Models\User;
+use App\Notifications\EventPayoutStatusNotification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -42,6 +44,8 @@ class EventPayoutReviewService
                 'note' => $note,
                 'created_at' => now(),
             ]);
+
+            $this->notifyRequesterAfterCommit($locked);
 
             return $locked;
         });
@@ -86,4 +90,30 @@ class EventPayoutReviewService
             return $locked;
         });
     }
+    private function notifyRequesterAfterCommit(EventPayoutRequest $request): void
+    {
+        $requestId = $request->getKey();
+
+        DB::afterCommit(function () use ($requestId): void {
+            try {
+                $record = EventPayoutRequest::query()
+                    ->with(['requester', 'event'])
+                    ->find($requestId);
+
+                if ($record?->requester && $record->event) {
+                    $record->requester->notify(new EventPayoutStatusNotification(
+                        $record->reference,
+                        $record->event->name,
+                        $record->status,
+                    ));
+                }
+            } catch (\\Throwable $exception) {
+                Log::warning('Payout status notification failed', [
+                    'payout_request_id' => $requestId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        });
+    }
+
 }
