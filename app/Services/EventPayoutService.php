@@ -60,29 +60,9 @@ class EventPayoutService
             throw ValidationException::withMessages(['destination' => 'A valid destination is required.']);
         }
 
-        // Do not permit payout requests against unverified cash balances.
-        // This is deliberately disabled until a reconciled settlement ledger exists.
+        // Request creation remains blocked until settlement eligibility is reconciled.
         throw ValidationException::withMessages([
-            'amount' => 'Payout requests are unavailable until funds are reconciled and approved for disbursement.',
+            'amount' => 'Payout requests are unavailable until funds are reconciled.',
         ]);
-
-        return DB::transaction(function () use ($event, $user, $amount, $destinationType, $destinationDetails) {
-            // Lock the parent event to serialize concurrent requests for its balance.
-            Event::query()->whereKey($event->getKey())->lockForUpdate()->firstOrFail();
-
-            if ($amount > $this->ticketBalance((int) $event->getKey())['requestable_ticket_balance']) {
-                throw ValidationException::withMessages(['amount' => 'Amount exceeds the remaining ticket balance.']);
-            }
-
-            return EventPayoutRequest::query()->create([
-                'event_id' => $event->getKey(),
-                'requested_by' => $user->getKey(),
-                'reference' => 'ELV-PO-'.strtoupper(Str::random(16)),
-                'amount' => $amount,
-                'currency' => 'TZS',
-                'destination_type' => $destinationType,
-                'destination_details' => $destinationDetails,
-            ]);
-        });
     }
 }
