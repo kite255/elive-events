@@ -22,6 +22,18 @@ class FinanceBalanceCalculatorTest extends TestCase
         $this->assertSame(10.0, $result['overallocated_amount']);
     }
 
+    public function test_invalid_precision_is_rejected(): void
+    {
+        $this->expectException(\\InvalidArgumentException::class);
+        FinanceBalanceCalculator::summarize('10.001', '0', '0');
+    }
+
+    public function test_negative_amount_is_rejected(): void
+    {
+        $this->expectException(\\InvalidArgumentException::class);
+        FinanceBalanceCalculator::summarize('-1.00', '0', '0');
+    }
+
     public function test_fractional_amounts_are_processed_in_cents(): void
     {
         $result = FinanceBalanceCalculator::summarize('0.30', '0.10', '0.20');
