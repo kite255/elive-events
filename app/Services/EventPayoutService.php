@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Event;
 use App\Models\EventPayoutRequest;
+use App\Models\Payment;
 use App\Models\TicketOrder;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,11 @@ class EventPayoutService
 
         $exceptions = TicketOrder::query()->where('event_id', $eventId)
             ->whereIn('status', [TicketOrder::STATUS_REFUNDED, TicketOrder::STATUS_PARTIALLY_REFUNDED])->count();
+
+        $paymentExceptions = Payment::query()->where('event_id', $eventId)
+            ->whereNotNull('ticket_order_id')
+            ->whereIn('status', [Payment::STATUS_REFUNDED, Payment::STATUS_PARTIALLY_REFUNDED])->count();
+        $exceptions += $paymentExceptions;
 
         $available = max(0, min($earned, $cleared - $reversals) - $paid - $reserved);
 
