@@ -107,10 +107,10 @@ class PayoutResource extends Resource
                 }),
             Action::make('recordTransfer')->label('Record Paid')->color('info')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::APPROVED)
-                ->schema([TextInput::make('reference')->label('Verified transfer reference')->required()->maxLength(255)])
+                ->schema([\n                    TextInput::make('reference')->label('Verified transfer reference')->required()->maxLength(255),\n                    \\Filament\\Forms\\Components\\Checkbox::make('transfer_verified')\n                        ->label('I have independently verified that this transfer was completed')\n                        ->accepted()->required(),\n                ])
                 ->requiresConfirmation()
                 ->action(function (EventPayoutRequest $record, array $data): void {
-                    app(EventPayoutReviewService::class)->recordCompletedTransfer($record, auth()->user(), $data['reference']);
+                    if (($data['transfer_verified'] ?? false) !== true) {\n                        throw \\Illuminate\\Validation\\ValidationException::withMessages(['transfer_verified' => 'Confirm the transfer before recording it.']);\n                    }\n                    app(EventPayoutReviewService::class)->recordCompletedTransfer($record, auth()->user(), $data['reference']);
                     Notification::make()->title('Confirmed transfer recorded')->success()->send();
                 }),
         ])->filters([
