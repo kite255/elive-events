@@ -33,11 +33,24 @@ class EventPayoutService
             ->whereIn('status', [EventPayoutRequest::REQUESTED, EventPayoutRequest::APPROVED])
             ->sum('amount');
 
+        $cleared = (float) DB::table('event_finance_clearance_entries')
+            ->where('event_id', $eventId)->where('entry_type', 'settlement')->sum('amount');
+        $reversals = (float) DB::table('event_finance_clearance_entries')
+            ->where('event_id', $eventId)->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
+
+        $exceptions = TicketOrder::query()->where('event_id', $eventId)
+            ->whereIn('status', [TicketOrder::STATUS_REFUNDED, TicketOrder::STATUS_PARTIALLY_REFUNDED])->count();
+
+        $available = max(0, min($earned, $cleared - $reversals) - $paid - $reserved);
+
         return [
             'ticket_net_earnings' => round($earned, 2),
+            'verified_cleared_funds' => round($cleared, 2),
+            'verified_reversals' => round($reversals, 2),
+            'refund_exception_count' => $exceptions,
             'paid_out' => round($paid, 2),
             'reserved_requests' => round($reserved, 2),
-            'requestable_ticket_balance' => round(max(0, $earned - $paid - $reserved), 2),
+            'requestable_ticket_balance' => round($available, 2),
         ];
     }
 
@@ -60,9 +73,33 @@ class EventPayoutService
             throw ValidationException::withMessages(['destination' => 'A valid destination is required.']);
         }
 
-        // Request creation remains blocked until settlement eligibility is reconciled.
-        throw ValidationException::withMessages([
-            'amount' => 'Payout requests are unavailable until funds are reconciled.',
-        ]);
+        if (! config('finance.payout_requests_enabled', false)) {
+            throw ValidationException::withMessages([
+                'amount' => 'Payout requests are disabled pending independent settlement review.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($event, $user, $amount, $destinationType, $destinationDetails): EventPayoutRequest {
+            Event::query()->whereKey($event->getKey())->lockForUpdate()->firstOrFail();
+            $balance = $this->ticketBalance((int) $event->getKey());
+
+            if ($balance['refund_exception_count'] > 0) {
+                throw ValidationException::withMessages(['amount' => 'Refund exceptions must be reconciled before payouts.']);
+            }
+
+            if ($amount > $balance['requestable_ticket_balance']) {
+                throw ValidationException::withMessages(['amount' => 'Amount exceeds reconciled available balance.']);
+            }
+
+            return EventPayoutRequest::query()->create([
+                'event_id' => $event->getKey(),
+                'requested_by' => $user->getKey(),
+                'reference' => 'ELV-PO-'.strtoupper(Str::random(16)),
+                'amount' => $amount,
+                'currency' => 'TZS',
+                'destination_type' => $destinationType,
+                'destination_details' => trim($destinationDetails),
+            ]);
+        });
     }
 }
