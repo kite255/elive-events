@@ -23,7 +23,7 @@ class EventFinanceReconciliationService
             TicketOrder::STATUS_PARTIALLY_REFUNDED,
         ])->count();
 
-        $net = (float) (clone $paid)->sum('organizer_net_amount');
+        $net = (string) (clone $paid)->sum('organizer_net_amount');
 
         $payments = Payment::query()->where('event_id', $eventId)
             ->whereNotNull('ticket_order_id');
@@ -35,11 +35,11 @@ class EventFinanceReconciliationService
         $refundedPayments = (clone $payments)->whereIn('status', [
             Payment::STATUS_REFUNDED, Payment::STATUS_PARTIALLY_REFUNDED,
         ])->count();
-        $paidOut = (float) EventPayoutRequest::query()
+        $paidOut = (string) EventPayoutRequest::query()
             ->where('event_id', $eventId)
             ->where('status', EventPayoutRequest::PAID)
             ->sum('amount');
-        $reserved = (float) EventPayoutRequest::query()
+        $reserved = (string) EventPayoutRequest::query()
             ->where('event_id', $eventId)
             ->whereIn('status', [EventPayoutRequest::REQUESTED, EventPayoutRequest::APPROVED])
             ->sum('amount');
