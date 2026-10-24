@@ -14,7 +14,7 @@
 
         @if($report)
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-                These figures are ticket-based financial diagnostics, not confirmed cleared cash. Payout requests remain unavailable pending settlement verification.
+                Finance report combines paid-ticket totals with administrator-attested settlement and reversal entries. Attestations are not independent bank/provider confirmation; payout requests remain disabled by default.
                 @if($report['overallocated'])
                     <p class="mt-2 font-semibold">Attention: recorded payouts and reservations exceed ticket net earnings by TZS {{ number_format($report['overallocated_amount'], 2) }}.</p>
                 @endif
