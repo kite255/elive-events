@@ -17,6 +17,8 @@ class AdminFinanceOverview extends Page
 
     protected static ?string $slug = 'finance-overview';
 
+    protected static ?int $navigationSort = 1;
+
     protected string $view = 'filament.pages.admin-finance-overview';
 
     public static function canAccess(): bool
