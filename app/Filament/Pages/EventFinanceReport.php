@@ -90,7 +90,7 @@ class EventFinanceReport extends Page
     {
         return [
             Action::make('recordClearance')
-                ->label('Record Verified Funds / Reversal')
+                ->label('Record Attested Settlement / Reversal')
                 ->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true)
                 ->schema([
                     Select::make('event_id')->label('Event')
@@ -98,14 +98,14 @@ class EventFinanceReport extends Page
                         ->default(fn () => $this->eventId)->searchable()->required(),
                     Select::make('entry_type')->label('Entry type')
                         ->options([
-                            'settlement' => 'Verified organizer-allocated cleared funds',
+                            'settlement' => 'Admin-attested organizer settlement',
                             'refund' => 'Refund / repayment adjustment',
                             'chargeback' => 'Chargeback adjustment',
                         ])->required(),
                     TextInput::make('amount')->label('Amount (TZS)')->numeric()->minValue(0.01)->required(),
                     TextInput::make('external_reference')->label('Bank or provider statement reference')
                         ->maxLength(255)->required(),
-                    Textarea::make('verification_note')->label('How the statement was verified')
+                    Textarea::make('verification_note')->label('Evidence reviewed and verification notes')
                         ->minLength(12)->maxLength(2000)->required(),
                 ])
                 ->requiresConfirmation()
@@ -125,7 +125,7 @@ class EventFinanceReport extends Page
                     );
 
                     $this->eventId = $event->id;
-                    Notification::make()->title('Verified finance entry recorded')->success()->send();
+                    Notification::make()->title('Finance attestation recorded')->success()->send();
                 }),
         ];
     }
