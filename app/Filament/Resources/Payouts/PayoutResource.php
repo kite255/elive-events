@@ -6,6 +6,11 @@ use App\Filament\Resources\Payouts\Pages\ListPayouts;
 use App\Models\Event;
 use App\Models\EventPayoutRequest;
 use App\Models\User;
+use App\Services\EventPayoutReviewService;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -85,6 +90,29 @@ class PayoutResource extends Resource
             }),
             TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
             TextColumn::make('paid_at')->dateTime('d M Y H:i')->placeholder('Not paid'),
+        ])->recordActions([
+            Action::make('approve')->label('Approve')->icon('heroicon-o-check')->color('success')
+                ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
+                ->requiresConfirmation()
+                ->action(function (EventPayoutRequest $record): void {
+                    app(EventPayoutReviewService::class)->review($record, auth()->user(), true);
+                    Notification::make()->title('Payout request approved')->success()->send();
+                }),
+            Action::make('reject')->label('Reject')->color('danger')
+                ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
+                ->schema([Textarea::make('reason')->label('Reason')->required()->maxLength(500)])
+                ->action(function (EventPayoutRequest $record, array $data): void {
+                    app(EventPayoutReviewService::class)->review($record, auth()->user(), false, $data['reason']);
+                    Notification::make()->title('Payout request rejected')->success()->send();
+                }),
+            Action::make('recordTransfer')->label('Record Paid')->color('info')
+                ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::APPROVED)
+                ->schema([TextInput::make('reference')->label('Verified transfer reference')->required()->maxLength(255)])
+                ->requiresConfirmation()
+                ->action(function (EventPayoutRequest $record, array $data): void {
+                    app(EventPayoutReviewService::class)->recordCompletedTransfer($record, auth()->user(), $data['reference']);
+                    Notification::make()->title('Confirmed transfer recorded')->success()->send();
+                }),
         ])->filters([
             SelectFilter::make('status')->options([
                 EventPayoutRequest::REQUESTED => 'Requested',
