@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\EventPayoutReviewService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use BackedEnum;
@@ -115,7 +116,7 @@ class PayoutResource extends Resource
                 ])
                 ->requiresConfirmation()
                 ->action(function (EventPayoutRequest $record, array $data): void {
-                    if (($data['transfer_verified'] ?? false) !== true) {
+                    if (! filter_var($data['transfer_verified'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                         throw \Illuminate\\Validation\\ValidationException::withMessages(['transfer_verified' => 'Confirm the transfer before recording it.']);
                     }
                     app(EventPayoutReviewService::class)->recordCompletedTransfer($record, auth()->user(), $data['reference']);
