@@ -32,6 +32,8 @@ class ListPayments extends ListRecords
                 )
                 ->count();
 
+        $pending = (clone $query)->whereIn('status', [Payment::STATUS_PENDING, Payment::STATUS_PROCESSING])->count();
+
         $revenue =
             (clone $query)
                 ->where(
@@ -44,7 +46,9 @@ class ListPayments extends ListRecords
             number_format($total)
             . ' transaction(s) · '
             . number_format($completed)
-            . ' completed · Revenue recorded: '
+            . ' completed · '
+            . number_format($pending)
+            . ' pending/processing · Completed payment volume: '
             . number_format((float) $revenue, 2);
     }
 }
