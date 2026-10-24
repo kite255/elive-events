@@ -27,9 +27,11 @@ class ListPayouts extends ListRecords
     {
         return [
             Action::make('requestPayout')
-                ->label('Request Payout')
+                ->label('Request Payout (Unavailable)')
                 ->icon('heroicon-o-plus')
                 ->visible(fn (): bool => PayoutResource::canViewAny())
+                ->disabled()
+                ->tooltip('Requests are disabled until reconciled funds are available.')
                 ->schema([
                     Select::make('event_id')
                         ->label('Event')
