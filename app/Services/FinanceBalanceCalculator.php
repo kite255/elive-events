@@ -2,17 +2,37 @@
 
 namespace App\Services;
 
+use InvalidArgumentException;
+
 /**
- * Pure arithmetic for read-only financial reporting, not payout authorization.
+ * Read-only finance arithmetic. Values are represented as integer cents
+ * internally; results are not evidence of settled funds.
  */
 final class FinanceBalanceCalculator
 {
-    public static function summarize(string|float|int $earned, string|float|int $paid, string|float|int $reserved): array
+    private static function cents(string|int|float $amount): int
     {
-        $net = (int) round((float) $earned * 100);
-        $transferred = (int) round((float) $paid * 100);
-        $pending = (int) round((float) $reserved * 100);
+        $raw = trim((string) $amount);
 
+        if (! preg_match('/^(0|[1-9][0-9]*)(\\.[0-9]{1,2})?$/D', $raw)) {
+            throw new InvalidArgumentException('Amount must be a non-negative decimal with at most two places.');
+        }
+
+        [$whole, $fraction] = array_pad(explode('.', $raw, 2), 2, '0');
+        $fraction = str_pad($fraction, 2, '0');
+
+        if (strlen($whole) > 14) {
+            throw new InvalidArgumentException('Amount exceeds the supported range.');
+        }
+
+        return ((int) $whole * 100) + (int) $fraction;
+    }
+
+    public static function summarize(string|int|float $earned, string|int|float $paid, string|int|float $reserved): array
+    {
+        $net = self::cents($earned);
+        $transferred = self::cents($paid);
+        $pending = self::cents($reserved);
         $difference = $net - $transferred - $pending;
 
         return [
