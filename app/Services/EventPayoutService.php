@@ -48,7 +48,7 @@ class EventPayoutService
         string $destinationType,
         string $destinationDetails
     ): EventPayoutRequest {
-        if (! $user->isSuperAdmin() && ! $event->isAccessibleBy($user)) {
+        if (! $user->isSuperAdmin() && ! ($user->canManageOrganization((int) $event->organization_id) || $user->assignedTicketingEvents()->where('events.id', $event->getKey())->exists())) {
             throw ValidationException::withMessages(['event' => 'You cannot access this event.']);
         }
 
