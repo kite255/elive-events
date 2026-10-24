@@ -64,7 +64,7 @@ class OrganizerFinanceOverview extends StatsOverviewWidget
                 ->description('Marked paid after a confirmed transfer'),
             Stat::make('Pending payout requests', 'TZS '.number_format($reserved, 2))
                 ->description('Requested or approved amounts'),
-            Stat::make('Unallocated ticket balance', 'TZS '.number_format(max(0, $net - $paid - $reserved), 2))
+            Stat::make('Indicative unallocated ticket earnings', 'TZS '.number_format(max(0, $net - $paid - $reserved), 2))
                 ->description('Indicative only; not verified cleared funds'),
         ];
     }
