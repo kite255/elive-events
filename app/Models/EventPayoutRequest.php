@@ -21,7 +21,7 @@ class EventPayoutRequest extends Model
 
     protected function casts(): array
     {
-        return ['amount' => 'decimal:2', 'reviewed_at' => 'datetime', 'paid_at' => 'datetime'];
+        return ['amount' => 'decimal:2', 'destination_details' => 'encrypted', 'reviewed_at' => 'datetime', 'paid_at' => 'datetime'];
     }
 
     public function event(): BelongsTo
