@@ -38,6 +38,16 @@ class EventPayoutReviewService
                     throw ValidationException::withMessages(['review' => 'Payout approvals remain disabled pending settlement verification.']);
                 }
 
+                // Manual entries are not bank confirmations. Require independent
+                // evidence review and do not count unreviewed settlements.
+                $unverified = DB::table('event_finance_clearance_entries')
+                    ->where('event_id', $locked->event_id)
+                    ->whereNull('independently_verified_at')
+                    ->exists();
+                if ($unverified) {
+                    throw ValidationException::withMessages(['review' => 'Every settlement and reversal must pass independent evidence review before payout approval.']);
+                }
+
                 $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
 
                 if ($balance['refund_exception_count'] > 0) {
