@@ -5,6 +5,8 @@ namespace Tests\Feature\Finance;
 use App\Models\Event;
 use App\Models\EventPayoutRequest;
 use App\Models\Organization;
+use App\Models\TicketOrder;
+use App\Services\EventFinanceClearanceService;
 use App\Models\User;
 use App\Services\EventPayoutReviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,16 +20,18 @@ class PayoutAuditTest extends TestCase
     public function test_administrator_review_writes_audit_row(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
+        config(['finance.payout_requests_enabled' => true]);
         $request = $this->requestFor($admin);
+        $reviewer = User::factory()->create(['is_super_admin' => true]);
 
-        app(EventPayoutReviewService::class)->review($request, $admin, true, 'Reviewed');
+        app(EventPayoutReviewService::class)->review($request, $reviewer, true, 'Reviewed');
 
         $this->assertDatabaseHas('event_payout_requests', [
             'id' => $request->id, 'status' => EventPayoutRequest::APPROVED,
         ]);
         $this->assertDatabaseHas('event_payout_audits', [
             'event_payout_request_id' => $request->id,
-            'actor_id' => $admin->id,
+            'actor_id' => $reviewer->id,
             'action' => 'approved',
             'from_status' => EventPayoutRequest::REQUESTED,
             'to_status' => EventPayoutRequest::APPROVED,
@@ -37,12 +41,14 @@ class PayoutAuditTest extends TestCase
     public function test_recording_transfer_creates_a_separate_audit_row(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
+        config(['finance.payout_requests_enabled' => true]);
         $request = $this->requestFor($admin);
-        app(EventPayoutReviewService::class)->review($request, $admin, true);
-        app(EventPayoutReviewService::class)->recordCompletedTransfer($request, $admin, 'TEST-TRANSFER-42');
+        $reviewer = User::factory()->create(['is_super_admin' => true]);
+        app(EventPayoutReviewService::class)->review($request, $reviewer, true);
+        app(EventPayoutReviewService::class)->recordCompletedTransfer($request, $reviewer, 'TEST-TRANSFER-42');
 
         $this->assertDatabaseHas('event_payout_audits', [
-            'event_payout_request_id' => $request->id, 'actor_id' => $admin->id,
+            'event_payout_request_id' => $request->id, 'actor_id' => $reviewer->id,
             'action' => 'paid', 'to_status' => EventPayoutRequest::PAID,
         ]);
         $this->assertSame(2, DB::table('event_payout_audits')->where('event_payout_request_id', $request->id)->count());
@@ -57,6 +63,24 @@ class PayoutAuditTest extends TestCase
             'slug' => 'payout-audit-event',
             'status' => Event::STATUS_ACTIVE,
         ]);
+
+        TicketOrder::create([
+            'event_id' => $event->id,
+            'order_number' => 'AUDIT-ORDER-'.uniqid(),
+            'buyer_name' => 'Test Buyer',
+            'buyer_phone' => '255700000111',
+            'quantity' => 1,
+            'subtotal' => 100,
+            'total' => 100,
+            'gross_amount' => 100,
+            'organizer_net_amount' => 100,
+            'currency' => 'TZS',
+            'status' => TicketOrder::STATUS_PAID,
+            'paid_at' => now(),
+        ]);
+        app(EventFinanceClearanceService::class)->record(
+            $event, $admin, 'settlement', '100.00', 'AUDIT-SETTLEMENT-'.uniqid(), 'Test evidence for audit workflow'
+        );
 
         return EventPayoutRequest::create([
             'event_id' => $event->id, 'requested_by' => $admin->id,
