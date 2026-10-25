@@ -45,7 +45,7 @@ RUN apt-get update \
         curl \
         zip \
         unzip \
-        postgresql-client-16 \
+        postgresql-client-18 \
         libpq-dev \
         libpng-dev \
         libjpeg-dev \
