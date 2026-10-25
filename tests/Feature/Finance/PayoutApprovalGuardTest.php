@@ -40,6 +40,22 @@ class PayoutApprovalGuardTest extends TestCase
         app(EventPayoutReviewService::class)->review($request, $reviewer, true);
     }
 
+    public function test_approval_rejects_unreviewed_settlement_evidence(): void
+    {
+        config(['finance.payout_requests_enabled' => true]);
+        [$request, $requester, $reviewer] = $this->fixture();
+        \Illuminate\Support\Facades\DB::table('event_finance_clearance_entries')
+            ->where('event_id', $request->event_id)
+            ->update([
+                'independently_verified_at' => null,
+                'independently_verified_by' => null,
+                'independent_verification_note' => null,
+            ]);
+
+        $this->expectException(ValidationException::class);
+        app(EventPayoutReviewService::class)->review($request, $reviewer, true);
+    }
+
     public function test_approval_succeeds_for_distinct_reviewer_with_sufficient_clearance(): void
     {
         config(['finance.payout_requests_enabled' => true]);
