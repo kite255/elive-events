@@ -47,6 +47,30 @@ class EventFinanceClearanceTest extends TestCase
         $service->record($event, $admin, 'settlement', '500.00', 'BANK-C-111', 'Verified bank statement 111');
     }
 
+    public function test_second_admin_can_verify_but_recorder_cannot(): void
+    {
+        $recorder = User::factory()->create(['is_super_admin' => true]);
+        $verifier = User::factory()->create(['is_super_admin' => true]);
+        $event = $this->event();
+        $service = app(EventFinanceClearanceService::class);
+        $reference = 'REVIEW-'.uniqid();
+        $service->record($event, $recorder, 'settlement', '500.00', $reference, 'Checked statement reference');
+        $entryId = (int) DB::table('event_finance_clearance_entries')->where('external_reference', $reference)->value('id');
+
+        try {
+            $service->independentlyVerify($entryId, $recorder, 'Attempted to self-verify evidence');
+            $this->fail('The original recorder must not verify their own entry.');
+        } catch (ValidationException $exception) {
+            $this->assertNull(DB::table('event_finance_clearance_entries')->where('id', $entryId)->value('independently_verified_at'));
+        }
+
+        $service->independentlyVerify($entryId, $verifier, 'Reviewed bank evidence independently');
+        $this->assertDatabaseHas('event_finance_clearance_entries', [
+            'id' => $entryId,
+            'independently_verified_by' => $verifier->id,
+        ]);
+    }
+
     private function event(): Event
     {
         $organization = Organization::query()->create(['name' => 'Settlement Test Organization '.uniqid()]);
