@@ -29,6 +29,33 @@ class EventPayoutReviewService
                 throw ValidationException::withMessages(['review' => 'This request has already been reviewed.']);
             }
 
+            if ($approve) {
+                if ((int) $locked->requested_by === (int) $reviewer->getKey()) {
+                    throw ValidationException::withMessages(['review' => 'A requester cannot approve their own payout.']);
+                }
+
+                if (! config('finance.payout_requests_enabled', false)) {
+                    throw ValidationException::withMessages(['review' => 'Payout approvals remain disabled pending settlement verification.']);
+                }
+
+                $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
+
+                if ($balance['refund_exception_count'] > 0) {
+                    throw ValidationException::withMessages(['review' => 'Refund exceptions must be reconciled before approval.']);
+                }
+
+                // The request itself is already counted among reserved funds.
+                $otherReserved = $balance['reserved_requests'] - (float) $locked->amount;
+                $eligible = max(0, min(
+                    $balance['ticket_net_earnings'],
+                    $balance['verified_cleared_funds'] - $balance['verified_reversals']
+                ) - $balance['paid_out'] - $otherReserved);
+
+                if ((float) $locked->amount > round($eligible, 2)) {
+                    throw ValidationException::withMessages(['review' => 'Available settlement balance is insufficient for approval.']);
+                }
+            }
+
             $previousStatus = $locked->status;
             $locked->status = $approve ? EventPayoutRequest::APPROVED : EventPayoutRequest::REJECTED;
             $locked->reviewed_by = $reviewer->getKey();
