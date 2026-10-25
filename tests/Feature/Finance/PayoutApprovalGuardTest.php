@@ -80,9 +80,15 @@ class PayoutApprovalGuardTest extends TestCase
             'status' => TicketOrder::STATUS_PAID,
             'paid_at' => now(),
         ]);
+        $reference = 'APPROVAL-SETTLE-'.uniqid();
         app(EventFinanceClearanceService::class)->record(
             $event, $requester, 'settlement', $settlement,
-            'APPROVAL-SETTLE-'.uniqid(), 'Independent test statement evidence'
+            $reference, 'Independent test statement evidence'
+        );
+        $entryId = (int) \Illuminate\Support\Facades\DB::table('event_finance_clearance_entries')
+            ->where('external_reference', $reference)->value('id');
+        app(EventFinanceClearanceService::class)->independentlyVerify(
+            $entryId, $reviewer, 'Verified second-person statement evidence'
         );
 
         $request = EventPayoutRequest::create([
