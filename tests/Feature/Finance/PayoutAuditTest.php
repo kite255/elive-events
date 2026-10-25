@@ -78,8 +78,15 @@ class PayoutAuditTest extends TestCase
             'status' => TicketOrder::STATUS_PAID,
             'paid_at' => now(),
         ]);
+        $reference = 'AUDIT-SETTLEMENT-'.uniqid();
         app(EventFinanceClearanceService::class)->record(
-            $event, $admin, 'settlement', '100.00', 'AUDIT-SETTLEMENT-'.uniqid(), 'Test evidence for audit workflow'
+            $event, $admin, 'settlement', '100.00', $reference, 'Test evidence for audit workflow'
+        );
+        $verifier = User::factory()->create(['is_super_admin' => true]);
+        $entryId = (int) DB::table('event_finance_clearance_entries')
+            ->where('external_reference', $reference)->value('id');
+        app(EventFinanceClearanceService::class)->independentlyVerify(
+            $entryId, $verifier, 'Second administrator reviewed statement evidence'
         );
 
         return EventPayoutRequest::create([
