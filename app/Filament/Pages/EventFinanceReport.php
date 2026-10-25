@@ -14,6 +14,7 @@ use App\Services\EventFinanceReconciliationService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
 class EventFinanceReport extends Page
@@ -89,6 +90,41 @@ class EventFinanceReport extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('verifyClearance')
+                ->label('Review Settlement Evidence')
+                ->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true)
+                ->schema([
+                    Select::make('clearance_entry_id')
+                        ->label('Unreviewed settlement or adjustment')
+                        ->options(fn (): array => DB::table('event_finance_clearance_entries')
+                            ->whereNull('independently_verified_at')
+                            ->orderByDesc('id')
+                            ->limit(100)
+                            ->get()
+                            ->mapWithKeys(fn ($entry): array => [
+                                $entry->id => '#'.$entry->id.' · Event '.$entry->event_id
+                                    .' · '.$entry->entry_type.' · '.$entry->currency.' '.$entry->amount
+                                    .' · '.$entry->external_reference,
+                            ])->all())
+                        ->searchable()->required(),
+                    Textarea::make('independent_verification_note')
+                        ->label('Independent evidence reviewed')
+                        ->helperText('Check the actual bank/provider statement outside this system. Do not approve solely from an administrator note.')
+                        ->minLength(12)->maxLength(2000)->required(),
+                ])
+                ->requiresConfirmation()
+                ->action(function (array $data): void {
+                    $actor = auth()->user();
+                    if (! $actor instanceof User || ! $actor->isSuperAdmin()) {
+                        abort(403);
+                    }
+                    app(EventFinanceClearanceService::class)->independentlyVerify(
+                        (int) $data['clearance_entry_id'],
+                        $actor,
+                        (string) $data['independent_verification_note'],
+                    );
+                    Notification::make()->title('Independent evidence review recorded')->success()->send();
+                }),
             Action::make('recordClearance')
                 ->label('Record Attested Settlement / Reversal')
                 ->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true)
