@@ -28,17 +28,17 @@ class OrganizerFinanceViewTest extends TestCase
         $contents = File::get($path);
 
         $this->assertStringContainsString(
-            'Gross Sales',
+            'Ticket Gross Sales',
             $contents
         );
 
         $this->assertStringContainsString(
-            'Total Charges',
+            'Ticket Charges',
             $contents
         );
 
         $this->assertStringContainsString(
-            'Net Payable',
+            'Ticket Net Payable',
             $contents
         );
 
