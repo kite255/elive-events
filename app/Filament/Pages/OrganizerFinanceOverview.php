@@ -138,15 +138,15 @@ class OrganizerFinanceOverview extends Page
     {
         return [
             'gross_sales' => [
-                'label' => 'Gross Sales',
+                'label' => 'Ticket Gross Sales',
             ],
 
             'total_charges' => [
-                'label' => 'Total Charges',
+                'label' => 'Ticket Charges',
             ],
 
             'net_payable' => [
-                'label' => 'Net Payable',
+                'label' => 'Ticket Net Payable',
             ],
         ];
     }
@@ -201,6 +201,8 @@ class OrganizerFinanceOverview extends Page
             'total_charges' => 0.0,
             'net_payable' => 0.0,
             'paid_orders' => 0,
+            'completed_merchandise_payments' => 0,
+            'merchandise_gross_sales' => 0.0,
             'currency' => 'TZS',
         ];
     }

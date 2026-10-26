@@ -40,8 +40,7 @@
                 <p
                     class="mt-3 max-w-3xl text-sm text-gray-600 dark:text-gray-400 sm:text-base"
                 >
-                    Review event revenue, total charges, net payable amount,
-                    and completed paid orders.
+                    Review ticket earnings and merchandise receipts separately for each event.
                 </p>
             </div>
 
@@ -153,7 +152,7 @@
             class="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
         >
 
-            {{-- Gross Sales --}}
+            {{-- Ticket Gross Sales --}}
             <div
                 class="relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
             >
@@ -168,7 +167,7 @@
                         <div
                             class="text-xs font-bold uppercase tracking-wider text-gray-400"
                         >
-                            Gross Sales
+                            Ticket Gross Sales
                         </div>
 
                         <div
@@ -200,12 +199,12 @@
                 <p
                     class="mt-6 text-sm text-gray-500 dark:text-gray-400"
                 >
-                    Revenue from paid orders
+                    Revenue from paid ticket orders
                 </p>
             </div>
 
 
-            {{-- Total Charges --}}
+            {{-- Ticket Charges --}}
             <div
                 class="relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
             >
@@ -220,7 +219,7 @@
                         <div
                             class="text-xs font-bold uppercase tracking-wider text-gray-400"
                         >
-                            Total Charges
+                            Ticket Charges
                         </div>
 
                         <div
@@ -259,12 +258,12 @@
                 <p
                     class="mt-6 text-sm text-gray-500 dark:text-gray-400"
                 >
-                    Total amount deducted
+                    Charges on paid ticket orders
                 </p>
             </div>
 
 
-            {{-- Net Payable --}}
+            {{-- Ticket Net Payable --}}
             <div
                 class="relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
             >
@@ -279,7 +278,7 @@
                         <div
                             class="text-xs font-bold uppercase tracking-wider text-gray-400"
                         >
-                            Net Payable
+                            Ticket Net Payable
                         </div>
 
                         <div
@@ -316,12 +315,12 @@
                 <p
                     class="mt-6 text-sm text-gray-500 dark:text-gray-400"
                 >
-                    Amount payable to you
+                    Ticket earnings before payout reconciliation
                 </p>
             </div>
 
 
-            {{-- Paid Orders --}}
+            {{-- Paid Ticket Orders --}}
             <div
                 class="relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
             >
@@ -336,7 +335,7 @@
                         <div
                             class="text-xs font-bold uppercase tracking-wider text-gray-400"
                         >
-                            Paid Orders
+                            Paid Ticket Orders
                         </div>
 
                         <div
@@ -373,7 +372,7 @@
                 <p
                     class="mt-6 text-sm text-gray-500 dark:text-gray-400"
                 >
-                    Successfully completed orders
+                    Successfully completed ticket orders
                 </p>
             </div>
         </div>
@@ -383,8 +382,7 @@
         <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
             <h2 class="text-xl font-bold text-gray-950 dark:text-white">Merchandise Sales</h2>
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Completed merchandise payments only. Gross receipts are not verified settlements
-                and do not increase the ticket net payable amount or available payout balance.
+                Completed merchandise sales are shown separately from ticket revenue. Payout amounts are subject to reconciliation.
             </p>
             <div class="mt-5 grid gap-4 sm:grid-cols-2">
                 <div class="rounded-2xl border border-gray-200 p-4 dark:border-white/10">
@@ -439,7 +437,7 @@
                         <div
                             class="text-sm text-gray-500 dark:text-gray-400"
                         >
-                            Gross Sales
+                            Ticket Gross Sales
                         </div>
 
                         <div
@@ -455,7 +453,7 @@
                         <div
                             class="text-sm text-gray-500 dark:text-gray-400"
                         >
-                            Total Charges
+                            Ticket Charges
                         </div>
 
                         <div
@@ -471,7 +469,7 @@
                         <div
                             class="text-sm text-gray-500 dark:text-gray-400"
                         >
-                            Net Payable
+                            Ticket Net Payable
                         </div>
 
                         <div
@@ -484,80 +482,26 @@
             </div>
 
 
-            {{-- Settlement Position --}}
-            <div
-                class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900"
-            >
-                <div>
-                    <div
-                        class="text-xs font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400"
-                    >
-                        Position
+            {{-- Revenue breakdown: informational gross receipts, never payout eligible by implication. --}}
+            <div class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
+                <div class="text-xs font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Revenue</div>
+                <h2 class="mt-1 text-xl font-bold text-gray-950 dark:text-white">Revenue Breakdown</h2>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Ticket sales and merchandise receipts are reported separately.
+                </p>
+                <dl class="mt-6 space-y-3">
+                    <div class="flex items-center justify-between gap-4 rounded-2xl bg-gray-50 p-4 dark:bg-white/5">
+                        <dt class="text-sm text-gray-600 dark:text-gray-300">Ticket Gross Sales</dt>
+                        <dd class="text-lg font-bold text-gray-950 dark:text-white">{{ $formatMoney($metrics['gross_sales'] ?? 0) }}</dd>
                     </div>
-
-                    <h2
-                        class="mt-1 text-xl font-bold text-gray-950 dark:text-white"
-                    >
-                        Financial Position
-                    </h2>
-
-                    <p
-                        class="mt-1 text-sm text-gray-600 dark:text-gray-400"
-                    >
-                        Overview of collected revenue, deductions, and your
-                        current payable balance.
-                    </p>
-                </div>
-
-                <div class="mt-6 space-y-4">
-                    <div
-                        class="rounded-2xl bg-gray-50 p-4 dark:bg-white/5"
-                    >
-                        <div
-                            class="text-xs font-bold uppercase tracking-wider text-gray-400"
-                        >
-                            Gross Sales
-                        </div>
-
-                        <div
-                            class="mt-2 text-xl font-bold text-gray-950 dark:text-white"
-                        >
-                            {{ $formatMoney($metrics['gross_sales'] ?? 0) }}
-                        </div>
+                    <div class="flex items-center justify-between gap-4 rounded-2xl bg-gray-50 p-4 dark:bg-white/5">
+                        <dt class="text-sm text-gray-600 dark:text-gray-300">Merchandise Gross Receipts</dt>
+                        <dd class="text-lg font-bold text-gray-950 dark:text-white">{{ $formatMoney($metrics['merchandise_gross_sales'] ?? 0) }}</dd>
                     </div>
-
-                    <div
-                        class="rounded-2xl bg-gray-50 p-4 dark:bg-white/5"
-                    >
-                        <div
-                            class="text-xs font-bold uppercase tracking-wider text-gray-400"
-                        >
-                            Total Charges
-                        </div>
-
-                        <div
-                            class="mt-2 text-xl font-bold text-gray-950 dark:text-white"
-                        >
-                            {{ $formatMoney($metrics['total_charges'] ?? 0) }}
-                        </div>
-                    </div>
-
-                    <div
-                        class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10"
-                    >
-                        <div
-                            class="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400"
-                        >
-                            Net Payable
-                        </div>
-
-                        <div
-                            class="mt-2 text-xl font-bold text-emerald-800 dark:text-emerald-300"
-                        >
-                            {{ $formatMoney($metrics['net_payable'] ?? 0) }}
-                        </div>
-                    </div>
-                </div>
+                </dl>
+                <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    These gross amounts do not represent cleared funds available for payout.
+                </p>
             </div>
         </div>
     </div>
