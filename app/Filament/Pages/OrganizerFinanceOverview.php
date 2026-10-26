@@ -151,7 +151,7 @@ class OrganizerFinanceOverview extends Page
         ];
     }
 
-    private function resolveAccessibleEvent(
+    protected function resolveAccessibleEvent(
         int $eventId
     ): ?Event {
         $user = Auth::user();
