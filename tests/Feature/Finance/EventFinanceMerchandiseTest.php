@@ -4,6 +4,7 @@ namespace Tests\Feature\Finance;
 
 use App\Models\Event;
 use App\Models\Organization;
+use App\Models\MerchandiseOrder;
 use App\Models\Payment;
 use App\Services\EventFinanceReconciliationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,4 +38,77 @@ class EventFinanceMerchandiseTest extends TestCase
         $this->assertFalse($report['cleared_funds_verified']);
         $this->assertFalse($report['payouts_enabled']);
     }
+    public function test_completed_merchandise_receipts_exclude_unpaid_attempts_and_ticket_balance(): void
+    {
+        $event = $this->makeEvent();
+
+        $this->makeMerchandisePayment($event, Payment::STATUS_COMPLETED, '1000.00');
+        $this->makeMerchandisePayment($event, Payment::STATUS_PENDING, '2000.00');
+        $this->makeMerchandisePayment($event, Payment::STATUS_EXPIRED, '3000.00');
+
+        $report = app(EventFinanceReconciliationService::class)->inspect($event->id);
+
+        $this->assertSame(1, $report['completed_merchandise_payments']);
+        $this->assertEquals(1000.00, $report['completed_merchandise_payment_gross']);
+        $this->assertEquals(0.00, $report['net_ticket_earnings']);
+        $this->assertEquals(0.00, $report['indicative_clearance_limited_balance']);
+        $this->assertFalse($report['payouts_enabled']);
+    }
+
+    public function test_refunded_merchandise_payments_are_exceptions_not_completed_sales(): void
+    {
+        $event = $this->makeEvent();
+
+        $this->makeMerchandisePayment($event, Payment::STATUS_REFUNDED, '500.00');
+        $this->makeMerchandisePayment($event, Payment::STATUS_PARTIALLY_REFUNDED, '400.00');
+        $this->makeMerchandisePayment($event, Payment::STATUS_COMPLETED, '1000.00');
+
+        $report = app(EventFinanceReconciliationService::class)->inspect($event->id);
+
+        $this->assertSame(2, $report['merchandise_refund_exceptions']);
+        $this->assertSame(1, $report['completed_merchandise_payments']);
+        $this->assertEquals(1000.00, $report['completed_merchandise_payment_gross']);
+        $this->assertEquals(0.00, $report['indicative_clearance_limited_balance']);
+    }
+
+    private function makeEvent(): Event
+    {
+        $organization = Organization::create(['name' => 'Finance merchandise '.uniqid()]);
+
+        return Event::create([
+            'organization_id' => $organization->id,
+            'name' => 'Merchandise finance test',
+            'slug' => 'merchandise-finance-'.uniqid(),
+            'status' => Event::STATUS_ACTIVE,
+        ]);
+    }
+
+    private function makeMerchandisePayment(Event $event, string $status, string $amount): Payment
+    {
+        $token = uniqid('merch-', true);
+
+        $order = MerchandiseOrder::create([
+            'event_id' => $event->id,
+            'public_token' => $token,
+            'order_number' => 'TEST-'.strtoupper(str_replace('.', '', $token)),
+            'buyer_name' => 'Finance Test Buyer',
+            'buyer_phone' => '255700000000',
+            'quantity' => 1,
+            'unit_price_tzs' => $amount,
+            'total_tzs' => $amount,
+            'fulfillment_method' => 'pickup',
+            'status' => $status === Payment::STATUS_COMPLETED ? 'paid' : 'pending',
+        ]);
+
+        return Payment::create([
+            'organization_id' => $event->organization_id,
+            'event_id' => $event->id,
+            'merchandise_order_id' => $order->id,
+            'reference' => 'FIN-'.uniqid(),
+            'amount' => $amount,
+            'currency' => 'TZS',
+            'status' => $status,
+        ]);
+    }
+
 }
