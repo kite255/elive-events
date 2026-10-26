@@ -58,6 +58,7 @@ class Event extends Model
         'starts_at',
         'ends_at',
         'capacity',
+        'show_seat_availability',
         'status',
         'show_on_elive_website',
 
@@ -130,6 +131,7 @@ class Event extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'capacity' => 'integer',
+            'show_seat_availability' => 'boolean',
             'show_on_elive_website' => 'boolean',
             'ministry_years' => 'integer',
             'group_members_count' => 'integer',
