@@ -5,6 +5,7 @@ namespace Tests\Feature\Finance;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\TicketOrder;
+use App\Models\Payment;
 use App\Services\Finance\OrganizerFinanceMetricsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -156,6 +157,19 @@ class OrganizerFinanceMetricsServiceTest extends TestCase
             2,
             $metrics['paid_orders']
         );
+
+        // Merchandise payments are shown separately and never alter ticket payout totals.
+        Payment::query()->create([
+            'organization_id' => $organization->id,
+            'event_id' => $event->id,
+            'reference' => 'MERCH-'.uniqid(),
+            'amount' => '1000.00',
+            'currency' => 'TZS',
+            'status' => Payment::STATUS_COMPLETED,
+        ]);
+
+        $this->assertSame(0.0, $metrics['merchandise_gross_sales']);
+        $this->assertSame(0, $metrics['completed_merchandise_payments']);
 
         $this->assertSame(
             'TZS',
