@@ -6,11 +6,14 @@ use App\Filament\Pages\OrganizerFinanceOverview;
 use App\Filament\Pages\OrganizerMerchandiseFinance;
 use App\Filament\Pages\OrganizerTicketFinance;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class OrganizerFinanceSeparatedPagesTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_each_finance_page_has_distinct_navigation_and_view(): void
     {
         $this->assertSame('my-finance', OrganizerFinanceOverview::getSlug());
