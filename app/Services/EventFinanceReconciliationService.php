@@ -36,6 +36,19 @@ class EventFinanceReconciliationService
         $refundedPayments = (clone $payments)->whereIn('status', [
             Payment::STATUS_REFUNDED, Payment::STATUS_PARTIALLY_REFUNDED,
         ])->count();
+        // Merchandise is reported separately from ticket earnings.
+        // Count payment transactions rather than order totals to avoid counting
+        // unpaid merchandise orders. Provider settlement remains unverified.
+        $merchandisePayments = Payment::query()->where('event_id', $eventId)
+            ->whereNotNull('merchandise_order_id');
+        $completedMerchandisePayments = (clone $merchandisePayments)
+            ->where('status', Payment::STATUS_COMPLETED);
+        $merchandiseCompletedCount = (clone $completedMerchandisePayments)->count();
+        $merchandiseGross = (string) (clone $completedMerchandisePayments)->sum('amount');
+        $merchandiseRefundExceptions = (clone $merchandisePayments)->whereIn('status', [
+            Payment::STATUS_REFUNDED, Payment::STATUS_PARTIALLY_REFUNDED,
+        ])->count();
+
         $paidOut = (string) EventPayoutRequest::query()
             ->where('event_id', $eventId)
             ->where('status', EventPayoutRequest::PAID)
@@ -54,6 +67,9 @@ class EventFinanceReconciliationService
 
         return [
             'paid_orders' => (clone $paid)->count(),
+            'completed_merchandise_payments' => $merchandiseCompletedCount,
+            'completed_merchandise_payment_gross' => round((float) $merchandiseGross, 2),
+            'merchandise_refund_exceptions' => $merchandiseRefundExceptions,
             'completed_payment_attempts' => $completedPayments,
             'refunded_or_partially_refunded_orders' => $exceptions,
             'refunded_or_partially_refunded_payments' => $refundedPayments,
