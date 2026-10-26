@@ -47,7 +47,8 @@ class OrganizerFinanceViewTest extends TestCase
             $contents
         );
 
-        $this->assertStringContainsString('Revenue Breakdown', $contents);
+        $this->assertStringContainsString('View Ticket Finance', $contents);
+        $this->assertStringContainsString('View Merchandise Finance', $contents);
         $this->assertStringContainsString('Merchandise Gross Receipts', $contents);
         $this->assertStringNotContainsString('Financial Position', $contents);
 
