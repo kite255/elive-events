@@ -903,7 +903,7 @@
 
         .countdown-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(var(--hero-stat-count, 4), minmax(0, 1fr));
             gap: 12px;
             max-width: 680px;
             margin: 0 auto;
@@ -2241,7 +2241,7 @@
                     || $event->capacity
                     || $publicTicketTypes->isNotEmpty()
                 )
-                    <div class="hero-summary" aria-label="Event highlights">
+                    <div class="hero-summary" aria-label="Event highlights" style="--hero-stat-count: {{ $event->show_seat_availability ? 4 : 3 }};">
                         <div class="hero-stat">
                             <strong>{{ $event->ministry_years ? $event->ministry_years . '+' : '—' }}</strong>
                             <span>Years of Ministry</span>
@@ -2252,10 +2252,12 @@
                             <span>Group Members</span>
                         </div>
 
-                        <div class="hero-stat">
-                            <strong>{{ $seatStatValue ?: '—' }}</strong>
-                            <span>{{ $seatStatLabel }}</span>
-                        </div>
+                        @if ($event->show_seat_availability)
+                            <div class="hero-stat">
+                                <strong>{{ $seatStatValue ?: '—' }}</strong>
+                                <span>{{ $seatStatLabel }}</span>
+                            </div>
+                        @endif
 
                         <div class="hero-stat">
                             <strong>{{ $publicTicketTypes->count() ?: '—' }}</strong>
