@@ -775,6 +775,11 @@ class EventForm
                             ->numeric()
                             ->minValue(1),
 
+                        Toggle::make('show_seat_availability')
+                            ->label('Show Seats Available on Public Event Page')
+                            ->helperText('When disabled, hide the Seats Available / Total Capacity statistic from the event page. Ticket capacity and sales remain unchanged.')
+                            ->default(true),
+
                         Select::make('status')
                             ->label('Status')
                             ->options([
