@@ -5,6 +5,9 @@ namespace Tests\Feature\Finance;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\TicketOrder;
+use App\Models\Payment;
+use App\Models\MerchandiseProduct;
+use App\Models\MerchandiseOrder;
 use App\Services\Finance\OrganizerFinanceMetricsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -157,6 +160,19 @@ class OrganizerFinanceMetricsServiceTest extends TestCase
             $metrics['paid_orders']
         );
 
+        // Merchandise payments are shown separately and never alter ticket payout totals.
+        Payment::query()->create([
+            'organization_id' => $organization->id,
+            'event_id' => $event->id,
+            'reference' => 'MERCH-'.uniqid(),
+            'amount' => '1000.00',
+            'currency' => 'TZS',
+            'status' => Payment::STATUS_COMPLETED,
+        ]);
+
+        $this->assertSame(0.0, $metrics['merchandise_gross_sales']);
+        $this->assertSame(0, $metrics['completed_merchandise_payments']);
+
         $this->assertSame(
             'TZS',
             $metrics['currency']
@@ -193,4 +209,60 @@ class OrganizerFinanceMetricsServiceTest extends TestCase
             $metrics
         );
     }
+
+    public function test_completed_merchandise_is_visible_without_changing_ticket_net_payable(): void
+    {
+        $organization = Organization::create(['name' => 'Organizer Merchandise '.uniqid()]);
+        $event = Event::create([
+            'organization_id' => $organization->id,
+            'name' => 'Organizer Merchandise Event',
+            'slug' => 'organizer-merch-'.uniqid(),
+            'status' => Event::STATUS_ACTIVE,
+        ]);
+        $product = MerchandiseProduct::create([
+            'event_id' => $event->id,
+            'name' => 'Test Product',
+            'slug' => 'product-'.uniqid(),
+            'category' => 'other',
+            'price_tzs' => 1000,
+            'is_active' => true,
+        ]);
+
+        foreach ([Payment::STATUS_COMPLETED, Payment::STATUS_PENDING, Payment::STATUS_EXPIRED, Payment::STATUS_REFUNDED] as $status) {
+            $token = uniqid('merch-', true);
+            $order = MerchandiseOrder::create([
+                'event_id' => $event->id,
+                'merchandise_product_id' => $product->id,
+                'public_token' => $token,
+                'order_number' => 'TEST-'.strtoupper(str_replace('.', '', $token)),
+                'buyer_name' => 'Test Buyer',
+                'buyer_phone' => '255700000000',
+                'quantity' => 1,
+                'unit_price_tzs' => 1000,
+                'total_tzs' => 1000,
+                'fulfillment_method' => 'pickup',
+                'status' => $status === Payment::STATUS_COMPLETED ? 'paid' : 'pending',
+            ]);
+            Payment::create([
+                'organization_id' => $organization->id,
+                'event_id' => $event->id,
+                'merchandise_order_id' => $order->id,
+                'reference' => 'ORG-MER-'.uniqid(),
+                'amount' => '1000.00',
+                'currency' => 'TZS',
+                'status' => $status,
+            ]);
+        }
+
+        $metrics = app(OrganizerFinanceMetricsService::class)->forEvent($event);
+
+        $this->assertSame(1, $metrics['completed_merchandise_payments']);
+        $this->assertSame(1000.0, $metrics['merchandise_gross_sales']);
+        $this->assertSame(0.0, $metrics['gross_sales']);
+        $this->assertSame(0.0, $metrics['net_payable']);
+        $this->assertSame(0.0, $metrics['total_charges']);
+        $this->assertArrayNotHasKey('platform_commission_amount', $metrics);
+        $this->assertArrayNotHasKey('gateway_fee_amount', $metrics);
+    }
+
 }

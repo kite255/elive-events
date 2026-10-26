@@ -379,6 +379,25 @@
         </div>
 
 
+        {{-- Merchandise receipts are informational and excluded from ticket net payable. --}}
+        <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
+            <h2 class="text-xl font-bold text-gray-950 dark:text-white">Merchandise Sales</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Completed merchandise payments only. Gross receipts are not verified settlements
+                and do not increase the ticket net payable amount or available payout balance.
+            </p>
+            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                <div class="rounded-2xl border border-gray-200 p-4 dark:border-white/10">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Completed merchandise payments</p>
+                    <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ number_format((int) ($metrics['completed_merchandise_payments'] ?? 0)) }}</p>
+                </div>
+                <div class="rounded-2xl border border-gray-200 p-4 dark:border-white/10">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Merchandise gross receipts</p>
+                    <p class="mt-2 text-2xl font-semibold text-gray-950 dark:text-white">{{ $formatMoney($metrics['merchandise_gross_sales'] ?? 0) }}</p>
+                </div>
+            </div>
+        </section>
+
         {{-- ========================================================= --}}
         {{-- FINANCE SUMMARY --}}
         {{-- ========================================================= --}}
