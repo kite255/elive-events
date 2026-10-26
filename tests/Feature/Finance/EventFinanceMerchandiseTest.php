@@ -5,6 +5,7 @@ namespace Tests\Feature\Finance;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\MerchandiseOrder;
+use App\Models\MerchandiseProduct;
 use App\Models\Payment;
 use App\Services\EventFinanceReconciliationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -87,7 +88,17 @@ class EventFinanceMerchandiseTest extends TestCase
     {
         $token = uniqid('merch-', true);
 
+        $product = MerchandiseProduct::create([
+            'event_id' => $event->id,
+            'name' => 'Finance Test Product',
+            'slug' => 'finance-test-'.uniqid(),
+            'category' => 'other',
+            'price_tzs' => (int) $amount,
+            'is_active' => true,
+        ]);
+
         $order = MerchandiseOrder::create([
+            'merchandise_product_id' => $product->id,
             'event_id' => $event->id,
             'public_token' => $token,
             'order_number' => 'TEST-'.strtoupper(str_replace('.', '', $token)),
