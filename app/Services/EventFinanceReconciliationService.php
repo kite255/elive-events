@@ -24,6 +24,27 @@ class EventFinanceReconciliationService
             TicketOrder::STATUS_PARTIALLY_REFUNDED,
         ])->count();
 
+        // Diagnostic only: a paid, positive-value ticket order without a
+        // completed linked payment must be investigated before settlement.
+        // This does not prove a payment provider settled any funds.
+        $paidTicketsMissingCompletedPayment = (clone $paid)
+            ->where('total', '>', 0)
+            ->whereDoesntHave('payments', fn ($query) => $query
+                ->where('status', Payment::STATUS_COMPLETED))
+            ->count();
+
+        // Completed merchandise receipts without an order association are
+        // unclassified; never infer that they belong to a ticket sale.
+        $unclassifiedCompletedPayments = Payment::query()
+            ->where('event_id', $eventId)
+            ->where('status', Payment::STATUS_COMPLETED)
+            ->whereNull('ticket_order_id')
+            ->whereNull('merchandise_order_id')
+            ->whereNull('donation_id')
+            ->whereNull('ticket_upgrade_id')
+            ->whereNull('attendee_id')
+            ->count();
+
         $net = (string) (clone $paid)->sum('organizer_net_amount');
 
         $payments = Payment::query()->where('event_id', $eventId)
@@ -67,6 +88,8 @@ class EventFinanceReconciliationService
 
         return [
             'paid_orders' => (clone $paid)->count(),
+            'paid_tickets_missing_completed_payment' => $paidTicketsMissingCompletedPayment,
+            'unclassified_completed_payments' => $unclassifiedCompletedPayments,
             'completed_merchandise_payments' => $merchandiseCompletedCount,
             'completed_merchandise_payment_gross' => round((float) $merchandiseGross, 2),
             'merchandise_refund_exceptions' => $merchandiseRefundExceptions,
