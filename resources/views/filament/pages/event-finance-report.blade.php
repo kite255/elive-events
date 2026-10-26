@@ -14,7 +14,7 @@
 
         @if($report)
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-                Finance report combines paid-ticket totals with administrator-attested settlement and reversal entries. Attestations are not independent bank/provider confirmation; payout requests remain disabled by default.
+                Finance report shows ticket earnings and merchandise payment receipts separately. Merchandise receipts are gross, not organizer net earnings or verified funds available for payout. The ticket finance section combines paid-ticket totals with administrator-attested settlement and reversal entries. Attestations are not independent bank/provider confirmation; payout requests remain disabled by default.
                 @if($report['overallocated'])
                     <p class="mt-2 font-semibold">Attention: recorded payouts and reservations exceed ticket net earnings by TZS {{ number_format($report['overallocated_amount'], 2) }}.</p>
                 @endif
@@ -26,6 +26,9 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach([
                     'Paid ticket orders' => number_format($report['paid_orders']),
+                    'Completed merchandise payments' => number_format($report['completed_merchandise_payments']),
+                    'Completed merchandise sales (gross)' => 'TZS '.number_format($report['completed_merchandise_payment_gross'], 2),
+                    'Merchandise refund exceptions' => number_format($report['merchandise_refund_exceptions']),
                     'Net ticket earnings' => 'TZS '.number_format($report['net_ticket_earnings'], 2),
                     'Manually attested cleared funds' => 'TZS '.number_format($report['manually_attested_cleared_funds'], 2),
                     'Recorded refund / chargeback reversals' => 'TZS '.number_format($report['manually_attested_reversals'], 2),
