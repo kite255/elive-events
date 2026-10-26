@@ -63,6 +63,21 @@
                 </div>
             </section>
 
+            <section class="space-y-3" aria-label="Payment reconciliation exceptions">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Payment Reconciliation Exceptions</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Payment linkage checks are investigative indicators, not proof of external settlement. Review exceptions before authorizing any payout.</p>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Paid positive-value tickets lacking completed payment</p>
+                        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($report['paid_tickets_missing_completed_payment']) }}</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Unclassified completed payments</p>
+                        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($report['unclassified_completed_payments']) }}</p>
+                    </div>
+                </div>
+            </section>
+
             <section class="space-y-3" aria-label="Settlement and Reconciliation">
                 <div>
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Settlement & Reconciliation</h2>
