@@ -43,9 +43,13 @@ class OrganizerFinanceViewTest extends TestCase
         );
 
         $this->assertStringContainsString(
-            'Paid Orders',
+            'Paid Ticket Orders',
             $contents
         );
+
+        $this->assertStringContainsString('Revenue Breakdown', $contents);
+        $this->assertStringContainsString('Merchandise Gross Receipts', $contents);
+        $this->assertStringNotContainsString('Financial Position', $contents);
 
         $this->assertStringNotContainsString(
             'eLive Commission',
