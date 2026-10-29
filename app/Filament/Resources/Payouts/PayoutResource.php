@@ -92,7 +92,8 @@ class PayoutResource extends Resource
                 default => 'warning',
             }),
             TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
-            TextColumn::make('paid_at')->dateTime('d M Y H:i')->placeholder('Not paid'),
+            TextColumn::make('paid_at')->label('Transferred At')->dateTime('d M Y H:i')->placeholder('Not transferred'),
+            TextColumn::make('received_at')->label('Received At')->dateTime('d M Y H:i')->placeholder('Awaiting confirmation'),
         ])->recordActions([
             Action::make('history')->label('History')->icon('heroicon-o-clock')
                 ->modalHeading('Payout audit history')
@@ -121,7 +122,7 @@ class PayoutResource extends Resource
                     app(EventPayoutReviewService::class)->review($record, auth()->user(), false, $data['reason']);
                     Notification::make()->title('Payout request rejected')->body('The organizer has been notified of the rejection.')->warning()->duration(8000)->send();
                 }),
-            Action::make('recordTransfer')->label('Record Paid')->color('info')
+            Action::make('recordTransfer')->label('Record Transfer')->color('info')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::APPROVED)
                 ->schema([
                     TextInput::make('reference')->label('Verified transfer reference')->required()->maxLength(255),
@@ -136,6 +137,15 @@ class PayoutResource extends Resource
                     }
                     app(EventPayoutReviewService::class)->recordCompletedTransfer($record, auth()->user(), $data['reference']);
                     Notification::make()->title('Confirmed transfer recorded')->body('The payout has been marked as paid and the organizer notified.')->success()->duration(8000)->send();
+                }),
+            Action::make('confirmReceipt')->label('Confirm Money Received')->icon('heroicon-o-check-badge')->color('success')
+                ->visible(fn (EventPayoutRequest $record): bool => (int) $record->requested_by === (int) auth()->id() && $record->status === EventPayoutRequest::PAID && $record->received_at === null)
+                ->requiresConfirmation()
+                ->modalHeading('Confirm payout received')
+                ->modalDescription('Confirm only when the full amount has arrived in your account.')
+                ->action(function (EventPayoutRequest $record): void {
+                    app(EventPayoutReviewService::class)->confirmReceipt($record, auth()->user());
+                    Notification::make()->title('Receipt confirmed')->success()->duration(8000)->send();
                 }),
         ])->filters([
             SelectFilter::make('status')->options([
