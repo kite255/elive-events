@@ -1809,10 +1809,10 @@
             }
 
             .hero-summary {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: repeat(var(--hero-mobile-columns, 2), minmax(0, 1fr));
             }
 
-            .hero-stat:nth-child(2) {
+            .hero-summary.has-seat-stat .hero-stat:nth-child(2) {
                 border-right: 0;
             }
         }
@@ -1872,21 +1872,289 @@
             .hero-visual,
             .hero-image,
             .hero-fallback {
-                height: 300px;
+                height: 350px;
+            }
+
+            .hero-image {
+                object-position: center top;
+            }
+
+            .hero-overlay {
+                background: linear-gradient(
+                    to bottom,
+                    rgba(15, 23, 42, .30) 0%,
+                    rgba(15, 23, 42, .40) 34%,
+                    rgba(15, 23, 42, .88) 100%
+                );
             }
 
             .hero-content {
                 left: 20px;
                 right: 20px;
-                bottom: 24px;
+                bottom: 22px;
             }
 
             .hero-title {
-                font-size: clamp(28px, 8vw, 38px);
+                font-size: clamp(25px, 6.5vw, 34px);
+                line-height: 1.12;
+                letter-spacing: -.025em;
+                overflow-wrap: break-word;
             }
 
             .hero-meta {
                 font-size: 12px;
+                gap: 8px 14px;
+                line-height: 1.45;
+            }
+
+            .hero-meta-item {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+
+
+
+            .details-section {
+                padding: 24px 0 54px;
+            }
+
+            .content-card,
+            .info-card {
+                border-radius: 16px;
+            }
+
+            .content-card {
+                padding: 22px;
+            }
+
+            .info-card {
+                padding: 20px;
+            }
+
+            .day-row {
+                align-items: flex-start;
+            }
+
+            .public-detail-section {
+                padding: 54px 0;
+            }
+
+            .ticket-package-grid {
+                grid-template-columns: 1fr;
+                gap: 18px;
+            }
+
+            .ticket-package-header {
+                padding: 22px 20px;
+            }
+
+            .ticket-package-list {
+                padding: 8px 20px 14px;
+            }
+
+            .ticket-package-list li {
+                padding: 17px 0 17px 28px;
+                font-size: 15px;
+            }
+
+            .ticket-package-list strong {
+                margin-bottom: 6px;
+                font-size: 15px;
+            }
+
+            .programme-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .faq-item summary {
+                grid-template-columns: 30px minmax(0, 1fr) 34px;
+                gap: 10px;
+                padding: 14px;
+            }
+
+            .faq-number {
+                width: 28px;
+                height: 28px;
+            }
+
+            .faq-toggle {
+                width: 34px;
+                height: 34px;
+            }
+
+            .faq-answer {
+                margin-inline: 54px 14px;
+                padding-bottom: 16px;
+            }
+
+            .footer-inner {
+                padding: 24px 0;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                width: calc(100% - 22px);
+            }
+
+            .hero-meta {
+                display: grid;
+                gap: 8px;
+            }
+
+            .countdown-card {
+                padding: 20px 14px;
+            }
+
+            .countdown-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .day-row {
+                flex-direction: column;
+            }
+
+            .day-number {
+                min-width: 0;
+                text-align: left;
+            }
+
+            .speaker-grid,
+            .related-grid,
+            .ticket-grid,
+            .detail-card-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .gallery-item {
+                flex-basis: 100%;
+                min-height: 230px;
+            }
+
+            .policy-grid .detail-card {
+                flex-basis: 100%;
+            }
+
+            .gallery-lightbox {
+                padding: 12px;
+            }
+
+            .gallery-lightbox-image {
+                max-width: calc(100vw - 24px);
+                max-height: calc(100vh - 170px);
+                border-radius: 12px;
+            }
+
+            .gallery-lightbox-button {
+                width: 42px;
+                height: 42px;
+            }
+
+            .hero-summary {
+                grid-template-columns: repeat(var(--hero-mobile-columns, 2), minmax(0, 1fr));
+            }
+
+            .hero-summary.has-seat-stat .hero-stat:nth-child(2) {
+                border-right: 0;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .has-mobile-ticket-cta {
+                padding-bottom: calc(92px + env(safe-area-inset-bottom));
+            }
+
+            .desktop-ticket-cta {
+                display: none;
+            }
+
+            .mobile-ticket-cta {
+                position: fixed;
+                z-index: 1200;
+                right: 14px;
+                bottom: calc(14px + env(safe-area-inset-bottom));
+                left: 14px;
+                min-height: 56px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0 24px;
+                border-radius: 14px;
+                background: var(--elive-orange);
+                color: #FFFFFF;
+                font-size: 16px;
+                font-weight: 800;
+                box-shadow: 0 14px 34px rgba(11, 31, 58, .24);
+            }
+
+            .container {
+                width: min(100% - 28px, 1180px);
+            }
+
+            .header-inner {
+                min-height: 68px;
+            }
+
+            .brand img {
+                height: 40px;
+            }
+
+            .nav {
+                display: none;
+            }
+
+            .mobile-menu-button {
+                display: inline-flex;
+            }
+
+            .hero-shell {
+                padding: 24px 0 30px;
+            }
+
+            .hero-visual,
+            .hero-image,
+            .hero-fallback {
+                height: 350px;
+            }
+
+            .hero-image {
+                object-position: center top;
+            }
+
+            .hero-overlay {
+                background: linear-gradient(
+                    to bottom,
+                    rgba(15, 23, 42, .30) 0%,
+                    rgba(15, 23, 42, .40) 34%,
+                    rgba(15, 23, 42, .88) 100%
+                );
+            }
+
+            .hero-content {
+                left: 20px;
+                right: 20px;
+                bottom: 22px;
+            }
+
+            .hero-title {
+                font-size: clamp(25px, 6.5vw, 34px);
+                line-height: 1.12;
+                letter-spacing: -.025em;
+                overflow-wrap: break-word;
+            }
+
+            .hero-meta {
+                font-size: 12px;
+                gap: 8px 14px;
+                line-height: 1.45;
+            }
+
+            .hero-meta-item {
+                min-width: 0;
+                overflow-wrap: anywhere;
             }
 
             .details-section {
@@ -2029,12 +2297,25 @@
             }
 
             .hero-summary {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(var(--hero-mobile-columns, 2), minmax(0, 1fr));
             }
 
             .hero-stat {
-                padding: 16px;
+                min-width: 0;
+                padding: 15px 12px;
             }
+
+            .hero-summary.no-seat-stat .hero-stat strong {
+                font-size: 20px;
+            }
+
+            .hero-summary.no-seat-stat .hero-stat span {
+                font-size: 10px;
+                letter-spacing: .025em;
+                overflow-wrap: anywhere;
+            }
+
+
 
             .hero-actions {
                 display: grid;
@@ -2241,7 +2522,7 @@
                     || $event->capacity
                     || $publicTicketTypes->isNotEmpty()
                 )
-                    <div class="hero-summary" aria-label="Event highlights" style="--hero-stat-count: {{ $event->show_seat_availability ? 4 : 3 }};">
+                    <div class="hero-summary {{ $event->show_seat_availability ? 'has-seat-stat' : 'no-seat-stat' }}" aria-label="Event highlights" style="--hero-stat-count: {{ $event->show_seat_availability ? 4 : 3 }}; --hero-mobile-columns: {{ $event->show_seat_availability ? 2 : 3 }};">
                         <div class="hero-stat">
                             <strong>{{ $event->ministry_years ? $event->ministry_years . '+' : '—' }}</strong>
                             <span>Years of Ministry</span>
