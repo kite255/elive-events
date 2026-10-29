@@ -178,3 +178,31 @@
     color: #ffffff !important;
     border-color: rgba(255, 255, 255, 0.25) !important;
 }
+
+
+/* Sidebar interactions: use consistent dark surfaces for hovered, focused, and active links. */
+.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible),
+.fi-sidebar :is(.fi-sidebar-item.fi-active, .fi-sidebar-item-active) > .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item-button[aria-current="page"] {
+    background: #303e74 !important;
+    background-image: none !important;
+    color: #ffffff !important;
+}
+
+.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible) :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, .fi-sidebar-group-label, svg),
+.fi-sidebar :is(.fi-sidebar-item.fi-active, .fi-sidebar-item-active) > .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg) {
+    color: #ffffff !important;
+}
+
+/* Some Filament variants apply background and foreground utilities directly
+   to a nested anchor, including sub-navigation links. */
+.fi-sidebar a:is(:hover, :focus-visible)[class*="fi-sidebar"],
+.fi-sidebar button:is(:hover, :focus-visible)[class*="fi-sidebar"] {
+    background: #303e74 !important;
+    color: #ffffff !important;
+}
+
+.fi-sidebar a:is(:hover, :focus-visible)[class*="fi-sidebar"] :is(span, svg),
+.fi-sidebar button:is(:hover, :focus-visible)[class*="fi-sidebar"] :is(span, svg) {
+    color: #ffffff !important;
+}
