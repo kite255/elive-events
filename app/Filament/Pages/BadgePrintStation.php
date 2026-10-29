@@ -29,7 +29,7 @@ class BadgePrintStation extends Page
 
     protected static ?string $title = 'Badge Print Station';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Badge Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Badges';
 
     protected static ?int $navigationSort = 30;
 
