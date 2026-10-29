@@ -18,7 +18,18 @@ class EventPayoutStatusNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return filled($notifiable->email ?? null) ? ['mail'] : [];
+        return filled($notifiable->email ?? null) ? ['database', 'mail'] : ['database'];
+    }
+
+    public function toArray(object $notifiable): array
+    {
+        return [
+            'format' => 'filament',
+            'title' => 'Payout request '.ucfirst($this->status),
+            'body' => 'Request '.$this->reference.' for '.$this->eventName.' is now '.$this->status.'.',
+            'status' => $this->status,
+            'duration' => 'persistent',
+        ];
     }
 
     public function toMail(object $notifiable): MailMessage
