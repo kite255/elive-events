@@ -60,10 +60,6 @@
     border-radius: 12px;
 }
 
-.fi-sidebar-item-active .fi-sidebar-item-button {
-    background: rgba(22, 25, 67, 0.08);
-}
-
 .fi-ta-header-cell {
     font-weight: 700;
 }
@@ -102,32 +98,57 @@
 }
 
 
-/* Dashboard and sidebar refinement — accessible light/dark surfaces. */
+
+/* Unified Filament sidebar styling: stable colors without click flicker. */
 .fi-sidebar {
     background: #161943;
     border-right-color: rgba(255, 255, 255, 0.12);
 }
 
-.fi-sidebar .fi-sidebar-item-label,
-.fi-sidebar .fi-sidebar-group-label,
-.fi-sidebar .fi-sidebar-item-icon,
-.fi-sidebar .fi-sidebar-group-button {
+.fi-sidebar-nav {
+    padding-inline: 0.75rem;
+}
+
+.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button) {
+    border-radius: 12px;
+    transition: none !important;
+    animation: none !important;
+}
+
+.fi-sidebar :is(.fi-sidebar-item-label, .fi-sidebar-group-label, .fi-sidebar-item-icon, .fi-sidebar-group-button) {
     color: #e7ecff;
+    transition: none !important;
 }
 
-.fi-sidebar .fi-sidebar-item-button:hover,
-.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button {
-    background: rgba(255, 255, 255, 0.14);
+.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible),
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item-button[aria-current] {
+    background: #303e74 !important;
+    background-image: none !important;
+    color: #ffffff !important;
 }
 
-.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-label {
-    color: #ffffff;
+.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible) :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, .fi-sidebar-group-label, svg),
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg),
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg),
+.fi-sidebar .fi-sidebar-item-button[aria-current] :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg) {
+    color: #ffffff !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-label {
     font-weight: 700;
 }
 
-.fi-sidebar .fi-sidebar-item-button:focus-visible {
+.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):focus-visible {
     outline: 2px solid #ff9800;
     outline-offset: 2px;
+}
+
+.fi-sidebar .fi-sidebar-item .fi-badge {
+    background: #303e74 !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
 }
 
 .fi-wi-stats-overview-stat {
@@ -144,90 +165,4 @@
 @media (max-width: 640px) {
     .fi-page { max-width: 100%; }
     .fi-wi-stats-overview-stat { border-radius: 14px; }
-}
-
-
-/* Ensure all Filament sidebar active and hover states remain legible on navy. */
-.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-button,
-.fi-sidebar .fi-sidebar-item-active > .fi-sidebar-item-button,
-.fi-sidebar .fi-sidebar-item-button[aria-current="page"],
-.fi-sidebar .fi-sidebar-item-button[aria-current="true"] {
-    background-color: #303e74 !important;
-}
-
-.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-button .fi-sidebar-item-label,
-.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-button .fi-sidebar-item-icon,
-.fi-sidebar .fi-sidebar-item-active > .fi-sidebar-item-button .fi-sidebar-item-label,
-.fi-sidebar .fi-sidebar-item-active > .fi-sidebar-item-button .fi-sidebar-item-icon,
-.fi-sidebar .fi-sidebar-item-button[aria-current="page"] .fi-sidebar-item-label,
-.fi-sidebar .fi-sidebar-item-button[aria-current="page"] .fi-sidebar-item-icon {
-    color: #ffffff !important;
-}
-
-.fi-sidebar .fi-sidebar-item-button:hover {
-    background-color: #303e74 !important;
-}
-
-.fi-sidebar .fi-sidebar-item-button:hover .fi-sidebar-item-label,
-.fi-sidebar .fi-sidebar-item-button:hover .fi-sidebar-item-icon {
-    color: #ffffff !important;
-}
-
-.fi-sidebar .fi-sidebar-item .fi-badge {
-    background-color: #303e74 !important;
-    color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
-}
-
-
-/* Sidebar interactions: use consistent dark surfaces for hovered, focused, and active links. */
-.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible),
-.fi-sidebar :is(.fi-sidebar-item.fi-active, .fi-sidebar-item-active) > .fi-sidebar-item-button,
-.fi-sidebar .fi-sidebar-item-button[aria-current="page"] {
-    background: #303e74 !important;
-    background-image: none !important;
-    color: #ffffff !important;
-}
-
-.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible) :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, .fi-sidebar-group-label, svg),
-.fi-sidebar :is(.fi-sidebar-item.fi-active, .fi-sidebar-item-active) > .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg) {
-    color: #ffffff !important;
-}
-
-/* Some Filament variants apply background and foreground utilities directly
-   to a nested anchor, including sub-navigation links. */
-.fi-sidebar a:is(:hover, :focus-visible)[class*="fi-sidebar"],
-.fi-sidebar button:is(:hover, :focus-visible)[class*="fi-sidebar"] {
-    background: #303e74 !important;
-    color: #ffffff !important;
-}
-
-.fi-sidebar a:is(:hover, :focus-visible)[class*="fi-sidebar"] :is(span, svg),
-.fi-sidebar button:is(:hover, :focus-visible)[class*="fi-sidebar"] :is(span, svg) {
-    color: #ffffff !important;
-}
-
-
-/*
- * Filament marks the containing <li> with .fi-active. Its link can be nested
- * rather than an immediate child, so direct-child selectors miss the active
- * state. Keep the same navy contrast used for hover.
- */
-.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
-.fi-sidebar .fi-sidebar-item.fi-active a,
-.fi-sidebar .fi-sidebar-item-button.fi-active,
-.fi-sidebar .fi-sidebar-item-button[aria-current],
-.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button {
-    background: #303e74 !important;
-    background-color: #303e74 !important;
-    background-image: none !important;
-    color: #ffffff !important;
-}
-
-.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
-.fi-sidebar .fi-sidebar-item.fi-active a :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
-.fi-sidebar .fi-sidebar-item-button.fi-active :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
-.fi-sidebar .fi-sidebar-item-button[aria-current] :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
-.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg) {
-    color: #ffffff !important;
 }
