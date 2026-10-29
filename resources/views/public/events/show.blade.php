@@ -942,7 +942,7 @@
 
         .hero-summary {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(var(--hero-stat-count, 4), minmax(0, 1fr));
             background: #FFFFFF;
         }
 
@@ -1809,10 +1809,10 @@
             }
 
             .hero-summary {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: repeat(var(--hero-mobile-columns, 2), minmax(0, 1fr));
             }
 
-            .hero-stat:nth-child(2) {
+            .hero-summary.has-seat-stat .hero-stat:nth-child(2) {
                 border-right: 0;
             }
         }
@@ -1872,21 +1872,44 @@
             .hero-visual,
             .hero-image,
             .hero-fallback {
-                height: 300px;
+                height: 350px;
+            }
+
+            .hero-image {
+                object-position: center top;
+            }
+
+            .hero-overlay {
+                background: linear-gradient(
+                    to bottom,
+                    rgba(15, 23, 42, .30) 0%,
+                    rgba(15, 23, 42, .40) 34%,
+                    rgba(15, 23, 42, .88) 100%
+                );
             }
 
             .hero-content {
                 left: 20px;
                 right: 20px;
-                bottom: 24px;
+                bottom: 22px;
             }
 
             .hero-title {
-                font-size: clamp(28px, 8vw, 38px);
+                font-size: clamp(25px, 6.5vw, 34px);
+                line-height: 1.12;
+                letter-spacing: -.025em;
+                overflow-wrap: break-word;
             }
 
             .hero-meta {
                 font-size: 12px;
+                gap: 8px 14px;
+                line-height: 1.45;
+            }
+
+            .hero-meta-item {
+                min-width: 0;
+                overflow-wrap: anywhere;
             }
 
             .details-section {
@@ -2029,11 +2052,22 @@
             }
 
             .hero-summary {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(var(--hero-mobile-columns, 2), minmax(0, 1fr));
             }
 
             .hero-stat {
-                padding: 16px;
+                min-width: 0;
+                padding: 15px 12px;
+            }
+
+            .hero-summary.no-seat-stat .hero-stat strong {
+                font-size: 20px;
+            }
+
+            .hero-summary.no-seat-stat .hero-stat span {
+                font-size: 10px;
+                letter-spacing: .025em;
+                overflow-wrap: anywhere;
             }
 
             .hero-actions {
@@ -2241,7 +2275,7 @@
                     || $event->capacity
                     || $publicTicketTypes->isNotEmpty()
                 )
-                    <div class="hero-summary" aria-label="Event highlights" style="--hero-stat-count: {{ $event->show_seat_availability ? 4 : 3 }};">
+                    <div class="hero-summary {{ $event->show_seat_availability ? 'has-seat-stat' : 'no-seat-stat' }}" aria-label="Event highlights" style="--hero-stat-count: {{ $event->show_seat_availability ? 4 : 3 }}; --hero-mobile-columns: {{ $event->show_seat_availability ? 2 : 3 }};">
                         <div class="hero-stat">
                             <strong>{{ $event->ministry_years ? $event->ministry_years . '+' : '—' }}</strong>
                             <span>Years of Ministry</span>
