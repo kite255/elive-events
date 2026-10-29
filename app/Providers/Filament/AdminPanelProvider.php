@@ -189,9 +189,9 @@ class AdminPanelProvider extends PanelProvider
             ]);
 
         // Livewire SPA navigation avoids full document flashes on ordinary
-        // admin pages. Keep it staging-only until operational pages are tested.
+        // admin pages. Enable for staging and production; exclude device-sensitive pages.
         // Scanner, printing and template designer pages use device/JS state.
-        if (app()->environment('staging')) {
+        if (app()->environment(['staging', 'production'])) {
             $panel->spa()
                 ->spaUrlExceptions([
                     '*/admin/check-in-station*',
