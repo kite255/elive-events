@@ -128,6 +128,49 @@ class EventPayoutReviewService
             return $locked;
         });
     }
+    public function confirmReceipt(EventPayoutRequest $request, User $organizer): EventPayoutRequest
+    {
+        return DB::transaction(function () use ($request, $organizer): EventPayoutRequest {
+            Event::query()->whereKey($request->event_id)->lockForUpdate()->firstOrFail();
+            $locked = EventPayoutRequest::query()->whereKey($request->getKey())->lockForUpdate()->firstOrFail();
+
+            if ((int) $locked->requested_by !== (int) $organizer->getKey()) {
+                throw ValidationException::withMessages(['receipt' => 'Only the payout requester may confirm receipt.']);
+            }
+            if ($locked->status !== EventPayoutRequest::PAID || $locked->received_at !== null) {
+                throw ValidationException::withMessages(['receipt' => 'Transfer not recorded or receipt already confirmed.']);
+            }
+
+            $locked->received_at = now();
+            $locked->save();
+            DB::table('event_payout_audits')->insert([
+                'event_payout_request_id' => $locked->getKey(),
+                'actor_id' => $organizer->getKey(),
+                'action' => 'receipt_confirmed',
+                'from_status' => EventPayoutRequest::PAID,
+                'to_status' => EventPayoutRequest::PAID,
+                'note' => 'Organizer confirmed receipt of funds.',
+                'created_at' => now(),
+            ]);
+
+            $requestId = $locked->getKey();
+            DB::afterCommit(function () use ($requestId): void {
+                try {
+                    $record = EventPayoutRequest::query()->with(['requester', 'event'])->find($requestId);
+                    if ($record?->requester && $record->event) {
+                        $record->requester->notify(new EventPayoutStatusNotification(
+                            $record->reference, $record->event->name, 'received',
+                            $record->currency.' '.number_format((float) $record->amount, 2)
+                        ));
+                    }
+                } catch (\Throwable $exception) {
+                    Log::warning('Payout receipt notification failed', ['payout_request_id' => $requestId, 'error' => $exception->getMessage()]);
+                }
+            });
+            return $locked;
+        });
+    }
+
     private function notifyRequesterAfterCommit(EventPayoutRequest $request): void
     {
         $requestId = $request->getKey();

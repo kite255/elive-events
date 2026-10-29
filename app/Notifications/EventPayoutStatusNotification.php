@@ -38,7 +38,8 @@ class EventPayoutStatusNotification extends Notification
         $subject = match ($this->status) {
             'approved' => 'Payout Request Approved - '.$this->reference,
             'rejected' => 'Payout Request Rejected - '.$this->reference,
-            'paid' => 'Payout Payment Confirmed - '.$this->reference,
+            'paid' => 'Payout Transferred - '.$this->reference,
+            'received' => 'Payout Receipt Confirmed - '.$this->reference,
             default => 'Payout Request Received - '.$this->reference,
         };
 
@@ -47,15 +48,17 @@ class EventPayoutStatusNotification extends Notification
             : '';
 
         $message = "Hello ".$notifiable->name.",\n\n"
-            ."Your payout request has been ".($this->status === 'paid' ? 'marked as paid' : $this->status).".\n\n"
+            ."Your payout request has been ".($this->status === 'paid' ? 'recorded as transferred' : ($this->status === 'received' ? 'confirmed as received' : $this->status)).".\n\n"
             ."Event: ".$this->eventName."\n"
             ."Request Reference: ".$this->reference
             .$amountLine."\n\n"
             .($this->status === 'approved'
                 ? "Your request is approved but payment has not yet been transferred."
                 : ($this->status === 'paid'
-                    ? "The platform has recorded the payout as paid. Contact the administrator if you have not received the funds."
-                    : "For questions, contact the eLive Events platform administrator."));
+                    ? "The platform has recorded the transfer. Verify the funds arrived and confirm receipt in your dashboard."
+                    : ($this->status === 'received'
+                        ? "Your receipt confirmation has been recorded. No additional transfer was initiated."
+                        : "For questions, contact the eLive Events platform administrator.")));
 
         return (new MailMessage)
             ->subject($subject)
