@@ -20,6 +20,8 @@ class OrganizerFinanceOverview extends Page
 
     protected static ?string $slug = 'my-finance';
 
+    protected static ?int $navigationSort = 1;
+
     protected string $view =
         'filament.pages.organizer-finance-overview';
 
@@ -136,20 +138,20 @@ class OrganizerFinanceOverview extends Page
     {
         return [
             'gross_sales' => [
-                'label' => 'Gross Sales',
+                'label' => 'Ticket Gross Sales',
             ],
 
             'total_charges' => [
-                'label' => 'Total Charges',
+                'label' => 'Ticket Charges',
             ],
 
             'net_payable' => [
-                'label' => 'Net Payable',
+                'label' => 'Ticket Net Payable',
             ],
         ];
     }
 
-    private function resolveAccessibleEvent(
+    protected function resolveAccessibleEvent(
         int $eventId
     ): ?Event {
         $user = Auth::user();
@@ -199,6 +201,8 @@ class OrganizerFinanceOverview extends Page
             'total_charges' => 0.0,
             'net_payable' => 0.0,
             'paid_orders' => 0,
+            'completed_merchandise_payments' => 0,
+            'merchandise_gross_sales' => 0.0,
             'currency' => 'TZS',
         ];
     }

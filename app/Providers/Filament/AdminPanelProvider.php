@@ -25,7 +25,7 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        $panel = $panel
             ->default()
             ->id('admin')
             ->path('admin')
@@ -93,6 +93,8 @@ class AdminPanelProvider extends PanelProvider
             |
             */
 
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->colors([
                 'primary' => Color::hex('#161943'),
                 'info' => Color::hex('#007AB2'),
@@ -124,6 +126,19 @@ class AdminPanelProvider extends PanelProvider
                 in: app_path('Filament/Pages'),
                 for: 'App\\Filament\\Pages'
             )
+
+            ->navigationGroups([
+                'Events & Registration',
+                'Ticketing',
+                'Check-in & Attendance',
+                'Merchandise',
+                'Badges',
+                'Finance',
+                'Donations',
+                'Communications',
+                'Reports',
+                'Administration',
+            ])
 
             ->pages([
                 Dashboard::class,
@@ -172,5 +187,23 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+
+        // Livewire SPA navigation avoids full document flashes on ordinary
+        // admin pages. Keep it staging-only until operational pages are tested.
+        // Scanner, printing and template designer pages use device/JS state.
+        if (app()->environment('staging')) {
+            $panel->spa()
+                ->spaUrlExceptions([
+                    '*/admin/check-in-station*',
+                    '*/admin/gate-check-in*',
+                    '*/admin/manual-check-in*',
+                    '*/admin/ticket-scanner*',
+                    '*/admin/badge-print-station*',
+                    '*/admin/*/design*',
+                    '*/admin/*/designer*',
+                ]);
+        }
+
+        return $panel;
     }
 }

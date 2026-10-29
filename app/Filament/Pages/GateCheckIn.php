@@ -26,7 +26,7 @@ class GateCheckIn extends Page implements Forms\Contracts\HasForms
         'heroicon-o-qr-code';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Check-in Management';
+        'Check-in & Attendance';
 
     protected static ?int $navigationSort = 1;
 

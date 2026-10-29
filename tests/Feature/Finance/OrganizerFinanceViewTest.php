@@ -28,24 +28,29 @@ class OrganizerFinanceViewTest extends TestCase
         $contents = File::get($path);
 
         $this->assertStringContainsString(
-            'Gross Sales',
+            'Ticket Gross Sales',
             $contents
         );
 
         $this->assertStringContainsString(
-            'Total Charges',
+            'Ticket Charges',
             $contents
         );
 
         $this->assertStringContainsString(
-            'Net Payable',
+            'Ticket Net Payable',
             $contents
         );
 
         $this->assertStringContainsString(
-            'Paid Orders',
+            'Paid Ticket Orders',
             $contents
         );
+
+        $this->assertStringContainsString('View Ticket Finance', $contents);
+        $this->assertStringContainsString('View Merchandise Finance', $contents);
+        $this->assertStringContainsString('Merchandise Gross Receipts', $contents);
+        $this->assertStringNotContainsString('Financial Position', $contents);
 
         $this->assertStringNotContainsString(
             'eLive Commission',

@@ -39,7 +39,7 @@ class BadgeTemplateResource extends Resource
         'Badge Templates';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Badge Management';
+        'Badges';
 
     protected static ?int $navigationSort = 1;
 

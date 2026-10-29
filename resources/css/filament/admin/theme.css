@@ -60,10 +60,6 @@
     border-radius: 12px;
 }
 
-.fi-sidebar-item-active .fi-sidebar-item-button {
-    background: rgba(22, 25, 67, 0.08);
-}
-
 .fi-ta-header-cell {
     font-weight: 700;
 }
@@ -99,4 +95,80 @@
 
 .elive-dashboard-orange {
     color: var(--elive-orange);
+}
+
+
+
+/* Stable dark sidebar: baseline wins over Filament light-theme link surfaces. */
+.fi-sidebar { background: #161943; border-right-color: #343958; }
+.fi-sidebar-nav { padding-inline: .75rem; }
+
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item > a,
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button:visited {
+    background: #161943 !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    color: #e7ecff !important;
+    border-radius: 12px;
+    transition: none !important;
+    animation: none !important;
+}
+
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-icon,
+.fi-sidebar .fi-sidebar-group-label,
+.fi-sidebar .fi-sidebar-group-icon {
+    color: #e7ecff !important;
+    transition: none !important;
+}
+
+/* Hover, focused, and actually active links. */
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button:hover,
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button:focus-visible,
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item.fi-sidebar-item-active .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button[aria-current="page"],
+.fi-sidebar .fi-sidebar-item > a:hover,
+.fi-sidebar .fi-sidebar-item > a:focus-visible,
+.fi-sidebar .fi-sidebar-item.fi-active > a {
+    background: #303e74 !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    color: #fff !important;
+}
+
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button:hover :is(span, svg),
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button:focus-visible :is(span, svg),
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button :is(span, svg),
+.fi-sidebar .fi-sidebar-item.fi-sidebar-item-active .fi-sidebar-item-button :is(span, svg),
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button[aria-current="page"] :is(span, svg),
+.fi-sidebar .fi-sidebar-item > a:hover :is(span, svg) {
+    color: #fff !important;
+}
+
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button::before,
+.fi-sidebar .fi-sidebar-item .fi-sidebar-item-button::after {
+    background: transparent !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-label { font-weight: 700; }
+.fi-sidebar .fi-sidebar-item-button:focus-visible { outline: 2px solid #ff9800; outline-offset: 2px; }
+.fi-sidebar .fi-sidebar-group-button { color: #e7ecff; transition: none !important; }
+.fi-sidebar .fi-sidebar-item .fi-badge { background: #303e74 !important; color: #fff !important; border-color: #6e7bad !important; }
+
+.fi-wi-stats-overview-stat {
+    transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .fi-wi-stats-overview-stat:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 30px rgba(22, 25, 67, 0.09);
+    }
+}
+
+@media (max-width: 640px) {
+    .fi-page { max-width: 100%; }
+    .fi-wi-stats-overview-stat { border-radius: 14px; }
 }

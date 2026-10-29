@@ -60,7 +60,7 @@ class MerchandisePaymentEntryTest extends TestCase
         $order = $this->order();
         $this->get(route('public.merchandise.orders.show', $order->public_token))
             ->assertOk()
-            ->assertSee('Pay with Pesapal');
+            ->assertSee('Pay securely with Pesapal');
     }
 
     public function test_payment_action_creates_once_and_redirects_to_existing_payment_route(): void
@@ -82,7 +82,7 @@ class MerchandisePaymentEntryTest extends TestCase
         $order = $this->order(true);
         $this->get(route('public.merchandise.orders.show', $order->public_token))
             ->assertOk()
-            ->assertDontSee('Pay with Pesapal');
+            ->assertDontSee('Pay securely with Pesapal');
         $this->post(route('public.merchandise.orders.pay', $order->public_token))
             ->assertRedirect(route('public.merchandise.orders.show', $order->public_token));
         $this->assertSame(0, Payment::where('merchandise_order_id', $order->id)->count());

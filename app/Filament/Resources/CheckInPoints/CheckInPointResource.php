@@ -37,7 +37,7 @@ class CheckInPointResource extends Resource
         'Check-in Points';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Event Management';
+        'Events & Registration';
 
     protected static ?int $navigationSort = 6;
 
