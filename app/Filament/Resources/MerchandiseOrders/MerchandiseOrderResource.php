@@ -20,7 +20,7 @@ class MerchandiseOrderResource extends Resource
 {
     protected static ?string $model = MerchandiseOrder::class;
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static string|UnitEnum|null $navigationGroup = 'Merchandise Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Merchandise';
     protected static ?int $navigationSort = 2;
     protected static ?string $navigationLabel = 'Shop Orders';
 
