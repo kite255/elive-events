@@ -31,7 +31,7 @@ class MerchandiseProductResource extends Resource
 {
     protected static ?string $model = MerchandiseProduct::class;
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-shopping-bag';
-    protected static string|UnitEnum|null $navigationGroup = 'Merchandise Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Merchandise';
     protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'Shop Products';
 
