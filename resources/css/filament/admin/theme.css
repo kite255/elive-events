@@ -99,9 +99,10 @@
 
 
 
-/* Unified Filament sidebar styling: stable colors without click flicker. */
+/* Filament navigation — single consistent style for normal, hover and active.
+   Filament marks active rows with .fi-sidebar-item-active, not only .fi-active. */
 .fi-sidebar {
-    background: #161943;
+    background-color: #161943;
     border-right-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -109,34 +110,52 @@
     padding-inline: 0.75rem;
 }
 
-.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button) {
+.fi-sidebar .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-group-button {
     border-radius: 12px;
     transition: none !important;
     animation: none !important;
 }
 
-.fi-sidebar :is(.fi-sidebar-item-label, .fi-sidebar-group-label, .fi-sidebar-item-icon, .fi-sidebar-group-button) {
+.fi-sidebar .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item-icon,
+.fi-sidebar .fi-sidebar-group-label,
+.fi-sidebar .fi-sidebar-group-icon {
     color: #e7ecff;
     transition: none !important;
 }
 
-.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible),
-.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
+/* Include both the actual active row and its child anchor for Filament v5. */
+.fi-sidebar .fi-sidebar-item-active > a,
+.fi-sidebar .fi-sidebar-item-active > .fi-sidebar-item-button,
 .fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button,
-.fi-sidebar .fi-sidebar-item-button[aria-current] {
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item-button[aria-current="page"],
+.fi-sidebar .fi-sidebar-item-button:hover,
+.fi-sidebar .fi-sidebar-item-button:focus-visible,
+.fi-sidebar .fi-sidebar-group-button:hover {
     background: #303e74 !important;
+    background-color: #303e74 !important;
     background-image: none !important;
-    color: #ffffff !important;
+    color: #fff !important;
 }
 
-.fi-sidebar :is(.fi-sidebar-item-button, .fi-sidebar-group-button):is(:hover, :focus-visible) :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, .fi-sidebar-group-label, svg),
-.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg),
-.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg),
-.fi-sidebar .fi-sidebar-item-button[aria-current] :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, svg) {
-    color: #ffffff !important;
+/* Filament's background highlight can be painted via a pseudo-element. */
+.fi-sidebar .fi-sidebar-item-active > a::before,
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button::before,
+.fi-sidebar .fi-sidebar-item-button:hover::before {
+    background: transparent !important;
 }
 
-.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-label {
+.fi-sidebar .fi-sidebar-item-active :is(.fi-sidebar-item-label, .fi-sidebar-item-icon),
+.fi-sidebar .fi-sidebar-item.fi-active :is(.fi-sidebar-item-label, .fi-sidebar-item-icon),
+.fi-sidebar .fi-sidebar-item-button[aria-current="page"] :is(.fi-sidebar-item-label, .fi-sidebar-item-icon),
+.fi-sidebar .fi-sidebar-item-button:hover :is(.fi-sidebar-item-label, .fi-sidebar-item-icon),
+.fi-sidebar .fi-sidebar-item-button:focus-visible :is(.fi-sidebar-item-label, .fi-sidebar-item-icon) {
+    color: #fff !important;
+}
+
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-label {
     font-weight: 700;
 }
 
@@ -147,8 +166,8 @@
 
 .fi-sidebar .fi-sidebar-item .fi-badge {
     background: #303e74 !important;
-    color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
+    color: #fff !important;
+    border-color: rgba(255, 255, 255, .25) !important;
 }
 
 .fi-wi-stats-overview-stat {
