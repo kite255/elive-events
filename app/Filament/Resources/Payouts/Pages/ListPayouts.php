@@ -11,6 +11,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,12 +44,30 @@ class ListPayouts extends ListRecords
                         ->label('Event')
                         ->options(fn (): array => $this->eligibleEvents())
                         ->searchable()
-                        ->required(),
+                        ->live()
+                        ->required()
+                        ->helperText('Choose the event whose cleared ticket proceeds will fund this request.'),
                     TextInput::make('amount')
                         ->label('Amount (TZS)')
                         ->numeric()
                         ->minValue(0.01)
-                        ->required(),
+                        ->required()
+                        ->helperText(function (Get $get): string {
+                            $eventId = (int) ($get('event_id') ?: 0);
+
+                            if (! $eventId || ! array_key_exists($eventId, $this->eligibleEvents())) {
+                                return 'Select an authorized event to see its reconciled available balance.';
+                            }
+
+                            $balance = app(EventPayoutService::class)->ticketBalance($eventId);
+
+                            if ($balance['refund_exception_count'] > 0) {
+                                return 'Refund exceptions require reconciliation before requesting funds.';
+                            }
+
+                            return 'Verified requestable balance: TZS '.number_format($balance['requestable_ticket_balance'], 2).
+                                '. Pending requests and recorded payouts are already deducted.';
+                        }),
                     Select::make('destination_type')
                         ->label('Payment destination')
                         ->options(['bank' => 'Bank account', 'mobile_money' => 'Mobile money'])
