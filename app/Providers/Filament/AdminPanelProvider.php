@@ -93,6 +93,8 @@ class AdminPanelProvider extends PanelProvider
             |
             */
 
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->colors([
                 'primary' => Color::hex('#161943'),
                 'info' => Color::hex('#007AB2'),

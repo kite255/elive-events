@@ -95,7 +95,7 @@ class ListPayouts extends ListRecords
                         $data['destination_details'],
                     );
 
-                    Notification::make()->title('Payout request submitted for review')->success()->send();
+                    Notification::make()->title('Payout request submitted')->body('Your request has been sent for administrator review.')->success()->duration(8000)->send();
                 }),
         ];
     }

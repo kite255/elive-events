@@ -112,14 +112,14 @@ class PayoutResource extends Resource
                 ->requiresConfirmation()
                 ->action(function (EventPayoutRequest $record): void {
                     app(EventPayoutReviewService::class)->review($record, auth()->user(), true);
-                    Notification::make()->title('Payout request approved')->success()->send();
+                    Notification::make()->title('Payout request approved')->body('The organizer has been notified of the approval.')->success()->duration(8000)->send();
                 }),
             Action::make('reject')->label('Reject')->color('danger')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
                 ->schema([Textarea::make('reason')->label('Reason')->required()->maxLength(500)])
                 ->action(function (EventPayoutRequest $record, array $data): void {
                     app(EventPayoutReviewService::class)->review($record, auth()->user(), false, $data['reason']);
-                    Notification::make()->title('Payout request rejected')->success()->send();
+                    Notification::make()->title('Payout request rejected')->body('The organizer has been notified of the rejection.')->warning()->duration(8000)->send();
                 }),
             Action::make('recordTransfer')->label('Record Paid')->color('info')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::APPROVED)
@@ -135,7 +135,7 @@ class PayoutResource extends Resource
                         throw ValidationException::withMessages(['transfer_verified' => 'Confirm the transfer before recording it.']);
                     }
                     app(EventPayoutReviewService::class)->recordCompletedTransfer($record, auth()->user(), $data['reference']);
-                    Notification::make()->title('Confirmed transfer recorded')->success()->send();
+                    Notification::make()->title('Confirmed transfer recorded')->body('The payout has been marked as paid and the organizer notified.')->success()->duration(8000)->send();
                 }),
         ])->filters([
             SelectFilter::make('status')->options([
