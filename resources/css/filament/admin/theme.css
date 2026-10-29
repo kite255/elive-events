@@ -206,3 +206,28 @@
 .fi-sidebar button:is(:hover, :focus-visible)[class*="fi-sidebar"] :is(span, svg) {
     color: #ffffff !important;
 }
+
+
+/*
+ * Filament marks the containing <li> with .fi-active. Its link can be nested
+ * rather than an immediate child, so direct-child selectors miss the active
+ * state. Keep the same navy contrast used for hover.
+ */
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item.fi-active a,
+.fi-sidebar .fi-sidebar-item-button.fi-active,
+.fi-sidebar .fi-sidebar-item-button[aria-current],
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button {
+    background: #303e74 !important;
+    background-color: #303e74 !important;
+    background-image: none !important;
+    color: #ffffff !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
+.fi-sidebar .fi-sidebar-item.fi-active a :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
+.fi-sidebar .fi-sidebar-item-button.fi-active :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
+.fi-sidebar .fi-sidebar-item-button[aria-current] :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg),
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button :is(.fi-sidebar-item-label, .fi-sidebar-item-icon, span, svg) {
+    color: #ffffff !important;
+}
