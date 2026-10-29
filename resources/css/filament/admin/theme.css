@@ -100,3 +100,48 @@
 .elive-dashboard-orange {
     color: var(--elive-orange);
 }
+
+
+/* Dashboard and sidebar refinement — accessible light/dark surfaces. */
+.fi-sidebar {
+    background: #161943;
+    border-right-color: rgba(255, 255, 255, 0.12);
+}
+
+.fi-sidebar .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-group-label,
+.fi-sidebar .fi-sidebar-item-icon,
+.fi-sidebar .fi-sidebar-group-button {
+    color: #e7ecff;
+}
+
+.fi-sidebar .fi-sidebar-item-button:hover,
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-button {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.fi-sidebar .fi-sidebar-item-active .fi-sidebar-item-label {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.fi-sidebar .fi-sidebar-item-button:focus-visible {
+    outline: 2px solid #ff9800;
+    outline-offset: 2px;
+}
+
+.fi-wi-stats-overview-stat {
+    transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .fi-wi-stats-overview-stat:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 30px rgba(22, 25, 67, 0.09);
+    }
+}
+
+@media (max-width: 640px) {
+    .fi-page { max-width: 100%; }
+    .fi-wi-stats-overview-stat { border-radius: 14px; }
+}
