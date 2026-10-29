@@ -12,7 +12,7 @@ use UnitEnum;
 class SuccessfulMerchandiseOrders extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-check-badge';
-    protected static string|UnitEnum|null $navigationGroup = 'Merchandise Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Merchandise';
     protected static ?string $navigationLabel = 'Successful Orders';
     protected static ?string $title = 'Successful Merchandise Orders';
     protected static ?int $navigationSort = 1;
