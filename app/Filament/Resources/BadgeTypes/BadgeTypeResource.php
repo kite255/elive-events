@@ -37,7 +37,7 @@ class BadgeTypeResource extends Resource
         'Badge Types';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Event Management';
+        'Events & Registration';
 
     protected static ?int $navigationSort = 5;
 
