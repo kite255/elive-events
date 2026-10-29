@@ -21,7 +21,7 @@ class AttendanceDashboard extends Page
         'heroicon-o-chart-bar-square';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Check-in Management';
+        'Check-in & Attendance';
 
     protected static ?string $navigationLabel =
         'Attendance Dashboard';
