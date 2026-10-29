@@ -127,6 +127,19 @@ class AdminPanelProvider extends PanelProvider
                 for: 'App\\Filament\\Pages'
             )
 
+            ->navigationGroups([
+                'Events & Registration',
+                'Ticketing',
+                'Check-in & Attendance',
+                'Merchandise',
+                'Badges',
+                'Finance',
+                'Donations',
+                'Communications',
+                'Reports',
+                'Administration',
+            ])
+
             ->pages([
                 Dashboard::class,
             ])

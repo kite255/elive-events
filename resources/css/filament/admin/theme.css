@@ -145,3 +145,36 @@
     .fi-page { max-width: 100%; }
     .fi-wi-stats-overview-stat { border-radius: 14px; }
 }
+
+
+/* Ensure all Filament sidebar active and hover states remain legible on navy. */
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item-active > .fi-sidebar-item-button,
+.fi-sidebar .fi-sidebar-item-button[aria-current="page"],
+.fi-sidebar .fi-sidebar-item-button[aria-current="true"] {
+    background-color: #303e74 !important;
+}
+
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-button .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item.fi-active > .fi-sidebar-item-button .fi-sidebar-item-icon,
+.fi-sidebar .fi-sidebar-item-active > .fi-sidebar-item-button .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item-active > .fi-sidebar-item-button .fi-sidebar-item-icon,
+.fi-sidebar .fi-sidebar-item-button[aria-current="page"] .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item-button[aria-current="page"] .fi-sidebar-item-icon {
+    color: #ffffff !important;
+}
+
+.fi-sidebar .fi-sidebar-item-button:hover {
+    background-color: #303e74 !important;
+}
+
+.fi-sidebar .fi-sidebar-item-button:hover .fi-sidebar-item-label,
+.fi-sidebar .fi-sidebar-item-button:hover .fi-sidebar-item-icon {
+    color: #ffffff !important;
+}
+
+.fi-sidebar .fi-sidebar-item .fi-badge {
+    background-color: #303e74 !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+}
