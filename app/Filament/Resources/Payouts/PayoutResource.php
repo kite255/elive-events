@@ -142,8 +142,23 @@ class PayoutResource extends Resource
                 ->visible(fn (EventPayoutRequest $record): bool => (int) $record->requested_by === (int) auth()->id() && $record->status === EventPayoutRequest::PAID && $record->received_at === null)
                 ->requiresConfirmation()
                 ->modalHeading('Confirm payout received')
-                ->modalDescription('Confirm only when the full amount has arrived in your account.')
-                ->action(function (EventPayoutRequest $record): void {
+                ->modalDescription('Check the transfer details against your bank or mobile money statement before confirming.')
+                ->modalContent(fn (EventPayoutRequest $record) => view('filament.payouts.receipt-details', [
+                    'payout' => $record,
+                ]))
+                ->schema([
+                    Checkbox::make('full_amount_received')
+                        ->label('I have checked my account and confirm that the full amount shown above has been received.')
+                        ->accepted()
+                        ->required(),
+                ])
+                ->action(function (EventPayoutRequest $record, array $data): void {
+                    if (! filter_var($data['full_amount_received'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                        throw ValidationException::withMessages([
+                            'full_amount_received' => 'You must confirm receipt of the full amount.',
+                        ]);
+                    }
+
                     app(EventPayoutReviewService::class)->confirmReceipt($record, auth()->user());
                     Notification::make()->title('Receipt confirmed')->success()->duration(8000)->send();
                 }),
