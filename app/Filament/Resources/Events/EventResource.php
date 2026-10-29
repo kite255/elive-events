@@ -55,7 +55,7 @@ class EventResource extends Resource
         'Events';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Event Management';
+        'Events & Registration';
 
     protected static ?int $navigationSort =
         2;
