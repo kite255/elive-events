@@ -30,7 +30,7 @@ class AttendeeMerchandiseResource extends Resource
         'Merchandise Orders';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Merchandise Management';
+        'Merchandise';
 
     protected static ?int $navigationSort = 3;
 
