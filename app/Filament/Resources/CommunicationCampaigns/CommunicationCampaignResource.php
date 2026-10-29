@@ -42,7 +42,7 @@ class CommunicationCampaignResource extends Resource
         'Communication Campaigns';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Communication';
+        'Communications';
 
     protected static ?int $navigationSort = 21;
 

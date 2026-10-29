@@ -55,6 +55,24 @@
                 </div>
             </div>
 
+            {{-- Organizer quick navigation: only pages allowed for this user. --}}
+            <nav aria-label="Organizer quick actions" class="flex flex-wrap gap-2" style="margin-bottom:18px;">
+                @foreach ([
+                    [\App\Filament\Resources\TicketOrders\TicketOrderResource::class, 'Ticket Orders'],
+                    [\App\Filament\Resources\Events\EventResource::class, 'Manage Events'],
+                    [\App\Filament\Pages\OrganizerFinanceOverview::class, 'My Finance'],
+                    [\App\Filament\Pages\EventFinanceReport::class, 'Event Finance'],
+                ] as [$destination, $label])
+                    @if (($destination === \App\Filament\Resources\TicketOrders\TicketOrderResource::class || $destination === \App\Filament\Resources\Events\EventResource::class) ? $destination::canViewAny() : $destination::canAccess())
+                        <a href="{{ $destination::getUrl() }}"
+                           class="rounded-lg border px-3 py-2 text-sm font-semibold"
+                           style="background:#fff;border-color:#e2e8f0;color:#161943;text-decoration:none;">
+                            {{ $label }}
+                        </a>
+                    @endif
+                @endforeach
+            </nav>
+
             {{-- Filters --}}
             <section class="elive-panel elive-filter-panel">
                 <div class="elive-filter-copy">

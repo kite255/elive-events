@@ -24,7 +24,7 @@ class ManualCheckIn extends Page implements Forms\Contracts\HasForms
         'heroicon-o-user-plus';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Check-in Management';
+        'Check-in & Attendance';
 
     protected static ?int $navigationSort = 2;
 

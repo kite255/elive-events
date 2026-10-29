@@ -25,7 +25,7 @@ class CommunicationCenter extends Page
 
     protected static ?string $title = 'Communication Center';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Communication';
+    protected static string|UnitEnum|null $navigationGroup = 'Communications';
 
     protected static ?int $navigationSort = 20;
 

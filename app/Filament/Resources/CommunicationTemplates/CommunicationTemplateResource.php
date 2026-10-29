@@ -36,7 +36,7 @@ class CommunicationTemplateResource extends Resource
         'Message Templates';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Registration & Communication';
+        'Communications';
 
     protected static ?int $navigationSort = 1;
 

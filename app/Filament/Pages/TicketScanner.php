@@ -14,7 +14,7 @@ class TicketScanner extends Page
         Heroicon::OutlinedQrCode;
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Attendance';
+        'Check-in & Attendance';
 
     protected static ?string $navigationLabel =
         'Ticket Scanner';
