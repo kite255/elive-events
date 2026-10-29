@@ -38,7 +38,7 @@ class AttendeeResource extends Resource
     protected static ?string $pluralModelLabel = 'Attendees';
 
     protected static string|UnitEnum|null $navigationGroup =
-        'Event Management';
+        'Events & Registration';
 
     protected static ?int $navigationSort = 3;
 
