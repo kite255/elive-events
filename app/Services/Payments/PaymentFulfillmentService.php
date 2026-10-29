@@ -91,6 +91,13 @@ class PaymentFulfillmentService
                 $this->markPaymentFulfilled($payment);
                 $this->queueTicketAccessLink($payment);
 
+                try {
+                    app(\App\Services\Tickets\OrganizerTicketSaleNotificationService::class)
+                        ->queueForPaidOrder((int) $payment->ticket_order_id);
+                } catch (\Throwable $notificationException) {
+                    report($notificationException);
+                }
+
                 return $payment->fresh(['ticketOrder']);
             }
 
