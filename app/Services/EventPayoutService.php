@@ -120,7 +120,8 @@ class EventPayoutService
             DB::afterCommit(function () use ($request, $event, $user): void {
                 try {
                     $user->notify(new EventPayoutStatusNotification(
-                        $request->reference, $event->name, EventPayoutRequest::REQUESTED
+                        $request->reference, $event->name, EventPayoutRequest::REQUESTED,
+                        $request->currency.' '.number_format((float) $request->amount, 2)
                     ));
                 } catch (\Throwable $exception) {
                     Log::warning('Payout request notification failed', [

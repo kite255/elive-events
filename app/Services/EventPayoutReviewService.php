@@ -143,6 +143,7 @@ class EventPayoutReviewService
                         $record->reference,
                         $record->event->name,
                         $record->status,
+                        $record->currency.' '.number_format((float) $record->amount, 2),
                     ));
                 }
             } catch (\Throwable $exception) {
