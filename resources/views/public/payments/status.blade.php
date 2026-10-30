@@ -381,6 +381,12 @@
 
     <div class="payment-card">
 
+        @if (session('error'))
+            <div role="alert" style="padding: 16px 18px; margin-bottom: 24px; border-radius: 12px; background: var(--danger-bg); color: var(--danger); font-size: 14px; line-height: 1.5;">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <div class="brand">
 
             <a
