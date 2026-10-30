@@ -9,6 +9,8 @@ services:
     volumes:
       - ./:/var/www/html
       - ./docker/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+      # Private finance evidence; keep outside the public /storage URL.
+      - elive_payout_proofs:/var/www/html/storage/app/private/payout-proofs
     depends_on:
       - postgres
       - redis
@@ -144,6 +146,7 @@ services:
 
 volumes:
   elive_events_postgres_data:
+  elive_payout_proofs:
 
 networks:
   elive_events_network:
