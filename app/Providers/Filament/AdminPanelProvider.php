@@ -188,20 +188,15 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ]);
 
-        // Livewire SPA navigation avoids full document flashes on ordinary
-        // admin pages. Enable for staging and production; exclude device-sensitive pages.
-        // Scanner, printing and template designer pages use device/JS state.
+        // Use SPA navigation for check-in pages to avoid full document flashes.
+        // Keep badge printing and designers on full-page navigation.
+        // Camera initialization/cleanup must be verified after deployment.
         if (app()->environment(['staging', 'production'])) {
-            $panel->spa()
-                ->spaUrlExceptions([
-                    '*/admin/check-in-station*',
-                    '*/admin/gate-check-in*',
-                    '*/admin/manual-check-in*',
-                    '*/admin/ticket-scanner*',
-                    '*/admin/badge-print-station*',
-                    '*/admin/*/design*',
-                    '*/admin/*/designer*',
-                ]);
+            $panel->spa()->spaUrlExceptions([
+                '*/admin/badge-print-station*',
+                '*/admin/*/design*',
+                '*/admin/*/designer*',
+            ]);
         }
 
         return $panel;
