@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\EventPayoutReviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PayoutAuditTest extends TestCase
@@ -45,7 +46,14 @@ class PayoutAuditTest extends TestCase
         $request = $this->requestFor($admin);
         $reviewer = User::factory()->create(['is_super_admin' => true]);
         app(EventPayoutReviewService::class)->review($request, $reviewer, true);
-        app(EventPayoutReviewService::class)->recordCompletedTransfer($request, $reviewer, 'TEST-TRANSFER-42');
+        Storage::fake('local');
+        Storage::disk('local')->put('payout-proofs/receipt.pdf', 'test transfer receipt');
+        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+            $request, $reviewer, 'TEST-TRANSFER-42', 'bank', now()->toDateString(),
+            '10.00', 'payout-proofs/receipt.pdf'
+        );
+        $this->assertSame('bank', $request->fresh()->transfer_method);
+        $this->assertSame('10.00', $request->fresh()->transferred_amount);
 
         $this->assertDatabaseHas('event_payout_audits', [
             'event_payout_request_id' => $request->id, 'actor_id' => $reviewer->id,
