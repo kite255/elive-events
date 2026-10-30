@@ -11,6 +11,9 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -92,6 +95,8 @@ class PayoutResource extends Resource
                 default => 'warning',
             }),
             TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
+            TextColumn::make('transfer_method')->label('Method')->placeholder('—'),
+            TextColumn::make('transfer_date')->label('Transfer Date')->date()->placeholder('—'),
             TextColumn::make('paid_at')->label('Transferred At')->dateTime('d M Y H:i')->placeholder('Not transferred'),
             TextColumn::make('received_at')->label('Received At')->dateTime('d M Y H:i')->placeholder('Awaiting confirmation'),
         ])->recordActions([
@@ -125,7 +130,12 @@ class PayoutResource extends Resource
             Action::make('recordTransfer')->label('Record Transfer')->color('info')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::APPROVED)
                 ->schema([
+                    Select::make('method')->label('Payment method')->options(['mpesa' => 'M-Pesa', 'airtel' => 'Airtel Money', 'mixx' => 'Mixx by Yas', 'bank' => 'Bank transfer', 'other' => 'Other'])->required(),
                     TextInput::make('reference')->label('Verified transfer reference')->required()->maxLength(255),
+                    TextInput::make('amount')->label('Amount transferred (TZS)')->numeric()->required()->default(fn (EventPayoutRequest $record) => $record->amount),
+                    DatePicker::make('transfer_date')->label('Transfer date')->required()->maxDate(now())->default(now()),
+                    FileUpload::make('proof')->label('Proof of successful transfer')->disk('local')->directory('payout-proofs')->visibility('private')->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])->maxSize(5120)->required(),
+                    Textarea::make('note')->label('Transfer notes')->maxLength(1000),
                     Checkbox::make('transfer_verified')
                         ->label('I have independently verified that this transfer was completed')
                         ->accepted()->required(),
@@ -135,7 +145,11 @@ class PayoutResource extends Resource
                     if (! filter_var($data['transfer_verified'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                         throw ValidationException::withMessages(['transfer_verified' => 'Confirm the transfer before recording it.']);
                     }
-                    app(EventPayoutReviewService::class)->recordCompletedTransfer($record, auth()->user(), $data['reference']);
+                    app(EventPayoutReviewService::class)->recordCompletedTransfer(
+                        $record, auth()->user(), $data['reference'], $data['method'],
+                        (string) $data['transfer_date'], (string) $data['amount'],
+                        (string) $data['proof'], $data['note'] ?? null
+                    );
                     Notification::make()->title('Confirmed transfer recorded')->body('The payout has been marked as paid and the organizer notified.')->success()->duration(8000)->send();
                 }),
             Action::make('confirmReceipt')->label('Confirm Money Received')->icon('heroicon-o-check-badge')->color('success')
