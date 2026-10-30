@@ -15,6 +15,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Storage;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -100,6 +101,16 @@ class PayoutResource extends Resource
             TextColumn::make('paid_at')->label('Transferred At')->dateTime('d M Y H:i')->placeholder('Not transferred'),
             TextColumn::make('received_at')->label('Received At')->dateTime('d M Y H:i')->placeholder('Awaiting confirmation'),
         ])->recordActions([
+            Action::make('viewProof')->label('Download Proof')->icon('heroicon-o-document-arrow-down')
+                ->visible(fn (EventPayoutRequest $record): bool =>
+                    auth()->user()?->isSuperAdmin()
+                    && is_string($record->transfer_proof_path)
+                    && Storage::disk('local')->exists($record->transfer_proof_path)
+                )
+                ->url(fn (EventPayoutRequest $record): string =>
+                    route('admin.payouts.transfer-proof', ['payout' => $record->getKey()])
+                )
+                ->openUrlInNewTab(),
             Action::make('history')->label('History')->icon('heroicon-o-clock')
                 ->modalHeading('Payout audit history')
                 ->modalSubmitAction(false)
