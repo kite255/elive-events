@@ -151,6 +151,7 @@ class SelcomService implements PaymentGateway
             throw new RuntimeException('Selcom HTTPS endpoint and API credentials must be configured.');
         }
 
+        // Selcom signs the literal timestamp followed by fields in Signed-Fields order.
         $timestamp = now()->format('Y-m-d\TH:i:sP');
         $signed = array_keys($fields);
         $message = 'timestamp=' . $timestamp;
@@ -185,7 +186,7 @@ class SelcomService implements PaymentGateway
     private function checkoutUrl(string $encoded): string
     {
         $decoded = base64_decode($encoded, true);
-        $url = filter_var($decoded, FILTER_VALIDATE_URL) ? $decoded : $encoded;
+        $url = is_string($decoded) && filter_var($decoded, FILTER_VALIDATE_URL) ? $decoded : $encoded;
         if (! filter_var($url, FILTER_VALIDATE_URL) || parse_url($url, PHP_URL_SCHEME) !== 'https') {
             return '';
         }
