@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BadgePrintController;
+use App\Http\Controllers\PayoutTransferProofController;
 use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\EventCommunicationPreviewController;
 use App\Http\Controllers\Payments\PaymentController;
@@ -23,6 +24,11 @@ use App\Http\Controllers\TicketScannerController;
 use App\Models\Event;
 use App\Http\Controllers\PublicMerchandiseController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/admin/payouts/{payout}/transfer-proof', PayoutTransferProofController::class)
+    ->middleware(['auth', 'throttle:30,1'])
+    ->whereNumber('payout')
+    ->name('admin.payouts.transfer-proof');
 
 Route::post('/payments/selcom/webhook', SelcomWebhookController::class)
     ->name('payments.selcom.webhook');
