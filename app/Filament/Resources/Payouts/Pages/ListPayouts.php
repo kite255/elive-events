@@ -44,7 +44,6 @@ class ListPayouts extends ListRecords
                 ->modalSubmitAction(fn (Action $action): Action => $action
                     ->label('Submit payout request')
                     ->disabled(fn (): bool => ! $this->canSubmitPayoutRequest()))
-                )
                 ->schema([
                     Select::make('event_id')
                         ->label('Event')
@@ -138,11 +137,13 @@ class ListPayouts extends ListRecords
                     Select::make('destination_type')
                         ->label('Payment destination')
                         ->options(['bank' => 'Bank account', 'mobile_money' => 'Mobile money'])
+                        ->live()
                         ->required(),
                     Textarea::make('destination_details')
                         ->label('Account name, provider and account/phone number')
                         ->rows(3)
                         ->maxLength(500)
+                        ->live(debounce: 500)
                         ->required(),
                 ])
                 ->action(function (array $data): void {
