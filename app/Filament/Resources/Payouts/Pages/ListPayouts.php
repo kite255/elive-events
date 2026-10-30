@@ -41,6 +41,9 @@ class ListPayouts extends ListRecords
                 ->visible(fn (): bool => PayoutResource::canViewAny())
                 ->disabled(fn (): bool => ! config('finance.payout_requests_enabled', false))
                 ->tooltip(fn (): string => config('finance.payout_requests_enabled', false) ? 'Request funds verified by the platform.' : 'Requests are disabled pending independent settlement review.')
+                ->modalSubmitAction(fn (Action $action): Action => $action
+                    ->label('Submit payout request')
+                    ->disabled(fn (): bool => ! $this->canSubmitPayoutRequest()))
                 ->schema([
                     Select::make('event_id')
                         ->label('Event')
@@ -75,23 +78,6 @@ class ListPayouts extends ListRecords
                         ->numeric()
                         ->minValue(0.01)
                         ->live(debounce: 700)
-                        ->afterStateUpdated(function (mixed $state, Get $get): void {
-                            if (! is_numeric($state) || (float) $state <= 0) {
-                                return;
-                            }
-
-                            $eventId = (int) ($get('event_id') ?: 0);
-                            if (! $eventId || ! array_key_exists($eventId, $this->eligibleEvents())) {
-                                return;
-                            }
-
-                            $balance = app(EventPayoutService::class)->ticketBalance($eventId);
-                            if ((float) $state > (float) $balance['requestable_ticket_balance']) {
-                                Notification::make()->title('Amount exceeds available funds')
-                                    ->body('Verified available balance: TZS '.number_format($balance['requestable_ticket_balance'], 2).'. Reduce the amount to proceed.')
-                                    ->warning()->duration(6000)->send();
-                            }
-                        })
                         ->required()
                         ->rules([
                             fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
@@ -151,11 +137,13 @@ class ListPayouts extends ListRecords
                     Select::make('destination_type')
                         ->label('Payment destination')
                         ->options(['bank' => 'Bank account', 'mobile_money' => 'Mobile money'])
+                        ->live()
                         ->required(),
                     Textarea::make('destination_details')
                         ->label('Account name, provider and account/phone number')
                         ->rows(3)
                         ->maxLength(500)
+                        ->live(debounce: 500)
                         ->required(),
                 ])
                 ->action(function (array $data): void {
@@ -169,11 +157,11 @@ class ListPayouts extends ListRecords
 
                     try {
                         app(EventPayoutService::class)->request(
-                        $event,
-                        $user,
-                        (float) $data['amount'],
-                        $data['destination_type'],
-                        $data['destination_details'],
+                            $event,
+                            $user,
+                            (float) $data['amount'],
+                            $data['destination_type'],
+                            $data['destination_details'],
                         );
                     } catch (ValidationException $exception) {
                         Notification::make()->title('Payout request not submitted')
@@ -185,6 +173,37 @@ class ListPayouts extends ListRecords
                     Notification::make()->title('Payout request submitted')->body('Your request has been sent for administrator review.')->success()->duration(8000)->send();
                 }),
         ];
+    }
+
+    private function canSubmitPayoutRequest(): bool
+    {
+        if (! config('finance.payout_requests_enabled', false)) {
+            return false;
+        }
+
+        // Filament keeps the current modal state in the last mounted action data entry.
+        $data = $this->mountedActionsData[array_key_last($this->mountedActionsData)] ?? [];
+        $eventId = (int) ($data['event_id'] ?? 0);
+        $amount = $data['amount'] ?? null;
+
+        if (! $eventId || ! array_key_exists($eventId, $this->eligibleEvents())) {
+            return false;
+        }
+
+        if (! is_numeric($amount) || ! is_finite((float) $amount)
+            || (float) $amount <= 0 || round((float) $amount, 2) !== (float) $amount) {
+            return false;
+        }
+
+        if (! in_array($data['destination_type'] ?? null, ['bank', 'mobile_money'], true)
+            || trim((string) ($data['destination_details'] ?? '')) === '') {
+            return false;
+        }
+
+        $balance = app(EventPayoutService::class)->ticketBalance($eventId);
+
+        return $balance['refund_exception_count'] === 0
+            && (float) $amount <= (float) $balance['requestable_ticket_balance'];
     }
 
     private function eligibleEvents(): array
