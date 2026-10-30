@@ -56,6 +56,49 @@ class SelcomServiceTest extends TestCase
         );
     }
 
+    public function test_selcom_digest_is_signed_using_exact_timestamp_and_field_order(): void
+    {
+        Http::fake(['gateway.example.test/*' => Http::response([
+            'result' => 'SUCCESS',
+            'resultcode' => '000',
+            'data' => [[
+                'order_id' => 'ELV-123',
+                'amount' => '25000',
+                'payment_status' => 'PENDING',
+            ]],
+        ])]);
+
+        app(SelcomService::class)->getPaymentStatus('ELV-123');
+
+        Http::assertSent(function ($request): bool {
+            $timestamp = $request->header('Timestamp')[0] ?? '';
+            $signedFields = $request->header('Signed-Fields')[0] ?? '';
+            $digest = $request->header('Digest')[0] ?? '';
+
+            return $signedFields === 'order_id'
+                && $timestamp !== ''
+                && hash_equals(
+                    base64_encode(hash_hmac('sha256', 'timestamp=' . $timestamp . '&order_id=ELV-123', 'test-secret', true)),
+                    $digest
+                );
+        });
+    }
+
+    public function test_invalid_or_missing_selcom_credentials_fail_before_any_http_request(): void
+    {
+        config()->set('services.selcom.api_secret', '');
+        Http::fake();
+
+        try {
+            app(SelcomService::class)->getPaymentStatus('ELV-123');
+            $this->fail('Expected missing credentials to prevent API requests.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('credentials', $e->getMessage());
+        }
+
+        Http::assertNothingSent();
+    }
+
     public function test_unexpected_order_id_fails_closed(): void
     {
         Http::fake(['gateway.example.test/*' => Http::response([
