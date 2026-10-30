@@ -27,7 +27,7 @@ class SelcomService implements PaymentGateway
         $merchandise = $payment->merchandiseOrder;
         $name = trim((string) ($buyer?->full_name ?: $order?->buyer_name ?: $donation?->donor_name ?: $merchandise?->buyer_name));
         $email = trim((string) ($buyer?->email ?: $order?->buyer_email ?: $donation?->donor_email ?: $merchandise?->buyer_email));
-        $phone = trim((string) ($buyer?->phone ?: $order?->buyer_phone ?: $donation?->donor_phone ?: $merchandise?->buyer_phone));
+        $phone = $this->normalizeTanzanianPhone((string) ($buyer?->phone ?: $order?->buyer_phone ?: $donation?->donor_phone ?: $merchandise?->buyer_phone));
         $parts = preg_split('/\s+/', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         if (! $name || ! filter_var($email, FILTER_VALIDATE_EMAIL) || ! preg_match('/^255\d{9}$/', $phone)) {
@@ -94,6 +94,10 @@ class SelcomService implements PaymentGateway
             throw new RuntimeException('Selcom returned an unknown payment status.');
         }
 
+        if ($status === 'COMPLETED' && trim((string) ($row['transid'] ?? '')) === '') {
+            throw new RuntimeException('Selcom completed payment is missing its transaction ID.');
+        }
+
         return [
             'merchant_reference' => $providerTrackingId,
             'order_tracking_id' => $providerTrackingId,
@@ -104,7 +108,7 @@ class SelcomService implements PaymentGateway
             'payment_status_description' => $status,
             'payment_method' => (string) ($row['channel'] ?? ''),
             'confirmation_code' => (string) ($row['transid'] ?? ''),
-            'payment_account' => (string) ($row['phone'] ?? ''),
+            'payment_account' => (string) ($row['msisdn'] ?? $row['phone'] ?? ''),
             'selcom_response' => $data,
         ];
     }
@@ -112,6 +116,21 @@ class SelcomService implements PaymentGateway
     public function registerIpn(string $url, string $method = 'POST'): array
     {
         throw new RuntimeException('Selcom uses a per-order webhook URL, not IPN registration.');
+    }
+
+    private function normalizeTanzanianPhone(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', trim($phone)) ?? '';
+        if (preg_match('/^0\d{9}$/', $digits)) {
+            return '255' . substr($digits, 1);
+        }
+        if (preg_match('/^\d{9}$/', $digits)) {
+            return '255' . $digits;
+        }
+        if (preg_match('/^255\d{9}$/', $digits)) {
+            return $digits;
+        }
+        return '';
     }
 
     private function vendor(): string
