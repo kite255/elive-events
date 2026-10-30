@@ -37,7 +37,8 @@ class EventPayoutService
             ->sum('amount');
 
         $cleared = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->where('entry_type', 'settlement')->sum('amount');
+            ->where('event_id', $eventId)->where('entry_type', 'settlement')
+            ->whereNotNull('independently_verified_at')->sum('amount');
         $reversals = (float) DB::table('event_finance_clearance_entries')
             ->where('event_id', $eventId)->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
 
@@ -49,11 +50,15 @@ class EventPayoutService
             ->whereIn('status', [Payment::STATUS_REFUNDED, Payment::STATUS_PARTIALLY_REFUNDED])->count();
         $exceptions += $paymentExceptions;
 
+        // Credit only independently verified settlements. Deduct ALL recorded
+        // reversals, including those awaiting independent review, as a
+        // conservative safeguard against overstating available funds.
         $available = max(0, min($earned, $cleared - $reversals) - $paid - $reserved);
 
         return [
             'ticket_net_earnings' => round($earned, 2),
             'verified_cleared_funds' => round($cleared, 2),
+            'recorded_reversals' => round($reversals, 2),
             'verified_reversals' => round($reversals, 2),
             'refund_exception_count' => $exceptions,
             'paid_out' => round($paid, 2),

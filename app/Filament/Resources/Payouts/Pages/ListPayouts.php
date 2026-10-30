@@ -15,6 +15,8 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
+use Closure;
+use Illuminate\Validation\ValidationException;
 
 class ListPayouts extends ListRecords
 {
@@ -45,13 +47,63 @@ class ListPayouts extends ListRecords
                         ->options(fn (): array => $this->eligibleEvents())
                         ->searchable()
                         ->live()
+                        ->afterStateUpdated(function (?string $state): void {
+                            $eventId = (int) $state;
+                            if (! $eventId || ! array_key_exists($eventId, $this->eligibleEvents())) {
+                                return;
+                            }
+
+                            $balance = app(EventPayoutService::class)->ticketBalance($eventId);
+                            if ($balance['refund_exception_count'] > 0) {
+                                Notification::make()->title('Payout temporarily unavailable')
+                                    ->body('Refund exceptions must be reconciled before requesting funds.')
+                                    ->warning()->duration(8000)->send();
+                            } elseif ($balance['requestable_ticket_balance'] <= 0) {
+                                Notification::make()->title('No verified funds available')
+                                    ->body('This event has no requestable payout balance. Contact the administrator for settlement review.')
+                                    ->warning()->duration(8000)->send();
+                            } else {
+                                Notification::make()->title('Verified payout balance available')
+                                    ->body('You may request up to TZS '.number_format($balance['requestable_ticket_balance'], 2).'.')
+                                    ->success()->duration(5000)->send();
+                            }
+                        })
                         ->required()
                         ->helperText('Choose the event whose cleared ticket proceeds will fund this request.'),
                     TextInput::make('amount')
                         ->label('Amount (TZS)')
                         ->numeric()
                         ->minValue(0.01)
+                        ->live(debounce: 700)
                         ->required()
+                        ->rules([
+                            fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                $eventId = (int) ($get('event_id') ?: 0);
+
+                                if (! $eventId || ! array_key_exists($eventId, $this->eligibleEvents())) {
+                                    $fail('Select an authorized event before requesting a payout.');
+                                    return;
+                                }
+
+                                if (! config('finance.payout_requests_enabled', false)) {
+                                    $fail('Payout requests are currently disabled.');
+                                    return;
+                                }
+
+                                $balance = app(EventPayoutService::class)->ticketBalance($eventId);
+                                if ($balance['refund_exception_count'] > 0) {
+                                    $fail('Refund exceptions must be reconciled before requesting funds.');
+                                    return;
+                                }
+
+                                $available = (float) $balance['requestable_ticket_balance'];
+                                if ($available <= 0) {
+                                    $fail('No verified funds are currently available for payout. Contact the administrator.');
+                                } elseif (is_numeric($value) && (float) $value > $available) {
+                                    $fail('Amount exceeds the verified available balance of TZS '.number_format($available, 2).'.');
+                                }
+                            },
+                        ])
                         ->helperText(function (Get $get): string {
                             $eventId = (int) ($get('event_id') ?: 0);
 
@@ -65,17 +117,30 @@ class ListPayouts extends ListRecords
                                 return 'Refund exceptions require reconciliation before requesting funds.';
                             }
 
-                            return 'Verified requestable balance: TZS '.number_format($balance['requestable_ticket_balance'], 2).
+                            if ($balance['requestable_ticket_balance'] <= 0) {
+                                return 'Verified requestable balance: TZS 0.00. No verified funds are available for payout. Contact the administrator.';
+                            }
+
+                            $message = 'Verified requestable balance: TZS '.number_format($balance['requestable_ticket_balance'], 2).
                                 '. Pending requests and recorded payouts are already deducted.';
+
+                            $amount = $get('amount');
+                            if (is_numeric($amount) && (float) $amount > $balance['requestable_ticket_balance']) {
+                                return $message.' Your entered amount exceeds this balance.';
+                            }
+
+                            return $message;
                         }),
                     Select::make('destination_type')
                         ->label('Payment destination')
                         ->options(['bank' => 'Bank account', 'mobile_money' => 'Mobile money'])
+                        ->live()
                         ->required(),
                     Textarea::make('destination_details')
                         ->label('Account name, provider and account/phone number')
                         ->rows(3)
                         ->maxLength(500)
+                        ->live(debounce: 500)
                         ->required(),
                 ])
                 ->action(function (array $data): void {
@@ -87,13 +152,20 @@ class ListPayouts extends ListRecords
 
                     $event = Event::query()->findOrFail((int) $data['event_id']);
 
-                    app(EventPayoutService::class)->request(
-                        $event,
-                        $user,
-                        (float) $data['amount'],
-                        $data['destination_type'],
-                        $data['destination_details'],
-                    );
+                    try {
+                        app(EventPayoutService::class)->request(
+                            $event,
+                            $user,
+                            (float) $data['amount'],
+                            $data['destination_type'],
+                            $data['destination_details'],
+                        );
+                    } catch (ValidationException $exception) {
+                        Notification::make()->title('Payout request not submitted')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'Please verify the requested amount and event balance.')
+                            ->danger()->duration(8000)->send();
+                        throw $exception;
+                    }
 
                     Notification::make()->title('Payout request submitted')->body('Your request has been sent for administrator review.')->success()->duration(8000)->send();
                 }),

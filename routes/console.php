@@ -144,3 +144,7 @@ Schedule::command(
     ->withoutOverlapping();
 
 Schedule::command('merchandise:expire-orders')->everyMinute()->withoutOverlapping();
+
+// Daily ticket summaries: opt-in emails for authorized recipients.
+Schedule::command('tickets:email-daily-summary')->dailyAt('00:10')->timezone('Africa/Dar_es_Salaam')->withoutOverlapping();
+Schedule::command('tickets:email-organizer-summaries')->dailyAt('00:20')->timezone('Africa/Dar_es_Salaam')->withoutOverlapping();

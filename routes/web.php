@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\PayoutTransferProofController;
+
 use App\Http\Controllers\BadgePrintController;
 use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\EventCommunicationPreviewController;
@@ -765,3 +767,7 @@ Route::get(
     ->name(
         'badges.print'
     );
+
+Route::get('/admin/payouts/{payout}/transfer-proof', PayoutTransferProofController::class)
+    ->whereNumber('payout')
+    ->name('admin.payouts.transfer-proof');
