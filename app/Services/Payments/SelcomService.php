@@ -50,6 +50,7 @@ class SelcomService implements PaymentGateway
             'payment_methods' => 'ALL',
             'redirect_url' => base64_encode($statusUrl),
             'cancel_url' => base64_encode($statusUrl),
+            'webhook' => base64_encode(route('payments.selcom.webhook')),
             'billing.firstname' => $parts[0] ?? $name,
             'billing.lastname' => implode(' ', array_slice($parts, 1)) ?: $name,
             'billing.address_1' => (string) config('services.selcom.billing_address', 'Tanzania'),
@@ -61,8 +62,6 @@ class SelcomService implements PaymentGateway
             'no_of_items' => '1',
         ];
 
-        // No webhook URL yet: signed callbacks will be added after the
-        // gateway adapter and payment-verification tests are validated.
         $data = $this->request('POST', '/v1/checkout/create-order', $payload);
         $urlValue = data_get($data, 'data.0.payment_gateway_url', '');
         $url = $this->checkoutUrl((string) $urlValue);
