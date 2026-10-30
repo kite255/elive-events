@@ -24,7 +24,7 @@ class StagingPayoutSimulationTest extends TestCase
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
         $this->actingAs($admin);
-        $this->app['env'] = 'staging';
+        $this->app->detectEnvironment(fn (): string => 'staging');
         $this->assertFalse(StagingPayoutSimulation::canAccess());
 
         $organization = Organization::create(['id' => 7, 'name' => 'Test Organization']);
