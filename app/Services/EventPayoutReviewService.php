@@ -103,7 +103,7 @@ class EventPayoutReviewService
             || ! preg_match('/^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$/D', $amount)
             || (float) $amount <= 0
             || ! preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $date)
-            || ! Carbon::createFromFormat('!Y-m-d', $date) || Carbon::parse($date)->isFuture()
+            || ! $this->isValidTransferDate($date)
             || ! str_starts_with($proofPath, 'payout-proofs/')
             || ! Storage::disk('local')->exists($proofPath)) {
             throw ValidationException::withMessages(['transfer' => 'Valid transfer method, date, amount and private receipt are required.']);
@@ -189,6 +189,19 @@ class EventPayoutReviewService
             });
             return $locked;
         });
+    }
+
+    private function isValidTransferDate(string $date): bool
+    {
+        try {
+            $parsed = Carbon::createFromFormat('!Y-m-d', $date);
+
+            return $parsed !== false
+                && $parsed->format('Y-m-d') === $date
+                && ! $parsed->isFuture();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function notifyRequesterAfterCommit(EventPayoutRequest $request): void
