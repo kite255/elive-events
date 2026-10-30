@@ -27,8 +27,8 @@ class StagingPayoutSimulationTest extends TestCase
         $this->app->detectEnvironment(fn (): string => 'staging');
         $this->assertFalse(StagingPayoutSimulation::canAccess());
 
-        $organization = Organization::create(['id' => 7, 'name' => 'Test Organization']);
-        Event::create([
+        $organization = Organization::forceCreate(['id' => 7, 'name' => 'Test Organization']);
+        Event::forceCreate([
             'id' => 10,
             'organization_id' => $organization->id,
             'name' => 'eLive Payout Testing - SIMULATED',
