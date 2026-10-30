@@ -44,7 +44,13 @@ class PayoutTransferProofAccessTest extends TestCase
         Storage::disk('local')->put('payout-proofs/test.pdf', '%PDF-1.4');
         $payout = $this->payoutWithProof();
 
-        $this->get(route('admin.payouts.transfer-proof', $payout))->assertRedirect();
+        $this->get(route('admin.payouts.transfer-proof', $payout))
+            ->assertRedirect(route('filament.admin.auth.login'));
+
+        $this->assertDatabaseMissing('event_payout_audits', [
+            'event_payout_request_id' => $payout->id,
+            'action' => 'proof_viewed',
+        ]);
     }
 
     public function test_organizer_cannot_download_private_payout_proof(): void
