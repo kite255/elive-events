@@ -62,6 +62,21 @@ class PayoutAuditTest extends TestCase
         $this->assertSame(2, DB::table('event_payout_audits')->where('event_payout_request_id', $request->id)->count());
     }
 
+    public function test_transfer_amount_mismatch_cannot_mark_payout_paid(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('payout-proofs/mismatch.pdf', 'test proof');
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $request = $this->requestFor($admin);
+        $request->forceFill(['status' => EventPayoutRequest::APPROVED])->save();
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+            $request, $admin, 'TEST-MISMATCH-42', 'bank', now()->toDateString(),
+            '9.00', 'payout-proofs/mismatch.pdf'
+        );
+    }
+
     private function requestFor(User $admin): EventPayoutRequest
     {
         $organization = Organization::create(['name' => 'Payout Audit Organization']);
