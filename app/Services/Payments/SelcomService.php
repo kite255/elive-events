@@ -5,6 +5,7 @@ namespace App\Services\Payments;
 use App\Contracts\PaymentGateway;
 use App\Models\Payment;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class SelcomService implements PaymentGateway
@@ -178,6 +179,16 @@ class SelcomService implements PaymentGateway
             || ! is_array($data)
             || (string) ($data['resultcode'] ?? '') !== '000'
             || strtoupper((string) ($data['result'] ?? '')) !== 'SUCCESS') {
+            // Only whitelist non-sensitive protocol fields; never log the body,
+            // request payload, customer details, credentials or provider message.
+            $code = data_get($data, 'resultcode');
+            $result = data_get($data, 'result');
+            Log::warning('Selcom API request rejected', [
+                'operation' => $path,
+                'http_status' => $response->status(),
+                'result_code' => is_scalar($code) ? substr((string) $code, 0, 32) : null,
+                'result' => in_array($result, ['SUCCESS', 'FAIL', 'FAILED', 'ERROR'], true) ? $result : 'unknown',
+            ]);
             throw new RuntimeException('Selcom API request failed or returned a non-success response.');
         }
         return $data;

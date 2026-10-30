@@ -9,6 +9,7 @@ use App\Services\Payments\TicketUpgradePaymentService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Throwable;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -24,9 +25,21 @@ class PaymentController extends Controller
             return $this->redirectAfterPayment($payment);
         }
 
-        $checkout = $payment->ticket_upgrade_id
-            ? $this->ticketUpgradePaymentService->start($payment)
-            : $this->paymentService->start($payment);
+        try {
+            $checkout = $payment->ticket_upgrade_id
+                ? $this->ticketUpgradePaymentService->start($payment)
+                : $this->paymentService->start($payment);
+        } catch (Throwable $exception) {
+            // PaymentService records the failed gateway attempt. Do not expose
+            // provider responses to the buyer or change the payment status.
+            Log::warning('Payment checkout initialization failed', [
+                'payment_id' => $payment->getKey(),
+                'exception_class' => get_class($exception),
+            ]);
+
+            return redirect()->route('payments.status', $payment)
+                ->with('error', 'Checkout is temporarily unavailable. Your payment has not been confirmed. Please try again later or contact support.');
+        }
 
         $redirectUrl = data_get($checkout, 'redirect_url');
 
