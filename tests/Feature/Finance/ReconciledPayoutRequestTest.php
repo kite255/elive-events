@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\EventFinanceClearanceService;
 use App\Services\EventPayoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -33,6 +34,16 @@ class ReconciledPayoutRequestTest extends TestCase
         app(EventFinanceClearanceService::class)->record(
             $event, $admin, 'settlement', '80.00', 'TEST-CLEAR-002', 'Independently checked statement'
         );
+        $unverifiedBalance = app(EventPayoutService::class)->ticketBalance($event->id);
+        $this->assertSame(0.0, $unverifiedBalance['requestable_ticket_balance']);
+
+        $verifier = User::factory()->create(['is_super_admin' => true]);
+        $entryId = (int) DB::table('event_finance_clearance_entries')
+            ->where('external_reference', 'TEST-CLEAR-002')->value('id');
+        app(EventFinanceClearanceService::class)->independentlyVerify(
+            $entryId, $verifier, 'Second administrator verified the settlement against provider evidence'
+        );
+
         $first = app(EventPayoutService::class)->request($event, $admin, 60, 'bank', 'Test account');
 
         $this->assertSame('60.00', $first->amount);

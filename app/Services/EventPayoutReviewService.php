@@ -9,6 +9,8 @@ use App\Notifications\EventPayoutStatusNotification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class EventPayoutReviewService
 {
@@ -91,13 +93,23 @@ class EventPayoutReviewService
     /**
      * Records an independently verified transfer; never initiates a transfer.
      */
-    public function recordCompletedTransfer(EventPayoutRequest $request, User $reviewer, string $transferReference): EventPayoutRequest
+    public function recordCompletedTransfer(EventPayoutRequest $request, User $reviewer, string $transferReference, string $method, string $date, string $amount, string $proofPath, ?string $note = null): EventPayoutRequest
     {
         if (! $reviewer->isSuperAdmin() || trim($transferReference) === '') {
             throw ValidationException::withMessages(['transfer' => 'Administrator and transfer reference required.']);
         }
 
-        return DB::transaction(function () use ($request, $reviewer, $transferReference): EventPayoutRequest {
+        if (! in_array($method, ['mpesa', 'airtel', 'mixx', 'bank', 'other'], true)
+            || ! preg_match('/^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$/D', $amount)
+            || (float) $amount <= 0
+            || ! preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $date)
+            || ! $this->isValidTransferDate($date)
+            || ! str_starts_with($proofPath, 'payout-proofs/')
+            || ! Storage::disk('local')->exists($proofPath)) {
+            throw ValidationException::withMessages(['transfer' => 'Valid transfer method, date, amount and private receipt are required.']);
+        }
+
+        return DB::transaction(function () use ($request, $reviewer, $transferReference, $method, $date, $amount, $proofPath, $note): EventPayoutRequest {
             Event::query()->whereKey($request->event_id)->lockForUpdate()->firstOrFail();
             $locked = EventPayoutRequest::query()->whereKey($request->getKey())->lockForUpdate()->firstOrFail();
 
@@ -109,7 +121,15 @@ class EventPayoutReviewService
                 throw ValidationException::withMessages(['transfer' => 'Transfer reference already recorded.']);
             }
 
+            if (bccomp((string) $locked->amount, $amount, 2) !== 0) {
+                throw ValidationException::withMessages(['transfer' => 'Transferred amount must match the approved payout.']);
+            }
             $previousStatus = $locked->status;
+            $locked->transfer_method = $method;
+            $locked->transfer_date = $date;
+            $locked->transferred_amount = $amount;
+            $locked->transfer_proof_path = $proofPath;
+            $locked->transfer_note = $note;
             $locked->status = EventPayoutRequest::PAID;
             $locked->paid_at = now();
             $locked->transfer_reference = trim($transferReference);
@@ -120,7 +140,7 @@ class EventPayoutReviewService
                 'action' => 'paid',
                 'from_status' => $previousStatus,
                 'to_status' => $locked->status,
-                'note' => 'Transfer reference: '.trim($transferReference),
+                'note' => 'Transfer method: '.$method.'; reference: '.trim($transferReference).'; amount: '.$amount.'; date: '.$date,
                 'created_at' => now(),
             ]);
             $this->notifyRequesterAfterCommit($locked);
@@ -169,6 +189,19 @@ class EventPayoutReviewService
             });
             return $locked;
         });
+    }
+
+    private function isValidTransferDate(string $date): bool
+    {
+        try {
+            $parsed = Carbon::createFromFormat('!Y-m-d', $date);
+
+            return $parsed !== false
+                && $parsed->format('Y-m-d') === $date
+                && ! $parsed->isFuture();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function notifyRequesterAfterCommit(EventPayoutRequest $request): void

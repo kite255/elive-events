@@ -17,11 +17,11 @@ class EventPayoutRequest extends Model
         'destination_type', 'destination_details',
     ];
 
-    protected $hidden = ['destination_details'];
+    protected $hidden = ['destination_details', 'transfer_proof_path'];
 
     protected function casts(): array
     {
-        return ['amount' => 'decimal:2', 'destination_details' => 'encrypted', 'reviewed_at' => 'datetime', 'paid_at' => 'datetime', 'received_at' => 'datetime'];
+        return ['amount' => 'decimal:2', 'destination_details' => 'encrypted', 'reviewed_at' => 'datetime', 'paid_at' => 'datetime', 'received_at' => 'datetime', 'transfer_date' => 'date', 'transferred_amount' => 'decimal:2'];
     }
 
     public function event(): BelongsTo

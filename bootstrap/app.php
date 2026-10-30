@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Filament provides the application login; there is no generic 'login' route.
+        $middleware->redirectGuestsTo(fn (Request $request): string =>
+            route('filament.admin.auth.login')
+        );
         $middleware->trustProxies(
             at: '*',
             headers: Request::HEADER_X_FORWARDED_FOR
