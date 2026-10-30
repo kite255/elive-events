@@ -73,12 +73,14 @@ class EmailDailyTicketSummary extends Command
             $this->info('Dry run: no email sent or delivery records changed.');
             return self::SUCCESS;
         }
-        if (! config('daily_ticket_summary.enabled', false)) {
-            $this->warn('Daily summary email is disabled.');
-            return self::FAILURE;
+        $settings = DB::table('daily_ticket_summary_settings')->where('id', 1)->first();
+        if (! $settings || ! $settings->admin_enabled) {
+            $this->warn('Administrator daily summary is disabled in the admin panel.');
+            return self::SUCCESS;
         }
 
-        $recipients = array_unique(config('daily_ticket_summary.recipients', []));
+        $configured = json_decode($settings->admin_recipients ?? '[]', true);
+        $recipients = array_unique(is_array($configured) ? $configured : []);
         if (empty($recipients) || count(array_filter($recipients, fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))) !== count($recipients)) {
             $this->error('Configure valid DAILY_TICKET_SUMMARY_RECIPIENTS first.');
             return self::FAILURE;
