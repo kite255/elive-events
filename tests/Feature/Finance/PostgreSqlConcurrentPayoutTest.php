@@ -38,9 +38,16 @@ class PostgreSqlConcurrentPayoutTest extends TestCase
             'currency' => 'TZS', 'status' => TicketOrder::STATUS_PAID,
             'paid_at' => now(),
         ]);
+        $reference = 'RACE-SETTLEMENT-'.uniqid();
         app(EventFinanceClearanceService::class)->record(
             $event, $admin, 'settlement', '100.00',
-            'RACE-SETTLEMENT-'.uniqid(), 'Independent statement checked'
+            $reference, 'Settlement statement was checked'
+        );
+        $verifier = User::factory()->create(['is_super_admin' => true]);
+        $entryId = (int) DB::table('event_finance_clearance_entries')
+            ->where('external_reference', $reference)->value('id');
+        app(EventFinanceClearanceService::class)->independentlyVerify(
+            $entryId, $verifier, 'Second administrator verified the settlement against evidence'
         );
 
         $script = <<<'PHP'
