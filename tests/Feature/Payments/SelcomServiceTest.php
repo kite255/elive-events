@@ -80,6 +80,23 @@ class SelcomServiceTest extends TestCase
         app(SelcomService::class)->getPaymentStatus('ELV-123');
     }
 
+    public function test_completed_status_without_transaction_id_is_rejected(): void
+    {
+        Http::fake(['gateway.example.test/*' => Http::response([
+            'result' => 'SUCCESS',
+            'resultcode' => '000',
+            'data' => [[
+                'order_id' => 'ELV-123',
+                'amount' => '25000',
+                'payment_status' => 'COMPLETED',
+                'transid' => null,
+            ]],
+        ])]);
+
+        $this->expectException(RuntimeException::class);
+        app(SelcomService::class)->getPaymentStatus('ELV-123');
+    }
+
     public function test_gateway_error_does_not_count_as_payment_success(): void
     {
         Http::fake(['gateway.example.test/*' => Http::response([
