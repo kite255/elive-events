@@ -18,7 +18,8 @@ class PaymentService
 {
     public function __construct(
         protected PaymentReferenceService $referenceService,
-        protected PesapalService $pesapalService
+        protected PesapalService $pesapalService,
+        protected SelcomService $selcomService
     ) {
     }
 
@@ -725,11 +726,16 @@ class PaymentService
                     Payment::STATUS_COMPLETED,
 
                 'FAILED',
-                'INVALID' =>
+                'INVALID',
+                'REJECTED' =>
                     Payment::STATUS_FAILED,
 
                 'REVERSED' =>
                     Payment::STATUS_REFUNDED,
+
+                'CANCELLED',
+                'USERCANCELLED' =>
+                    Payment::STATUS_CANCELLED,
 
                 default =>
                     Payment::STATUS_PROCESSING,
@@ -873,7 +879,7 @@ class PaymentService
                                 $lockedPayment->metadata
                                     ?? [],
                                 [
-                                    'pesapal_status' =>
+                                    'gateway_status' =>
                                         $gatewayStatus,
 
                                     'pesapal_status_code' =>
@@ -1183,6 +1189,9 @@ class PaymentService
         ) {
             'pesapal' =>
                 $this->pesapalService,
+
+            'selcom' =>
+                $this->selcomService,
 
             default =>
                 throw new RuntimeException(

@@ -6,6 +6,7 @@ use App\Http\Controllers\EventCommunicationPreviewController;
 use App\Http\Controllers\Payments\PaymentController;
 use App\Http\Controllers\Payments\PesapalCallbackController;
 use App\Http\Controllers\Payments\PesapalIpnController;
+use App\Http\Controllers\Payments\SelcomWebhookController;
 use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicDonationCampaignController;
 use App\Http\Controllers\PublicDonationController;
@@ -22,6 +23,9 @@ use App\Http\Controllers\TicketScannerController;
 use App\Models\Event;
 use App\Http\Controllers\PublicMerchandiseController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/payments/selcom/webhook', SelcomWebhookController::class)
+    ->name('payments.selcom.webhook');
 
 /*
 |--------------------------------------------------------------------------
