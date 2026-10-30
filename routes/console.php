@@ -144,3 +144,10 @@ Schedule::command(
     ->withoutOverlapping();
 
 Schedule::command('merchandise:expire-orders')->everyMinute()->withoutOverlapping();
+
+// Send the previous completed calendar day's ticket summary at 00:10 EAT.
+// Delivery is opt-in via DAILY_TICKET_SUMMARY_EMAIL_ENABLED and explicit recipients.
+Schedule::command('tickets:email-daily-summary')
+    ->dailyAt('00:10')
+    ->timezone('Africa/Dar_es_Salaam')
+    ->withoutOverlapping();
