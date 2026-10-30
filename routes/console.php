@@ -151,3 +151,9 @@ Schedule::command('tickets:email-daily-summary')
     ->dailyAt('00:10')
     ->timezone('Africa/Dar_es_Salaam')
     ->withoutOverlapping();
+
+// Send each eligible organizer only their own event's previous-day report.
+Schedule::command('tickets:email-organizer-summaries')
+    ->dailyAt('00:20')
+    ->timezone('Africa/Dar_es_Salaam')
+    ->withoutOverlapping();
