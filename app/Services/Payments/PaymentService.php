@@ -11,6 +11,7 @@ use App\Models\PaymentGateway;
 use App\Models\PaymentTransaction;
 use App\Models\TicketOrder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use Throwable;
 
@@ -402,6 +403,17 @@ class PaymentService
     public function start(
         Payment $payment
     ): array {
+        // A distributed lock prevents simultaneous requests for the same
+        // payment from creating multiple orders at the provider.
+        $lock = Cache::lock('payment:checkout:' . $payment->getKey(), 90);
+
+        if (! $lock->get()) {
+            throw new RuntimeException('Checkout is already being initialized.');
+        }
+
+        try {
+            // Refresh after acquiring the lock so replay checks use current state.
+            $payment = Payment::query()->findOrFail($payment->getKey());
         // Never create another provider order for terminal or active payments.
         // Pending retries are handled separately until provider idempotency
         // can be guaranteed, and existing settlements remain untouched.
@@ -665,6 +677,9 @@ class PaymentService
             );
 
             throw $exception;
+        }
+        } finally {
+            $lock->release();
         }
     }
 
