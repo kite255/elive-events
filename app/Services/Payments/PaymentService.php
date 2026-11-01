@@ -428,12 +428,6 @@ class PaymentService
             throw new RuntimeException('This payment cannot start checkout.');
         }
 
-        // A previous provider attempt may have succeeded despite a timeout.
-        // Never automatically submit the same merchant reference twice.
-        if (filled(data_get($payment->metadata, 'checkout_attempted_at'))) {
-            throw new RuntimeException('Checkout attempt requires reconciliation before retry.');
-        }
-
         if ($payment->isProcessing() || filled($payment->provider_tracking_id)) {
             throw new RuntimeException('Checkout has already been initialized.');
         }
@@ -513,27 +507,37 @@ class PaymentService
                 $gatewayModel
             );
 
+        // Selcom order creation uses this payment's merchant reference.
+        // An uncertain previous attempt must be reconciled, not repeated.
+        if ($gatewayModel->code === 'selcom'
+            && filled(data_get($payment->metadata, 'checkout_attempted_at'))) {
+            throw new RuntimeException('Checkout attempt requires reconciliation before retry.');
+        }
+
         try {
-            // Persist intent BEFORE the network request. A timeout or worker
-            // crash must not allow another request to create a second order.
-            // This marker deliberately survives failures until reconciled.
-            DB::transaction(function () use ($payment): void {
-                $locked = Payment::query()
-                    ->lockForUpdate()
-                    ->findOrFail($payment->getKey());
+            if ($gatewayModel->code === 'selcom') {
+                // Persist intent BEFORE the network request. A timeout or worker
+                // crash must not allow another request to create a second order.
+                // This marker deliberately survives failures until reconciled.
+                DB::transaction(function () use ($payment): void {
+                    $locked = Payment::query()
+                        ->lockForUpdate()
+                        ->findOrFail($payment->getKey());
 
-                if ($locked->status !== Payment::STATUS_PENDING
-                    || filled($locked->provider_tracking_id)
-                    || filled(data_get($locked->metadata, 'checkout_attempted_at'))) {
-                    throw new RuntimeException('Checkout already attempted or unavailable.');
-                }
+                    if ($locked->status !== Payment::STATUS_PENDING
+                        || filled($locked->provider_tracking_id)
+                        || filled(data_get($locked->metadata, 'checkout_attempted_at'))) {
+                        throw new RuntimeException('Checkout already attempted or unavailable.');
+                    }
 
-                $locked->update([
-                    'metadata' => array_merge($locked->metadata ?? [], [
-                        'checkout_attempted_at' => now()->toIso8601String(),
-                    ]),
-                ]);
-            });
+                    $locked->update([
+                        'metadata' => array_merge($locked->metadata ?? [], [
+                            'checkout_attempted_at' => now()->toIso8601String(),
+                        ]),
+                    ]);
+                });
+
+            }
 
             $response =
                 $gateway->createPayment(
