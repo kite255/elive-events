@@ -624,6 +624,11 @@ class PaymentService
             return $response;
         } catch (Throwable $exception) {
             try {
+                // A failed checkout attempt is NOT proof that the provider
+                // rejected or reversed the payment. Keep the parent pending
+                // for reconciliation; never mark it paid or failed here.
+                // Do not persist raw gateway exception text, which can
+                // contain upstream response data or other sensitive details.
                 $payment
                     ->transactions()
                     ->create([
@@ -634,7 +639,8 @@ class PaymentService
                             'failed',
 
                         'error_message' =>
-                            $exception->getMessage(),
+                            'Checkout initialization failed (' .
+                            class_basename($exception) . ').',
                     ]);
             } catch (Throwable $loggingException) {
                 report(

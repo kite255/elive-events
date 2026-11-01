@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Payments\PaymentService;
 use App\Services\Payments\TicketUpgradePaymentService;
-use Illuminate\Contracts\View\View;
+use Illuminate\Http\Response;
 use Illuminate\Http\RedirectResponse;
 use Throwable;
 use Illuminate\Support\Facades\Log;
@@ -52,7 +52,7 @@ class PaymentController extends Controller
         return redirect()->away($redirectUrl);
     }
 
-    public function status(Payment $payment): View|RedirectResponse
+    public function status(Payment $payment): Response|RedirectResponse
     {
         $payment->loadMissing([
             'event',
@@ -102,7 +102,9 @@ class PaymentController extends Controller
             );
         }
 
-        return view('public.payments.status', ['payment' => $payment]);
+        return response()->view('public.payments.status', ['payment' => $payment])
+            ->header('Cache-Control', 'private, no-store')
+            ->header('Referrer-Policy', 'no-referrer');
     }
 
     private function redirectAfterPayment(Payment $payment): RedirectResponse
