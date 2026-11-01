@@ -635,7 +635,7 @@ Route::post(
 );
 
 Route::get(
-    '/register/{event:slug}/success/{attendee}',
+    '/register/{event:slug}/success/{attendee:public_token}',
     [
         PublicRegistrationController::class,
         'success',
@@ -703,7 +703,7 @@ Route::post(
 );
 
 Route::get(
-    '/events/{event:slug}/register/success/{attendee}',
+    '/events/{event:slug}/register/success/{attendee:public_token}',
     [
         PublicRegistrationController::class,
         'success',
@@ -752,7 +752,7 @@ Route::get(
         CheckInController::class,
         'show',
     ]
-)->name(
+)->middleware(['auth', 'throttle:30,1'])->name(
     'qr.check-in'
 );
 
