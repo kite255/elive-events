@@ -10,6 +10,8 @@ use App\Models\TicketOrder;
 use App\Services\Payments\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use RuntimeException;
 use Tests\TestCase;
 
 class SelcomCheckoutFlowTest extends TestCase
@@ -116,4 +118,100 @@ class SelcomCheckoutFlowTest extends TestCase
             'amount' => 1000,
         ]));
     }
+    /**
+     * These tests must run against the test cache, never the live gateway.
+     */
+    private function pendingCheckoutPayment(): Payment
+    {
+        $organization = Organization::query()->create([
+            'name' => 'Payment Replay Test',
+            'slug' => 'payment-replay-' . uniqid(),
+        ]);
+        $event = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Replay Test Event',
+            'slug' => 'replay-event-' . uniqid(),
+            'status' => Event::STATUS_ACTIVE,
+        ]);
+        PaymentGateway::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'environment' => 'sandbox',
+            'is_default' => true,
+            'is_enabled' => true,
+        ]);
+        $order = TicketOrder::query()->create([
+            'event_id' => $event->id,
+            'order_number' => 'REPLAY-' . uniqid(),
+            'buyer_name' => 'Jane Mushi',
+            'buyer_email' => 'jane@example.com',
+            'buyer_phone' => '0712345678',
+            'quantity' => 1,
+            'subtotal' => 25000,
+            'discount_amount' => 0,
+            'total' => 25000,
+            'currency' => 'TZS',
+            'status' => TicketOrder::STATUS_PENDING,
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
+        return app(PaymentService::class)->createForTicketOrder($order);
+    }
+
+    public function test_terminal_and_active_payments_never_initialize_gateway_checkout(): void
+    {
+        config()->set('cache.default', 'array');
+        Http::preventStrayRequests();
+        Http::fake();
+
+        foreach ([
+            Payment::STATUS_COMPLETED,
+            Payment::STATUS_FAILED,
+            Payment::STATUS_CANCELLED,
+            Payment::STATUS_EXPIRED,
+            Payment::STATUS_REFUNDED,
+            Payment::STATUS_PARTIALLY_REFUNDED,
+            Payment::STATUS_PROCESSING,
+        ] as $status) {
+            $payment = $this->pendingCheckoutPayment();
+            $payment->update(['status' => $status]);
+
+            try {
+                app(PaymentService::class)->start($payment);
+                $this->fail('Checkout unexpectedly accepted status: ' . $status);
+            } catch (RuntimeException $exception) {
+                $this->assertNotSame('', $exception->getMessage());
+            }
+        }
+
+        $tracked = $this->pendingCheckoutPayment();
+        $tracked->update(['provider_tracking_id' => 'TRACKED-123']);
+        $this->expectException(RuntimeException::class);
+        try {
+            app(PaymentService::class)->start($tracked);
+        } finally {
+            Http::assertNothingSent();
+        }
+    }
+
+    public function test_held_atomic_checkout_lock_rejects_second_attempt_without_gateway_call(): void
+    {
+        config()->set('cache.default', 'array');
+        Http::preventStrayRequests();
+        Http::fake();
+        $payment = $this->pendingCheckoutPayment();
+        $lock = Cache::lock('payment:checkout:' . $payment->getKey(), 30);
+        $this->assertTrue($lock->get());
+
+        try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('already being initialized');
+            app(PaymentService::class)->start($payment);
+        } finally {
+            $lock->release();
+            Http::assertNothingSent();
+        }
+    }
+
 }
