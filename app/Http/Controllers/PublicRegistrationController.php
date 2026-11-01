@@ -339,7 +339,7 @@ class PublicRegistrationController extends Controller
                     'public.registration.success',
                     [
                         'event' => $event,
-                        'attendee' => $attendee,
+                        'attendee' => $attendee->public_token,
                     ]
                 )->with(
                     'error',
@@ -380,7 +380,7 @@ class PublicRegistrationController extends Controller
             'public.registration.success',
             [
                 'event' => $event,
-                'attendee' => $attendee,
+                'attendee' => $attendee->public_token,
             ]
         );
     }
