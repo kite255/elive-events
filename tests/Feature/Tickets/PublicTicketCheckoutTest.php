@@ -231,7 +231,7 @@ class PublicTicketCheckoutTest extends TestCase
             ->firstOrFail();
 
         $response->assertRedirect();
-        $this->assertSame('0712345678', $order->buyer_phone);
+        $this->assertSame('255712345678', $order->buyer_phone);
         $this->assertNull($order->buyer_email);
     }
 
