@@ -214,4 +214,36 @@ class SelcomCheckoutFlowTest extends TestCase
         }
     }
 
+    public function test_failed_gateway_response_cannot_trigger_second_checkout_order(): void
+    {
+        config()->set('cache.default', 'array');
+        $payment = $this->pendingCheckoutPayment();
+
+        Http::preventStrayRequests();
+        Http::fake(['gateway.example.test/*' => Http::response([
+            'result' => 'FAIL',
+            'resultcode' => '500',
+        ], 500)]);
+
+        try {
+            app(PaymentService::class)->start($payment);
+            $this->fail('First checkout should fail.');
+        } catch (RuntimeException $exception) {
+            $this->assertNotSame('', $exception->getMessage());
+        }
+
+        $this->assertNotNull(data_get($payment->fresh()->metadata, 'checkout_attempted_at'));
+        Http::assertSentCount(1);
+
+        try {
+            app(PaymentService::class)->start($payment);
+            $this->fail('Second checkout must be blocked pending reconciliation.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('reconciliation', $exception->getMessage());
+        }
+
+        Http::assertSentCount(1);
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+    }
+
 }
