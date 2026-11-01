@@ -711,6 +711,31 @@ class PaymentService
     }
 
     /**
+     * Read-only provider reconciliation for a Selcom checkout whose create
+     * response was lost. Never retries create-order or clears the attempt flag.
+     * Invoke only from a controlled recovery workflow.
+     */
+    public function reconcileUncertainSelcomCheckout(Payment $payment): Payment
+    {
+        $payment = Payment::query()->with('gateway')
+            ->findOrFail($payment->getKey());
+
+        if ($payment->gateway?->code !== 'selcom'
+            || ! filled(data_get($payment->metadata, 'checkout_attempted_at'))) {
+            throw new RuntimeException('Payment is not an uncertain Selcom checkout.');
+        }
+
+        if ($payment->isCompleted() || $payment->isFulfilled()) {
+            return $payment;
+        }
+
+        // Selcom checkout order_id is the local merchant reference. The
+        // authenticated status response is checked for reference and amount
+        // by syncFromGateway before a completed payment can be fulfilled.
+        return $this->syncFromGateway($payment, $payment->reference);
+    }
+
+    /**
      * Verify a payment directly with its gateway
      * and synchronize eLive.
      */
