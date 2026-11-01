@@ -33,8 +33,8 @@ class EmailOrganizerTicketSummaries extends Command
         }
 
         if (! $this->option('dry-run') && ! config('daily_ticket_summary.organizer_enabled', false)) {
-            $this->warn('Organizer summary emails are disabled.');
-            return self::FAILURE;
+            $this->info('Organizer summary emails are disabled; skipping.');
+            return self::SUCCESS;
         }
 
         $orders = TicketOrder::query()
