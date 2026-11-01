@@ -246,4 +246,61 @@ class SelcomCheckoutFlowTest extends TestCase
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
     }
 
+    public function test_uncertain_selcom_checkout_can_query_status_without_creating_another_order(): void
+    {
+        config()->set('cache.default', 'array');
+        $payment = $this->pendingCheckoutPayment();
+        $payment->update(['metadata' => [
+            'checkout_attempted_at' => now()->toIso8601String(),
+        ]]);
+
+        Http::preventStrayRequests();
+        Http::fake(['gateway.example.test/*' => Http::response([
+            'result' => 'SUCCESS',
+            'resultcode' => '000',
+            'data' => [[
+                'order_id' => $payment->reference,
+                'amount' => '25000.00',
+                'payment_status' => 'PENDING',
+            ]],
+        ])]);
+
+        $updated = app(PaymentService::class)->reconcileUncertainSelcomCheckout($payment);
+
+        $this->assertSame(Payment::STATUS_PROCESSING, $updated->status);
+        $this->assertSame($payment->reference, $updated->provider_tracking_id);
+        $this->assertNotNull(data_get($updated->metadata, 'checkout_attempted_at'));
+        $this->assertNull($updated->paid_at);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request->method() === 'GET'
+            && str_contains($request->url(), '/v1/checkout/order-status'));
+    }
+
+    public function test_uncertain_selcom_status_failure_keeps_payment_unconfirmed(): void
+    {
+        config()->set('cache.default', 'array');
+        $payment = $this->pendingCheckoutPayment();
+        $payment->update(['metadata' => [
+            'checkout_attempted_at' => now()->toIso8601String(),
+        ]]);
+
+        Http::preventStrayRequests();
+        Http::fake(['gateway.example.test/*' => Http::response([
+            'result' => 'FAIL',
+            'resultcode' => '404',
+        ], 404)]);
+
+        try {
+            app(PaymentService::class)->reconcileUncertainSelcomCheckout($payment);
+            $this->fail('Failed status lookup must not confirm payment.');
+        } catch (RuntimeException $exception) {
+            $this->assertNotSame('', $exception->getMessage());
+        }
+
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertNotNull(data_get($payment->fresh()->metadata, 'checkout_attempted_at'));
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request->method() === 'GET');
+    }
+
 }
