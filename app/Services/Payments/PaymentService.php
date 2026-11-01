@@ -402,10 +402,22 @@ class PaymentService
     public function start(
         Payment $payment
     ): array {
-        if ($payment->isCompleted()) {
-            throw new RuntimeException(
-                'This payment is already completed.'
-            );
+        // Never create another provider order for terminal or active payments.
+        // Pending retries are handled separately until provider idempotency
+        // can be guaranteed, and existing settlements remain untouched.
+        if (in_array($payment->status, [
+            Payment::STATUS_COMPLETED,
+            Payment::STATUS_FAILED,
+            Payment::STATUS_CANCELLED,
+            Payment::STATUS_EXPIRED,
+            Payment::STATUS_REFUNDED,
+            Payment::STATUS_PARTIALLY_REFUNDED,
+        ], true)) {
+            throw new RuntimeException('This payment cannot start checkout.');
+        }
+
+        if ($payment->isProcessing() || filled($payment->provider_tracking_id)) {
+            throw new RuntimeException('Checkout has already been initialized.');
         }
 
         if ($payment->merchandise_order_id) {
