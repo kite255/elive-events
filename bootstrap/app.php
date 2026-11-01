@@ -17,8 +17,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn (Request $request): string =>
             route('filament.admin.auth.login')
         );
+        // Trust forwarded headers only from explicitly configured reverse proxies.
+        // Configure TRUSTED_PROXIES with the actual proxy source address(es)
+        // in Coolify before deploying; never trust all clients with '*'.
+        $trustedProxies = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1'))
+        )));
         $middleware->trustProxies(
-            at: '*',
+            at: $trustedProxies,
             headers: Request::HEADER_X_FORWARDED_FOR
                 | Request::HEADER_X_FORWARDED_HOST
                 | Request::HEADER_X_FORWARDED_PORT
