@@ -64,7 +64,7 @@ class ListPayouts extends ListRecords
                                     ->warning()->duration(8000)->send();
                             } else {
                                 Notification::make()->title('Payout request balance available')
-                                    ->body('You may request up to TZS '.number_format($balance['requestable_ticket_balance'], 2).'.')
+                                    ->body('You may request up to TZS '.number_format($balance['requestable_pending_verification_balance'], 2).'.')
                                     ->success()->duration(5000)->send();
                             }
                         })
