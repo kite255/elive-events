@@ -96,7 +96,7 @@ class ListPayouts extends ListRecords
                                     return;
                                 }
 
-                                $available = (float) $balance['requestable_ticket_balance'];
+                                $available = (float) $balance['requestable_pending_verification_balance'];
                                 if ($available <= 0) {
                                     $fail('No unpaid ticket earnings are available for a new request.');
                                 } elseif (is_numeric($value) && (float) $value > $available) {
@@ -117,15 +117,15 @@ class ListPayouts extends ListRecords
                                 return 'Refund exceptions require reconciliation before requesting funds.';
                             }
 
-                            if ($balance['requestable_ticket_balance'] <= 0) {
+                            if ($balance['requestable_pending_verification_balance'] <= 0) {
                                 return 'Unpaid ticket earnings available for new requests: TZS 0.00.';
                             }
 
-                            $message = 'Unpaid ticket earnings available for requests: TZS '.number_format($balance['requestable_ticket_balance'], 2).
+                            $message = 'Unpaid ticket earnings available for requests: TZS '.number_format($balance['requestable_pending_verification_balance'], 2).
                                 '. Existing requests and completed payouts are already deducted. Approval requires separately verified settlement.';
 
                             $amount = $get('amount');
-                            if (is_numeric($amount) && (float) $amount > $balance['requestable_ticket_balance']) {
+                            if (is_numeric($amount) && (float) $amount > $balance['requestable_pending_verification_balance']) {
                                 return $message.' Your entered amount exceeds this balance.';
                             }
 
