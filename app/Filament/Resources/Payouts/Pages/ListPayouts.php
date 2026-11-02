@@ -187,6 +187,10 @@ class ListPayouts extends ListRecords
 
         return Event::query()
             ->when(! $user->isSuperAdmin(), function (Builder $query) use ($user): void {
+                if ($user->isTicketOrganizer()) {
+                    $query->whereIn('events.id', $user->assignedTicketingEvents()->select('events.id'));
+                    return;
+                }
                 $query->where(function (Builder $scope) use ($user): void {
                     $scope->whereIn('organization_id', $user->managedOrganizations()->select('organizations.id'))
                         ->orWhereIn('events.id', $user->assignedTicketingEvents()->select('events.id'));
