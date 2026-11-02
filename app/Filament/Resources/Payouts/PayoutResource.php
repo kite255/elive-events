@@ -70,6 +70,10 @@ class PayoutResource extends Resource
             return $query;
         }
 
+        if ($user->isTicketOrganizer()) {
+            return $query->whereIn('event_id', $user->assignedTicketingEvents()->select('events.id'));
+        }
+
         return $query->whereHas('event', function (Builder $events) use ($user): void {
             $events->where(function (Builder $scope) use ($user): void {
                 $scope->whereIn('organization_id', $user->managedOrganizations()->select('organizations.id'))
