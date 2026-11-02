@@ -108,6 +108,7 @@ class EventPayoutService
             $request = EventPayoutRequest::query()->create([
                 'event_id' => $event->getKey(),
                 'requested_by' => $user->getKey(),
+                'status' => EventPayoutRequest::REQUESTED,
                 'reference' => 'ELV-PO-'.strtoupper(Str::random(16)),
                 'amount' => $amount,
                 'currency' => 'TZS',
