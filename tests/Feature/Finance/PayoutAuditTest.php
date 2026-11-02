@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\EventPayoutReviewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PayoutAuditTest extends TestCase
@@ -45,13 +46,102 @@ class PayoutAuditTest extends TestCase
         $request = $this->requestFor($admin);
         $reviewer = User::factory()->create(['is_super_admin' => true]);
         app(EventPayoutReviewService::class)->review($request, $reviewer, true);
-        app(EventPayoutReviewService::class)->recordCompletedTransfer($request, $reviewer, 'TEST-TRANSFER-42');
+        Storage::fake('local');
+        Storage::disk('local')->put('payout-proofs/receipt.pdf', 'test transfer receipt');
+        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+            $request, $reviewer, 'TEST-TRANSFER-42', 'bank', now()->toDateString(),
+            '10.00', 'payout-proofs/receipt.pdf'
+        );
+        $this->assertSame('bank', $request->fresh()->transfer_method);
+        $this->assertSame('10.00', $request->fresh()->transferred_amount);
 
         $this->assertDatabaseHas('event_payout_audits', [
             'event_payout_request_id' => $request->id, 'actor_id' => $reviewer->id,
             'action' => 'paid', 'to_status' => EventPayoutRequest::PAID,
         ]);
         $this->assertSame(2, DB::table('event_payout_audits')->where('event_payout_request_id', $request->id)->count());
+    }
+
+    public function test_transfer_amount_mismatch_cannot_mark_payout_paid(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('payout-proofs/mismatch.pdf', 'test proof');
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $request = $this->requestFor($admin);
+        $request->forceFill(['status' => EventPayoutRequest::APPROVED])->save();
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+            $request, $admin, 'TEST-MISMATCH-42', 'bank', now()->toDateString(),
+            '9.00', 'payout-proofs/mismatch.pdf'
+        );
+    }
+
+    public function test_rejection_requires_meaningful_reason_and_preserves_pending_request(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $request = $this->requestFor($admin);
+        $reviewer = User::factory()->create(['is_super_admin' => true]);
+
+        try {
+            app(EventPayoutReviewService::class)->review($request, $reviewer, false, 'no');
+            $this->fail('A short reason should be rejected.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('reason', $exception->errors());
+        }
+
+        $this->assertSame(EventPayoutRequest::REQUESTED, $request->fresh()->status);
+        $this->assertSame(0, DB::table('event_payout_audits')->where('event_payout_request_id', $request->id)->count());
+
+        app(EventPayoutReviewService::class)->review(
+            $request, $reviewer, false, 'Settlement evidence is still pending.'
+        );
+
+        $this->assertSame(EventPayoutRequest::REJECTED, $request->fresh()->status);
+        $this->assertSame('Settlement evidence is still pending.', $request->fresh()->review_note);
+    }
+
+    public function test_approved_payout_transfer_receipt_and_duplicate_protection(): void
+    {
+        config(['finance.payout_requests_enabled' => true]);
+        $requester = User::factory()->create(['is_super_admin' => true]);
+        $request = $this->requestFor($requester);
+        $reviewer = User::factory()->create(['is_super_admin' => true]);
+
+        app(EventPayoutReviewService::class)->review($request, $reviewer, true);
+        $this->assertSame(EventPayoutRequest::APPROVED, $request->fresh()->status);
+        $this->assertNull($request->fresh()->paid_at);
+
+        Storage::fake('local');
+        Storage::disk('local')->put('payout-proofs/lifecycle.pdf', 'isolated test receipt');
+
+        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+            $request, $reviewer, 'TEST-LIFECYCLE-TRANSFER', 'bank',
+            now()->toDateString(), '10.00', 'payout-proofs/lifecycle.pdf'
+        );
+
+        $this->assertSame(EventPayoutRequest::PAID, $request->fresh()->status);
+        $this->assertNotNull($request->fresh()->paid_at);
+
+        try {
+            app(EventPayoutReviewService::class)->recordCompletedTransfer(
+                $request, $reviewer, 'TEST-LIFECYCLE-TRANSFER', 'bank',
+                now()->toDateString(), '10.00', 'payout-proofs/lifecycle.pdf'
+            );
+            $this->fail('Duplicate transfer recording must fail.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('transfer', $exception->errors());
+        }
+
+        $this->assertSame(1, DB::table('event_payout_audits')
+            ->where('event_payout_request_id', $request->id)
+            ->where('action', 'paid')->count());
+
+        app(EventPayoutReviewService::class)->confirmReceipt($request, $requester);
+        $this->assertNotNull($request->fresh()->received_at);
+        $this->assertSame(1, DB::table('event_payout_audits')
+            ->where('event_payout_request_id', $request->id)
+            ->where('action', 'receipt_confirmed')->count());
     }
 
     private function requestFor(User $admin): EventPayoutRequest
