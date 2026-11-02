@@ -45,7 +45,7 @@ class PayoutTransferProofAccessTest extends TestCase
         $payout = $this->payoutWithProof();
 
         $this->get(route('admin.payouts.transfer-proof', $payout))
-            ->assertRedirect(route('filament.admin.auth.login'));
+            ->assertForbidden();
 
         $this->assertDatabaseMissing('event_payout_audits', [
             'event_payout_request_id' => $payout->id,
