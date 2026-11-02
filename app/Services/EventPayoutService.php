@@ -64,6 +64,7 @@ class EventPayoutService
             'paid_out' => round($paid, 2),
             'reserved_requests' => round($reserved, 2),
             'requestable_ticket_balance' => round($available, 2),
+            'requestable_pending_verification_balance' => round(max(0, $earned - $paid - $reserved), 2),
         ];
     }
 
@@ -100,8 +101,8 @@ class EventPayoutService
                 throw ValidationException::withMessages(['amount' => 'Refund exceptions must be reconciled before payouts.']);
             }
 
-            if ($amount > $balance['requestable_ticket_balance']) {
-                throw ValidationException::withMessages(['amount' => 'Amount exceeds reconciled available balance.']);
+            if ($amount > $balance['requestable_pending_verification_balance']) {
+                throw ValidationException::withMessages(['amount' => 'Amount exceeds unpaid ticket earnings after existing requests and payouts.']);
             }
 
             $request = EventPayoutRequest::query()->create([
