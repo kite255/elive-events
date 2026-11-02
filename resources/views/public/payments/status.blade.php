@@ -439,6 +439,19 @@
 
             @endif
 
+        @elseif ($checkoutUnavailable)
+
+            <div class="status-icon failed">!</div>
+
+            <h1>Checkout Unavailable</h1>
+
+            <p class="status-message">
+                We could not start checkout with the payment provider.
+                Your payment has not been confirmed. Please contact support
+                or return to the event. Do not retry this payment reference
+                until its status has been checked.
+            </p>
+
         @elseif (
             $payment->isPending()
             || $payment->isProcessing()
@@ -636,22 +649,15 @@
                 <div class="detail-value">
 
                     @php
-                        $statusClass =
-                            $payment->isCompleted()
-                                ? 'success'
-                                : (
-                                    $payment->isPending()
-                                    || $payment->isProcessing()
-                                        ? 'processing'
-                                        : (
-                                            $payment->isFailed()
-                                            || $payment->status
-                                                === \App\Models\Payment::STATUS_CANCELLED
-                                                ? 'failed'
-                                                : 'neutral'
-                                        )
-                                );
-                    @endphp
+                        $statusClass = $payment->isCompleted()
+                            ? 'success'
+                            : ($checkoutUnavailable || $payment->isFailed()
+                                || $payment->status === \App\Models\Payment::STATUS_CANCELLED
+                                ? 'failed'
+                                : ($payment->isPending() || $payment->isProcessing()
+                                    ? 'processing'
+                                    : 'neutral'));
+                                        @endphp
 
                     <span class="payment-status {{ $statusClass }}">
                         {{
@@ -712,8 +718,8 @@
         <div class="actions">
 
             @if (
-                $payment->isPending()
-                || $payment->isProcessing()
+                ! $checkoutUnavailable
+                && ($payment->isPending() || $payment->isProcessing())
             )
 
                 <a
@@ -825,7 +831,15 @@
         </div>
 
 
-        @if (
+        @if ($checkoutUnavailable)
+
+            <div class="notice">
+                Checkout was not initialized. This payment remains
+                unconfirmed. Contact support with your reference
+                before making another payment attempt.
+            </div>
+
+        @elseif (
             $payment->isPending()
             || $payment->isProcessing()
         )
