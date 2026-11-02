@@ -24,7 +24,7 @@ class ListPayouts extends ListRecords
 
     protected function getHeaderWidgets(): array
     {
-        return [\\App\\Filament\\Widgets\\PayoutBalanceOverview::class];
+        return [\App\Filament\Widgets\PayoutBalanceOverview::class];
     }
 
     public function getSubheading(): ?string
