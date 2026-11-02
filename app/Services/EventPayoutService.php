@@ -64,6 +64,7 @@ class EventPayoutService
             'paid_out' => round($paid, 2),
             'reserved_requests' => round($reserved, 2),
             'requestable_ticket_balance' => round($available, 2),
+            'requestable_pending_verification_balance' => round(max(0, $earned - $reversals - $paid - $reserved), 2),
         ];
     }
 
@@ -74,6 +75,10 @@ class EventPayoutService
         string $destinationType,
         string $destinationDetails
     ): EventPayoutRequest {
+        if ($user->isTicketOrganizer() && ! $user->assignedTicketingEvents()->where('events.id', $event->getKey())->exists()) {
+            throw ValidationException::withMessages(['event' => 'This event is not assigned to your organizer account.']);
+        }
+
         if (! $user->isSuperAdmin() && ! ($user->canManageOrganization((int) $event->organization_id) || $user->assignedTicketingEvents()->where('events.id', $event->getKey())->exists())) {
             throw ValidationException::withMessages(['event' => 'You cannot access this event.']);
         }
@@ -82,8 +87,8 @@ class EventPayoutService
             throw ValidationException::withMessages(['amount' => 'Enter a valid positive amount with at most two decimal places.']);
         }
 
-        if (! in_array($destinationType, ['bank', 'mobile_money'], true) || trim($destinationDetails) === '') {
-            throw ValidationException::withMessages(['destination' => 'A valid destination is required.']);
+        if (! in_array($destinationType, ['bank', 'mobile_money'], true) || trim($destinationDetails) === '' || mb_strlen(trim($destinationDetails)) > 500) {
+            throw ValidationException::withMessages(['destination' => 'A valid payment destination of at most 500 characters is required.']);
         }
 
         if (! config('finance.payout_requests_enabled', false)) {
@@ -100,13 +105,14 @@ class EventPayoutService
                 throw ValidationException::withMessages(['amount' => 'Refund exceptions must be reconciled before payouts.']);
             }
 
-            if ($amount > $balance['requestable_ticket_balance']) {
-                throw ValidationException::withMessages(['amount' => 'Amount exceeds reconciled available balance.']);
+            if ($amount > $balance['requestable_pending_verification_balance']) {
+                throw ValidationException::withMessages(['amount' => 'Amount exceeds unpaid ticket earnings after existing requests and payouts.']);
             }
 
             $request = EventPayoutRequest::query()->create([
                 'event_id' => $event->getKey(),
                 'requested_by' => $user->getKey(),
+                'status' => EventPayoutRequest::REQUESTED,
                 'reference' => 'ELV-PO-'.strtoupper(Str::random(16)),
                 'amount' => $amount,
                 'currency' => 'TZS',
@@ -134,6 +140,7 @@ class EventPayoutService
                         'error' => $exception->getMessage(),
                     ]);
                 }
+
             });
 
             return $request;
