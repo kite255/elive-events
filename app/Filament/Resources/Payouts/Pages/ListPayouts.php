@@ -22,6 +22,11 @@ class ListPayouts extends ListRecords
 {
     protected static string $resource = PayoutResource::class;
 
+    protected function getHeaderWidgets(): array
+    {
+        return [\App\Filament\Widgets\PayoutBalanceOverview::class];
+    }
+
     public function getSubheading(): ?string
     {
         return 'Request against unpaid ticket earnings. Approval requires independently verified settlement; transfers remain manual.';
