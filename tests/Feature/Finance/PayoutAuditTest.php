@@ -101,6 +101,49 @@ class PayoutAuditTest extends TestCase
         $this->assertSame('Settlement evidence is still pending.', $request->fresh()->review_note);
     }
 
+    public function test_approved_payout_transfer_receipt_and_duplicate_protection(): void
+    {
+        config(['finance.payout_requests_enabled' => true]);
+        $requester = User::factory()->create(['is_super_admin' => true]);
+        $request = $this->requestFor($requester);
+        $reviewer = User::factory()->create(['is_super_admin' => true]);
+
+        app(EventPayoutReviewService::class)->review($request, $reviewer, true);
+        $this->assertSame(EventPayoutRequest::APPROVED, $request->fresh()->status);
+        $this->assertNull($request->fresh()->paid_at);
+
+        Storage::fake('local');
+        Storage::disk('local')->put('payout-proofs/lifecycle.pdf', 'isolated test receipt');
+
+        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+            $request, $reviewer, 'TEST-LIFECYCLE-TRANSFER', 'bank',
+            now()->toDateString(), '10.00', 'payout-proofs/lifecycle.pdf'
+        );
+
+        $this->assertSame(EventPayoutRequest::PAID, $request->fresh()->status);
+        $this->assertNotNull($request->fresh()->paid_at);
+
+        try {
+            app(EventPayoutReviewService::class)->recordCompletedTransfer(
+                $request, $reviewer, 'TEST-LIFECYCLE-TRANSFER', 'bank',
+                now()->toDateString(), '10.00', 'payout-proofs/lifecycle.pdf'
+            );
+            $this->fail('Duplicate transfer recording must fail.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('transfer', $exception->errors());
+        }
+
+        $this->assertSame(1, DB::table('event_payout_audits')
+            ->where('event_payout_request_id', $request->id)
+            ->where('action', 'paid')->count());
+
+        app(EventPayoutReviewService::class)->confirmReceipt($request, $requester);
+        $this->assertNotNull($request->fresh()->received_at);
+        $this->assertSame(1, DB::table('event_payout_audits')
+            ->where('event_payout_request_id', $request->id)
+            ->where('action', 'receipt_confirmed')->count());
+    }
+
     private function requestFor(User $admin): EventPayoutRequest
     {
         $organization = Organization::create(['name' => 'Payout Audit Organization']);
