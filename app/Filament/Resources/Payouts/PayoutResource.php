@@ -36,6 +36,16 @@ class PayoutResource extends Resource
     protected static ?string $navigationLabel = 'Payout Requests';
     protected static ?int $navigationSort = 3;
 
+    public static function getModelLabel(): string
+    {
+        return 'Payout Request';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return auth()->user()?->isSuperAdmin() ? 'All Payout Requests' : 'My Payout Requests';
+    }
+
     public static function canViewAny(): bool
     {
         $user = auth()->user();
@@ -60,6 +70,10 @@ class PayoutResource extends Resource
             return $query;
         }
 
+        if ($user->isTicketOrganizer()) {
+            return $query->whereIn('event_id', $user->assignedTicketingEvents()->select('events.id'));
+        }
+
         return $query->whereHas('event', function (Builder $events) use ($user): void {
             $events->where(function (Builder $scope) use ($user): void {
                 $scope->whereIn('organization_id', $user->managedOrganizations()->select('organizations.id'))
@@ -82,9 +96,9 @@ class PayoutResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->defaultSort('id', 'desc')->columns([
-            TextColumn::make('reference')->searchable()->copyable(),
+            TextColumn::make('reference')->searchable()->copyable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('event.name')->label('Event')->searchable(),
-            TextColumn::make('requester.name')->label('Requested By'),
+            TextColumn::make('requester.name')->label('Requested By')->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true),
             TextColumn::make('amount')->formatStateUsing(
                 fn ($state, EventPayoutRequest $record): string =>
                     $record->currency.' '.number_format((float) $state, 2)
@@ -96,11 +110,20 @@ class PayoutResource extends Resource
                 default => 'warning',
             }),
             TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
-            TextColumn::make('transfer_method')->label('Method')->placeholder('—'),
-            TextColumn::make('transfer_date')->label('Transfer Date')->date()->placeholder('—'),
-            TextColumn::make('paid_at')->label('Transferred At')->dateTime('d M Y H:i')->placeholder('Not transferred'),
-            TextColumn::make('received_at')->label('Received At')->dateTime('d M Y H:i')->placeholder('Awaiting confirmation'),
+            TextColumn::make('transfer_method')->label('Method')->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('transfer_date')->label('Transfer Date')->date()->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('paid_at')->label('Transferred At')->dateTime('d M Y H:i')->placeholder('Not transferred')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('received_at')->label('Received At')->dateTime('d M Y H:i')
+                ->placeholder(fn (EventPayoutRequest $record): string => $record->status === EventPayoutRequest::PAID ? 'Awaiting confirmation' : 'Not applicable')
+                ->toggleable(isToggledHiddenByDefault: true),
         ])->recordActions([
+            Action::make('details')
+                ->label('Details')->icon('heroicon-o-eye')
+                ->modalHeading(fn (EventPayoutRequest $record): string => 'Payout '.$record->reference)
+                ->modalSubmitAction(false)->modalCancelActionLabel('Close')
+                ->modalContent(fn (EventPayoutRequest $record) => view('filament.payouts.request-details', [
+                    'payout' => $record,
+                ])),
             Action::make('viewProof')->label('Download Proof')->icon('heroicon-o-document-arrow-down')
                 ->visible(fn (EventPayoutRequest $record): bool =>
                     auth()->user()?->isSuperAdmin()
@@ -128,12 +151,20 @@ class PayoutResource extends Resource
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
                 ->requiresConfirmation()
                 ->action(function (EventPayoutRequest $record): void {
-                    app(EventPayoutReviewService::class)->review($record, auth()->user(), true);
+                    try {
+                        app(EventPayoutReviewService::class)->review($record, auth()->user(), true);
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Payout approval blocked')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'The payout cannot be approved yet.')
+                            ->danger()->duration(10000)->send();
+                        return;
+                    }
                     Notification::make()->title('Payout request approved')->body('The organizer has been notified of the approval.')->success()->duration(8000)->send();
                 }),
             Action::make('reject')->label('Reject')->color('danger')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
-                ->schema([Textarea::make('reason')->label('Reason')->required()->maxLength(500)])
+                ->schema([Textarea::make('reason')->label('Reason for rejection')->required()->minLength(10)->maxLength(500)])
                 ->action(function (EventPayoutRequest $record, array $data): void {
                     app(EventPayoutReviewService::class)->review($record, auth()->user(), false, $data['reason']);
                     Notification::make()->title('Payout request rejected')->body('The organizer has been notified of the rejection.')->warning()->duration(8000)->send();
