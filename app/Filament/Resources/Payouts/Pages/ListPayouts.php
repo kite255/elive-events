@@ -24,7 +24,7 @@ class ListPayouts extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Ticket-based payout requests, subject to manual financial verification before transfer.';
+        return 'Request against unpaid ticket earnings. Approval requires independently verified settlement; transfers remain manual.';
     }
 
     protected function getHeaderActions(): array
@@ -40,7 +40,7 @@ class ListPayouts extends ListRecords
                 ->icon('heroicon-o-plus')
                 ->visible(fn (): bool => PayoutResource::canViewAny())
                 ->disabled(fn (): bool => ! config('finance.payout_requests_enabled', false))
-                ->tooltip(fn (): string => config('finance.payout_requests_enabled', false) ? 'Request funds verified by the platform.' : 'Requests are disabled pending independent settlement review.')
+                ->tooltip(fn (): string => config('finance.payout_requests_enabled', false) ? 'Submit a request against unpaid ticket earnings. Verification is required before approval.' : 'Requests are disabled pending independent settlement review.')
                 ->schema([
                     Select::make('event_id')
                         ->label('Event')
@@ -58,18 +58,18 @@ class ListPayouts extends ListRecords
                                 Notification::make()->title('Payout temporarily unavailable')
                                     ->body('Refund exceptions must be reconciled before requesting funds.')
                                     ->warning()->duration(8000)->send();
-                            } elseif ($balance['requestable_ticket_balance'] <= 0) {
-                                Notification::make()->title('No verified funds available')
-                                    ->body('This event has no requestable payout balance. Contact the administrator for settlement review.')
+                            } elseif ($balance['requestable_pending_verification_balance'] <= 0) {
+                                Notification::make()->title('No unpaid earnings available')
+                                    ->body('This event has no unpaid earnings available for another request.')
                                     ->warning()->duration(8000)->send();
                             } else {
-                                Notification::make()->title('Verified payout balance available')
+                                Notification::make()->title('Payout request balance available')
                                     ->body('You may request up to TZS '.number_format($balance['requestable_ticket_balance'], 2).'.')
                                     ->success()->duration(5000)->send();
                             }
                         })
                         ->required()
-                        ->helperText('Choose the event whose cleared ticket proceeds will fund this request.'),
+                        ->helperText('Choose the event whose unpaid ticket earnings will support this request. Settlement verification happens before approval.'),
                     TextInput::make('amount')
                         ->label('Amount (TZS)')
                         ->numeric()
@@ -98,9 +98,9 @@ class ListPayouts extends ListRecords
 
                                 $available = (float) $balance['requestable_ticket_balance'];
                                 if ($available <= 0) {
-                                    $fail('No verified funds are currently available for payout. Contact the administrator.');
+                                    $fail('No unpaid ticket earnings are available for a new request.');
                                 } elseif (is_numeric($value) && (float) $value > $available) {
-                                    $fail('Amount exceeds the verified available balance of TZS '.number_format($available, 2).'.');
+                                    $fail('Amount exceeds the available unpaid earnings of TZS '.number_format($available, 2).'.');
                                 }
                             },
                         ])
@@ -108,7 +108,7 @@ class ListPayouts extends ListRecords
                             $eventId = (int) ($get('event_id') ?: 0);
 
                             if (! $eventId || ! array_key_exists($eventId, $this->eligibleEvents())) {
-                                return 'Select an authorized event to see its reconciled available balance.';
+                                return 'Select an authorized event to see its unpaid earnings available for a request.';
                             }
 
                             $balance = app(EventPayoutService::class)->ticketBalance($eventId);
@@ -118,11 +118,11 @@ class ListPayouts extends ListRecords
                             }
 
                             if ($balance['requestable_ticket_balance'] <= 0) {
-                                return 'Verified requestable balance: TZS 0.00. No verified funds are available for payout. Contact the administrator.';
+                                return 'Unpaid ticket earnings available for new requests: TZS 0.00.';
                             }
 
-                            $message = 'Verified requestable balance: TZS '.number_format($balance['requestable_ticket_balance'], 2).
-                                '. Pending requests and recorded payouts are already deducted.';
+                            $message = 'Unpaid ticket earnings available for requests: TZS '.number_format($balance['requestable_ticket_balance'], 2).
+                                '. Existing requests and completed payouts are already deducted. Approval requires separately verified settlement.';
 
                             $amount = $get('amount');
                             if (is_numeric($amount) && (float) $amount > $balance['requestable_ticket_balance']) {
@@ -167,7 +167,7 @@ class ListPayouts extends ListRecords
                         throw $exception;
                     }
 
-                    Notification::make()->title('Payout request submitted')->body('Your request has been sent for administrator review.')->success()->duration(8000)->send();
+                    Notification::make()->title('Payout request submitted')->body('Your request is pending administrator review and independent settlement verification.')->success()->duration(8000)->send();
                 }),
         ];
     }
