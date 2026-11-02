@@ -70,6 +70,23 @@ class ReconciledPayoutRequestTest extends TestCase
         );
     }
 
+    public function test_recorded_reversal_reduces_requestable_earnings_before_settlement_verification(): void
+    {
+        config(['finance.payout_requests_enabled' => true]);
+        [$event, $admin] = $this->eventWithPaidTickets();
+
+        app(EventFinanceClearanceService::class)->record(
+            $event, $admin, 'chargeback', '30.00', 'TEST-REVERSAL-001',
+            'Documented reversal pending independent review'
+        );
+
+        $balance = app(EventPayoutService::class)->ticketBalance($event->id);
+        $this->assertSame(70.0, $balance['requestable_pending_verification_balance']);
+
+        $this->expectException(ValidationException::class);
+        app(EventPayoutService::class)->request($event, $admin, 71, 'bank', 'Test account');
+    }
+
     private function eventWithPaidTickets(): array
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
