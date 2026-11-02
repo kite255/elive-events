@@ -64,7 +64,7 @@ class EventPayoutService
             'paid_out' => round($paid, 2),
             'reserved_requests' => round($reserved, 2),
             'requestable_ticket_balance' => round($available, 2),
-            'requestable_pending_verification_balance' => round(max(0, $earned - $paid - $reserved), 2),
+            'requestable_pending_verification_balance' => round(max(0, $earned - $reversals - $paid - $reserved), 2),
         ];
     }
 
@@ -83,8 +83,8 @@ class EventPayoutService
             throw ValidationException::withMessages(['amount' => 'Enter a valid positive amount with at most two decimal places.']);
         }
 
-        if (! in_array($destinationType, ['bank', 'mobile_money'], true) || trim($destinationDetails) === '') {
-            throw ValidationException::withMessages(['destination' => 'A valid destination is required.']);
+        if (! in_array($destinationType, ['bank', 'mobile_money'], true) || trim($destinationDetails) === '' || mb_strlen(trim($destinationDetails)) > 500) {
+            throw ValidationException::withMessages(['destination' => 'A valid payment destination of at most 500 characters is required.']);
         }
 
         if (! config('finance.payout_requests_enabled', false)) {
