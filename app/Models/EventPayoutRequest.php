@@ -12,6 +12,8 @@ class EventPayoutRequest extends Model
     public const REJECTED = 'rejected';
     public const PAID = 'paid';
 
+    protected $attributes = ['status' => self::REQUESTED];
+
     protected $fillable = [
         'event_id', 'requested_by', 'reference', 'amount', 'currency',
         'destination_type', 'destination_details',
