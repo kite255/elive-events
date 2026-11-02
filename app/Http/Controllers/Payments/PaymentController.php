@@ -102,7 +102,19 @@ class PaymentController extends Controller
             );
         }
 
-        return response()->view('public.payments.status', ['payment' => $payment])
+        // The latest failed order-initialization attempt is not a payment failure.
+        // Never show this state for a payment already tracked by a provider.
+        $checkoutUnavailable = $payment->isPending()
+            && blank($payment->provider_tracking_id)
+            && $payment->transactions()
+                ->where('type', 'order_created')
+                ->latest('id')
+                ->value('status') === 'failed';
+
+        return response()->view('public.payments.status', [
+            'payment' => $payment,
+            'checkoutUnavailable' => $checkoutUnavailable,
+        ])
             ->header('Cache-Control', 'private, no-store')
             ->header('Referrer-Policy', 'no-referrer');
     }
