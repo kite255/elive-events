@@ -23,6 +23,10 @@ class EventPayoutReviewService
             throw ValidationException::withMessages(['review' => 'Only a platform administrator can review payouts.']);
         }
 
+        if (! $approve && (mb_strlen(trim((string) $note)) < 10 || mb_strlen(trim((string) $note)) > 500)) {
+            throw ValidationException::withMessages(['reason' => 'Provide a rejection reason between 10 and 500 characters.']);
+        }
+
         return DB::transaction(function () use ($request, $reviewer, $approve, $note): EventPayoutRequest {
             Event::query()->whereKey($request->event_id)->lockForUpdate()->firstOrFail();
             $locked = EventPayoutRequest::query()->whereKey($request->getKey())->lockForUpdate()->firstOrFail();
@@ -71,7 +75,7 @@ class EventPayoutReviewService
             $previousStatus = $locked->status;
             $locked->status = $approve ? EventPayoutRequest::APPROVED : EventPayoutRequest::REJECTED;
             $locked->reviewed_by = $reviewer->getKey();
-            $locked->review_note = $note;
+            $locked->review_note = $note === null ? null : trim($note);
             $locked->reviewed_at = now();
             $locked->save();
             DB::table('event_payout_audits')->insert([

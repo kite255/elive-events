@@ -2,7 +2,7 @@ name: Finance validation
 
 on:
   pull_request:
-    branches: [staging]
+    branches: [staging, main]
   workflow_dispatch:
 
 permissions:
@@ -95,5 +95,10 @@ jobs:
         run: php artisan migrate --force
       - name: Run finance integration tests on PostgreSQL
         run: php artisan test --filter='FinanceVisibilityTest|PayoutAuditTest|EventFinanceClearanceTest|ReconciledPayoutRequestTest|PayoutReviewAuthorizationTest|PayoutRequestSettlementGuardTest'
-      - name: Test concurrent payout reservations on PostgreSQL
-        run: php artisan test --filter=PostgreSqlConcurrentPayoutTest
+      - name: Test concurrent payout reservations on isolated PostgreSQL
+        env:
+          DB_DATABASE: elive_events_concurrency_test
+        run: |
+          PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USERNAME" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE elive_events_concurrency_test"
+          php artisan migrate --force
+          php artisan test --filter=PostgreSqlConcurrentPayoutTest

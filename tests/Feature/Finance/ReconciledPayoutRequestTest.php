@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\EventFinanceClearanceService;
 use App\Services\EventPayoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -26,19 +27,64 @@ class ReconciledPayoutRequestTest extends TestCase
         app(EventPayoutService::class)->request($event, $admin, 50, 'bank', 'Test account');
     }
 
-    public function test_enabled_request_never_exceeds_clearance_after_reservations(): void
+    public function test_enabled_request_never_exceeds_unpaid_earnings_after_reservations(): void
     {
         config(['finance.payout_requests_enabled' => true]);
         [$event, $admin] = $this->eventWithPaidTickets();
         app(EventFinanceClearanceService::class)->record(
             $event, $admin, 'settlement', '80.00', 'TEST-CLEAR-002', 'Independently checked statement'
         );
+        $unverifiedBalance = app(EventPayoutService::class)->ticketBalance($event->id);
+        $this->assertSame(0.0, $unverifiedBalance['requestable_ticket_balance']);
+
+        $verifier = User::factory()->create(['is_super_admin' => true]);
+        $entryId = (int) DB::table('event_finance_clearance_entries')
+            ->where('external_reference', 'TEST-CLEAR-002')->value('id');
+        app(EventFinanceClearanceService::class)->independentlyVerify(
+            $entryId, $verifier, 'Second administrator verified the settlement against provider evidence'
+        );
+
         $first = app(EventPayoutService::class)->request($event, $admin, 60, 'bank', 'Test account');
 
         $this->assertSame('60.00', $first->amount);
         $this->assertSame(20.0, app(EventPayoutService::class)->ticketBalance($event->id)['requestable_ticket_balance']);
+        $this->assertSame(40.0, app(EventPayoutService::class)->ticketBalance($event->id)['requestable_pending_verification_balance']);
         $this->expectException(ValidationException::class);
-        app(EventPayoutService::class)->request($event, $admin, 30, 'bank', 'Test account');
+        app(EventPayoutService::class)->request($event, $admin, 50, 'bank', 'Test account');
+    }
+
+    public function test_request_can_be_submitted_before_settlement_but_cannot_be_approved(): void
+    {
+        config(['finance.payout_requests_enabled' => true]);
+        [$event, $admin] = $this->eventWithPaidTickets();
+        $balance = app(EventPayoutService::class)->ticketBalance($event->id);
+        $this->assertSame(0.0, $balance['requestable_ticket_balance']);
+        $this->assertSame(100.0, $balance['requestable_pending_verification_balance']);
+
+        $request = app(EventPayoutService::class)->request($event, $admin, 60, 'bank', 'Test account');
+        $this->assertSame('requested', $request->status);
+        $this->assertSame(40.0, app(EventPayoutService::class)->ticketBalance($event->id)['requestable_pending_verification_balance']);
+        $this->expectException(ValidationException::class);
+        app(\App\Services\EventPayoutReviewService::class)->review(
+            $request, User::factory()->create(['is_super_admin' => true]), true
+        );
+    }
+
+    public function test_recorded_reversal_reduces_requestable_earnings_before_settlement_verification(): void
+    {
+        config(['finance.payout_requests_enabled' => true]);
+        [$event, $admin] = $this->eventWithPaidTickets();
+
+        app(EventFinanceClearanceService::class)->record(
+            $event, $admin, 'chargeback', '30.00', 'TEST-REVERSAL-001',
+            'Documented reversal pending independent review'
+        );
+
+        $balance = app(EventPayoutService::class)->ticketBalance($event->id);
+        $this->assertSame(70.0, $balance['requestable_pending_verification_balance']);
+
+        $this->expectException(ValidationException::class);
+        app(EventPayoutService::class)->request($event, $admin, 71, 'bank', 'Test account');
     }
 
     private function eventWithPaidTickets(): array
