@@ -36,6 +36,16 @@ class PayoutResource extends Resource
     protected static ?string $navigationLabel = 'Payout Requests';
     protected static ?int $navigationSort = 3;
 
+    public static function getModelLabel(): string
+    {
+        return 'Payout Request';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return auth()->user()?->isSuperAdmin() ? 'All Payout Requests' : 'My Payout Requests';
+    }
+
     public static function canViewAny(): bool
     {
         $user = auth()->user();
@@ -82,9 +92,9 @@ class PayoutResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->defaultSort('id', 'desc')->columns([
-            TextColumn::make('reference')->searchable()->copyable(),
+            TextColumn::make('reference')->searchable()->copyable()->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('event.name')->label('Event')->searchable(),
-            TextColumn::make('requester.name')->label('Requested By'),
+            TextColumn::make('requester.name')->label('Requested By')->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true),
             TextColumn::make('amount')->formatStateUsing(
                 fn ($state, EventPayoutRequest $record): string =>
                     $record->currency.' '.number_format((float) $state, 2)
@@ -96,11 +106,20 @@ class PayoutResource extends Resource
                 default => 'warning',
             }),
             TextColumn::make('created_at')->dateTime('d M Y H:i')->sortable(),
-            TextColumn::make('transfer_method')->label('Method')->placeholder('—'),
-            TextColumn::make('transfer_date')->label('Transfer Date')->date()->placeholder('—'),
-            TextColumn::make('paid_at')->label('Transferred At')->dateTime('d M Y H:i')->placeholder('Not transferred'),
-            TextColumn::make('received_at')->label('Received At')->dateTime('d M Y H:i')->placeholder('Awaiting confirmation'),
+            TextColumn::make('transfer_method')->label('Method')->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('transfer_date')->label('Transfer Date')->date()->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('paid_at')->label('Transferred At')->dateTime('d M Y H:i')->placeholder('Not transferred')->toggleable(isToggledHiddenByDefault: true),
+            TextColumn::make('received_at')->label('Received At')->dateTime('d M Y H:i')
+                ->placeholder(fn (EventPayoutRequest $record): string => $record->status === EventPayoutRequest::PAID ? 'Awaiting confirmation' : 'Not applicable')
+                ->toggleable(isToggledHiddenByDefault: true),
         ])->recordActions([
+            Action::make('details')
+                ->label('Details')->icon('heroicon-o-eye')
+                ->modalHeading(fn (EventPayoutRequest $record): string => 'Payout '.$record->reference)
+                ->modalSubmitAction(false)->modalCancelActionLabel('Close')
+                ->modalContent(fn (EventPayoutRequest $record) => view('filament.payouts.request-details', [
+                    'payout' => $record,
+                ])),
             Action::make('viewProof')->label('Download Proof')->icon('heroicon-o-document-arrow-down')
                 ->visible(fn (EventPayoutRequest $record): bool =>
                     auth()->user()?->isSuperAdmin()
