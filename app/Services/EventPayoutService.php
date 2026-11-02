@@ -8,6 +8,8 @@ use App\Models\Payment;
 use App\Models\TicketOrder;
 use App\Models\User;
 use App\Notifications\EventPayoutStatusNotification;
+use App\Notifications\NewPayoutRequestAdminNotification;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -136,6 +138,26 @@ class EventPayoutService
                     ));
                 } catch (\Throwable $exception) {
                     Log::warning('Payout request notification failed', [
+                        'payout_request_id' => $request->getKey(),
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+                try {
+                    $settings = DB::table('system_notification_settings')->where('id', 1)->first();
+                    if ($settings && $settings->payout_request_emails_enabled) {
+                        $emails = json_decode($settings->payout_request_recipients ?? '[]', true);
+                        foreach (is_array($emails) ? $emails : [] as $email) {
+                            if (is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                                Notification::route('mail', $email)->notify(new NewPayoutRequestAdminNotification(
+                                    $request->reference,
+                                    $event->name,
+                                    $request->currency.' '.number_format((float) $request->amount, 2)
+                                ));
+                            }
+                        }
+                    }
+                } catch (\Throwable $exception) {
+                    Log::warning('Payout administrator email notification failed', [
                         'payout_request_id' => $request->getKey(),
                         'error' => $exception->getMessage(),
                     ]);
