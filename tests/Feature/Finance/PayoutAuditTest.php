@@ -77,6 +77,30 @@ class PayoutAuditTest extends TestCase
         );
     }
 
+    public function test_rejection_requires_meaningful_reason_and_preserves_pending_request(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $request = $this->requestFor($admin);
+        $reviewer = User::factory()->create(['is_super_admin' => true]);
+
+        try {
+            app(EventPayoutReviewService::class)->review($request, $reviewer, false, 'no');
+            $this->fail('A short reason should be rejected.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('reason', $exception->errors());
+        }
+
+        $this->assertSame(EventPayoutRequest::REQUESTED, $request->fresh()->status);
+        $this->assertSame(0, DB::table('event_payout_audits')->where('event_payout_request_id', $request->id)->count());
+
+        app(EventPayoutReviewService::class)->review(
+            $request, $reviewer, false, 'Settlement evidence is still pending.'
+        );
+
+        $this->assertSame(EventPayoutRequest::REJECTED, $request->fresh()->status);
+        $this->assertSame('Settlement evidence is still pending.', $request->fresh()->review_note);
+    }
+
     private function requestFor(User $admin): EventPayoutRequest
     {
         $organization = Organization::create(['name' => 'Payout Audit Organization']);

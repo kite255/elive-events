@@ -160,7 +160,7 @@ class PayoutResource extends Resource
                 }),
             Action::make('reject')->label('Reject')->color('danger')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
-                ->schema([Textarea::make('reason')->label('Reason')->required()->maxLength(500)])
+                ->schema([Textarea::make('reason')->label('Reason for rejection')->required()->minLength(10)->maxLength(500)])
                 ->action(function (EventPayoutRequest $record, array $data): void {
                     app(EventPayoutReviewService::class)->review($record, auth()->user(), false, $data['reason']);
                     Notification::make()->title('Payout request rejected')->body('The organizer has been notified of the rejection.')->warning()->duration(8000)->send();
