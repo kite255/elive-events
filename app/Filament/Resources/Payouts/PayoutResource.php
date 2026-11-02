@@ -128,7 +128,15 @@ class PayoutResource extends Resource
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
                 ->requiresConfirmation()
                 ->action(function (EventPayoutRequest $record): void {
-                    app(EventPayoutReviewService::class)->review($record, auth()->user(), true);
+                    try {
+                        app(EventPayoutReviewService::class)->review($record, auth()->user(), true);
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Payout approval blocked')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'The payout cannot be approved yet.')
+                            ->danger()->duration(10000)->send();
+                        return;
+                    }
                     Notification::make()->title('Payout request approved')->body('The organizer has been notified of the approval.')->success()->duration(8000)->send();
                 }),
             Action::make('reject')->label('Reject')->color('danger')
