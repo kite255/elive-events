@@ -18,6 +18,12 @@ class PayoutBalanceOverview extends Widget
 
     public ?string $selectedEventId = null;
 
+    public function mount(): void
+    {
+        $firstId = array_key_first($this->eventOptions());
+        $this->selectedEventId = $firstId === null ? null : (string) $firstId;
+    }
+
     public static function canView(): bool
     {
         return PayoutResource::canViewAny();
