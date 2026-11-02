@@ -65,7 +65,7 @@ class ReconciledPayoutRequestTest extends TestCase
         $this->assertSame('requested', $request->status);
         $this->assertSame(40.0, app(EventPayoutService::class)->ticketBalance($event->id)['requestable_pending_verification_balance']);
         $this->expectException(ValidationException::class);
-        app(\\App\\Services\\EventPayoutReviewService::class)->review(
+        app(\App\Services\EventPayoutReviewService::class)->review(
             $request, User::factory()->create(['is_super_admin' => true]), true
         );
     }
