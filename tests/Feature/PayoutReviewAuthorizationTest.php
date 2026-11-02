@@ -32,7 +32,7 @@ class PayoutReviewAuthorizationTest extends TestCase
         app(EventPayoutReviewService::class)->recordCompletedTransfer(
             $request,
             $reviewer,
-            'BANK-TRANSFER-123'
+            'BANK-TRANSFER-123', 'bank', now()->toDateString(), '100.00', 'payout-proofs/receipt.pdf'
         );
     }
 
@@ -46,7 +46,7 @@ class PayoutReviewAuthorizationTest extends TestCase
         app(EventPayoutReviewService::class)->recordCompletedTransfer(
             new EventPayoutRequest(),
             $reviewer,
-            ' '
+            ' ', 'bank', now()->toDateString(), '100.00', 'payout-proofs/receipt.pdf'
         );
     }
 }
