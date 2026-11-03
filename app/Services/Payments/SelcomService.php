@@ -40,6 +40,9 @@ class SelcomService implements PaymentGateway
         }
 
         $statusUrl = route('payments.status', ['payment' => $payment->reference]);
+        // Selcom Support specifically requested Create Order - Minimal.
+        // This endpoint does not support card checkout; retain the redirect,
+        // cancellation and webhook URLs for the supported payment methods.
         $payload = [
             'vendor' => $this->vendor(),
             'order_id' => $payment->reference,
@@ -48,22 +51,13 @@ class SelcomService implements PaymentGateway
             'buyer_phone' => $phone,
             'amount' => (string) $payment->amount,
             'currency' => 'TZS',
-            'payment_methods' => 'ALL',
             'redirect_url' => base64_encode($statusUrl),
             'cancel_url' => base64_encode($statusUrl),
             'webhook' => base64_encode(route('payments.selcom.webhook')),
-            'billing.firstname' => $parts[0] ?? $name,
-            'billing.lastname' => implode(' ', array_slice($parts, 1)) ?: $name,
-            'billing.address_1' => (string) config('services.selcom.billing_address', 'Tanzania'),
-            'billing.city' => (string) config('services.selcom.billing_city', 'Dar es Salaam'),
-            'billing.state_or_region' => (string) config('services.selcom.billing_region', 'Dar es Salaam'),
-            'billing.postcode_or_pobox' => (string) config('services.selcom.billing_postcode', '00000'),
-            'billing.country' => 'TZ',
-            'billing.phone' => $phone,
             'no_of_items' => '1',
         ];
 
-        $data = $this->request('POST', '/v1/checkout/create-order', $payload);
+        $data = $this->request('POST', '/v1/checkout/create-order-minimal', $payload);
         $urlValue = data_get($data, 'data.0.payment_gateway_url', '');
         $url = $this->checkoutUrl((string) $urlValue);
         if ($url === '') {

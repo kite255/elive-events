@@ -93,7 +93,7 @@ class SelcomCheckoutFlowTest extends TestCase
             $payload = $request->data();
 
             return $request->method() === 'POST'
-                && $request->url() === 'https://gateway.example.test/v1/checkout/create-order'
+                && $request->url() === 'https://gateway.example.test/v1/checkout/create-order-minimal'
                 && ($payload['vendor'] ?? '') === 'TESTVENDOR'
                 && ($payload['order_id'] ?? '') === $payment->reference
                 && ($payload['buyer_name'] ?? '') === 'Jane Mushi'
@@ -101,7 +101,14 @@ class SelcomCheckoutFlowTest extends TestCase
                 && ($payload['buyer_phone'] ?? '') === '255712345678'
                 && (string) ($payload['amount'] ?? '') === '25000.00'
                 && ($payload['currency'] ?? '') === 'TZS'
-                && ($payload['payment_methods'] ?? '') === 'ALL'
+                && ! array_key_exists('payment_methods', $payload)
+                && ! array_key_exists('billing.firstname', $payload)
+                && ! array_key_exists('billing.phone', $payload)
+                && ($payload['no_of_items'] ?? '') === '1'
+                && base64_decode((string) ($payload['redirect_url'] ?? ''), true)
+                    === route('payments.status', ['payment' => $payment->reference])
+                && base64_decode((string) ($payload['cancel_url'] ?? ''), true)
+                    === route('payments.status', ['payment' => $payment->reference])
                 && base64_decode((string) ($payload['webhook'] ?? ''), true)
                     === route('payments.selcom.webhook');
         });
