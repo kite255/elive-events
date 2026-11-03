@@ -68,7 +68,7 @@ class PaymentController extends Controller
 
         $validated = $request->validate([
             'method' => ['required', 'in:mobile,qr'],
-            'phone' => ['required_if:method,mobile', 'nullable', 'string', 'max:24'],
+            'phone' => ['required_if:method,mobile', 'nullable', 'string', 'max:24', 'regex:/^(?:\\+?255|0)?[67]\\d{8}$/'],
         ]);
 
         // A Selcom order that is already processing may have a phone request
