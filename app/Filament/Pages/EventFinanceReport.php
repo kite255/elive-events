@@ -138,6 +138,7 @@ class EventFinanceReport extends Page
                             ->where('recorded_by', auth()->id())
                             ->whereNull('independently_verified_at')
                             ->whereNull('self_attested_at')
+                            ->whereNull('voided_at')
                             ->orderByDesc('id')->limit(100)->get()
                             ->mapWithKeys(fn ($entry): array => [
                                 $entry->id => '#'.$entry->id.' · Event '.$entry->event_id
