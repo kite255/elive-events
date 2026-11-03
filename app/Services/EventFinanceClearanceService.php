@@ -147,6 +147,11 @@ class EventFinanceClearanceService
             if ($entry->voided_at !== null) {
                 throw ValidationException::withMessages(['void_reason' => 'This entry was already voided.']);
             }
+            if ($entry->entry_type !== 'settlement') {
+                throw ValidationException::withMessages([
+                    'void_reason' => 'Refunds and chargebacks require separate financial correction and cannot be voided here.',
+                ]);
+            }
             if ($entry->independently_verified_at !== null || $entry->self_attested_at !== null) {
                 throw ValidationException::withMessages([
                     'void_reason' => 'Previously reviewed entries require a separate financial reconciliation process.',
