@@ -193,7 +193,7 @@ class PayoutResource extends Resource
                             (string) $data['transfer_date'], (string) $data['amount'],
                             (string) $data['proof'], $data['note'] ?? null
                         );
-                        } catch (ValidationException $exception) {
+                    } catch (ValidationException $exception) {
                         Notification::make()
                             ->title('Transfer recording blocked')
                             ->body(collect($exception->errors())->flatten()->first() ?: 'The transfer cannot be recorded yet.')
