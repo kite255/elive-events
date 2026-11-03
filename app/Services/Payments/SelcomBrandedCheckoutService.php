@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Throwable;
 
 class SelcomBrandedCheckoutService
@@ -98,8 +99,8 @@ class SelcomBrandedCheckoutService
 
     /**
      * Read Selcom's QR image/token returned for this exact order.
-     * Never generate a QR from an arbitrary payment token: its format is
-     * provider-defined, and an incorrect QR could direct funds elsewhere.
+     * Encode the exact Selcom EMV QR payload without alteration.
+     * Never synthesize a QR from a payment token or local order reference.
      */
     public function qrDetails(Payment $payment): array
     {
@@ -114,8 +115,18 @@ class SelcomBrandedCheckoutService
         $rawQr = (string) data_get($data, 'qr', '');
         $image = null;
 
-        // Accept only an actual PNG image, never arbitrary remote or SVG data.
-        if (strlen($rawQr) < 100000) {
+        // Selcom's minimal checkout returns an EMV QR payload (000201...),
+        // not always an image. Render the exact provider-supplied payload.
+        if (preg_match('/^000201[\x20-\x7E]{20,2040}$/D', $rawQr)) {
+            $svg = (string) QrCode::format('svg')
+                ->size(320)
+                ->margin(2)
+                ->errorCorrection('M')
+                ->generate($rawQr);
+
+            $image = 'data:image/svg+xml;base64,' . base64_encode($svg);
+        } elseif (strlen($rawQr) < 100000) {
+            // Keep compatibility with Base64-encoded provider PNG images.
             $bytes = base64_decode($rawQr, true);
             if (is_string($bytes) && strlen($bytes) < 75000
                 && str_starts_with($bytes, "\x89PNG\r\n\x1a\n")) {
