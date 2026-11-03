@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::table('event_finance_clearance_entries', function (Blueprint $table): void {
+            $table->foreignId('voided_by')->nullable();
+            $table->timestamp('voided_at')->nullable();
+            $table->text('void_reason')->nullable();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('event_finance_clearance_entries', function (Blueprint $table): void {
+            $table->dropColumn(['voided_by', 'voided_at', 'void_reason']);
+        });
+    }
+};
