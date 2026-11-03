@@ -3,6 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Models\User;
+use App\Notifications\PayoutEmailTestNotification;
+use Illuminate\Support\Facades\Notification as MailNotification;
+use Illuminate\Support\Facades\Log;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -40,6 +43,43 @@ class SystemEmailSettings extends Page
         $this->payoutEnabled = (bool) ($settings?->payout_request_emails_enabled ?? false);
         $recipients = json_decode($settings?->payout_request_recipients ?? '[]', true);
         $this->payoutEmails = implode("\n", is_array($recipients) ? $recipients : []);
+    }
+
+    /**
+     * Send an explicitly labelled test only to the saved alert recipients.
+     * Queued means accepted for processing, not delivered.
+     */
+    public function sendTest(): void
+    {
+        abort_unless(static::canAccess(), 403);
+        $settings = DB::table('system_notification_settings')->where('id', 1)->first();
+        $recipients = json_decode($settings?->payout_request_recipients ?? '[]', true);
+        $recipients = is_array($recipients) ? array_values(array_filter($recipients, fn ($email) =>
+            is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL)
+        )) : [];
+
+        if (! $settings?->payout_request_emails_enabled || count($recipients) === 0) {
+            Notification::make()->title('Save and enable payout alerts first')
+                ->body('Enable payout request emails, add valid recipients, and save settings before sending a test.')
+                ->warning()->send();
+            return;
+        }
+
+        try {
+            foreach ($recipients as $email) {
+                MailNotification::route('mail', $email)->notify(new PayoutEmailTestNotification());
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Payout email test dispatch failed', ['error' => $exception->getMessage()]);
+            Notification::make()->title('Payout email test could not be queued')
+                ->body('Check your application logs, queue connection and mail configuration.')
+                ->danger()->send();
+            return;
+        }
+
+        Notification::make()->title('Test email notifications queued')
+            ->body(count($recipients).' recipient(s). Delivery is not confirmed until the queue worker processes the jobs and your inbox receives the test.')
+            ->success()->send();
     }
 
     public function save(): void

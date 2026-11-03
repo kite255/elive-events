@@ -19,4 +19,10 @@
             </div>
         </x-filament::section>
     </form>
+    <x-filament::section heading="Verify email delivery" description="Send an explicitly marked test email to the saved payout alert recipients. This does not create or change any payout.">
+        <div class="space-y-3">
+            <p class="text-sm text-gray-600 dark:text-gray-300">First save your email settings, then send a test. The success message means jobs were queued, not that an email reached the inbox. Check your queue workers, failed jobs and spam folder if it does not arrive.</p>
+            <x-filament::button type="button" color="gray" icon="heroicon-o-paper-airplane" wire:click="sendTest">Send Test Payout Alert</x-filament::button>
+        </div>
+    </x-filament::section>
 </x-filament-panels::page>
