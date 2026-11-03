@@ -187,11 +187,19 @@ class PayoutResource extends Resource
                     if (! filter_var($data['transfer_verified'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                         throw ValidationException::withMessages(['transfer_verified' => 'Confirm the transfer before recording it.']);
                     }
-                    app(EventPayoutReviewService::class)->recordCompletedTransfer(
-                        $record, auth()->user(), $data['reference'], $data['method'],
-                        (string) $data['transfer_date'], (string) $data['amount'],
-                        (string) $data['proof'], $data['note'] ?? null
-                    );
+                    try {
+                        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+                            $record, auth()->user(), $data['reference'], $data['method'],
+                            (string) $data['transfer_date'], (string) $data['amount'],
+                            (string) $data['proof'], $data['note'] ?? null
+                        );
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Transfer recording blocked')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'The transfer cannot be recorded yet.')
+                            ->danger()->duration(12000)->send();
+                        return;
+                    }
                     Notification::make()->title('Confirmed transfer recorded')->body('The payout has been marked as paid and the organizer notified.')->success()->duration(8000)->send();
                 }),
             Action::make('confirmReceipt')->label('Confirm Money Received')->icon('heroicon-o-check-badge')->color('success')
