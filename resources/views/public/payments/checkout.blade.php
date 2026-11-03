@@ -71,7 +71,7 @@
         @if(filled(data_get($payment->metadata, 'wallet_attempted_at')))
             <div class="notice success">A mobile payment authorization was requested. Check your phone and approve the payment there. A request is not proof of payment.</div>
         @elseif(data_get($payment->metadata, 'checkout_method') === 'qr')
-            <h2>Pay with QR / Payment Token</h2>
+            <h2>Pay with QR Code</h2>
             <div class="tips-panel">
                 <img src="{{ asset('images/payment-networks/tips.png') }}"
                      alt="TIPS — Tanzania Instant Payments System" loading="lazy"
@@ -82,7 +82,7 @@
                 <img class="qr" alt="Selcom order QR code" src="{{ $qrDetails['qr_image'] }}">
             @endif
             @if($qrDetails['payment_token'])
-                <p class="muted">Selcom payment token for this order:</p>
+                <p class="muted">Alternatively, use this payment token:</p>
                 <div class="token">{{ $qrDetails['payment_token'] }}</div>
             @endif
             @if(! $qrDetails['qr_image'] && ! $qrDetails['payment_token'])
@@ -105,7 +105,7 @@
             </label>
             <label class="method">
                 <input type="radio" name="method" value="qr" {{ old('method') === 'qr' ? 'checked' : '' }}>
-                <span><strong>QR Code / Payment Token</strong><small>Use Selcom's order-linked QR or payment token</small></span>
+                <span><strong>Pay with QR Code</strong><small>Scan the QR code using a supported payment app.</small></span>
             </label>
             <div id="phone-container">
                 <label for="phone" class="field">Mobile Money Number</label>
@@ -150,7 +150,7 @@
                 phoneContainer.hidden = !mobile;
                 walletNetworks.hidden = !mobile;
                 phone.required = mobile;
-                submit.textContent = mobile ? 'Request Payment on Phone' : 'Continue with QR / Payment Token';
+                submit.textContent = mobile ? 'Request Payment on Phone' : 'Generate Payment QR Code';
             }
             methods.forEach(radio => radio.addEventListener('change', updateMethod));
             updateMethod();
