@@ -153,9 +153,17 @@ class EventFinanceReport extends Page
                 ->action(function (array $data): void {
                     $actor = auth()->user();
                     abort_unless($actor instanceof User && $actor->isSuperAdmin(), 403);
-                    app(EventFinanceClearanceService::class)->selfAttest(
-                        (int) $data['clearance_entry_id'], $actor, (string) $data['evidence_note']
-                    );
+                    try {
+                        app(EventFinanceClearanceService::class)->selfAttest(
+                            (int) $data['clearance_entry_id'], $actor, (string) $data['evidence_note']
+                        );
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        Notification::make()
+                            ->title('Settlement attestation blocked')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'The evidence could not be attested.')
+                            ->danger()->duration(12000)->send();
+                        return;
+                    }
                     Notification::make()
                         ->title('Single-admin self-attestation recorded')
                         ->body('This is not independent verification. Preserve the external evidence for audit.')
