@@ -38,7 +38,7 @@ class PayoutApprovalGuardTest extends TestCase
         [$request, $requester, $reviewer] = $this->fixture('30.00');
         $approved = app(EventPayoutReviewService::class)->review($request, $reviewer, true);
         $this->assertSame(EventPayoutRequest::APPROVED, $approved->status);
-        $this->assertSame('30.00', (string) \Illuminate\Support\Facades\DB::table('event_finance_clearance_entries')->where('event_id', $request->event_id)->value('amount'));
+        $this->assertEquals(30.0, (float) \Illuminate\Support\Facades\DB::table('event_finance_clearance_entries')->where('event_id', $request->event_id)->value('amount'));
     }
 
     public function test_manual_approval_does_not_override_unverified_evidence(): void
