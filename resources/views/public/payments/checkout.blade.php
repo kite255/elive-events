@@ -27,14 +27,28 @@
         .footer{border-top:1px solid var(--border);padding-top:18px;margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
         .payment-networks{margin:18px 0;padding:14px;background:#f8fafc;border:1px solid var(--border);border-radius:12px}
         .payment-networks-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
-        .wallet-logos{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px}
-        .wallet-logo{height:62px;background:#fff;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:7px}
-        .wallet-logo img{display:block;width:100%;height:100%;object-fit:contain}
+        .wallet-logos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+        .wallet-logo{min-width:0;height:70px;background:#fff;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:8px}
+        .wallet-logo img{display:block;width:100%;max-height:48px;height:auto;object-fit:contain}
         .wallet-logo span{font-size:12px;font-weight:700;text-align:center;color:var(--navy)}
-        .tips-panel{margin:16px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#f8fafc;padding:12px;border:1px solid var(--border);border-radius:12px}
-        .tips-panel img{width:155px;max-width:100%;height:auto;object-fit:contain}
-        .tips-panel span{flex:1 1 170px;color:var(--muted);font-size:12px;line-height:1.5}
+        .tips-panel{margin:16px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;background:#f8fafc;padding:18px 12px;border:1px solid var(--border);border-radius:12px}
+        .tips-panel img{display:block;width:190px;max-width:100%;height:auto;object-fit:contain;margin:0 auto}
+        .tips-panel span{max-width:400px;color:var(--muted);font-size:12px;line-height:1.5}
         .network-note{font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.5}
+        @media (max-width:650px){
+            main{margin:12px auto;padding:12px}
+            .card{border-radius:16px;padding:20px 16px}
+            h1{font-size:23px}
+            .price{font-size:26px}
+            .wallet-logos{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+            .wallet-logo{height:66px;padding:6px}
+            .tips-panel img{width:160px}
+        }
+        @media (max-width:390px){
+            .wallet-logos{grid-template-columns:repeat(2,minmax(0,1fr))}
+            .wallet-logo{height:70px}
+            .payment-networks{padding:10px}
+        }
         [hidden]{display:none!important}a{color:var(--blue)}
     </style>
 </head>
@@ -93,10 +107,6 @@
                 <input type="radio" name="method" value="qr" {{ old('method') === 'qr' ? 'checked' : '' }}>
                 <span><strong>QR Code / Payment Token</strong><small>Use Selcom's order-linked QR or payment token</small></span>
             </label>
-            <label class="method" style="opacity:.5;cursor:not-allowed">
-                <input type="radio" disabled>
-                <span><strong>Debit / Credit Card — Coming Soon</strong><small>Unavailable until Selcom enables full card checkout</small></span>
-            </label>
             <div id="phone-container">
                 <label for="phone" class="field">Mobile Money Number</label>
                 <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
@@ -108,11 +118,11 @@
                 <div class="payment-networks-title">Mobile money networks</div>
                 <div class="wallet-logos">
                     @foreach ([
+                        ['file' => 'm-pesa.png', 'label' => 'Vodacom M-Pesa'],
+                        ['file' => 'mixx-by-yas.png', 'label' => 'Mixx by Yas'],
+                        ['file' => 'airtel-money.png', 'label' => 'Airtel Money'],
                         ['file' => 'halopesa.png', 'label' => 'HaloPesa'],
                         ['file' => 't-pesa.png', 'label' => 'T-Pesa'],
-                        ['file' => 'mixx-by-yas.png', 'label' => 'Mixx by Yas'],
-                        ['file' => 'm-pesa.png', 'label' => 'M-Pesa'],
-                        ['file' => 'airtel-money.png', 'label' => 'Airtel Money'],
                     ] as $network)
                         <div class="wallet-logo" title="{{ $network['label'] }}">
                             <img src="{{ asset('images/payment-networks/' . $network['file']) }}"
