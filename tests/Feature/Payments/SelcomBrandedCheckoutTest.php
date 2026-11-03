@@ -168,7 +168,7 @@ class SelcomBrandedCheckoutTest extends TestCase
         $payment = $this->payment();
         Http::fake();
 
-        $this->post(route('payments.submit', $payment), [
+        $this->from(route('payments.pay', $payment))->post(route('payments.submit', $payment), [
             'method' => 'mobile',
             'phone' => '123',
         ])->assertRedirect(route('payments.pay', $payment));
