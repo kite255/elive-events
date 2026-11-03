@@ -25,6 +25,16 @@
         .success{background:#effaf2;color:#166534}.token{background:#f3f6fb;font-size:22px;letter-spacing:.08em;font-weight:800;word-break:break-all;padding:16px;border-radius:10px;text-align:center}
         .qr{display:block;width:220px;max-width:100%;height:auto;margin:15px auto}
         .footer{border-top:1px solid var(--border);padding-top:18px;margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
+        .payment-networks{margin:18px 0;padding:14px;background:#f8fafc;border:1px solid var(--border);border-radius:12px}
+        .payment-networks-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
+        .wallet-logos{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px}
+        .wallet-logo{height:62px;background:#fff;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:7px}
+        .wallet-logo img{display:block;width:100%;height:100%;object-fit:contain}
+        .wallet-logo span{font-size:12px;font-weight:700;text-align:center;color:var(--navy)}
+        .tips-panel{margin:16px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#f8fafc;padding:12px;border:1px solid var(--border);border-radius:12px}
+        .tips-panel img{width:155px;max-width:100%;height:auto;object-fit:contain}
+        .tips-panel span{flex:1 1 170px;color:var(--muted);font-size:12px;line-height:1.5}
+        .network-note{font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.5}
         [hidden]{display:none!important}a{color:var(--blue)}
     </style>
 </head>
@@ -48,6 +58,12 @@
             <div class="notice success">A mobile payment authorization was requested. Check your phone and approve the payment there. A request is not proof of payment.</div>
         @elseif(data_get($payment->metadata, 'checkout_method') === 'qr')
             <h2>Pay with QR / Payment Token</h2>
+            <div class="tips-panel">
+                <img src="{{ asset('images/payment-networks/tips.png') }}"
+                     alt="TIPS — Tanzania Instant Payments System" loading="lazy"
+                     onerror="this.hidden=true">
+                <span>TIPS is Tanzania's instant-payment infrastructure, not a mobile wallet. Use a compatible payment app to scan the order QR.</span>
+            </div>
             @if($qrDetails['qr_image'])
                 <img class="qr" alt="Selcom order QR code" src="{{ $qrDetails['qr_image'] }}">
             @endif
@@ -88,6 +104,26 @@
                     aria-describedby="phone-help">
                 <p class="helper" id="phone-help">You will authorize payment securely on your phone. Do not enter your PIN on this website.</p>
             </div>
+            <div id="wallet-networks" class="payment-networks">
+                <div class="payment-networks-title">Mobile money networks</div>
+                <div class="wallet-logos">
+                    @foreach ([
+                        ['file' => 'halopesa.png', 'label' => 'HaloPesa'],
+                        ['file' => 't-pesa.png', 'label' => 'T-Pesa'],
+                        ['file' => 'mixx-by-yas.png', 'label' => 'Mixx by Yas'],
+                        ['file' => 'm-pesa.png', 'label' => 'M-Pesa'],
+                        ['file' => 'airtel-money.png', 'label' => 'Airtel Money'],
+                    ] as $network)
+                        <div class="wallet-logo" title="{{ $network['label'] }}">
+                            <img src="{{ asset('images/payment-networks/' . $network['file']) }}"
+                                 alt="{{ $network['label'] }}" loading="lazy"
+                                 onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+                            <span hidden>{{ $network['label'] }}</span>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="network-note">Supported payment channels depend on Selcom merchant activation. Enter your number to request mobile payment.</p>
+            </div>
             @error('phone')<div class="notice" role="alert">{{ $message }}</div>@enderror
             @error('method')<div class="notice" role="alert">{{ $message }}</div>@enderror
             <button type="submit" id="submit-payment">Request Payment on Phone</button>
@@ -97,10 +133,12 @@
             const methods = form.querySelectorAll('input[name=method]');
             const phone = document.getElementById('phone');
             const phoneContainer = document.getElementById('phone-container');
+            const walletNetworks = document.getElementById('wallet-networks');
             const submit = document.getElementById('submit-payment');
             function updateMethod() {
                 const mobile = form.querySelector('input[name=method]:checked').value === 'mobile';
                 phoneContainer.hidden = !mobile;
+                walletNetworks.hidden = !mobile;
                 phone.required = mobile;
                 submit.textContent = mobile ? 'Request Payment on Phone' : 'Continue with QR / Payment Token';
             }
