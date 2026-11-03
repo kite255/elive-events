@@ -205,16 +205,17 @@ class OrganizerFinanceOverviewPageTest extends TestCase
         ]);
         $order->forceFill(['organizer_net_amount' => 1000])->save();
         foreach ([['paid', 250], ['requested', 500]] as [$status, $amount]) {
-            EventPayoutRequest::query()->create([
+            $payout = EventPayoutRequest::query()->create([
                 'event_id' => $event->id,
                 'requested_by' => $owner->id,
-                'status' => $status,
                 'reference' => 'SUM-'.uniqid(),
                 'amount' => $amount,
                 'currency' => 'TZS',
                 'destination_type' => 'bank',
                 'destination_details' => 'Test bank',
             ]);
+            // Status is guarded by the model and therefore must be set explicitly in this fixture.
+            $payout->forceFill(['status' => $status])->save();
         }
 
         $this->actingAs($owner);
