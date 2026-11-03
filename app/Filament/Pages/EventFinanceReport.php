@@ -129,7 +129,7 @@ class EventFinanceReport extends Page
             Action::make('selfAttestClearance')
                 ->label('Single-Admin Evidence Attestation')
                 ->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true
-                    && User::query()->where('is_super_admin', true)->count() === 1)
+                    && app(EventFinanceClearanceService::class)->singleSuperAdminIs(auth()->user()))
                 ->schema([
                     Select::make('clearance_entry_id')
                         ->label('Unreviewed entry recorded by your account')
