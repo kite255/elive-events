@@ -70,6 +70,35 @@ class PayoutApprovalGuardTest extends TestCase
         ]);
     }
 
+    public function test_unverified_settlement_blocks_transfer_after_manual_approval(): void
+    {
+        config(['finance.payout_requests_enabled' => true]);
+        [$request, $requester, $reviewer] = $this->fixture();
+        \Illuminate\Support\Facades\DB::table('event_finance_clearance_entries')
+            ->where('event_id', $request->event_id)->update([
+                'independently_verified_at' => null,
+                'independently_verified_by' => null,
+                'independent_verification_note' => null,
+            ]);
+        app(EventPayoutReviewService::class)->review($request, $reviewer, true);
+
+        \Illuminate\Support\Facades\Storage::fake('local');
+        \Illuminate\Support\Facades\Storage::disk('local')->put('payout-proofs/receipt.pdf', 'test proof');
+
+        try {
+            app(EventPayoutReviewService::class)->recordCompletedTransfer(
+                $request, $reviewer, 'MANUAL-TEST-TRANSFER', 'bank',
+                now()->toDateString(), '60.00', 'payout-proofs/receipt.pdf'
+            );
+            $this->fail('Transfer recording must require verified settlement.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('transfer', $exception->errors());
+        }
+
+        $this->assertSame(EventPayoutRequest::APPROVED, $request->fresh()->status);
+        $this->assertNull($request->fresh()->paid_at);
+    }
+
     private function fixture(string $settlement = '100.00'): array
     {
         $requester = User::factory()->create(['is_super_admin' => true]);
