@@ -67,7 +67,7 @@ class EventPayoutReviewService
             DB::table('event_payout_audits')->insert([
                 'event_payout_request_id' => $locked->getKey(),
                 'actor_id' => $reviewer->getKey(),
-                'action' => $approve ? 'conditionally_approved' : 'rejected',
+                'action' => $approve ? 'approved' : 'rejected',
                 'from_status' => $previousStatus,
                 'to_status' => $locked->status,
                 'note' => $approve ? 'Conditional approval only; transfer requires independent settlement clearance. '.trim((string) $note) : $note,
