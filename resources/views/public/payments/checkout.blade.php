@@ -100,7 +100,7 @@
             <div id="phone-container">
                 <label for="phone" class="field">Mobile Money Number</label>
                 <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
-                    placeholder="2557XXXXXXXX" maxlength="24" value="{{ old('phone') }}"
+                    placeholder="e.g. 0712 345 678" maxlength="24" value="{{ old('phone') }}"
                     aria-describedby="phone-help">
                 <p class="helper" id="phone-help">You will authorize payment securely on your phone. Do not enter your PIN on this website.</p>
             </div>
