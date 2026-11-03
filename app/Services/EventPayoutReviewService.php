@@ -112,6 +112,7 @@ class EventPayoutReviewService
             $unverified = DB::table('event_finance_clearance_entries')
                 ->where('event_id', $locked->event_id)
                 ->whereNull('independently_verified_at')
+                ->whereNull('self_attested_at')
                 ->exists();
             if ($unverified) {
                 throw ValidationException::withMessages(['transfer' => 'Settlement or reversal evidence is still awaiting independent review.']);
@@ -124,7 +125,7 @@ class EventPayoutReviewService
             $otherReserved = $balance['reserved_requests'] - (float) $locked->amount;
             $eligible = max(0, min(
                 $balance['ticket_net_earnings'],
-                $balance['verified_cleared_funds'] - $balance['recorded_reversals']
+                $balance['reviewed_cleared_funds'] - $balance['recorded_reversals']
             ) - $balance['paid_out'] - $otherReserved);
             if ((float) $locked->amount > round($eligible, 2)) {
                 throw ValidationException::withMessages(['transfer' => 'Verified settlement balance is insufficient to record this transfer.']);
