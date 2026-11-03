@@ -30,7 +30,7 @@ class EventFinanceClearanceService
             }
             Event::query()->whereKey($entry->event_id)->lockForUpdate()->firstOrFail();
             $entry = DB::table('event_finance_clearance_entries')->where('id', $entryId)->lockForUpdate()->first();
-            if ($entry->independently_verified_at !== null || (int) $entry->recorded_by === (int) $verifier->getKey()) {
+            if ($entry->independently_verified_at !== null || $entry->self_attested_at !== null || (int) $entry->recorded_by === (int) $verifier->getKey()) {
                 throw ValidationException::withMessages(['verification' => 'Entry already reviewed or verifier is the original recorder.']);
             }
             DB::table('event_finance_clearance_entries')->where('id', $entryId)->update([
