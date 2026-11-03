@@ -71,8 +71,13 @@ class PaymentController extends Controller
             'phone' => ['required_if:method,mobile', 'nullable', 'string', 'max:24'],
         ]);
 
-        if (! $payment->isPending() && ! $payment->isProcessing()) {
-            return redirect()->route('payments.status', $payment);
+        // A Selcom order that is already processing may have a phone request
+        // or QR payment in flight. Never send another request against it.
+        if (! $payment->isPending()
+            || filled($payment->provider_tracking_id)
+            || filled(data_get($payment->metadata, 'checkout_attempted_at'))) {
+            return redirect()->route('payments.pay', $payment)
+                ->with('error', 'This order already has a checkout attempt. Check payment status before paying again.');
         }
 
         try {
