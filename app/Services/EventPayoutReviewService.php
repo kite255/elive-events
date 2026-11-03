@@ -44,31 +44,17 @@ class EventPayoutReviewService
                     throw ValidationException::withMessages(['review' => 'Payout approvals remain disabled pending settlement verification.']);
                 }
 
-                // Manual entries are not bank confirmations. Require independent
-                // evidence review and do not count unreviewed settlements.
-                $unverified = DB::table('event_finance_clearance_entries')
-                    ->where('event_id', $locked->event_id)
-                    ->whereNull('independently_verified_at')
-                    ->exists();
-                if ($unverified) {
-                    throw ValidationException::withMessages(['review' => 'Every settlement and reversal must pass independent evidence review before payout approval.']);
-                }
-
+                // An approval is a commitment only, never authorization to transfer.
+                // Hold the request's existing reservation against recorded net earnings.
                 $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
-
                 if ($balance['refund_exception_count'] > 0) {
                     throw ValidationException::withMessages(['review' => 'Refund exceptions must be reconciled before approval.']);
                 }
-
-                // The request itself is already counted among reserved funds.
                 $otherReserved = $balance['reserved_requests'] - (float) $locked->amount;
-                $eligible = max(0, min(
-                    $balance['ticket_net_earnings'],
-                    $balance['verified_cleared_funds'] - $balance['verified_reversals']
-                ) - $balance['paid_out'] - $otherReserved);
-
+                $eligible = max(0, $balance['ticket_net_earnings'] - $balance['recorded_reversals']
+                    - $balance['paid_out'] - $otherReserved);
                 if ((float) $locked->amount > round($eligible, 2)) {
-                    throw ValidationException::withMessages(['review' => 'Available settlement balance is insufficient for approval.']);
+                    throw ValidationException::withMessages(['review' => 'Available unpaid ticket earnings are insufficient for conditional approval.']);
                 }
             }
 
@@ -81,10 +67,10 @@ class EventPayoutReviewService
             DB::table('event_payout_audits')->insert([
                 'event_payout_request_id' => $locked->getKey(),
                 'actor_id' => $reviewer->getKey(),
-                'action' => $approve ? 'approved' : 'rejected',
+                'action' => $approve ? 'conditionally_approved' : 'rejected',
                 'from_status' => $previousStatus,
                 'to_status' => $locked->status,
-                'note' => $note,
+                'note' => $approve ? 'Conditional approval only; transfer requires independent settlement clearance. '.trim((string) $note) : $note,
                 'created_at' => now(),
             ]);
 
@@ -119,6 +105,29 @@ class EventPayoutReviewService
 
             if ($locked->status !== EventPayoutRequest::APPROVED) {
                 throw ValidationException::withMessages(['transfer' => 'Payout must be approved before recording a transfer.']);
+            }
+
+            // Conditional approvals may be recorded before clearance; a paid status
+            // requires verified settlements and absence of outstanding review items.
+            $unverified = DB::table('event_finance_clearance_entries')
+                ->where('event_id', $locked->event_id)
+                ->whereNull('independently_verified_at')
+                ->exists();
+            if ($unverified) {
+                throw ValidationException::withMessages(['transfer' => 'Settlement or reversal evidence is still awaiting independent review.']);
+            }
+            $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
+            if ($balance['refund_exception_count'] > 0) {
+                throw ValidationException::withMessages(['transfer' => 'Refund exceptions must be reconciled before recording a transfer.']);
+            }
+            // The current approved request is already included in reserved_requests.
+            $otherReserved = $balance['reserved_requests'] - (float) $locked->amount;
+            $eligible = max(0, min(
+                $balance['ticket_net_earnings'],
+                $balance['verified_cleared_funds'] - $balance['recorded_reversals']
+            ) - $balance['paid_out'] - $otherReserved);
+            if ((float) $locked->amount > round($eligible, 2)) {
+                throw ValidationException::withMessages(['transfer' => 'Verified settlement balance is insufficient to record this transfer.']);
             }
 
             if (EventPayoutRequest::query()->where('transfer_reference', trim($transferReference))->exists()) {
