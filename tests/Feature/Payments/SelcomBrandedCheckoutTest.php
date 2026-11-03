@@ -150,7 +150,7 @@ class SelcomBrandedCheckoutTest extends TestCase
             ],
         ]);
 
-        $details = app(\\App\\Services\\Payments\\SelcomBrandedCheckoutService::class)->qrDetails($payment);
+        $details = app(\App\Services\Payments\SelcomBrandedCheckoutService::class)->qrDetails($payment);
         $this->assertSame('TOKEN-1234', $details['payment_token']);
         $this->assertStringStartsWith('data:image/svg+xml;base64,', $details['qr_image']);
 
@@ -174,7 +174,7 @@ class SelcomBrandedCheckoutTest extends TestCase
             ],
         ]);
 
-        $details = app(\\App\\Services\\Payments\\SelcomBrandedCheckoutService::class)->qrDetails($payment);
+        $details = app(\App\Services\Payments\SelcomBrandedCheckoutService::class)->qrDetails($payment);
         $this->assertNull($details['qr_image']);
         $this->assertSame('TOKEN-1234', $details['payment_token']);
     }
