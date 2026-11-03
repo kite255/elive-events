@@ -98,6 +98,7 @@ class EventFinanceReport extends Page
                         ->label('Unreviewed settlement or adjustment')
                         ->options(fn (): array => DB::table('event_finance_clearance_entries')
                             ->whereNull('independently_verified_at')
+                            ->whereNull('self_attested_at')
                             ->orderByDesc('id')
                             ->limit(100)
                             ->get()
@@ -124,6 +125,41 @@ class EventFinanceReport extends Page
                         (string) $data['independent_verification_note'],
                     );
                     Notification::make()->title('Independent evidence review recorded')->success()->send();
+                }),
+            Action::make('selfAttestClearance')
+                ->label('Single-Admin Evidence Attestation')
+                ->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true
+                    && app(EventFinanceClearanceService::class)->singleSuperAdminIs(auth()->user()))
+                ->schema([
+                    Select::make('clearance_entry_id')
+                        ->label('Unreviewed entry recorded by your account')
+                        ->options(fn (): array => DB::table('event_finance_clearance_entries')
+                            ->where('recorded_by', auth()->id())
+                            ->whereNull('independently_verified_at')
+                            ->whereNull('self_attested_at')
+                            ->orderByDesc('id')->limit(100)->get()
+                            ->mapWithKeys(fn ($entry): array => [
+                                $entry->id => '#'.$entry->id.' · Event '.$entry->event_id
+                                    .' · '.$entry->entry_type.' · '.$entry->currency.' '.$entry->amount
+                                    .' · '.$entry->external_reference,
+                            ])->all())
+                        ->searchable()->required(),
+                    Textarea::make('evidence_note')
+                        ->label('External evidence and exception justification')
+                        ->helperText('Self-attestation is NOT independent verification. Check the real bank/provider statement. Duplicate-looking entries must be reconciled first. State source, date, amount, reference, and why no second reviewer is available.')
+                        ->minLength(40)->maxLength(2000)->required(),
+                ])
+                ->requiresConfirmation()
+                ->action(function (array $data): void {
+                    $actor = auth()->user();
+                    abort_unless($actor instanceof User && $actor->isSuperAdmin(), 403);
+                    app(EventFinanceClearanceService::class)->selfAttest(
+                        (int) $data['clearance_entry_id'], $actor, (string) $data['evidence_note']
+                    );
+                    Notification::make()
+                        ->title('Single-admin self-attestation recorded')
+                        ->body('This is not independent verification. Preserve the external evidence for audit.')
+                        ->warning()->send();
                 }),
             Action::make('recordClearance')
                 ->label('Record Attested Settlement / Reversal')

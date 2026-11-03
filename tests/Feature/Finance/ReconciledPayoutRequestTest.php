@@ -53,7 +53,7 @@ class ReconciledPayoutRequestTest extends TestCase
         app(EventPayoutService::class)->request($event, $admin, 50, 'bank', 'Test account');
     }
 
-    public function test_request_can_be_submitted_before_settlement_but_cannot_be_approved(): void
+    public function test_request_can_be_approved_before_settlement_but_not_paid(): void
     {
         config(['finance.payout_requests_enabled' => true]);
         [$event, $admin] = $this->eventWithPaidTickets();
@@ -64,10 +64,11 @@ class ReconciledPayoutRequestTest extends TestCase
         $request = app(EventPayoutService::class)->request($event, $admin, 60, 'bank', 'Test account');
         $this->assertSame('requested', $request->status);
         $this->assertSame(40.0, app(EventPayoutService::class)->ticketBalance($event->id)['requestable_pending_verification_balance']);
-        $this->expectException(ValidationException::class);
-        app(\App\Services\EventPayoutReviewService::class)->review(
+        $approved = app(\App\Services\EventPayoutReviewService::class)->review(
             $request, User::factory()->create(['is_super_admin' => true]), true
         );
+        $this->assertSame('approved', $approved->status);
+        $this->assertNull($approved->paid_at);
     }
 
     public function test_recorded_reversal_reduces_requestable_earnings_before_settlement_verification(): void
