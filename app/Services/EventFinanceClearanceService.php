@@ -43,6 +43,29 @@ class EventFinanceClearanceService
     }
 
     /**
+     * Check the effective policy, including legacy/role and system-admin fallbacks.
+     * Stop early when a second super administrator is discovered.
+     */
+    public function singleSuperAdminIs(User $admin): bool
+    {
+        if (! $admin->isSuperAdmin()) {
+            return false;
+        }
+
+        $count = 0;
+        foreach (User::query()->cursor() as $candidate) {
+            if ($candidate->isSuperAdmin()) {
+                $count++;
+                if ($count > 1) {
+                    return false;
+                }
+            }
+        }
+
+        return $count === 1;
+    }
+
+    /**
      * Explicit single-administrator exception: a self-attestation is NOT an
      * independent verification and must always remain labelled as such.
      */
@@ -62,7 +85,7 @@ class EventFinanceClearanceService
             Event::query()->whereKey($entry->event_id)->lockForUpdate()->firstOrFail();
             $entry = DB::table('event_finance_clearance_entries')->where('id', $entryId)->lockForUpdate()->first();
 
-            if (User::query()->where('is_super_admin', true)->count() !== 1
+            if (! $this->singleSuperAdminIs($admin)
                 || (int) $entry->recorded_by !== (int) $admin->getKey()) {
                 throw ValidationException::withMessages([
                     'verification' => 'Self-attestation is permitted only when exactly one super administrator exists and recorded this entry.',
