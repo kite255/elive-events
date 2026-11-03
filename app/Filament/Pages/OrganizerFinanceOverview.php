@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\Finance\OrganizerFinanceMetricsService;
+use App\Services\EventPayoutService;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use UnitEnum;
@@ -132,6 +133,31 @@ class OrganizerFinanceOverview extends Page
         return app(
             OrganizerFinanceMetricsService::class
         )->forEvent($event);
+    }
+
+    /** Unpaid ticket earnings and outstanding payout reservations for the selected authorized event. */
+    public function payoutSummary(): ?array
+    {
+        if ($this->selectedEventId === null) {
+            return null;
+        }
+
+        $event = $this->resolveAccessibleEvent($this->selectedEventId);
+        if (! $event) {
+            return null;
+        }
+
+        $balance = app(EventPayoutService::class)->ticketBalance((int) $event->getKey());
+
+        $remaining = max(0, round($balance['ticket_net_earnings'] - $balance['paid_out'], 2));
+
+        return [
+            'net_earnings' => $balance['ticket_net_earnings'],
+            'paid_out' => $balance['paid_out'],
+            'remaining_unpaid' => $remaining,
+            'reserved_requests' => $balance['reserved_requests'],
+            'available_for_request' => max(0, round($remaining - $balance['reserved_requests'], 2)),
+        ];
     }
 
     public function financeMetricDefinitions(): array
