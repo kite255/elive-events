@@ -147,7 +147,7 @@ class PayoutResource extends Resource
                             'event_payout_audits.to_status', 'event_payout_audits.note',
                             'event_payout_audits.created_at', 'users.name as actor_name']),
                 ])),
-            Action::make('approve')->label('Approve')->icon('heroicon-o-check')->color('success')
+            Action::make('approve')->label('Approve Request')->icon('heroicon-o-check')->color('success')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
                 ->requiresConfirmation()
                 ->action(function (EventPayoutRequest $record): void {
@@ -160,7 +160,7 @@ class PayoutResource extends Resource
                             ->danger()->duration(10000)->send();
                         return;
                     }
-                    Notification::make()->title('Payout request approved')->body('The organizer has been notified of the approval.')->success()->duration(8000)->send();
+                    Notification::make()->title('Payout request approved')->body('Approval does not mean funds have been transferred. Settlement clearance is required before recording payment.')->success()->duration(8000)->send();
                 }),
             Action::make('reject')->label('Reject')->color('danger')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
