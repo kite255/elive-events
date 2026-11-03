@@ -103,6 +103,23 @@ class EventFinanceClearanceTest extends TestCase
         app(EventFinanceClearanceService::class)->selfAttest($id, $admin, str_repeat('Evidence independently unavailable; ', 2));
     }
 
+    public function test_system_admin_fallback_also_counts_as_a_second_superadmin(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        User::factory()->create([
+            'is_super_admin' => false,
+            'email' => User::SYSTEM_ADMIN_EMAIL,
+        ]);
+        $event = $this->event();
+        $service = app(EventFinanceClearanceService::class);
+        $service->record($event, $admin, 'settlement', '90.00', 'BANK-SOLO-FALLBACK', 'Recorded from external bank statement');
+        $id = (int) DB::table('event_finance_clearance_entries')->where('external_reference', 'BANK-SOLO-FALLBACK')->value('id');
+
+        $this->assertFalse($service->singleSuperAdminIs($admin));
+        $this->expectException(ValidationException::class);
+        $service->selfAttest($id, $admin, 'Reviewed external bank statement; no duplicate bank receipt is present.');
+    }
+
     public function test_same_amount_duplicate_entries_cannot_be_self_attested(): void
     {
         $admin = User::factory()->create(['is_super_admin' => true]);
