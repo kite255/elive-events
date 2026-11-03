@@ -72,6 +72,40 @@ class SelcomService implements PaymentGateway
         ];
     }
 
+    /**
+     * Request a wallet pull on an existing minimal checkout order.
+     * Selcom resultcode 111/PENDING means the phone prompt was requested,
+     * NOT that money was received.
+     */
+    public function requestWalletPayment(string $orderId, string $transactionId, string $phone): array
+    {
+        if (! config('services.selcom.enabled', false)) {
+            throw new RuntimeException('Selcom checkout is not enabled.');
+        }
+
+        $phone = $this->normalizeTanzanianPhone($phone);
+        if (! preg_match('/^255\\d{9}$/', $phone)
+            || ! preg_match('/^[A-Za-z0-9-]{8,64}$/', $orderId)
+            || ! preg_match('/^[A-Za-z0-9-]{8,64}$/', $transactionId)) {
+            throw new RuntimeException('Valid order, transaction and Tanzanian mobile number are required.');
+        }
+
+        $response = $this->request('POST', '/v1/checkout/wallet-payment', [
+            'transid' => $transactionId,
+            'order_id' => $orderId,
+            'msisdn' => $phone,
+        ], allowPending: true);
+
+        if ((string) ($response['resultcode'] ?? '') !== '111'
+            || strtoupper((string) ($response['result'] ?? '')) !== 'PENDING') {
+            // Selcom may eventually document other accepted initiation codes.
+            // Fail closed until they have been verified for our merchant.
+            throw new RuntimeException('Selcom did not confirm the wallet authorization request as pending.');
+        }
+
+        return ['status' => 'PENDING'];
+    }
+
     public function getPaymentStatus(string $providerTrackingId): array
     {
         if (trim($providerTrackingId) === '') {
@@ -137,7 +171,7 @@ class SelcomService implements PaymentGateway
         return $vendor;
     }
 
-    private function request(string $method, string $path, array $fields): array
+    private function request(string $method, string $path, array $fields, bool $allowPending = false): array
     {
         $base = rtrim((string) config('services.selcom.base_url'), '/');
         $key = (string) config('services.selcom.api_key');
@@ -171,8 +205,11 @@ class SelcomService implements PaymentGateway
         $data = $response->json();
         if (! $response->successful()
             || ! is_array($data)
-            || (string) ($data['resultcode'] ?? '') !== '000'
-            || strtoupper((string) ($data['result'] ?? '')) !== 'SUCCESS') {
+            || ! ((string) ($data['resultcode'] ?? '') === '000'
+                && strtoupper((string) ($data['result'] ?? '')) === 'SUCCESS')
+                && ! ($allowPending
+                    && (string) ($data['resultcode'] ?? '') === '111'
+                    && strtoupper((string) ($data['result'] ?? '')) === 'PENDING')) {
             // Only whitelist non-sensitive protocol fields; never log the body,
             // request payload, customer details, credentials or provider message.
             $code = data_get($data, 'resultcode');

@@ -353,6 +353,12 @@ Route::get(
         'payments.pay'
     );
 
+// Selcom branded mobile-wallet / QR checkout. CSRF protected by web middleware.
+Route::post(
+    '/payments/{payment:reference}/pay',
+    [PaymentController::class, 'submit']
+)->middleware('throttle:5,1')->name('payments.submit');
+
 /*
 |--------------------------------------------------------------------------
 | Public Payment Status
