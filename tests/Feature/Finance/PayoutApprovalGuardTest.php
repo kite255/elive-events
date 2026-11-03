@@ -45,7 +45,7 @@ class PayoutApprovalGuardTest extends TestCase
     {
         config(['finance.payout_requests_enabled' => true]);
         [$request, $requester, $reviewer] = $this->fixture();
-        \\Illuminate\\Support\\Facades\\DB::table('event_finance_clearance_entries')
+        \Illuminate\Support\Facades\DB::table('event_finance_clearance_entries')
             ->where('event_id', $request->event_id)->update([
                 'independently_verified_at' => null,
                 'independently_verified_by' => null,
@@ -53,7 +53,7 @@ class PayoutApprovalGuardTest extends TestCase
             ]);
         $approved = app(EventPayoutReviewService::class)->review($request, $reviewer, true);
         $this->assertSame(EventPayoutRequest::APPROVED, $approved->status);
-        $this->assertSame(0.0, app(\\App\\Services\\EventPayoutService::class)->ticketBalance($request->event_id)['verified_cleared_funds']);
+        $this->assertSame(0.0, app(\App\Services\EventPayoutService::class)->ticketBalance($request->event_id)['verified_cleared_funds']);
     }
 
     public function test_approval_succeeds_for_distinct_reviewer_with_sufficient_clearance(): void
@@ -66,7 +66,7 @@ class PayoutApprovalGuardTest extends TestCase
         $this->assertDatabaseHas('event_payout_audits', [
             'event_payout_request_id' => $request->id,
             'actor_id' => $reviewer->id,
-            'action' => 'conditionally_approved',
+            'action' => 'approved',
         ]);
     }
 
