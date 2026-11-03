@@ -12,6 +12,30 @@
         </div>
         @php($balance = $this->overview())
         @if ($balance)
+            {{-- Earnings summary is intentionally separate from settlement verification. --}}
+            <div class="mb-4 rounded-xl border-2 border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-800 dark:bg-indigo-950/40" aria-label="Organizer remaining payout balance">
+                <p class="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Remaining organizer balance</p>
+                <p class="mt-1 text-3xl font-bold tracking-tight text-indigo-950 dark:text-white">TZS {{ number_format($balance['remaining_unpaid_earnings'], 2) }}</p>
+                <p class="mt-1 text-sm text-indigo-800 dark:text-indigo-200">Unpaid ticket earnings after completed bank transfers. Includes money reserved for requests that are not yet paid.</p>
+                <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Reserved for pending / approved</p>
+                        <p class="mt-1 text-xl font-bold text-gray-950 dark:text-white">TZS {{ number_format($balance['reserved_requests'], 2) }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Not yet transferred</p>
+                    </div>
+                    <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Available for a new request</p>
+                        <p class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-400">TZS {{ number_format($balance['unreserved_earnings'], 2) }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Unreserved ticket earnings; settlement clearance required for transfer</p>
+                    </div>
+                    <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
+                        <p class="text-sm font-medium text-gray-600 dark:text-gray-300">Already paid out</p>
+                        <p class="mt-1 text-xl font-bold text-gray-950 dark:text-white">TZS {{ number_format($balance['paid_out'], 2) }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Completed transfers recorded in eLive</p>
+                    </div>
+                </div>
+                <p class="mt-3 text-xs text-indigo-800 dark:text-indigo-200">Calculation: Net ticket earnings − Paid out = Remaining unpaid. Remaining unpaid − Reserved requests = Available for new requests. These are payout ledger figures, not your actual bank-account balance.</p>
+            </div>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                     <p class="text-sm text-gray-500 dark:text-gray-400">Available to request</p>
