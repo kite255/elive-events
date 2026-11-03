@@ -40,14 +40,14 @@
             .card{border-radius:16px;padding:20px 16px}
             h1{font-size:23px}
             .price{font-size:26px}
-            .wallet-logos{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-            .wallet-logo{height:66px;padding:6px}
+            .wallet-logos{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+            .wallet-logo{height:50px;padding:3px;border-radius:7px}
             .tips-panel img{width:160px}
         }
         @media (max-width:390px){
-            .wallet-logos{grid-template-columns:repeat(2,minmax(0,1fr))}
-            .wallet-logo{height:70px}
-            .payment-networks{padding:10px}
+            .wallet-logos{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+            .wallet-logo{height:44px;padding:2px}
+            .payment-networks{padding:8px}
         }
         [hidden]{display:none!important}a{color:var(--blue)}
     </style>
