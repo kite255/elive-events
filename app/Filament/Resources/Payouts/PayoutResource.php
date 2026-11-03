@@ -103,7 +103,7 @@ class PayoutResource extends Resource
                 fn ($state, EventPayoutRequest $record): string =>
                     $record->currency.' '.number_format((float) $state, 2)
             ),
-            TextColumn::make('status')->badge()->color(fn (string $state): string => match ($state) {
+            TextColumn::make('status')->badge()->formatStateUsing(fn (string $state): string => $state === EventPayoutRequest::APPROVED ? 'Approved (pending transfer clearance)' : ucfirst($state))->color(fn (string $state): string => match ($state) {
                 EventPayoutRequest::PAID => 'success',
                 EventPayoutRequest::APPROVED => 'info',
                 EventPayoutRequest::REJECTED => 'danger',
