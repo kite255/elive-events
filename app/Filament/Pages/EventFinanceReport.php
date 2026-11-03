@@ -87,6 +87,29 @@ class EventFinanceReport extends Page
 
         return app(EventFinanceReconciliationService::class)->inspect($this->eventId);
     }
+    public function voidedEntries(): array
+    {
+        if (! $this->eventId || ! $this->accessibleEvents()->whereKey($this->eventId)->exists()) {
+            return [];
+        }
+
+        return DB::table('event_finance_clearance_entries')
+            ->leftJoin('users', 'users.id', '=', 'event_finance_clearance_entries.voided_by')
+            ->where('event_finance_clearance_entries.event_id', $this->eventId)
+            ->whereNotNull('event_finance_clearance_entries.voided_at')
+            ->orderByDesc('event_finance_clearance_entries.voided_at')
+            ->limit(30)
+            ->get([
+                'event_finance_clearance_entries.id',
+                'event_finance_clearance_entries.amount',
+                'event_finance_clearance_entries.currency',
+                'event_finance_clearance_entries.external_reference',
+                'event_finance_clearance_entries.void_reason',
+                'event_finance_clearance_entries.voided_at',
+                'users.name as voided_by_name',
+            ])->toArray();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
