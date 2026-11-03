@@ -87,6 +87,29 @@ class EventFinanceReport extends Page
 
         return app(EventFinanceReconciliationService::class)->inspect($this->eventId);
     }
+    public function voidedEntries(): array
+    {
+        if (! $this->eventId || ! $this->accessibleEvents()->whereKey($this->eventId)->exists()) {
+            return [];
+        }
+
+        return DB::table('event_finance_clearance_entries')
+            ->leftJoin('users', 'users.id', '=', 'event_finance_clearance_entries.voided_by')
+            ->where('event_finance_clearance_entries.event_id', $this->eventId)
+            ->whereNotNull('event_finance_clearance_entries.voided_at')
+            ->orderByDesc('event_finance_clearance_entries.voided_at')
+            ->limit(30)
+            ->get([
+                'event_finance_clearance_entries.id',
+                'event_finance_clearance_entries.amount',
+                'event_finance_clearance_entries.currency',
+                'event_finance_clearance_entries.external_reference',
+                'event_finance_clearance_entries.void_reason',
+                'event_finance_clearance_entries.voided_at',
+                'users.name as voided_by_name',
+            ])->toArray();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -99,6 +122,7 @@ class EventFinanceReport extends Page
                         ->options(fn (): array => DB::table('event_finance_clearance_entries')
                             ->whereNull('independently_verified_at')
                             ->whereNull('self_attested_at')
+                            ->whereNull('voided_at')
                             ->orderByDesc('id')
                             ->limit(100)
                             ->get()
@@ -137,6 +161,7 @@ class EventFinanceReport extends Page
                             ->where('recorded_by', auth()->id())
                             ->whereNull('independently_verified_at')
                             ->whereNull('self_attested_at')
+                            ->whereNull('voided_at')
                             ->orderByDesc('id')->limit(100)->get()
                             ->mapWithKeys(fn ($entry): array => [
                                 $entry->id => '#'.$entry->id.' · Event '.$entry->event_id
@@ -153,13 +178,63 @@ class EventFinanceReport extends Page
                 ->action(function (array $data): void {
                     $actor = auth()->user();
                     abort_unless($actor instanceof User && $actor->isSuperAdmin(), 403);
-                    app(EventFinanceClearanceService::class)->selfAttest(
-                        (int) $data['clearance_entry_id'], $actor, (string) $data['evidence_note']
-                    );
+                    try {
+                        app(EventFinanceClearanceService::class)->selfAttest(
+                            (int) $data['clearance_entry_id'], $actor, (string) $data['evidence_note']
+                        );
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        Notification::make()->title('Settlement attestation blocked')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'Entry could not be attested.')
+                            ->danger()->duration(12000)->send();
+                        return;
+                    }
                     Notification::make()
                         ->title('Single-admin self-attestation recorded')
                         ->body('This is not independent verification. Preserve the external evidence for audit.')
                         ->warning()->send();
+                }),
+            Action::make('voidClearance')
+                ->label('Void Incorrect Settlement Entry')
+                ->color('danger')
+                ->visible(fn (): bool => auth()->user()?->isSuperAdmin() === true)
+                ->schema([
+                    Select::make('clearance_entry_id')
+                        ->label('Incorrect, unreviewed settlement')
+                        ->options(fn (): array => DB::table('event_finance_clearance_entries')
+                            ->where('entry_type', 'settlement')
+                            ->whereNull('voided_at')
+                            ->whereNull('independently_verified_at')
+                            ->whereNull('self_attested_at')
+                            ->orderByDesc('id')->limit(100)->get()
+                            ->mapWithKeys(fn ($entry): array => [
+                                $entry->id => '#'.$entry->id.' · Event '.$entry->event_id
+                                    .' · '.$entry->entry_type.' · '.$entry->currency.' '.$entry->amount
+                                    .' · '.$entry->external_reference,
+                            ])->all())
+                        ->searchable()->required(),
+                    Textarea::make('void_reason')
+                        ->label('Reason for voiding')
+                        ->helperText('Compare with the actual bank/provider evidence first. The original row is preserved, excluded from payout calculations, and remains auditable. Never void a valid settlement.')
+                        ->minLength(20)->maxLength(2000)->required(),
+                ])
+                ->requiresConfirmation()
+                ->action(function (array $data): void {
+                    $actor = auth()->user();
+                    abort_unless($actor instanceof User && $actor->isSuperAdmin(), 403);
+                    try {
+                        app(EventFinanceClearanceService::class)->voidEntry(
+                            (int) $data['clearance_entry_id'],
+                            $actor,
+                            (string) $data['void_reason']
+                        );
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        Notification::make()->title('Settlement correction blocked')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'Entry could not be voided.')
+                            ->danger()->duration(12000)->send();
+                        return;
+                    }
+                    Notification::make()->title('Finance entry voided and retained for audit')
+                        ->success()->send();
                 }),
             Action::make('recordClearance')
                 ->label('Record Attested Settlement / Reversal')

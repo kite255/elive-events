@@ -111,6 +111,7 @@ class EventPayoutReviewService
             // requires verified settlements and absence of outstanding review items.
             $unverified = DB::table('event_finance_clearance_entries')
                 ->where('event_id', $locked->event_id)
+                ->whereNull('voided_at')
                 ->whereNull('independently_verified_at')
                 ->whereNull('self_attested_at')
                 ->exists();

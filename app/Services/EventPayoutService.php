@@ -39,15 +39,15 @@ class EventPayoutService
             ->sum('amount');
 
         $cleared = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->where('entry_type', 'settlement')
+            ->where('event_id', $eventId)->whereNull('voided_at')->where('entry_type', 'settlement')
             ->whereNotNull('independently_verified_at')->sum('amount');
         // Separate genuine independent review from the single-admin exception.
         $selfAttested = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->where('entry_type', 'settlement')
+            ->where('event_id', $eventId)->whereNull('voided_at')->where('entry_type', 'settlement')
             ->whereNotNull('self_attested_at')->whereNull('independently_verified_at')->sum('amount');
         $acceptedClearance = $cleared + $selfAttested;
         $reversals = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
+            ->where('event_id', $eventId)->whereNull('voided_at')->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
 
         $exceptions = TicketOrder::query()->where('event_id', $eventId)
             ->whereIn('status', [TicketOrder::STATUS_REFUNDED, TicketOrder::STATUS_PARTIALLY_REFUNDED])->count();
