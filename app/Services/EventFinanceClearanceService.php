@@ -30,7 +30,7 @@ class EventFinanceClearanceService
             }
             Event::query()->whereKey($entry->event_id)->lockForUpdate()->firstOrFail();
             $entry = DB::table('event_finance_clearance_entries')->where('id', $entryId)->lockForUpdate()->first();
-            if ($entry->independently_verified_at !== null || $entry->self_attested_at !== null || (int) $entry->recorded_by === (int) $verifier->getKey()) {
+            if ($entry->voided_at !== null || $entry->independently_verified_at !== null || $entry->self_attested_at !== null || (int) $entry->recorded_by === (int) $verifier->getKey()) {
                 throw ValidationException::withMessages(['verification' => 'Entry already reviewed or verifier is the original recorder.']);
             }
             DB::table('event_finance_clearance_entries')->where('id', $entryId)->update([
@@ -92,7 +92,7 @@ class EventFinanceClearanceService
                 ]);
             }
 
-            if ($entry->independently_verified_at !== null || $entry->self_attested_at !== null) {
+            if ($entry->voided_at !== null || $entry->independently_verified_at !== null || $entry->self_attested_at !== null) {
                 throw ValidationException::withMessages(['verification' => 'This entry has already been reviewed.']);
             }
 
@@ -103,6 +103,7 @@ class EventFinanceClearanceService
                 ->where('entry_type', $entry->entry_type)
                 ->where('amount', $entry->amount)
                 ->where('id', '!=', $entryId)
+                ->whereNull('voided_at')
                 ->exists();
             if ($duplicate) {
                 throw ValidationException::withMessages([
@@ -114,6 +115,54 @@ class EventFinanceClearanceService
                 'self_attested_by' => $admin->getKey(),
                 'self_attested_at' => now(),
                 'self_attestation_note' => trim($note),
+                'updated_at' => now(),
+            ]);
+        });
+    }
+
+    /**
+     * Preserve mistaken entries and their evidence references without treating
+     * them as money received. Voiding is only possible before verification and
+     * before any payout for this event has been recorded as paid.
+     */
+    public function voidEntry(int $entryId, User $admin, string $reason): void
+    {
+        $reason = trim($reason);
+        if (! $admin->isSuperAdmin() || mb_strlen($reason) < 20 || mb_strlen($reason) > 2000) {
+            throw ValidationException::withMessages([
+                'void_reason' => 'A super administrator must provide a correction reason of 20–2000 characters.',
+            ]);
+        }
+
+        DB::transaction(function () use ($entryId, $admin, $reason): void {
+            $entry = DB::table('event_finance_clearance_entries')->where('id', $entryId)->first();
+            if (! $entry) {
+                throw ValidationException::withMessages(['void_reason' => 'Settlement entry not found.']);
+            }
+
+            Event::query()->whereKey($entry->event_id)->lockForUpdate()->firstOrFail();
+            $entry = DB::table('event_finance_clearance_entries')
+                ->where('id', $entryId)->lockForUpdate()->first();
+
+            if ($entry->voided_at !== null) {
+                throw ValidationException::withMessages(['void_reason' => 'This entry was already voided.']);
+            }
+            if ($entry->independently_verified_at !== null || $entry->self_attested_at !== null) {
+                throw ValidationException::withMessages([
+                    'void_reason' => 'Previously reviewed entries require a separate financial reconciliation process.',
+                ]);
+            }
+            if (DB::table('event_payout_requests')
+                ->where('event_id', $entry->event_id)->where('status', 'paid')->exists()) {
+                throw ValidationException::withMessages([
+                    'void_reason' => 'A completed payout exists for this event. Reconcile the payout before correcting settlement records.',
+                ]);
+            }
+
+            DB::table('event_finance_clearance_entries')->where('id', $entryId)->update([
+                'voided_by' => $admin->getKey(),
+                'voided_at' => now(),
+                'void_reason' => $reason,
                 'updated_at' => now(),
             ]);
         });
