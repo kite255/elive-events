@@ -100,11 +100,24 @@ class SelcomBrandedCheckoutTest extends TestCase
         $payment = $this->payment();
         Http::fake();
 
-        $this->get(route('payments.pay', $payment))
+        $response = $this->get(route('payments.pay', $payment))
             ->assertOk()
             ->assertSee('Mobile Money')
             ->assertSee('QR Code / Payment Token')
-            ->assertSee('Debit / Credit Card');
+            ->assertSee('e.g. 255712345678')
+            ->assertDontSee('Debit / Credit Card');
+
+        $html = $response->getContent();
+        $this->assertTrue(
+            strpos($html, 'Vodacom M-Pesa') < strpos($html, 'Mixx by Yas')
+            && strpos($html, 'Mixx by Yas') < strpos($html, 'Airtel Money')
+            && strpos($html, 'Airtel Money') < strpos($html, 'HaloPesa')
+            && strpos($html, 'HaloPesa') < strpos($html, 'T-Pesa')
+        );
+
+        foreach (['m-pesa.png', 'mixx-by-yas.png', 'airtel-money.png', 'halopesa.png', 't-pesa.png', 'tips.png'] as $logo) {
+            $this->assertFileExists(public_path('images/payment-networks/' . $logo));
+        }
 
         Http::assertNothingSent();
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
