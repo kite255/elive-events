@@ -41,7 +41,11 @@
                         <p class="mt-1 text-lg font-semibold">TZS {{ number_format($balance['verified_cleared_funds'], 2) }}</p>
                     </div>
                     <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Available for approval*</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Single-admin self-attested settlement (not independent)</p>
+                        <p class="mt-1 text-lg font-semibold">TZS {{ number_format($balance['self_attested_cleared_funds'] ?? 0, 2) }}</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Unreserved reviewed settlement*</p>
                         <p class="mt-1 text-lg font-semibold">TZS {{ number_format($balance['requestable_ticket_balance'], 2) }}</p>
                     </div>
                     <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
@@ -53,12 +57,12 @@
                         <p class="mt-1 text-lg font-semibold">TZS {{ number_format($balance['approved_amount'], 2) }}</p>
                     </div>
                 </div>
-                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">*Indicative unreserved settlement headroom. The approval service independently checks each request, existing commitments, reversals, and refund exceptions; a zero balance here does not by itself imply a pending request cannot be approved.</p>
+                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">*Indicative unreserved settlement headroom. Approval does not authorize payment. Recording a transfer requires verified evidence or an explicitly documented single-admin exception, plus sufficient funds and no unresolved exceptions.</p>
                 @if ($balance['refund_exception_count'] > 0)
                     <p class="mt-2 text-sm font-medium text-red-600">Approval blocked: unresolved refund exceptions ({{ $balance['refund_exception_count'] }}).</p>
                 @endif
             @else
-                <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Requests can be submitted before settlement verification; administrators must independently verify received funds before approval. Select an event in Request Payout to see its maximum amount.</p>
+                <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Requests can be submitted before settlement verification; a super administrator may approve conditionally, but money must be reviewed before a transfer is recorded. Select an event in Request Payout to see its maximum amount.</p>
             @endif
         @elseif (count($options))
             <p class="text-sm text-gray-500 dark:text-gray-400">Choose an event above to view its current payout figures.</p>
