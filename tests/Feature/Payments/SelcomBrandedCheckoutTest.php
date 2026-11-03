@@ -103,7 +103,9 @@ class SelcomBrandedCheckoutTest extends TestCase
         $response = $this->get(route('payments.pay', $payment))
             ->assertOk()
             ->assertSee('Mobile Money')
-            ->assertSee('QR Code / Payment Token')
+            ->assertSee('Pay with QR Code')
+            ->assertSee('Scan the QR code using a supported payment app.')
+            ->assertDontSee('QR Code / Payment Token')
             ->assertSee('e.g. 255712345678')
             ->assertDontSee('Debit / Credit Card');
 
@@ -134,6 +136,8 @@ class SelcomBrandedCheckoutTest extends TestCase
         $this->get(route('payments.pay', $payment))
             ->assertOk()
             ->assertSee('TOKEN-1234')
+            ->assertSee('Alternatively, use this payment token:')
+            ->assertSee('Pay with QR Code')
             ->assertSee('Check Payment Status');
 
         $this->assertSame(Payment::STATUS_PROCESSING, $payment->fresh()->status);
