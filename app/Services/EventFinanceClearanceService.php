@@ -42,6 +42,60 @@ class EventFinanceClearanceService
         });
     }
 
+    /**
+     * Explicit single-administrator exception: a self-attestation is NOT an
+     * independent verification and must always remain labelled as such.
+     */
+    public function selfAttest(int $entryId, User $admin, string $note): void
+    {
+        if (! $admin->isSuperAdmin() || mb_strlen(trim($note)) < 40) {
+            throw ValidationException::withMessages([
+                'verification' => 'Super administrator and a detailed evidence note (40+ characters) required.',
+            ]);
+        }
+
+        DB::transaction(function () use ($entryId, $admin, $note): void {
+            $entry = DB::table('event_finance_clearance_entries')->where('id', $entryId)->first();
+            if (! $entry) {
+                throw ValidationException::withMessages(['verification' => 'Clearance entry not found.']);
+            }
+            Event::query()->whereKey($entry->event_id)->lockForUpdate()->firstOrFail();
+            $entry = DB::table('event_finance_clearance_entries')->where('id', $entryId)->lockForUpdate()->first();
+
+            if (User::query()->where('is_super_admin', true)->count() !== 1
+                || (int) $entry->recorded_by !== (int) $admin->getKey()) {
+                throw ValidationException::withMessages([
+                    'verification' => 'Self-attestation is permitted only when exactly one super administrator exists and recorded this entry.',
+                ]);
+            }
+
+            if ($entry->independently_verified_at !== null || $entry->self_attested_at !== null) {
+                throw ValidationException::withMessages(['verification' => 'This entry has already been reviewed.']);
+            }
+
+            // Duplicate amount/type across the same event requires separate
+            // reconciliation rather than signing off multiple suspect receipts.
+            $duplicate = DB::table('event_finance_clearance_entries')
+                ->where('event_id', $entry->event_id)
+                ->where('entry_type', $entry->entry_type)
+                ->where('amount', $entry->amount)
+                ->where('id', '!=', $entryId)
+                ->exists();
+            if ($duplicate) {
+                throw ValidationException::withMessages([
+                    'verification' => 'Another entry has the same amount and type. Reconcile duplicate-looking receipts before using the single-admin exception.',
+                ]);
+            }
+
+            DB::table('event_finance_clearance_entries')->where('id', $entryId)->update([
+                'self_attested_by' => $admin->getKey(),
+                'self_attested_at' => now(),
+                'self_attestation_note' => trim($note),
+                'updated_at' => now(),
+            ]);
+        });
+    }
+
     public function record(
         Event $event, User $admin, string $type, string $amount,
         string $externalReference, string $note
