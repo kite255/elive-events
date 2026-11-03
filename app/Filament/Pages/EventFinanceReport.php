@@ -98,6 +98,7 @@ class EventFinanceReport extends Page
                         ->label('Unreviewed settlement or adjustment')
                         ->options(fn (): array => DB::table('event_finance_clearance_entries')
                             ->whereNull('independently_verified_at')
+                            ->whereNull('self_attested_at')
                             ->orderByDesc('id')
                             ->limit(100)
                             ->get()
