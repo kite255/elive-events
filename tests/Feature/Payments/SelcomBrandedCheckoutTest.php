@@ -134,6 +134,51 @@ class SelcomBrandedCheckoutTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_emv_qr_payload_is_rendered_as_a_scannable_svg_without_changing_provider_data(): void
+    {
+        $payment = $this->payment();
+        $emv = '000201' . str_repeat('1234567890', 23) . '6304ABCD';
+
+        $payment->transactions()->create([
+            'type' => 'order_created',
+            'status' => 'success',
+            'response_payload' => [
+                'selcom_response' => ['data' => [[
+                    'qr' => $emv,
+                    'payment_token' => 'TOKEN-1234',
+                ]]],
+            ],
+        ]);
+
+        $details = app(\\App\\Services\\Payments\\SelcomBrandedCheckoutService::class)->qrDetails($payment);
+        $this->assertSame('TOKEN-1234', $details['payment_token']);
+        $this->assertStringStartsWith('data:image/svg+xml;base64,', $details['qr_image']);
+
+        $svg = base64_decode(substr($details['qr_image'], strlen('data:image/svg+xml;base64,')), true);
+        $this->assertIsString($svg);
+        $this->assertStringContainsString('<svg', $svg);
+        $this->assertStringContainsString('</svg>', $svg);
+    }
+
+    public function test_arbitrary_qr_strings_are_not_rendered_as_payment_qr(): void
+    {
+        $payment = $this->payment();
+        $payment->transactions()->create([
+            'type' => 'order_created',
+            'status' => 'success',
+            'response_payload' => [
+                'selcom_response' => ['data' => [[
+                    'qr' => 'INVALID-QR-DATA',
+                    'payment_token' => 'TOKEN-1234',
+                ]]],
+            ],
+        ]);
+
+        $details = app(\\App\\Services\\Payments\\SelcomBrandedCheckoutService::class)->qrDetails($payment);
+        $this->assertNull($details['qr_image']);
+        $this->assertSame('TOKEN-1234', $details['payment_token']);
+    }
+
     public function test_wallet_checkout_requests_phone_push_once_and_never_marks_paid(): void
     {
         $payment = $this->payment();
