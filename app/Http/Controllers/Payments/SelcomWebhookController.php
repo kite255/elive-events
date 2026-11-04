@@ -8,6 +8,7 @@ use App\Services\Payments\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -15,7 +16,16 @@ class SelcomWebhookController extends Controller
 {
     public function __invoke(Request $request, PaymentService $payments): JsonResponse
     {
-        if (! $this->isSignedRequest($request)) {
+        $rejectionReason = $this->signatureRejectionReason($request);
+        if ($rejectionReason !== null) {
+            // A single diagnostic per failure category per minute bounds
+            // unauthenticated log volume, without logging request identifiers.
+            if (Cache::add('selcom:webhook:rejected:' . $rejectionReason, true, 60)) {
+                Log::notice('Selcom webhook authentication rejected.', [
+                    'reason' => $rejectionReason,
+                ]);
+            }
+
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
@@ -55,47 +65,67 @@ class SelcomWebhookController extends Controller
         return response()->json(['message' => 'Accepted']);
     }
 
-    private function isSignedRequest(Request $request): bool
+    /**
+     * Return a fixed diagnostic category only. No request body, credentials,
+     * digest, IP, order reference or exception message is ever logged.
+     */
+    private function signatureRejectionReason(Request $request): ?string
     {
         $secret = (string) config('services.selcom.api_secret');
         $key = (string) config('services.selcom.api_key');
         $timestamp = (string) $request->header('Timestamp', '');
         $fields = (string) $request->header('Signed-Fields', '');
         $digest = (string) $request->header('Digest', '');
+        $authorization = (string) $request->header('Authorization', '');
+        $digestMethod = (string) $request->header('Digest-Method', '');
 
-        if ($secret === '' || $key === '' || $timestamp === ''
-            || $fields === '' || $digest === ''
-            || (string) $request->header('Authorization') !== 'SELCOM ' . base64_encode($key)
-            || (string) $request->header('Digest-Method') !== 'HS256') {
-            return false;
+        if ($secret === '' || $key === '') {
+            return 'credentials_not_configured';
+        }
+
+        if ($timestamp === '' || $fields === '' || $digest === ''
+            || $authorization === '' || $digestMethod === '') {
+            return 'missing_headers';
+        }
+
+        if (! hash_equals('SELCOM ' . base64_encode($key), $authorization)
+            || $digestMethod !== 'HS256') {
+            return 'invalid_authentication_headers';
         }
 
         try {
             if (abs(Carbon::parse($timestamp)->diffInSeconds(now(), false)) > 300) {
-                return false;
+                return 'invalid_timestamp';
             }
         } catch (Throwable) {
-            return false;
+            return 'invalid_timestamp';
         }
 
         $message = 'timestamp=' . $timestamp;
         $names = explode(',', $fields);
         if (count($names) > 25 || count($names) !== count(array_unique($names))) {
-            return false;
+            return 'invalid_signed_fields';
         }
 
         foreach ($names as $name) {
-            if (! preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)
-                || ! $request->exists($name)
-                || ! is_scalar($request->input($name))) {
-                return false;
+            if (! preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)) {
+                return 'invalid_signed_fields';
             }
+
+            if (! $request->exists($name) || ! is_scalar($request->input($name))) {
+                return 'missing_signed_field';
+            }
+
             $message .= '&' . $name . '=' . $request->input($name);
         }
 
-        return hash_equals(
+        if (! hash_equals(
             base64_encode(hash_hmac('sha256', $message, $secret, true)),
             $digest
-        );
+        )) {
+            return 'invalid_signature';
+        }
+
+        return null;
     }
 }
