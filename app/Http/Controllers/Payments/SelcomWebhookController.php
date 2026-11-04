@@ -8,6 +8,7 @@ use App\Services\Payments\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class SelcomWebhookController extends Controller
@@ -25,14 +26,30 @@ class SelcomWebhookController extends Controller
             return response()->json(['message' => 'Unknown Selcom order'], 404);
         }
 
+        Log::info('Selcom webhook accepted for verification.', [
+            'payment_id' => $payment->getKey(),
+            'previous_status' => $payment->status,
+        ]);
+
         try {
             // Never trust webhook's payment_status/amount. Query Selcom's
             // authenticated order status before the existing fulfillment path.
             $payments->syncFromGateway($payment);
         } catch (Throwable $e) {
+            Log::warning('Selcom webhook provider verification failed.', [
+                'payment_id' => $payment->getKey(),
+                'exception_class' => $e::class,
+            ]);
             report($e);
             return response()->json(['message' => 'Verification temporarily unavailable'], 503);
         }
+
+        $payment->refresh();
+        Log::info('Selcom webhook provider verification completed.', [
+            'payment_id' => $payment->getKey(),
+            'payment_status' => $payment->status,
+            'fulfillment_queued_or_completed' => $payment->isCompleted(),
+        ]);
 
         return response()->json(['message' => 'Accepted']);
     }
