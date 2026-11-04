@@ -526,6 +526,7 @@ class PublicTicketCheckoutTest extends TestCase
                     'ticket_order_id',
                     $order->id
                 )
+                ->where('purpose', CommunicationLog::PURPOSE_TICKET_ACCESS)
                 ->orderBy('channel')
                 ->pluck('channel')
                 ->all()
