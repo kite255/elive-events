@@ -8,6 +8,7 @@ use App\Http\Controllers\EventCommunicationPreviewController;
 use App\Http\Controllers\Payments\PaymentController;
 use App\Http\Controllers\Payments\PesapalCallbackController;
 use App\Http\Controllers\Payments\PesapalIpnController;
+use App\Http\Controllers\Payments\SelcomWebhookController;
 use App\Http\Controllers\PublicAttendeeController;
 use App\Http\Controllers\PublicDonationCampaignController;
 use App\Http\Controllers\PublicDonationController;
@@ -41,6 +42,9 @@ Route::view(
 )->name(
     'home'
 );
+
+Route::post('/payments/selcom/webhook', SelcomWebhookController::class)
+    ->name('payments.selcom.webhook');
 
 Route::view('/terms-and-conditions', 'public.legal.ticket-terms')
     ->name('public.terms');
@@ -346,11 +350,16 @@ Route::get(
     ]
 )
     ->middleware(
-        'throttle:30,1'
+        'throttle:payment-checkout-view'
     )
     ->name(
         'payments.pay'
     );
+
+// Selcom branded QR and mobile-wallet checkout (web CSRF protected).
+Route::post('/payments/{payment:reference}/pay', [PaymentController::class, 'submit'])
+    ->middleware('throttle:5,1')
+    ->name('payments.submit');
 
 /*
 |--------------------------------------------------------------------------

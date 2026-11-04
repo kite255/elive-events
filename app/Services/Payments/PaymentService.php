@@ -11,6 +11,7 @@ use App\Models\PaymentGateway;
 use App\Models\PaymentTransaction;
 use App\Models\TicketOrder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use Throwable;
 
@@ -18,7 +19,8 @@ class PaymentService
 {
     public function __construct(
         protected PaymentReferenceService $referenceService,
-        protected PesapalService $pesapalService
+        protected PesapalService $pesapalService,
+        protected SelcomService $selcomService
     ) {
     }
 
@@ -401,10 +403,33 @@ class PaymentService
     public function start(
         Payment $payment
     ): array {
-        if ($payment->isCompleted()) {
-            throw new RuntimeException(
-                'This payment is already completed.'
-            );
+        // A distributed lock prevents simultaneous requests for the same
+        // payment from creating multiple orders at the provider.
+        $lock = Cache::lock('payment:checkout:' . $payment->getKey(), 90);
+
+        if (! $lock->get()) {
+            throw new RuntimeException('Checkout is already being initialized.');
+        }
+
+        try {
+            // Refresh after acquiring the lock so replay checks use current state.
+            $payment = Payment::query()->findOrFail($payment->getKey());
+        // Never create another provider order for terminal or active payments.
+        // Pending retries are handled separately until provider idempotency
+        // can be guaranteed, and existing settlements remain untouched.
+        if (in_array($payment->status, [
+            Payment::STATUS_COMPLETED,
+            Payment::STATUS_FAILED,
+            Payment::STATUS_CANCELLED,
+            Payment::STATUS_EXPIRED,
+            Payment::STATUS_REFUNDED,
+            Payment::STATUS_PARTIALLY_REFUNDED,
+        ], true)) {
+            throw new RuntimeException('This payment cannot start checkout.');
+        }
+
+        if ($payment->isProcessing() || filled($payment->provider_tracking_id)) {
+            throw new RuntimeException('Checkout has already been initialized.');
         }
 
         if ($payment->merchandise_order_id) {
@@ -482,7 +507,38 @@ class PaymentService
                 $gatewayModel
             );
 
+        // Selcom order creation uses this payment's merchant reference.
+        // An uncertain previous attempt must be reconciled, not repeated.
+        if ($gatewayModel->code === 'selcom'
+            && filled(data_get($payment->metadata, 'checkout_attempted_at'))) {
+            throw new RuntimeException('Checkout attempt requires reconciliation before retry.');
+        }
+
         try {
+            if ($gatewayModel->code === 'selcom') {
+                // Persist intent BEFORE the network request. A timeout or worker
+                // crash must not allow another request to create a second order.
+                // This marker deliberately survives failures until reconciled.
+                DB::transaction(function () use ($payment): void {
+                    $locked = Payment::query()
+                        ->lockForUpdate()
+                        ->findOrFail($payment->getKey());
+
+                    if ($locked->status !== Payment::STATUS_PENDING
+                        || filled($locked->provider_tracking_id)
+                        || filled(data_get($locked->metadata, 'checkout_attempted_at'))) {
+                        throw new RuntimeException('Checkout already attempted or unavailable.');
+                    }
+
+                    $locked->update([
+                        'metadata' => array_merge($locked->metadata ?? [], [
+                            'checkout_attempted_at' => now()->toIso8601String(),
+                        ]),
+                    ]);
+                });
+
+            }
+
             $response =
                 $gateway->createPayment(
                     $payment
@@ -623,6 +679,11 @@ class PaymentService
             return $response;
         } catch (Throwable $exception) {
             try {
+                // A failed checkout attempt is NOT proof that the provider
+                // rejected or reversed the payment. Keep the parent pending
+                // for reconciliation; never mark it paid or failed here.
+                // Do not persist raw gateway exception text, which can
+                // contain upstream response data or other sensitive details.
                 $payment
                     ->transactions()
                     ->create([
@@ -633,7 +694,8 @@ class PaymentService
                             'failed',
 
                         'error_message' =>
-                            $exception->getMessage(),
+                            'Checkout initialization failed (' .
+                            class_basename($exception) . ').',
                     ]);
             } catch (Throwable $loggingException) {
                 report(
@@ -647,6 +709,34 @@ class PaymentService
 
             throw $exception;
         }
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Read-only provider reconciliation for a Selcom checkout whose create
+     * response was lost. Never retries create-order or clears the attempt flag.
+     * Invoke only from a controlled recovery workflow.
+     */
+    public function reconcileUncertainSelcomCheckout(Payment $payment): Payment
+    {
+        $payment = Payment::query()->with('gateway')
+            ->findOrFail($payment->getKey());
+
+        if ($payment->gateway?->code !== 'selcom'
+            || ! filled(data_get($payment->metadata, 'checkout_attempted_at'))) {
+            throw new RuntimeException('Payment is not an uncertain Selcom checkout.');
+        }
+
+        if ($payment->isCompleted() || $payment->isFulfilled()) {
+            return $payment;
+        }
+
+        // Selcom checkout order_id is the local merchant reference. The
+        // authenticated status response is checked for reference and amount
+        // by syncFromGateway before a completed payment can be fulfilled.
+        return $this->syncFromGateway($payment, $payment->reference);
     }
 
     /**
@@ -1183,6 +1273,9 @@ class PaymentService
         ) {
             'pesapal' =>
                 $this->pesapalService,
+
+            'selcom' =>
+                $this->selcomService,
 
             default =>
                 throw new RuntimeException(

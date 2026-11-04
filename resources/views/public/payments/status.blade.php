@@ -381,6 +381,12 @@
 
     <div class="payment-card">
 
+        @if (session('error'))
+            <div role="alert" style="padding: 16px 18px; margin-bottom: 24px; border-radius: 12px; background: var(--danger-bg); color: var(--danger); font-size: 14px; line-height: 1.5;">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <div class="brand">
 
             <a
@@ -432,6 +438,19 @@
                 </p>
 
             @endif
+
+        @elseif ($checkoutUnavailable)
+
+            <div class="status-icon failed">!</div>
+
+            <h1>Checkout Unavailable</h1>
+
+            <p class="status-message">
+                We could not start checkout with the payment provider.
+                Your payment has not been confirmed. Please contact support
+                or return to the event. Do not retry this payment reference
+                until its status has been checked.
+            </p>
 
         @elseif (
             $payment->isPending()
@@ -630,22 +649,15 @@
                 <div class="detail-value">
 
                     @php
-                        $statusClass =
-                            $payment->isCompleted()
-                                ? 'success'
-                                : (
-                                    $payment->isPending()
-                                    || $payment->isProcessing()
-                                        ? 'processing'
-                                        : (
-                                            $payment->isFailed()
-                                            || $payment->status
-                                                === \App\Models\Payment::STATUS_CANCELLED
-                                                ? 'failed'
-                                                : 'neutral'
-                                        )
-                                );
-                    @endphp
+                        $statusClass = $payment->isCompleted()
+                            ? 'success'
+                            : ($checkoutUnavailable || $payment->isFailed()
+                                || $payment->status === \App\Models\Payment::STATUS_CANCELLED
+                                ? 'failed'
+                                : ($payment->isPending() || $payment->isProcessing()
+                                    ? 'processing'
+                                    : 'neutral'));
+                                        @endphp
 
                     <span class="payment-status {{ $statusClass }}">
                         {{
@@ -706,8 +718,8 @@
         <div class="actions">
 
             @if (
-                $payment->isPending()
-                || $payment->isProcessing()
+                ! $checkoutUnavailable
+                && ($payment->isPending() || $payment->isProcessing())
             )
 
                 <a
@@ -819,16 +831,26 @@
         </div>
 
 
-        @if (
+        @if ($checkoutUnavailable)
+
+            <div class="notice">
+                Checkout was not initialized. This payment remains
+                unconfirmed. Contact support with your reference
+                before making another payment attempt.
+            </div>
+
+        @elseif (
             $payment->isPending()
             || $payment->isProcessing()
         )
 
             <div class="notice">
                 Payment confirmation can take a short time depending
-                on the payment method. You can safely use
-                <strong>Check Again</strong>
-                to refresh the status.
+                on the payment method. You can use
+                <strong>Check Again</strong> to refresh the status.
+                @if ($payment->gateway?->code === 'selcom' && filled($payment->provider_tracking_id))
+                    This page also checks automatically about every 25 seconds while it is visible.
+                @endif
             </div>
 
         @elseif (
@@ -847,6 +869,24 @@
     </div>
 
 </div>
+
+
+@if (
+    ! $checkoutUnavailable
+    && ($payment->isPending() || $payment->isProcessing())
+    && $payment->gateway?->code === 'selcom'
+    && filled($payment->provider_tracking_id)
+)
+    <script>
+        // A status refresh is not a payment initiation; never retry wallet authorization.
+        // Only poll while the tab is visible, at most once every 25 seconds.
+        window.setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+                window.location.reload();
+            }
+        }, 25000);
+    </script>
+@endif
 
 </body>
 </html>
