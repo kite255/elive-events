@@ -71,7 +71,7 @@
 
         <p class="meta">For clarity, a specific event may include additional admission, accessibility, age, refund or rescheduling conditions on its event page.</p>
     </article>
-    <footer>eLive Events &middot; Ticket purchase information</footer>
+    <footer>eLive Events &middot; Ticket purchase information &middot; <a href="{{ route('public.terms') }}">Terms &amp; Conditions</a></footer>
 </main>
 </body>
 </html>
