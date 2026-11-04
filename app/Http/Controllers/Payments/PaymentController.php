@@ -80,10 +80,13 @@ class PaymentController extends Controller
                 ->with('error', 'This order already has a checkout attempt. Check payment status before paying again.');
         }
 
+        $checkoutStage = 'order_initialization';
+
         try {
             $payment = $branded->initialize($payment);
 
             if ($validated['method'] === 'mobile') {
+                $checkoutStage = 'wallet_authorization';
                 $branded->requestWallet($payment, (string) $validated['phone']);
             } else {
                 // Only retain method choice when there has not already
@@ -97,8 +100,15 @@ class PaymentController extends Controller
 
             return redirect()->route('payments.pay', $payment);
         } catch (Throwable $exception) {
+            // Log only stable internal state, never the phone number, provider
+            // payload, payment token, headers or exception message.
+            $latest = $payment->fresh();
             Log::warning('Selcom branded checkout request failed', [
                 'payment_id' => $payment->getKey(),
+                'stage' => $checkoutStage,
+                'payment_status' => $latest?->status,
+                'provider_order_recorded' => filled($latest?->provider_tracking_id),
+                'wallet_attempted' => filled(data_get($latest?->metadata, 'wallet_attempted_at')),
                 'exception_class' => get_class($exception),
             ]);
 
