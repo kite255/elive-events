@@ -294,9 +294,9 @@
             grid-area: content;
 
             padding:
-                42px
-                42px
-                18px;
+                38px
+                40px
+                14px;
         }
 
         .eyebrow {
@@ -326,12 +326,12 @@
         }
 
         .hero-meta {
-            margin-top: 22px;
+            margin-top: 18px;
 
             display: flex;
             flex-wrap: wrap;
 
-            gap: 10px;
+            gap: 8px;
         }
 
         .hero-meta span {
@@ -348,8 +348,22 @@
             background:
                 rgba(255, 255, 255, .08);
 
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .hero-powered-by {
+            margin: 16px 0 0;
+            color: rgba(255, 255, 255, .68);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: .01em;
+        }
+
+        .hero-powered-by strong {
+            color: #FFFFFF;
+            font-weight: 800;
         }
 
         .reservation-notice {
@@ -357,21 +371,21 @@
 
             margin:
                 0
-                42px
-                38px;
+                40px
+                34px;
 
             padding:
-                14px
-                16px;
+                12px
+                14px;
 
             border:
                 1px solid
-                rgba(255, 152, 0, .5);
+                rgba(255, 184, 89, .3);
 
             border-radius: 14px;
 
             background:
-                rgba(255, 152, 0, .13);
+                rgba(255, 184, 89, .09);
 
             color: #FFE1B2;
 
@@ -391,7 +405,8 @@
             width: 100%;
             height: 100%;
 
-            object-fit: cover;
+            object-fit: contain;
+            object-position: center;
 
             display: block;
         }
@@ -970,15 +985,16 @@
                 grid-template-columns: 1fr;
 
                 grid-template-areas:
-                    "content"
                     "visual"
+                    "content"
                     "notice";
 
                 grid-template-rows: auto;
             }
 
             .hero-visual {
-                min-height: 240px;
+                min-height: 0;
+                aspect-ratio: 16 / 9;
             }
 
             .hero-placeholder {
@@ -1025,13 +1041,19 @@
 
             .hero-content {
                 padding:
-                    24px
-                    20px;
+                    22px
+                    20px
+                    8px;
+            }
+
+            .hero-card {
+                border-radius: 18px;
             }
 
             .hero h1 {
-                font-size: 34px;
-                line-height: 1.08;
+                font-size: clamp(26px, 7.5vw, 34px);
+                line-height: 1.1;
+                overflow-wrap: break-word;
             }
 
             .hero-meta {
@@ -1047,9 +1069,13 @@
                 font-size: 12px;
             }
 
-            .hero-visual,
+            .hero-visual {
+                min-height: 0;
+                aspect-ratio: 16 / 9;
+            }
+
             .hero-placeholder {
-                min-height: 210px;
+                min-height: 190px;
             }
 
             .reservation-notice {
@@ -1170,6 +1196,10 @@
 
                     </div>
 
+                    <p class="hero-powered-by">
+                        Ticketing powered by <strong>eLive</strong>
+                    </p>
+
                 </div>
 
                 <div class="hero-visual">
@@ -1192,18 +1222,9 @@
 
                 </div>
 
-                <div class="reservation-notice">
-                    Tickets are reserved for
-
-                    <strong>
-                        {{ $reservationMinutes }}
-                        {{ Str::plural(
-                            'minute',
-                            $reservationMinutes
-                        ) }}
-                    </strong>
-
-                    after you continue to payment.
+                <div class="reservation-notice" role="note">
+                    After you continue to payment, your tickets are held for up to
+                    <strong>{{ $reservationMinutes }} {{ Str::plural('minute', $reservationMinutes) }}</strong>.
                 </div>
 
             </div>
