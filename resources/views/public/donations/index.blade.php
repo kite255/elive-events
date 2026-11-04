@@ -532,6 +532,7 @@
         <p>© {{ date('Y') }} eLive Events. All rights reserved.</p>
 
         <div class="footer-links">
+            <a href="{{ route('public.terms') }}">Terms &amp; Conditions</a>
             <a href="{{ route('home') }}">Home</a>
             <a href="{{ route('public.events.index') }}">Events</a>
             <a href="{{ route('public.donations.index') }}">Donations</a>
