@@ -103,7 +103,7 @@ class PayoutResource extends Resource
                 fn ($state, EventPayoutRequest $record): string =>
                     $record->currency.' '.number_format((float) $state, 2)
             ),
-            TextColumn::make('status')->badge()->color(fn (string $state): string => match ($state) {
+            TextColumn::make('status')->badge()->formatStateUsing(fn (string $state): string => $state === EventPayoutRequest::APPROVED ? 'Approved (pending transfer clearance)' : ucfirst($state))->color(fn (string $state): string => match ($state) {
                 EventPayoutRequest::PAID => 'success',
                 EventPayoutRequest::APPROVED => 'info',
                 EventPayoutRequest::REJECTED => 'danger',
@@ -147,7 +147,7 @@ class PayoutResource extends Resource
                             'event_payout_audits.to_status', 'event_payout_audits.note',
                             'event_payout_audits.created_at', 'users.name as actor_name']),
                 ])),
-            Action::make('approve')->label('Approve')->icon('heroicon-o-check')->color('success')
+            Action::make('approve')->label('Approve Request')->icon('heroicon-o-check')->color('success')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
                 ->requiresConfirmation()
                 ->action(function (EventPayoutRequest $record): void {
@@ -160,7 +160,7 @@ class PayoutResource extends Resource
                             ->danger()->duration(10000)->send();
                         return;
                     }
-                    Notification::make()->title('Payout request approved')->body('The organizer has been notified of the approval.')->success()->duration(8000)->send();
+                    Notification::make()->title('Payout request approved')->body('Approval does not mean funds have been transferred. Settlement clearance is required before recording payment.')->success()->duration(8000)->send();
                 }),
             Action::make('reject')->label('Reject')->color('danger')
                 ->visible(fn (EventPayoutRequest $record): bool => auth()->user()?->isSuperAdmin() && $record->status === EventPayoutRequest::REQUESTED)
@@ -187,11 +187,19 @@ class PayoutResource extends Resource
                     if (! filter_var($data['transfer_verified'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                         throw ValidationException::withMessages(['transfer_verified' => 'Confirm the transfer before recording it.']);
                     }
-                    app(EventPayoutReviewService::class)->recordCompletedTransfer(
-                        $record, auth()->user(), $data['reference'], $data['method'],
-                        (string) $data['transfer_date'], (string) $data['amount'],
-                        (string) $data['proof'], $data['note'] ?? null
-                    );
+                    try {
+                        app(EventPayoutReviewService::class)->recordCompletedTransfer(
+                            $record, auth()->user(), $data['reference'], $data['method'],
+                            (string) $data['transfer_date'], (string) $data['amount'],
+                            (string) $data['proof'], $data['note'] ?? null
+                        );
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Transfer recording blocked')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'The transfer cannot be recorded yet.')
+                            ->danger()->duration(12000)->send();
+                        return;
+                    }
                     Notification::make()->title('Confirmed transfer recorded')->body('The payout has been marked as paid and the organizer notified.')->success()->duration(8000)->send();
                 }),
             Action::make('confirmReceipt')->label('Confirm Money Received')->icon('heroicon-o-check-badge')->color('success')
