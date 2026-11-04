@@ -129,6 +129,38 @@ class OrganizerTicketSaleAdminNotificationTest extends TestCase
         $this->assertStringContainsString('eLive Events', $html);
     }
 
+    public function test_paid_sale_without_financial_snapshot_sends_no_admin_email(): void
+    {
+        Queue::fake();
+        $organization = Organization::query()->create([
+            'name' => 'Snapshot Guard Org',
+            'slug' => 'snapshot-guard-org',
+        ]);
+        $event = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Snapshot Guard Event',
+            'slug' => 'snapshot-guard-event',
+            'status' => Event::STATUS_ACTIVE,
+            'starts_at' => now()->addDays(5),
+        ]);
+        $order = TicketOrder::query()->create([
+            'event_id' => $event->id,
+            'order_number' => 'ELV-SNAPSHOT-GUARD',
+            'buyer_name' => 'Test Buyer',
+            'quantity' => 1,
+            'subtotal' => 10000,
+            'total' => 10000,
+            'currency' => 'TZS',
+            'status' => TicketOrder::STATUS_PAID,
+            'paid_at' => now(),
+        ]);
+
+        app(OrganizerTicketSaleNotificationService::class)->queueForPaidOrder($order->id);
+
+        $this->assertDatabaseCount('communication_logs', 0);
+        Queue::assertNothingPushed();
+    }
+
     public function test_unpaid_order_does_not_send_admin_notification(): void
     {
         Queue::fake();
