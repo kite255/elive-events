@@ -42,6 +42,13 @@ Route::view(
     'home'
 );
 
+Route::view('/terms-and-conditions', 'public.legal.ticket-terms')
+    ->name('public.terms');
+
+Route::get('/terms-and-conditions/versions/{version}', function (string $version) {
+    return view(\App\Support\TicketPurchaseTerms::versionedView($version));
+})->name('public.terms.version');
+
 /*
 |--------------------------------------------------------------------------
 | Public Events Directory
