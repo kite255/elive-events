@@ -81,16 +81,7 @@ class TicketDesignerAuthorizationTest extends TestCase
 
         $this->actingAs($user);
 
-        $this->expectException(
-            ModelNotFoundException::class
-        );
-
-        Livewire::test(
-            DesignOrganizationTicketTemplate::class,
-            [
-                'record' => $template->getRouteKey(),
-            ]
-        );
+        $this->assertDesignerUnavailable(DesignOrganizationTicketTemplate::class, $template->getRouteKey());
     }
 
     public function test_organization_owner_cannot_open_organization_designer(): void
@@ -117,16 +108,7 @@ class TicketDesignerAuthorizationTest extends TestCase
 
         $this->actingAs($user);
 
-        $this->expectException(
-            ModelNotFoundException::class
-        );
-
-        Livewire::test(
-            DesignOrganizationTicketTemplate::class,
-            [
-                'record' => $template->getRouteKey(),
-            ]
-        );
+        $this->assertDesignerUnavailable(DesignOrganizationTicketTemplate::class, $template->getRouteKey());
     }
 
     public function test_ticketing_manager_cannot_open_organization_designer(): void
@@ -153,16 +135,7 @@ class TicketDesignerAuthorizationTest extends TestCase
 
         $this->actingAs($user);
 
-        $this->expectException(
-            ModelNotFoundException::class
-        );
-
-        Livewire::test(
-            DesignOrganizationTicketTemplate::class,
-            [
-                'record' => $template->getRouteKey(),
-            ]
-        );
+        $this->assertDesignerUnavailable(DesignOrganizationTicketTemplate::class, $template->getRouteKey());
     }
 
     public function test_super_admin_can_open_event_designer(): void
@@ -235,16 +208,7 @@ class TicketDesignerAuthorizationTest extends TestCase
 
         $this->actingAs($user);
 
-        $this->expectException(
-            ModelNotFoundException::class
-        );
-
-        Livewire::test(
-            DesignEventTicketTemplate::class,
-            [
-                'record' => $template->getRouteKey(),
-            ]
-        );
+        $this->assertDesignerUnavailable(DesignEventTicketTemplate::class, $template->getRouteKey());
     }
 
     public function test_ticketing_manager_cannot_open_event_designer(): void
@@ -266,16 +230,7 @@ class TicketDesignerAuthorizationTest extends TestCase
 
         $this->actingAs($user);
 
-        $this->expectException(
-            ModelNotFoundException::class
-        );
-
-        Livewire::test(
-            DesignEventTicketTemplate::class,
-            [
-                'record' => $template->getRouteKey(),
-            ]
-        );
+        $this->assertDesignerUnavailable(DesignEventTicketTemplate::class, $template->getRouteKey());
     }
 
     public function test_organization_owner_cannot_open_event_designer(): void
@@ -292,16 +247,18 @@ class TicketDesignerAuthorizationTest extends TestCase
 
         $this->actingAs($user);
 
-        $this->expectException(
-            ModelNotFoundException::class
-        );
+        $this->assertDesignerUnavailable(DesignEventTicketTemplate::class, $template->getRouteKey());
+    }
 
-        Livewire::test(
-            DesignEventTicketTemplate::class,
-            [
-                'record' => $template->getRouteKey(),
-            ]
-        );
+    private function assertDesignerUnavailable(string $page, string $record): void
+    {
+        try {
+            Livewire::test($page, ['record' => $record])->assertNotFound();
+        } catch (ModelNotFoundException $exception) {
+            // Filament may reject the record at binding time rather than
+            // returning an HTTP 404 from the page authorization hook.
+            $this->assertInstanceOf(ModelNotFoundException::class, $exception);
+        }
     }
 
     private function createEventTemplate(): array
