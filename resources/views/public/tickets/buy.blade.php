@@ -369,28 +369,41 @@
         .reservation-notice {
             grid-area: notice;
 
-            margin:
-                0
-                40px
-                34px;
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
 
-            padding:
-                12px
-                14px;
+            margin: 0 40px 28px;
+            padding: 0;
 
-            border:
-                1px solid
-                rgba(255, 184, 89, .3);
+            border: 0;
+            border-radius: 0;
+            background: none;
 
-            border-radius: 14px;
+            color: #F5D59B;
+            font-size: 13px;
+            line-height: 1.5;
+        }
 
-            background:
-                rgba(255, 184, 89, .09);
+        .reservation-notice::before {
+            content: "i";
+            display: inline-flex;
+            flex: 0 0 17px;
+            align-items: center;
+            justify-content: center;
+            width: 17px;
+            height: 17px;
+            margin-top: 1px;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1;
+        }
 
-            color: #FFE1B2;
-
-            font-size: 14px;
-            line-height: 1.55;
+        .reservation-notice strong {
+            color: #FFFFFF;
+            font-weight: 800;
         }
 
         .hero-visual {
@@ -1223,8 +1236,7 @@
                 </div>
 
                 <div class="reservation-notice" role="note">
-                    After you continue to payment, your tickets are held for up to
-                    <strong>{{ $reservationMinutes }} {{ Str::plural('minute', $reservationMinutes) }}</strong>.
+                    <span>Tickets are reserved for <strong>{{ $reservationMinutes }} {{ Str::plural('minute', $reservationMinutes) }}</strong> after proceeding to payment.</span>
                 </div>
 
             </div>
