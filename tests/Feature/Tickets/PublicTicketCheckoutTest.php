@@ -554,10 +554,12 @@ class PublicTicketCheckoutTest extends TestCase
             $order->status
         );
 
-        $this->get(route('public.ticket-orders.show', ['token' => $order->public_token]))
-            ->assertOk()
-            ->assertHeader('Cache-Control', 'private, no-store')
-            ->assertHeader('Referrer-Policy', 'no-referrer');
+        $orderResponse = $this->get(route('public.ticket-orders.show', ['token' => $order->public_token]));
+        $orderResponse->assertOk()->assertHeader('Referrer-Policy', 'no-referrer');
+
+        $cacheControl = (string) $orderResponse->headers->get('Cache-Control');
+        $this->assertContains('private', array_map('trim', explode(',', $cacheControl)));
+        $this->assertContains('no-store', array_map('trim', explode(',', $cacheControl)));
 
         $this->assertSame(
             '0.00',
