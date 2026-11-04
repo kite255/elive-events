@@ -2086,7 +2086,10 @@
         <div class="border-t border-white/10">
 
             <div class="mx-auto max-w-7xl px-6 py-5 text-xs text-slate-400 sm:text-sm lg:px-8">
-                © {{ date('Y') }} eLive Company Limited. All rights reserved.
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <span>© {{ date('Y') }} eLive Company Limited. All rights reserved.</span>
+                    <a href="{{ route('public.terms') }}" class="text-slate-300 underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Terms &amp; Conditions</a>
+                </div>
             </div>
 
         </div>
