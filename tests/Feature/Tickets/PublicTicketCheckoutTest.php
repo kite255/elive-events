@@ -120,6 +120,35 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('Email address');
     }
 
+    public function test_all_existing_public_footers_link_to_ticket_terms(): void
+    {
+        $footerViews = [
+            'welcome',
+            'public.events.index',
+            'public.events.show',
+            'public.tickets.order',
+            'public.tickets.show',
+            'public.donations.index',
+            'public.donations.show',
+            'public.merchandise.index',
+            'public.events.register',
+            'public.events.success',
+            'public.attendees.show',
+            'public.event-communications.show',
+            'public.payments.checkout',
+        ];
+
+        foreach ($footerViews as $view) {
+            $path = resource_path('views/'.str_replace('.', '/', $view).'.blade.php');
+            $this->assertFileExists($path);
+            $this->assertStringContainsString(
+                "route('public.terms')",
+                (string) file_get_contents($path),
+                $view.' must link to the Terms & Conditions page.'
+            );
+        }
+    }
+
     public function test_public_ticket_terms_page_is_accessible_and_linked_from_checkout(): void
     {
         $event = $this->createEvent();
