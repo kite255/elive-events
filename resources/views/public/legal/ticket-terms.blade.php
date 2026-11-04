@@ -33,7 +33,7 @@
 <header>
     <div class="header-inner">
         <a href="{{ route('home') }}" class="brand"><img src="{{ asset('eLive-Logo.png') }}" alt="eLive Events"></a>
-        <a class="back" href="javascript:history.back()" onclick="if (history.length <= 1) { this.href = '{{ route('home') }}'; }">Back</a>
+        <a class="back" href="{{ route('home') }}">Back to eLive Events</a>
     </div>
 </header>
 <main>
