@@ -23,11 +23,13 @@
         button:disabled{opacity:.45;cursor:not-allowed}.helper{text-align:center;color:var(--muted);font-size:14px;line-height:1.55;margin-top:12px}
         .notice{background:#fff7e6;color:#854d0e;padding:14px;border-radius:10px;margin-bottom:18px;line-height:1.6}
         .success{background:#effaf2;color:#166534}.token{background:#f3f6fb;font-size:22px;letter-spacing:.08em;font-weight:800;word-break:break-all;padding:16px;border-radius:10px;text-align:center}
-        .qr{display:block;width:220px;max-width:100%;height:auto;margin:15px auto}
+        .qr{display:block;width:240px;max-width:100%;height:auto;margin:18px auto;padding:12px;background:#fff;border:1px solid var(--border);border-radius:12px}
         .qr-app-guidance{text-align:center;margin:8px 0 20px;line-height:1.55}
         .qr-app-guidance strong{font-size:14px;color:var(--navy)}
         .qr-app-guidance p{font-size:13px;color:#475569;margin:6px 0}
         .qr-app-guidance small{display:block;font-size:12px;color:var(--muted)}
+        .qr-app-guidance .app-examples{font-size:13px;color:#334155;margin:8px auto;max-width:440px}
+        .token-actions{margin:12px 0 18px;text-align:center}.token-copy{display:inline-block;width:auto;min-width:160px;padding:11px 18px;background:#fff;border:1px solid var(--navy);color:var(--navy)}.token-copy:focus-visible{outline:3px solid var(--blue);outline-offset:3px}.copy-feedback{display:block;min-height:20px;margin-top:8px;font-size:12px;color:var(--muted)}
         .footer{border-top:1px solid var(--border);padding-top:20px;margin-top:24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7}.footer a{display:inline-flex;align-items:center;min-height:40px;font-size:14px;font-weight:700}.footer .powered{display:block}
         .payment-networks{margin:18px 0;padding:14px;background:#f8fafc;border:1px solid var(--border);border-radius:12px}
         .payment-networks-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
@@ -96,13 +98,32 @@
                 <img class="qr" alt="Selcom order QR code" src="{{ $qrDetails['qr_image'] }}">
                 <div class="qr-app-guidance">
                     <strong>Scan to Pay</strong>
-                    <p>Scan using a compatible app, such as CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.</p>
-                    <small>App compatibility may vary. Verify the merchant and amount before confirming payment.</small>
+                    <p>Open the scan-to-pay option in a supported banking or payment app, then scan this QR code.</p>
+                    <p class="app-examples"><strong>Examples:</strong> CRDB SimBanking, NBC Kiganjani, NMB Mkononi, Selcom Pesa, M-Pesa, Mixx by Yas, and Airtel Money.</p>
+                    <small>These are examples, not a guarantee of QR compatibility. Availability depends on the app and payment network. Always verify the merchant and amount before confirming.</small>
                 </div>
             @endif
             @if($qrDetails['payment_token'])
                 <p class="muted">Alternatively, use this payment token:</p>
-                <div class="token">{{ $qrDetails['payment_token'] }}</div>
+                <div class="token" id="payment-token">{{ $qrDetails['payment_token'] }}</div>
+                <div class="token-actions">
+                    <button type="button" class="token-copy" id="copy-payment-token">Copy Token</button>
+                    <span class="copy-feedback" id="copy-token-feedback" role="status" aria-live="polite"></span>
+                </div>
+                <script>
+                    document.getElementById('copy-payment-token')?.addEventListener('click', async () => {
+                        const token = document.getElementById('payment-token')?.textContent.trim();
+                        const feedback = document.getElementById('copy-token-feedback');
+                        if (!token || !feedback) return;
+                        try {
+                            if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+                            await navigator.clipboard.writeText(token);
+                            feedback.textContent = 'Payment token copied.';
+                        } catch (error) {
+                            feedback.textContent = 'Copy unavailable. Select the token above to copy it manually.';
+                        }
+                    });
+                </script>
             @endif
             @if(! $qrDetails['qr_image'] && ! $qrDetails['payment_token'])
                 <div class="notice">Selcom did not return a usable QR image or payment token for this order. Contact support before paying.</div>
@@ -124,7 +145,7 @@
             </label>
             <label class="method">
                 <input type="radio" name="method" value="qr" {{ old('method') === 'qr' ? 'checked' : '' }}>
-                <span><strong>Pay with QR Code</strong><small>Scan using a compatible banking app, e.g. CRDB SimBanking, NBC Kiganjani or NMB Mkononi. App support may vary.</small></span>
+                <span><strong>Pay with QR Code</strong><small>Scan with a compatible banking or payment app. Availability varies by provider.</small></span>
             </label>
             <div id="phone-container">
                 <label for="phone" class="field">Mobile Money Number</label>
