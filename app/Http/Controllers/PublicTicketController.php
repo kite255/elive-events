@@ -254,12 +254,16 @@ class PublicTicketController extends Controller
             default => null,
         };
 
-        $selcomIsDefault = PaymentGateway::query()
-            ->where('organization_id', $event->organization_id)
-            ->where('code', 'selcom')
+        // Resolve the gateway with the same organization-first fallback as PaymentService.
+        // A globally configured Selcom default must enforce Selcom phone validation too.
+        $defaultGateway = PaymentGateway::query()
             ->where('is_enabled', true)
             ->where('is_default', true)
-            ->exists();
+            ->where(fn ($query) => $query
+                ->where('organization_id', $event->organization_id)
+                ->orWhereNull('organization_id'))
+            ->orderByRaw('CASE WHEN organization_id = ? THEN 0 ELSE 1 END', [(int) $event->organization_id])
+            ->first();
 
         $selectedIds = collect($items)->pluck('ticket_type_id')->all();
         $containsPaidTickets = TicketType::query()
@@ -268,7 +272,7 @@ class PublicTicketController extends Controller
             ->where('price', '>', 0)
             ->exists();
 
-        if ($selcomIsDefault && $containsPaidTickets) {
+        if ($containsPaidTickets && $defaultGateway?->code === 'selcom') {
             $errors = [];
             if (blank($validated['buyer_email'] ?? null)) {
                 $errors['buyer_email'] = 'Email is required for paid ticket checkout.';
