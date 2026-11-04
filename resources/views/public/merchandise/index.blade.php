@@ -188,6 +188,7 @@
     <div class="container footer-inner">
         <p>© {{ date('Y') }} eLive Events. All rights reserved.</p>
         <nav class="footer-links" aria-label="Footer navigation">
+            <a href="{{ route('public.terms') }}">Terms &amp; Conditions</a>
             <a href="{{ route('home') }}">Home</a>
             <a href="{{ route('public.events.index') }}">Events</a>
             <a href="{{ route('public.donations.index') }}">Donations</a>
