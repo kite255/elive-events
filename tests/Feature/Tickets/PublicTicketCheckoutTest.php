@@ -114,15 +114,15 @@ class PublicTicketCheckoutTest extends TestCase
         $response
             ->assertOk()
             ->assertSee(
-                'Enter at least a phone number or email address'
+                'Enter your full name, phone number, and email address'
             )
-            ->assertSee('Phone number (optional)')
-            ->assertSee('Email address (optional)');
+            ->assertSee('Phone number')
+            ->assertSee('Email address');
     }
 
-    public function test_public_footers_include_terms_link(): void
+    public function test_all_existing_public_footers_link_to_ticket_terms(): void
     {
-        $views = [
+        $footerViews = [
             'welcome',
             'public.events.index',
             'public.events.show',
@@ -135,57 +135,93 @@ class PublicTicketCheckoutTest extends TestCase
             'public.events.success',
             'public.attendees.show',
             'public.event-communications.show',
+            'public.payments.checkout',
         ];
 
-        foreach ($views as $view) {
+        foreach ($footerViews as $view) {
             $path = resource_path('views/'.str_replace('.', '/', $view).'.blade.php');
             $this->assertFileExists($path);
             $this->assertStringContainsString(
                 "route('public.terms')",
                 (string) file_get_contents($path),
-                $view.' must link to the public policy.'
+                $view.' must link to the Terms & Conditions page.'
             );
         }
     }
 
-    public function test_public_terms_links_and_archived_versions(): void
+    public function test_public_ticket_terms_page_is_accessible_and_linked_from_checkout(): void
     {
         $event = $this->createEvent();
         $this->createTicketType($event);
 
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('href="'.route('public.terms').'"', false);
+
+        $this->get(route('public.events.index'))
+            ->assertOk()
+            ->assertSee('href="'.route('public.terms').'"', false);
+
         $this->get(route('public.terms'))
             ->assertOk()
-            ->assertSee('Last updated: 4 November 2026')
-            ->assertSee('ticket-purchase-2026-11-04-2')
-            ->assertSee('To ask about a refund or cancellation');
-
-        $this->get(route('public.terms.version', ['version' => 'ticket-purchase-2026-11-04']))
-            ->assertOk()
             ->assertSee('Ticket Purchase Terms')
-            ->assertDontSee('Last updated: 4 November 2026');
-
-        $this->get(route('public.terms.version', ['version' => 'invalid']))
-            ->assertNotFound();
+            ->assertSee('Refunds and cancellations')
+            ->assertSee('ticket-purchase-2026-11-04-2')
+            ->assertSee('Effective date: 4 November 2026')
+            ->assertSee('Last updated: 4 November 2026')
+            ->assertSee('To ask about a refund or cancellation')
+            ->assertSee('href="'.route('public.terms').'"', false)
+            ->assertDontSee('Draft for review.')
+            ->assertDontSee('noindex, nofollow');
 
         $this->get(route('public.tickets.buy', ['event' => $event->slug]))
             ->assertOk()
-            ->assertSee('name="accept_terms"', false)
-            ->assertSee('href="'.route('public.terms').'"', false);
-
-        $this->get(route('home'))->assertOk()
-            ->assertSee('href="'.route('public.terms').'"', false);
+            ->assertSee('href="'.route('public.terms').'"', false)
+            ->assertSee('name="accept_terms"', false);
     }
 
-    public function test_ticket_purchase_is_rejected_without_terms_consent(): void
+    public function test_published_terms_are_available_at_permanent_versioned_url(): void
+    {
+        $version = \App\Support\TicketPurchaseTerms::CURRENT_VERSION;
+
+        $this->get(route('public.terms.version', ['version' => $version]))
+            ->assertOk()
+            ->assertSee('Ticket Purchase Terms')
+            ->assertSee('Refunds and cancellations')
+            ->assertSee($version);
+
+        $this->get(route('public.terms.version', ['version' => 'ticket-purchase-2026-11-04']))
+            ->assertOk()
+            ->assertSee('Version: ticket-purchase-2026-11-04')
+            ->assertDontSee('Last updated: 4 November 2026');
+
+        $this->get(route('public.terms.version', ['version' => 'unknown-policy']))
+            ->assertNotFound();
+
+        $this->assertMatchesRegularExpression(
+            '/^[a-f0-9]{64}$/',
+            \App\Support\TicketPurchaseTerms::snapshotHash()
+        );
+    }
+
+    public function test_ticket_checkout_requires_explicit_terms_acceptance(): void
     {
         $event = $this->createEvent();
         $ticketType = $this->createTicketType($event);
 
-        $this->from(route('public.tickets.buy', ['event' => $event->slug]))
-            ->post(route('public.tickets.store', ['event' => $event->slug]), [
-                'buyer_name' => 'Unaccepted Buyer',
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertSee('I agree to the')
+            ->assertSee('Terms &amp; Conditions', false)
+            ->assertSee('name="accept_terms"', false)
+            ->assertSee('I agree to the')
+            ->assertDontSee('Read ticket purchase conditions');
+
+        $this->from('/events/'.$event->slug.'/tickets')
+            ->post('/events/'.$event->slug.'/tickets', [
+                'buyer_name' => 'Terms Buyer',
                 'buyer_phone' => '255700000001',
-                'buyer_email' => 'buyer@example.com',
+                'buyer_email' => 'terms@example.com',
                 'tickets' => [$ticketType->id => 1],
             ])
             ->assertRedirect()
@@ -245,10 +281,11 @@ class PublicTicketCheckoutTest extends TestCase
         );
 
         $this->assertSame(
-            \App\Support\TicketPurchaseTerms::CURRENT_VERSION,
+            'ticket-purchase-2026-11-04-2',
             data_get($order->metadata, 'purchase_terms_version')
         );
         $this->assertNotEmpty(data_get($order->metadata, 'purchase_terms_accepted_at'));
+
         $this->assertSame(
             \App\Support\TicketPurchaseTerms::snapshotHash(),
             data_get($order->metadata, 'purchase_terms_sha256')
@@ -298,64 +335,76 @@ class PublicTicketCheckoutTest extends TestCase
         );
     }
 
-    public function test_checkout_accepts_phone_without_email(): void
+    public function test_global_selcom_default_validates_paid_ticket_phone(): void
     {
         $event = $this->createEvent();
         $ticketType = $this->createTicketType($event);
 
-        $response = $this->post(
-            '/events/'.$event->slug.'/tickets',
-            [
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        // Format passes the generic form regex but is not a valid Tanzanian
+        // mobile number; reject it before creating an order or contacting Selcom.
+        $this->from('/events/'.$event->slug.'/tickets')
+            ->post('/events/'.$event->slug.'/tickets', [
+                'buyer_name' => 'Invalid Selcom Buyer',
+                'buyer_phone' => '12345678',
+                'buyer_email' => 'invalid@example.com',
+                'accept_terms' => '1',
+                'tickets' => [$ticketType->id => 1],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors(['buyer_phone']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
+    public function test_checkout_rejects_phone_without_email(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $response = $this
+            ->from('/events/'.$event->slug.'/tickets')
+            ->post('/events/'.$event->slug.'/tickets', [
                 'buyer_name' => 'Phone Buyer',
                 'buyer_phone' => '0712345678',
                 'buyer_email' => '',
                 'accept_terms' => '1',
-                    'tickets' => [
-                    $ticketType->id => 1,
-                ],
-            ]
-        );
+                    'tickets' => [$ticketType->id => 1],
+            ]);
 
-        $order = TicketOrder::query()
-            ->latest('id')
-            ->firstOrFail();
-
-        $response->assertRedirect();
-        $this->assertSame('0712345678', $order->buyer_phone);
-        $this->assertNull($order->buyer_email);
+        $response->assertRedirect()->assertSessionHasErrors(['buyer_email']);
+        $this->assertDatabaseCount('ticket_orders', 0);
     }
 
-    public function test_checkout_accepts_email_without_phone(): void
+    public function test_checkout_rejects_email_without_phone(): void
     {
         $event = $this->createEvent();
         $ticketType = $this->createTicketType($event);
 
-        $response = $this->post(
-            '/events/'.$event->slug.'/tickets',
-            [
+        $response = $this
+            ->from('/events/'.$event->slug.'/tickets')
+            ->post('/events/'.$event->slug.'/tickets', [
                 'buyer_name' => 'Email Buyer',
                 'buyer_phone' => '',
                 'buyer_email' => 'email.buyer@example.com',
                 'accept_terms' => '1',
-                    'tickets' => [
-                    $ticketType->id => 1,
-                ],
-            ]
-        );
+                    'tickets' => [$ticketType->id => 1],
+            ]);
 
-        $order = TicketOrder::query()
-            ->latest('id')
-            ->firstOrFail();
-
-        $response->assertRedirect();
-        $this->assertNull($order->buyer_phone);
-        $this->assertSame(
-            'email.buyer@example.com',
-            $order->buyer_email
-        );
+        $response->assertRedirect()->assertSessionHasErrors(['buyer_phone']);
+        $this->assertDatabaseCount('ticket_orders', 0);
     }
 
-    public function test_checkout_requires_phone_or_email(): void
+    public function test_checkout_requires_both_phone_and_email(): void
     {
         $event = $this->createEvent();
         $ticketType = $this->createTicketType($event);
