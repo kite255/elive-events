@@ -64,11 +64,12 @@ class ExpiredSelcomReconciliationTest extends TestCase
             'discount_amount' => 0,
             'total' => 500,
             'currency' => 'TZS',
-            'status' => TicketOrder::STATUS_EXPIRED,
-            'expires_at' => now()->subMinutes(5),
+            'status' => TicketOrder::STATUS_PENDING,
+            'expires_at' => now()->addMinutes(30),
         ]);
 
         $payment = app(PaymentService::class)->createForTicketOrder($order);
+        $order->update(['status' => TicketOrder::STATUS_EXPIRED, 'expires_at' => now()->subMinutes(5)]);
         $payment->update([
             'status' => Payment::STATUS_EXPIRED,
             'provider_tracking_id' => $payment->reference,
