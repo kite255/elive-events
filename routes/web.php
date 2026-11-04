@@ -30,6 +30,10 @@ Route::get('/admin/payouts/{payout}/transfer-proof', PayoutTransferProofControll
     ->whereNumber('payout')
     ->name('admin.payouts.transfer-proof');
 
+// Public ticket purchase conditions. Keep accessible before any checkout.
+Route::view('/terms-and-conditions', 'public.legal.ticket-terms')
+    ->name('public.terms');
+
 Route::post('/payments/selcom/webhook', SelcomWebhookController::class)
     ->name('payments.selcom.webhook');
 

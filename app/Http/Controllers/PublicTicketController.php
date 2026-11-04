@@ -175,6 +175,11 @@ class PublicTicketController extends Controller
                     'max:255',
                 ],
 
+                'accept_terms' => [
+                    'required',
+                    'accepted',
+                ],
+
                 'tickets' => [
                     'required',
                     'array',
@@ -298,6 +303,14 @@ class PublicTicketController extends Controller
 
                     items: $items
                 );
+
+        // Preserve evidence of the buyer's explicit checkout acknowledgment.
+        $order->update([
+            'metadata' => array_merge($order->metadata ?? [], [
+                'purchase_terms_accepted_at' => now()->toIso8601String(),
+                'purchase_terms_version' => 'ticket-purchase-2026-11-04',
+            ]),
+        ]);
 
         $payment =
             $this->paymentService
