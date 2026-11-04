@@ -23,6 +23,46 @@ class SelcomServiceTest extends TestCase
         ]);
     }
 
+    public function test_wallet_payment_accepts_valid_tanzanian_mobile_number(): void
+    {
+        Http::fake(['gateway.example.test/*' => Http::response([
+            'result' => 'PENDING',
+            'resultcode' => '111',
+            'data' => [],
+        ])]);
+
+        $result = app(SelcomService::class)->requestWalletPayment(
+            'ELV-ORDER-123',
+            'ELV-TRANS-123',
+            '0712 345 678'
+        );
+
+        $this->assertSame(['status' => 'PENDING'], $result);
+
+        Http::assertSent(fn ($request) =>
+            $request->method() === 'POST'
+            && $request->url() === 'https://gateway.example.test/v1/checkout/wallet-payment'
+            && $request['msisdn'] === '255712345678'
+            && $request['order_id'] === 'ELV-ORDER-123'
+        );
+    }
+
+    public function test_wallet_payment_rejects_invalid_phone_without_gateway_request(): void
+    {
+        Http::fake();
+
+        $this->expectException(RuntimeException::class);
+        try {
+            app(SelcomService::class)->requestWalletPayment(
+                'ELV-ORDER-123',
+                'ELV-TRANS-123',
+                '123'
+            );
+        } finally {
+            Http::assertNothingSent();
+        }
+    }
+
     public function test_get_status_signs_request_and_normalizes_completed_payment(): void
     {
         Http::fake([
