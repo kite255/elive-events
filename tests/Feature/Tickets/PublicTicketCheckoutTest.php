@@ -321,8 +321,80 @@ class PublicTicketCheckoutTest extends TestCase
             ->firstOrFail();
 
         $response->assertRedirect();
-        $this->assertSame('0712345678', $order->buyer_phone);
+        $this->assertSame('255712345678', $order->buyer_phone);
         $this->assertNull($order->buyer_email);
+    }
+
+    public function test_paid_selcom_checkout_requires_email_and_tanzanian_phone(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        PaymentGateway::query()->create([
+            'organization_id' => $event->organization_id,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        $url = route('public.tickets.store', ['event' => $event->slug]);
+        $payload = [
+            'buyer_name' => 'Selcom Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => '',
+            'accept_terms' => '1',
+            'tickets' => [$ticketType->id => 1],
+        ];
+
+        $this->from($url)->post($url, $payload)
+            ->assertSessionHasErrors(['buyer_email']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+
+        $payload['buyer_email'] = 'selcom@example.com';
+        $payload['buyer_phone'] = '+1 (202) 555-0199';
+
+        $this->from($url)->post($url, $payload)
+            ->assertSessionHasErrors(['buyer_phone']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+
+        $payload['buyer_phone'] = '0712345678';
+        $this->post($url, $payload)->assertRedirect();
+
+        $order = TicketOrder::query()->latest('id')->firstOrFail();
+        $this->assertSame('255712345678', $order->buyer_phone);
+        $this->assertSame('selcom@example.com', $order->buyer_email);
+        $this->assertSame('selcom', Payment::query()->where('ticket_order_id', $order->id)->firstOrFail()->gateway->code);
+    }
+
+    public function test_free_checkout_does_not_require_selcom_contacts(): void
+    {
+        Queue::fake();
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+        $ticketType->update(['price' => 0]);
+
+        PaymentGateway::query()->create([
+            'organization_id' => $event->organization_id,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Free Buyer',
+            'buyer_phone' => '',
+            'buyer_email' => 'free@example.com',
+            'accept_terms' => '1',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $this->assertSame('free@example.com', TicketOrder::query()->latest('id')->firstOrFail()->buyer_email);
     }
 
     public function test_checkout_accepts_email_without_phone(): void
