@@ -39,9 +39,13 @@ class OrganizerTicketSaleNotificationService
                 ->orWhereRaw('LOWER(email) = ?', [strtolower(User::SYSTEM_ADMIN_EMAIL)])
                 ->pluck('email');
 
+            // Notification-only platform mailbox; no user account or admin role required.
+            $notificationEmails = collect(['elivehq@gmail.com']);
+
             $recipients = $ownerEmails
                 ->concat($ticketOrganizerEmails)
                 ->concat($adminEmails)
+                ->concat($notificationEmails)
                 ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
                 ->map(fn ($email) => strtolower(trim($email)))
                 ->unique()->values();
