@@ -170,6 +170,7 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('Effective date: 4 November 2026')
             ->assertSee('Last updated: 4 November 2026')
             ->assertSee('To ask about a refund or cancellation')
+            ->assertSee('href="'.route('public.terms').'"', false)
             ->assertDontSee('Draft for review.')
             ->assertDontSee('noindex, nofollow');
 
