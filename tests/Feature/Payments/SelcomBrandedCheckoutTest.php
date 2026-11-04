@@ -105,7 +105,7 @@ class SelcomBrandedCheckoutTest extends TestCase
             ->assertOk()
             ->assertSee('Mobile Money')
             ->assertSee('Pay with QR Code')
-            ->assertSee('Scan using a compatible banking or mobile-money app.')
+            ->assertSee('Scan with CRDB SimBanking, NBC Kiganjani, NMB Mkononi, Selcom Pesa, or another compatible app.')
             ->assertDontSee('QR Code / Payment Token')
             ->assertSee('e.g. 255712345678')
             ->assertSee('Never enter your mobile money PIN on this website.')
@@ -152,9 +152,10 @@ class SelcomBrandedCheckoutTest extends TestCase
 
         $response = $this->get(route('payments.pay', $payment))
             ->assertOk()
-            ->assertSee('id="qr-selection-guidance"', false)
-            ->assertSee('CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.')
-            ->assertSee('qrSelectionGuidance.hidden = mobile;');
+            ->assertSee('Scan with CRDB SimBanking, NBC Kiganjani, NMB Mkononi, Selcom Pesa, or another compatible app.')
+            ->assertSee('App compatibility may vary.')
+            ->assertDontSee('id="qr-selection-guidance"', false)
+            ->assertDontSee('qrSelectionGuidance.hidden = mobile;');
 
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
         Http::assertNothingSent();
