@@ -96,8 +96,8 @@
                 <img class="qr" alt="Selcom order QR code" src="{{ $qrDetails['qr_image'] }}">
                 <div class="qr-app-guidance">
                     <strong>Scan to Pay</strong>
-                    <p>Examples of apps with QR payment features include CRDB SimBanking, NBC Kiganjani, NMB Mkononi, Selcom Pesa, M-Pesa, Mixx by Yas, and Airtel Money.</p>
-                    <small>Compatibility with this Selcom QR may vary. Check that your app accepts it, and confirm the merchant name and amount before paying.</small>
+                    <p>Scan using a compatible app, such as CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.</p>
+                    <small>App compatibility may vary. Verify the merchant and amount before confirming payment.</small>
                 </div>
             @endif
             @if($qrDetails['payment_token'])
@@ -179,7 +179,7 @@
         <div class="notice">This payment can no longer be initiated. Check its status for details.</div>
         <a class="button" href="{{ route('payments.status', $payment) }}">View Payment Status</a>
     @endif
-    <div class="footer"><span class="powered">&#128274; Secure payments powered by Selcom. Tickets are issued after confirmed payment.</span>
+    <div class="footer"><span class="powered">Secure payments powered by Selcom. Tickets are issued after confirmed payment.</span>
         <a href="{{ route('payments.status', $payment) }}">View payment status</a>
     </div>
 </div></main>
