@@ -201,6 +201,8 @@
     @endif
     <div class="footer"><span class="powered">Secure payments powered by Selcom. Tickets are issued after confirmed payment.</span>
         <a href="{{ route('payments.status', $payment) }}">View payment status</a>
+        <span aria-hidden="true"> · </span>
+        <a href="{{ route('public.terms') }}">Terms &amp; Conditions</a>
     </div>
 </div></main>
 </body>
