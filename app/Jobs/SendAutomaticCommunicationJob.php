@@ -672,6 +672,32 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     : 'eLive Events Notification';
         }
 
+        // Ticket sale notifications use a dedicated, data-backed HTML layout.
+        // Never follow links or untrusted details from a communication log.
+        if ($communicationLog->purpose === 'organizer_ticket_sale') {
+            $order = $communicationLog->ticketOrder()
+                ->with(['event', 'items.ticketType'])
+                ->first();
+
+            if (! $order || ! $order->isPaid() || ! $order->financial_snapshot_at || ! $order->event) {
+                throw new RuntimeException('Confirmed ticket sale details are unavailable.');
+            }
+
+            Mail::send(
+                'emails.ticket-sale-notification',
+                [
+                    'subject' => $subject,
+                    'order' => $order,
+                    'event' => $order->event,
+                ],
+                function ($mail) use ($recipient, $subject): void {
+                    $mail->to($recipient)->subject($subject);
+                }
+            );
+
+            return null;
+        }
+
         $attendee =
             $communicationLog->attendee;
 
