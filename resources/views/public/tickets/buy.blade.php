@@ -1496,7 +1496,7 @@
                                 </h2>
 
                                 <p class="panel-description">
-                                    Enter at least a phone number or email address so we can send your ticket link.
+                                    Enter your full name, phone number, and email address to receive your ticket after confirmed payment.
                                 </p>
 
                                 <div class="field-grid">
@@ -1530,7 +1530,8 @@
                                     <div class="field">
 
                                         <label for="buyer_phone">
-                                            Phone number (optional)
+                                            Phone number
+                                            <span class="required">*</span>
                                         </label>
 
                                         <input
@@ -1540,7 +1541,8 @@
                                             value="{{ old('buyer_phone') }}"
                                             maxlength="30"
                                             autocomplete="tel"
-                                            placeholder="e.g. 2557XXXXXXXX"
+                                            required
+                                            placeholder="e.g. 255712345678"
                                         >
 
                                         @error('buyer_phone')
@@ -1554,7 +1556,8 @@
                                     <div class="field">
 
                                         <label for="buyer_email">
-                                            Email address (optional)
+                                            Email address
+                                            <span class="required">*</span>
                                         </label>
 
                                         <input
@@ -1564,6 +1567,7 @@
                                             value="{{ old('buyer_email') }}"
                                             maxlength="255"
                                             autocomplete="email"
+                                            required
                                             placeholder="you@example.com"
                                         >
 
