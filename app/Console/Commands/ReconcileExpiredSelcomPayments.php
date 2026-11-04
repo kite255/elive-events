@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Payment;
-use App\Models\PaymentTransaction;
 use App\Services\Payments\SelcomService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
