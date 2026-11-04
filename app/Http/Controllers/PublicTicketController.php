@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Models\PaymentGateway;
+use App\Models\TicketType;
 use App\Services\Payments\PaymentFulfillmentService;
 use App\Services\Payments\PaymentService;
 use App\Services\Tickets\TicketAvailabilityService;
@@ -10,6 +12,7 @@ use App\Services\Tickets\TicketOrderService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class PublicTicketController extends Controller
 {
@@ -240,6 +243,45 @@ class PublicTicketController extends Controller
                 ]);
         }
 
+        // Normalize supported Tanzanian mobile numbers, preserving international ones.
+        $phoneInput = trim((string) ($validated['buyer_phone'] ?? ''));
+        $phoneDigits = preg_replace('/[^0-9]/', '', $phoneInput) ?? '';
+        $normalizedPhone = match (true) {
+            preg_match('/^0[0-9]{9}$/', $phoneDigits) === 1 => '255'.substr($phoneDigits, 1),
+            preg_match('/^[0-9]{9}$/', $phoneDigits) === 1 => '255'.$phoneDigits,
+            preg_match('/^255[0-9]{9}$/', $phoneDigits) === 1 => $phoneDigits,
+            default => null,
+        };
+
+        // Match PaymentService gateway selection: organization default, then global default.
+        $defaultGateway = PaymentGateway::query()
+            ->where('is_enabled', true)
+            ->where('is_default', true)
+            ->where(fn ($query) => $query
+                ->where('organization_id', $event->organization_id)
+                ->orWhereNull('organization_id'))
+            ->orderByRaw('CASE WHEN organization_id = ? THEN 0 ELSE 1 END', [(int) $event->organization_id])
+            ->first();
+
+        $containsPaidTickets = TicketType::query()
+            ->where('event_id', $event->getKey())
+            ->whereIn('id', collect($items)->pluck('ticket_type_id'))
+            ->where('price', '>', 0)
+            ->exists();
+
+        if ($containsPaidTickets && $defaultGateway?->code === 'selcom') {
+            $errors = [];
+            if (blank($validated['buyer_email'] ?? null)) {
+                $errors['buyer_email'] = 'Email is required for Selcom paid ticket checkout.';
+            }
+            if ($normalizedPhone === null || preg_match('/^255[0-9]{9}$/', $normalizedPhone) !== 1) {
+                $errors['buyer_phone'] = 'Enter a valid Tanzanian phone number, such as 0712345678.';
+            }
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+        }
+
         $order =
             $this->ticketOrderService
                 ->createOrder(
@@ -252,9 +294,7 @@ class PublicTicketController extends Controller
                             ],
 
                         'phone' =>
-                            $validated[
-                                'buyer_phone'
-                            ] ?? null,
+                            $normalizedPhone ?? ($validated['buyer_phone'] ?? null),
 
                         'email' =>
                             $validated[
