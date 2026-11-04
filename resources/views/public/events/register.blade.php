@@ -2612,6 +2612,7 @@
 
             <div class="elive-footer" style="text-align:center;color:var(--elive-muted);font-size:13px;margin-top:18px;">
                 Powered by <strong>eLive Events</strong>
+                | <a href="{{ route('public.terms') }}" style="color:inherit;text-decoration:underline;text-underline-offset:2px">Terms &amp; Conditions</a>
                 @if ($branding['support_email'])
                     | Support: {{ $branding['support_email'] }}
                 @endif
