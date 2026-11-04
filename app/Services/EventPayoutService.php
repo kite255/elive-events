@@ -9,8 +9,8 @@ use App\Models\TicketOrder;
 use App\Models\User;
 use App\Notifications\EventPayoutStatusNotification;
 use App\Notifications\NewPayoutRequestAdminNotification;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -39,10 +39,15 @@ class EventPayoutService
             ->sum('amount');
 
         $cleared = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->where('entry_type', 'settlement')
+            ->where('event_id', $eventId)->whereNull('voided_at')->where('entry_type', 'settlement')
             ->whereNotNull('independently_verified_at')->sum('amount');
+        // Separate genuine independent review from the single-admin exception.
+        $selfAttested = (float) DB::table('event_finance_clearance_entries')
+            ->where('event_id', $eventId)->whereNull('voided_at')->where('entry_type', 'settlement')
+            ->whereNotNull('self_attested_at')->whereNull('independently_verified_at')->sum('amount');
+        $acceptedClearance = $cleared + $selfAttested;
         $reversals = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
+            ->where('event_id', $eventId)->whereNull('voided_at')->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
 
         $exceptions = TicketOrder::query()->where('event_id', $eventId)
             ->whereIn('status', [TicketOrder::STATUS_REFUNDED, TicketOrder::STATUS_PARTIALLY_REFUNDED])->count();
@@ -55,11 +60,13 @@ class EventPayoutService
         // Credit only independently verified settlements. Deduct ALL recorded
         // reversals, including those awaiting independent review, as a
         // conservative safeguard against overstating available funds.
-        $available = max(0, min($earned, $cleared - $reversals) - $paid - $reserved);
+        $available = max(0, min($earned, $acceptedClearance - $reversals) - $paid - $reserved);
 
         return [
             'ticket_net_earnings' => round($earned, 2),
             'verified_cleared_funds' => round($cleared, 2),
+            'self_attested_cleared_funds' => round($selfAttested, 2),
+            'reviewed_cleared_funds' => round($acceptedClearance, 2),
             'recorded_reversals' => round($reversals, 2),
             'verified_reversals' => round($reversals, 2),
             'refund_exception_count' => $exceptions,
@@ -142,6 +149,7 @@ class EventPayoutService
                         'error' => $exception->getMessage(),
                     ]);
                 }
+
                 try {
                     $settings = DB::table('system_notification_settings')->where('id', 1)->first();
                     if ($settings && $settings->payout_request_emails_enabled) {
