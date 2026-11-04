@@ -10,7 +10,7 @@
         *{box-sizing:border-box}body{margin:0;background:#f6f8fc;color:#111827;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
         main{max-width:620px;margin:6vh auto;padding:16px}
         .card{background:white;border:1px solid var(--border);border-radius:22px;box-shadow:0 18px 55px rgba(22,25,67,.07);padding:clamp(20px,5vw,36px)}
-        .eyebrow{text-transform:uppercase;color:var(--blue);font-weight:800;letter-spacing:.08em;font-size:12px}
+        .eyebrow{text-transform:none;color:var(--blue);font-weight:800;letter-spacing:.08em;font-size:12px}
         h1{font-size:27px;color:var(--navy);margin:10px 0 24px}h2{font-size:17px;margin:20px 0 12px}
         .summary{border-radius:14px;background:#f4f7fb;padding:20px;margin-bottom:24px}
         .summary small,.muted{color:var(--muted)}.price{font-size:30px;font-weight:800;color:var(--navy);margin-top:5px}
