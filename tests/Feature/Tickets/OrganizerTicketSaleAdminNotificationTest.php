@@ -78,6 +78,51 @@ class OrganizerTicketSaleAdminNotificationTest extends TestCase
         Queue::assertPushed(SendAutomaticCommunicationJob::class, 1);
     }
 
+    public function test_branded_email_includes_buyer_and_financial_summary(): void
+    {
+        $organization = Organization::query()->create([
+            'name' => 'Email Preview Organization',
+            'slug' => 'email-preview-organization',
+        ]);
+        $event = Event::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Preview Concert',
+            'slug' => 'preview-concert',
+            'status' => Event::STATUS_ACTIVE,
+            'starts_at' => now()->addDays(5),
+        ]);
+        $order = TicketOrder::query()->create([
+            'event_id' => $event->id,
+            'order_number' => 'ELV-EMAIL-001',
+            'buyer_name' => 'Jane Buyer',
+            'buyer_email' => 'jane@example.com',
+            'buyer_phone' => '+255712345678',
+            'quantity' => 2,
+            'subtotal' => 50000,
+            'total' => 50000,
+            'organizer_net_amount' => 47500,
+            'currency' => 'TZS',
+            'status' => TicketOrder::STATUS_PAID,
+            'paid_at' => now(),
+            'financial_snapshot_at' => now(),
+        ]);
+
+        $html = view('emails.ticket-sale-notification', [
+            'subject' => 'New ticket sale confirmed - Preview Concert',
+            'order' => $order->load('items.ticketType'),
+            'event' => $event,
+        ])->render();
+
+        $this->assertStringContainsString('Jane Buyer', $html);
+        $this->assertStringContainsString('jane@example.com', $html);
+        $this->assertStringContainsString('+255712345678', $html);
+        $this->assertStringContainsString('ELV-EMAIL-001', $html);
+        $this->assertStringContainsString('TZS 47,500.00', $html);
+        $this->assertStringContainsString('not a settlement or payout confirmation', $html);
+        $this->assertStringContainsString(url('/admin'), $html);
+        $this->assertStringContainsString('eLive Events', $html);
+    }
+
     public function test_unpaid_order_does_not_send_admin_notification(): void
     {
         Queue::fake();
