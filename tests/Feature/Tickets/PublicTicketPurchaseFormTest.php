@@ -76,6 +76,8 @@ class PublicTicketPurchaseFormTest extends TestCase
             ->assertSee('buyer_name', false)
             ->assertSee('buyer_phone', false)
             ->assertSee('buyer_email', false)
+            ->assertSee('e.g. 255712345678')
+            ->assertSee('Enter your full name, phone number, and email address')
             ->assertSee(
                 'tickets[' . $ticketType->id . ']',
                 false

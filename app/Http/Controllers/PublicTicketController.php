@@ -161,7 +161,7 @@ class PublicTicketController extends Controller
                 ],
 
                 'buyer_phone' => [
-                    'required_without:buyer_email',
+                    'required',
                     'nullable',
                     'string',
                     'max:30',
@@ -169,7 +169,7 @@ class PublicTicketController extends Controller
                 ],
 
                 'buyer_email' => [
-                    'required_without:buyer_phone',
+                    'required',
                     'nullable',
                     'email',
                     'max:255',
