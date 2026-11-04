@@ -74,7 +74,7 @@ class OrganizerTicketSaleAdminNotificationTest extends TestCase
         $this->assertStringContainsString('Jane Buyer', $logs->first()->message);
         $this->assertStringContainsString('jane@example.com', $logs->first()->message);
         $this->assertStringContainsString('+255712345678', $logs->first()->message);
-        $this->assertStringContainsString('47500', $logs->first()->message);
+        $this->assertStringContainsString('47,500.00', $logs->first()->message);
         Queue::assertPushed(SendAutomaticCommunicationJob::class, 1);
     }
 
