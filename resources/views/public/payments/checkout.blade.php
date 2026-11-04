@@ -144,13 +144,8 @@
             </label>
             <label class="method">
                 <input type="radio" name="method" value="qr" {{ old('method') === 'qr' ? 'checked' : '' }}>
-                <span><strong>Pay with QR Code</strong><small>Scan using a compatible banking or mobile-money app.</small></span>
+                <span><strong>Pay with QR Code</strong><small>Scan with CRDB SimBanking, NBC Kiganjani, NMB Mkononi, Selcom Pesa, or another compatible app.</small><small>App compatibility may vary.</small></span>
             </label>
-            <div id="qr-selection-guidance" class="qr-app-guidance" {{ old('method', 'mobile') === 'qr' ? '' : 'hidden' }}>
-                <strong>Scan to Pay</strong>
-                <p>Scan the QR code using a compatible banking or mobile-money app, such as CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.</p>
-                <small>App compatibility may vary. Always verify the merchant name and payment amount before confirming.</small>
-            </div>
             <div id="phone-container">
                 <label for="phone" class="field">Mobile Money Number</label>
                 <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
@@ -188,13 +183,11 @@
             const phone = document.getElementById('phone');
             const phoneContainer = document.getElementById('phone-container');
             const walletNetworks = document.getElementById('wallet-networks');
-            const qrSelectionGuidance = document.getElementById('qr-selection-guidance');
             const submit = document.getElementById('submit-payment');
             function updateMethod() {
                 const mobile = form.querySelector('input[name=method]:checked').value === 'mobile';
                 phoneContainer.hidden = !mobile;
                 walletNetworks.hidden = !mobile;
-                qrSelectionGuidance.hidden = mobile;
                 phone.required = mobile;
                 submit.textContent = mobile ? 'Request Payment on Phone' : 'Generate Payment QR Code';
             }
