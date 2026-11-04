@@ -68,6 +68,13 @@ class PayoutBalanceOverview extends Widget
 
         return [
             ...$balance,
+            // Derived from ticket earnings, never from the sum of settlement receipts.
+            'remaining_unpaid_earnings' => max(0, round(
+                $balance['ticket_net_earnings'] - $balance['paid_out'], 2
+            )),
+            'unreserved_earnings' => max(0, round(
+                $balance['ticket_net_earnings'] - $balance['paid_out'] - $balance['reserved_requests'], 2
+            )),
             'event_name' => $options[$id],
             'pending_count' => (clone $requests)->where('status', EventPayoutRequest::REQUESTED)->count(),
             'pending_amount' => (float) (clone $requests)->where('status', EventPayoutRequest::REQUESTED)->sum('amount'),

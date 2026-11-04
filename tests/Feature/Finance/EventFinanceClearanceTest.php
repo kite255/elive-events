@@ -71,6 +71,68 @@ class EventFinanceClearanceTest extends TestCase
         ]);
     }
 
+    public function test_only_superadmin_may_self_attest_when_exactly_one_exists(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $event = $this->event();
+        $service = app(EventFinanceClearanceService::class);
+        $service->record($event, $admin, 'settlement', '100.00', 'BANK-SOLO-101', 'Bank statement reviewed for settlement');
+        $id = (int) DB::table('event_finance_clearance_entries')->where('external_reference', 'BANK-SOLO-101')->value('id');
+
+        $service->selfAttest($id, $admin, 'Checked external bank statement, settlement date and matching receipt reference; only one authorized administrator.');
+        $entry = DB::table('event_finance_clearance_entries')->where('id', $id)->first();
+
+        $this->assertSame($admin->id, (int) $entry->self_attested_by);
+        $this->assertNotNull($entry->self_attested_at);
+        $this->assertNull($entry->independently_verified_at);
+        $this->assertSame('100.00', number_format((float) $entry->amount, 2, '.', ''));
+        $balance = app(\App\Services\EventPayoutService::class)->ticketBalance($event->id);
+        $this->assertSame(0.0, $balance['verified_cleared_funds']);
+        $this->assertSame(100.0, $balance['self_attested_cleared_funds']);
+    }
+
+    public function test_self_attestation_fails_when_second_superadmin_exists(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        User::factory()->create(['is_super_admin' => true]);
+        $event = $this->event();
+        app(EventFinanceClearanceService::class)->record($event, $admin, 'settlement', '80.00', 'BANK-SOLO-102', 'Recorded from bank evidence');
+        $id = (int) DB::table('event_finance_clearance_entries')->where('external_reference', 'BANK-SOLO-102')->value('id');
+
+        $this->expectException(ValidationException::class);
+        app(EventFinanceClearanceService::class)->selfAttest($id, $admin, str_repeat('Evidence independently unavailable; ', 2));
+    }
+
+    public function test_system_admin_fallback_also_counts_as_a_second_superadmin(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        User::factory()->create([
+            'is_super_admin' => false,
+            'email' => User::SYSTEM_ADMIN_EMAIL,
+        ]);
+        $event = $this->event();
+        $service = app(EventFinanceClearanceService::class);
+        $service->record($event, $admin, 'settlement', '90.00', 'BANK-SOLO-FALLBACK', 'Recorded from external bank statement');
+        $id = (int) DB::table('event_finance_clearance_entries')->where('external_reference', 'BANK-SOLO-FALLBACK')->value('id');
+
+        $this->assertFalse($service->singleSuperAdminIs($admin));
+        $this->expectException(ValidationException::class);
+        $service->selfAttest($id, $admin, 'Reviewed external bank statement; no duplicate bank receipt is present.');
+    }
+
+    public function test_same_amount_duplicate_entries_cannot_be_self_attested(): void
+    {
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $event = $this->event();
+        $service = app(EventFinanceClearanceService::class);
+        $service->record($event, $admin, 'settlement', '550.00', 'BANK-SOLO-103', 'First purported payment receipt');
+        $service->record($event, $admin, 'settlement', '550.00', 'BANK-SOLO-104', 'Second purported payment receipt');
+        $id = (int) DB::table('event_finance_clearance_entries')->where('external_reference', 'BANK-SOLO-103')->value('id');
+
+        $this->expectException(ValidationException::class);
+        $service->selfAttest($id, $admin, 'Reconciled settlement reference against the bank statement and verified receipt date.');
+    }
+
     private function event(): Event
     {
         $organization = Organization::query()->create(['name' => 'Settlement Test Organization '.uniqid()]);

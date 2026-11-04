@@ -115,6 +115,21 @@
                     @endforeach
                 </div>
             </section>
+            @if(count($this->voidedEntries()))
+                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900" aria-label="Voided Settlement Audit">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Voided Settlement Audit</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Preserved corrections; these entries no longer count as settled funds or block evidence review.</p>
+                    <div class="mt-3 space-y-3">
+                        @foreach($this->voidedEntries() as $entry)
+                            <div class="rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
+                                <p class="font-semibold text-gray-900 dark:text-white">#{{ $entry->id }} · {{ $entry->currency }} {{ number_format((float) $entry->amount, 2) }} · {{ $entry->external_reference }}</p>
+                                <p class="mt-1 text-gray-600 dark:text-gray-300">Voided by {{ $entry->voided_by_name ?? 'Administrator' }} at {{ $entry->voided_at }}</p>
+                                <p class="mt-1 text-gray-600 dark:text-gray-300">{{ $entry->void_reason }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
         @else
             <p class="text-sm text-gray-500 dark:text-gray-400">Select an event to view its finance report.</p>
         @endif

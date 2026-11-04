@@ -335,6 +335,37 @@ class PublicTicketCheckoutTest extends TestCase
         );
     }
 
+    public function test_global_selcom_default_validates_paid_ticket_phone(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        // Format passes the generic form regex but is not a valid Tanzanian
+        // mobile number; reject it before creating an order or contacting Selcom.
+        $this->from('/events/'.$event->slug.'/tickets')
+            ->post('/events/'.$event->slug.'/tickets', [
+                'buyer_name' => 'Invalid Selcom Buyer',
+                'buyer_phone' => '12345678',
+                'buyer_email' => 'invalid@example.com',
+                'accept_terms' => '1',
+                'tickets' => [$ticketType->id => 1],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors(['buyer_phone']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
     public function test_checkout_rejects_phone_without_email(): void
     {
         $event = $this->createEvent();

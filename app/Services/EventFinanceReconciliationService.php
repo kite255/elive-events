@@ -81,9 +81,9 @@ class EventFinanceReconciliationService
 
         $balance = FinanceBalanceCalculator::summarize($net, $paidOut, $reserved);
         $settled = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->where('entry_type', 'settlement')->sum('amount');
+            ->where('event_id', $eventId)->whereNull('voided_at')->where('entry_type', 'settlement')->sum('amount');
         $reversals = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
+            ->where('event_id', $eventId)->whereNull('voided_at')->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
         $clearedBalance = max(0, min((float) $net, $settled - $reversals) - (float) $paidOut - (float) $reserved);
 
         return [
