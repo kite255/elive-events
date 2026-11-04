@@ -27,9 +27,9 @@
         .footer{border-top:1px solid var(--border);padding-top:18px;margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
         .payment-networks{margin:18px 0;padding:14px;background:#f8fafc;border:1px solid var(--border);border-radius:12px}
         .payment-networks-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
-        .wallet-logos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
-        .wallet-logo{min-width:0;height:70px;background:#fff;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:8px}
-        .wallet-logo img{display:block;width:100%;max-height:48px;height:auto;object-fit:contain}
+        .wallet-logos{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:10px;width:100%}
+        .wallet-logo{flex:1 1 0;min-width:0;height:56px;background:transparent;border:0;box-shadow:none;display:flex;align-items:center;justify-content:center;padding:0}
+        .wallet-logo img{display:block;width:auto;max-width:100%;height:auto;max-height:42px;object-fit:contain;margin:0 auto;background:transparent}
         .wallet-logo span{font-size:12px;font-weight:700;text-align:center;color:var(--navy)}
         .tips-panel{margin:16px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;background:#f8fafc;padding:18px 12px;border:1px solid var(--border);border-radius:12px}
         .tips-panel img{display:block;width:190px;max-width:100%;height:auto;object-fit:contain;margin:0 auto}
@@ -40,13 +40,15 @@
             .card{border-radius:16px;padding:20px 16px}
             h1{font-size:23px}
             .price{font-size:26px}
-            .wallet-logos{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
-            .wallet-logo{height:50px;padding:3px;border-radius:7px}
+            .wallet-logos{gap:6px}
+            .wallet-logo{height:42px;padding:0}
+            .wallet-logo img{max-height:32px}
             .tips-panel img{width:160px}
         }
         @media (max-width:390px){
-            .wallet-logos{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
-            .wallet-logo{height:44px;padding:2px}
+            .wallet-logos{gap:4px}
+            .wallet-logo{height:36px;padding:0}
+            .wallet-logo img{max-height:26px}
             .payment-networks{padding:8px}
         }
         [hidden]{display:none!important}a{color:var(--blue)}
