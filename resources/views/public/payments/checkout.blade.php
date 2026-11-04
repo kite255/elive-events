@@ -124,7 +124,7 @@
             </label>
             <label class="method">
                 <input type="radio" name="method" value="qr" {{ old('method') === 'qr' ? 'checked' : '' }}>
-                <span><strong>Pay with QR Code</strong><small>Scan the QR code using a supported payment app.</small></span>
+                <span><strong>Pay with QR Code</strong><small>Scan using a compatible banking app, e.g. CRDB SimBanking, NBC Kiganjani or NMB Mkononi. App support may vary.</small></span>
             </label>
             <div id="phone-container">
                 <label for="phone" class="field">Mobile Money Number</label>
