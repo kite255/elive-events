@@ -162,13 +162,10 @@ class SelcomBrandedCheckoutTest extends TestCase
             ->assertSee('NBC Kiganjani')
             ->assertSee('NMB Mkononi')
             ->assertSee('Selcom Pesa')
-            ->assertSee('Open the scan-to-pay option in a supported banking or payment app')
-            ->assertSee('These are examples, not a guarantee of QR compatibility.')
+            ->assertSee('Scan the QR code using a compatible banking or mobile-money app, such as CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.')
+            ->assertSee('App compatibility may vary. Always verify the merchant name and payment amount before confirming.')
             ->assertSee('Copy Token')
             ->assertSee('id="payment-token"', false)
-            ->assertSee('M-Pesa')
-            ->assertSee('Mixx by Yas')
-            ->assertSee('Airtel Money')
             ->assertDontSee('&#128274;', false)
             ->assertSee('Check Payment Status');
 
