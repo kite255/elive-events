@@ -905,6 +905,8 @@
         .purchase-terms { margin-top: 18px; padding: 14px; border: 1px solid var(--elive-border); border-radius: 12px; background: #F8FAFC; }
         .purchase-terms-label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.55; color: #344054; cursor: pointer; }
         .purchase-terms-label input { width: 18px; height: 18px; flex: 0 0 18px; margin: 2px 0 0; accent-color: var(--elive-blue); }
+        .purchase-terms-link { color: var(--elive-blue); text-decoration: underline; text-underline-offset: 2px; font-weight: 800; }
+        .purchase-terms-link:focus-visible { outline: 3px solid var(--elive-blue); outline-offset: 2px; }
         .purchase-terms-details { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--elive-muted); }
         .purchase-terms-details summary { color: var(--elive-blue); font-weight: 800; cursor: pointer; }
         .purchase-terms-details p { margin: 8px 0 0; }
@@ -1637,7 +1639,7 @@
                                         <input id="accept_terms" type="checkbox" name="accept_terms" value="1"
                                             required {{ old('accept_terms') ? 'checked' : '' }}
                                             aria-describedby="purchase-terms-details">
-                                        <span>I agree to the <strong>Terms &amp; Conditions</strong> for this ticket purchase.</span>
+                                        <span>I agree to the <a href="{{ route('public.terms') }}" target="_blank" rel="noopener noreferrer" class="purchase-terms-link">Terms &amp; Conditions</a> for this ticket purchase.</span>
                                     </label>
                                     <details class="purchase-terms-details" id="purchase-terms-details">
                                         <summary>Read ticket purchase conditions</summary>
