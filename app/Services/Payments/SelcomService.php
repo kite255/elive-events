@@ -84,7 +84,7 @@ class SelcomService implements PaymentGateway
         }
 
         $phone = $this->normalizeTanzanianPhone($phone);
-        if (! preg_match('/^255\\d{9}$/', $phone)
+        if (! preg_match('/^255\d{9}$/', $phone)
             || ! preg_match('/^[A-Za-z0-9-]{8,64}$/', $orderId)
             || ! preg_match('/^[A-Za-z0-9-]{8,64}$/', $transactionId)) {
             throw new RuntimeException('Valid order, transaction and Tanzanian mobile number are required.');
