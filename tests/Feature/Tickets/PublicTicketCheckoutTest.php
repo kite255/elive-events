@@ -120,6 +120,34 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('Email address (optional)');
     }
 
+    public function test_public_footers_include_terms_link(): void
+    {
+        $views = [
+            'welcome',
+            'public.events.index',
+            'public.events.show',
+            'public.tickets.order',
+            'public.tickets.show',
+            'public.donations.index',
+            'public.donations.show',
+            'public.merchandise.index',
+            'public.events.register',
+            'public.events.success',
+            'public.attendees.show',
+            'public.event-communications.show',
+        ];
+
+        foreach ($views as $view) {
+            $path = resource_path('views/'.str_replace('.', '/', $view).'.blade.php');
+            $this->assertFileExists($path);
+            $this->assertStringContainsString(
+                "route('public.terms')",
+                (string) file_get_contents($path),
+                $view.' must link to the public policy.'
+            );
+        }
+    }
+
     public function test_public_terms_links_and_archived_versions(): void
     {
         $event = $this->createEvent();
