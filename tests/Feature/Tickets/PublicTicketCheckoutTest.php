@@ -114,10 +114,10 @@ class PublicTicketCheckoutTest extends TestCase
         $response
             ->assertOk()
             ->assertSee(
-                'Enter at least a phone number or email address'
+                'Enter your full name, phone number, and email address'
             )
-            ->assertSee('Phone number (optional)')
-            ->assertSee('Email address (optional)');
+            ->assertSee('Phone number')
+            ->assertSee('Email address');
     }
 
     public function test_buyer_can_create_ticket_order_and_payment(): void
@@ -209,62 +209,43 @@ class PublicTicketCheckoutTest extends TestCase
         );
     }
 
-    public function test_checkout_accepts_phone_without_email(): void
+    public function test_checkout_rejects_phone_without_email(): void
     {
         $event = $this->createEvent();
         $ticketType = $this->createTicketType($event);
 
-        $response = $this->post(
-            '/events/'.$event->slug.'/tickets',
-            [
+        $response = $this
+            ->from('/events/'.$event->slug.'/tickets')
+            ->post('/events/'.$event->slug.'/tickets', [
                 'buyer_name' => 'Phone Buyer',
                 'buyer_phone' => '0712345678',
                 'buyer_email' => '',
-                'tickets' => [
-                    $ticketType->id => 1,
-                ],
-            ]
-        );
+                'tickets' => [$ticketType->id => 1],
+            ]);
 
-        $order = TicketOrder::query()
-            ->latest('id')
-            ->firstOrFail();
-
-        $response->assertRedirect();
-        $this->assertSame('255712345678', $order->buyer_phone);
-        $this->assertNull($order->buyer_email);
+        $response->assertRedirect()->assertSessionHasErrors(['buyer_email']);
+        $this->assertDatabaseCount('ticket_orders', 0);
     }
 
-    public function test_checkout_accepts_email_without_phone(): void
+    public function test_checkout_rejects_email_without_phone(): void
     {
         $event = $this->createEvent();
         $ticketType = $this->createTicketType($event);
 
-        $response = $this->post(
-            '/events/'.$event->slug.'/tickets',
-            [
+        $response = $this
+            ->from('/events/'.$event->slug.'/tickets')
+            ->post('/events/'.$event->slug.'/tickets', [
                 'buyer_name' => 'Email Buyer',
                 'buyer_phone' => '',
                 'buyer_email' => 'email.buyer@example.com',
-                'tickets' => [
-                    $ticketType->id => 1,
-                ],
-            ]
-        );
+                'tickets' => [$ticketType->id => 1],
+            ]);
 
-        $order = TicketOrder::query()
-            ->latest('id')
-            ->firstOrFail();
-
-        $response->assertRedirect();
-        $this->assertNull($order->buyer_phone);
-        $this->assertSame(
-            'email.buyer@example.com',
-            $order->buyer_email
-        );
+        $response->assertRedirect()->assertSessionHasErrors(['buyer_phone']);
+        $this->assertDatabaseCount('ticket_orders', 0);
     }
 
-    public function test_checkout_requires_phone_or_email(): void
+    public function test_checkout_requires_both_phone_and_email(): void
     {
         $event = $this->createEvent();
         $ticketType = $this->createTicketType($event);
