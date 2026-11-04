@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Payments;
 
-use App\Jobs\Payments\FulfillCompletedPayment;
+use App\Jobs\FulfillCompletedPayment;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\Payment;
