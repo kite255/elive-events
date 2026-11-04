@@ -166,8 +166,10 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertOk()
             ->assertSee('Ticket Purchase Terms')
             ->assertSee('Refunds and cancellations')
-            ->assertSee('ticket-purchase-2026-11-04')
+            ->assertSee('ticket-purchase-2026-11-04-2')
             ->assertSee('Effective date: 4 November 2026')
+            ->assertSee('Last updated: 4 November 2026')
+            ->assertSee('To ask about a refund or cancellation')
             ->assertDontSee('Draft for review.')
             ->assertDontSee('noindex, nofollow');
 
@@ -186,6 +188,11 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('Ticket Purchase Terms')
             ->assertSee('Refunds and cancellations')
             ->assertSee($version);
+
+        $this->get(route('public.terms.version', ['version' => 'ticket-purchase-2026-11-04']))
+            ->assertOk()
+            ->assertSee('Version: ticket-purchase-2026-11-04')
+            ->assertDontSee('Last updated: 4 November 2026');
 
         $this->get(route('public.terms.version', ['version' => 'unknown-policy']))
             ->assertNotFound();
@@ -273,7 +280,7 @@ class PublicTicketCheckoutTest extends TestCase
         );
 
         $this->assertSame(
-            'ticket-purchase-2026-11-04',
+            'ticket-purchase-2026-11-04-2',
             data_get($order->metadata, 'purchase_terms_version')
         );
         $this->assertNotEmpty(data_get($order->metadata, 'purchase_terms_accepted_at'));
