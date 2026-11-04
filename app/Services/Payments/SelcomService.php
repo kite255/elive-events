@@ -4,6 +4,7 @@ namespace App\Services\Payments;
 
 use App\Contracts\PaymentGateway;
 use App\Models\Payment;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -198,9 +199,20 @@ class SelcomService implements PaymentGateway
 
         $http = Http::acceptJson()->asJson()->withHeaders($headers)
             ->timeout((int) config('services.selcom.timeout', 30));
-        $response = $method === 'GET'
-            ? $http->get($base . $path, $fields)
-            : $http->post($base . $path, $fields);
+        try {
+            $response = $method === 'GET'
+                ? $http->get($base . $path, $fields)
+                : $http->post($base . $path, $fields);
+        } catch (ConnectionException $exception) {
+            // Provider may have received the request. Never retry the wallet
+            // authorization automatically; keep its local state uncertain.
+            Log::warning('Selcom API transport failure', [
+                'operation' => $path,
+                'failure_type' => 'connection',
+                'exception_class' => $exception::class,
+            ]);
+            throw $exception;
+        }
 
         $data = $response->json();
         if (! $response->successful()
@@ -218,7 +230,8 @@ class SelcomService implements PaymentGateway
                 'operation' => $path,
                 'http_status' => $response->status(),
                 'result_code' => is_scalar($code) ? substr((string) $code, 0, 32) : null,
-                'result' => in_array($result, ['SUCCESS', 'FAIL', 'FAILED', 'ERROR'], true) ? $result : 'unknown',
+                'result' => in_array($result, ['SUCCESS', 'PENDING', 'FAIL', 'FAILED', 'ERROR'], true) ? $result : 'unknown',
+                'failure_type' => $response->successful() ? 'provider_result' : 'http_response',
             ]);
             throw new RuntimeException('Selcom API request failed or returned a non-success response.');
         }
