@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex, nofollow">
     <title>Ticket Purchase Terms &amp; Conditions | eLive Events</title>
     <style>
         :root { color-scheme: light; --navy:#161943; --blue:#007ab2; --muted:#667085; --border:#e5eaf1; }
@@ -40,8 +39,7 @@
     <article>
         <div class="eyebrow">eLive Events</div>
         <h1>Ticket Purchase Terms &amp; Conditions</h1>
-        <p class="meta">Document version: ticket-purchase-2026-11-04</p>
-        <div class="notice"><strong>Draft for review.</strong> These ticketing terms are proposed wording and require eLive's approval before they become the published policy. Event-specific conditions may also apply.</div>
+        <p class="meta">Effective date: 4 November 2026 · Version: ticket-purchase-2026-11-04</p>
         <p class="intro">These terms describe the main conditions to review before purchasing or reserving a ticket through eLive Events. Please also review the information and any additional conditions published for your chosen event.</p>
 
         <h2>1. Events and organizers</h2>
