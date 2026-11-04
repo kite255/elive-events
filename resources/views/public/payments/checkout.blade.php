@@ -98,9 +98,8 @@
                 <img class="qr" alt="Selcom order QR code" src="{{ $qrDetails['qr_image'] }}">
                 <div class="qr-app-guidance">
                     <strong>Scan to Pay</strong>
-                    <p>Open the scan-to-pay option in a supported banking or payment app, then scan this QR code.</p>
-                    <p class="app-examples"><strong>Examples:</strong> CRDB SimBanking, NBC Kiganjani, NMB Mkononi, Selcom Pesa, M-Pesa, Mixx by Yas, and Airtel Money.</p>
-                    <small>These are examples, not a guarantee of QR compatibility. Availability depends on the app and payment network. Always verify the merchant and amount before confirming.</small>
+                    <p>Scan the QR code using a compatible banking or mobile-money app, such as CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.</p>
+                    <small>App compatibility may vary. Always verify the merchant name and payment amount before confirming.</small>
                 </div>
             @endif
             @if($qrDetails['payment_token'])
