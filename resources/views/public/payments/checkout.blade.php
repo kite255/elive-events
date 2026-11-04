@@ -24,6 +24,10 @@
         .notice{background:#fff7e6;color:#854d0e;padding:14px;border-radius:10px;margin-bottom:18px;line-height:1.6}
         .success{background:#effaf2;color:#166534}.token{background:#f3f6fb;font-size:22px;letter-spacing:.08em;font-weight:800;word-break:break-all;padding:16px;border-radius:10px;text-align:center}
         .qr{display:block;width:220px;max-width:100%;height:auto;margin:15px auto}
+        .qr-app-guidance{text-align:center;margin:8px 0 20px;line-height:1.55}
+        .qr-app-guidance strong{font-size:14px;color:var(--navy)}
+        .qr-app-guidance p{font-size:13px;color:#475569;margin:6px 0}
+        .qr-app-guidance small{display:block;font-size:12px;color:var(--muted)}
         .footer{border-top:1px solid var(--border);padding-top:18px;margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
         .payment-networks{margin:18px 0;padding:14px;background:#f8fafc;border:1px solid var(--border);border-radius:12px}
         .payment-networks-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
@@ -82,6 +86,11 @@
             </div>
             @if($qrDetails['qr_image'])
                 <img class="qr" alt="Selcom order QR code" src="{{ $qrDetails['qr_image'] }}">
+                <div class="qr-app-guidance">
+                    <strong>Scan to Pay</strong>
+                    <p>Examples of apps with QR payment features include CRDB SimBanking, NBC Kiganjani, NMB Mkononi, Selcom Pesa, M-Pesa, Mixx by Yas, and Airtel Money.</p>
+                    <small>Compatibility with this Selcom QR may vary. Check that your app accepts it, and confirm the merchant name and amount before paying.</small>
+                </div>
             @endif
             @if($qrDetails['payment_token'])
                 <p class="muted">Alternatively, use this payment token:</p>
