@@ -32,7 +32,16 @@ class OrganizerTicketSaleNotificationService
 
             $ticketOrganizerEmails = $event->ticketingManagers()->pluck('users.email');
 
-            $recipients = $ownerEmails->concat($ticketOrganizerEmails)
+            // Notify platform administrators as well as authorized event organizers.
+            // Other organizations' admins are not global recipients.
+            $adminEmails = User::query()
+                ->where('is_super_admin', true)
+                ->orWhereRaw('LOWER(email) = ?', [strtolower(User::SYSTEM_ADMIN_EMAIL)])
+                ->pluck('email');
+
+            $recipients = $ownerEmails
+                ->concat($ticketOrganizerEmails)
+                ->concat($adminEmails)
                 ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
                 ->map(fn ($email) => strtolower(trim($email)))
                 ->unique()->values();
