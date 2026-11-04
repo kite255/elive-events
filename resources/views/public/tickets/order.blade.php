@@ -1246,6 +1246,8 @@
 <footer class="footer">
     <div class="container">
         Powered by eLive Events
+        <span aria-hidden="true"> · </span>
+        <a href="{{ route('public.terms') }}" style="color:inherit;text-decoration:underline;text-underline-offset:2px">Terms &amp; Conditions</a>
     </div>
 </footer>
 

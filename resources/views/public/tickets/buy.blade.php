@@ -902,6 +902,13 @@
             font-size: 25px;
         }
 
+        .purchase-terms { margin-top: 18px; padding: 12px 14px; border: 1px solid var(--elive-border); border-radius: 12px; background: #F8FAFC; }
+        .purchase-terms-label { display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 1.5; color: #344054; cursor: pointer; }
+        .purchase-terms-label input { width: 18px; height: 18px; flex: 0 0 18px; margin: 0; accent-color: var(--elive-blue); }
+        .purchase-terms-link { color: var(--elive-blue); text-decoration: underline; text-underline-offset: 2px; font-weight: 800; }
+        .purchase-terms-link:focus-visible { outline: 3px solid var(--elive-blue); outline-offset: 2px; }
+        .purchase-terms .field-error { margin-top: 8px; }
+
         .checkout-button {
             width: 100%;
 
@@ -1617,6 +1624,17 @@
                                         {{ $displayCurrency }} 0
                                     </strong>
 
+                                </div>
+
+                                <div class="purchase-terms">
+                                    <label class="purchase-terms-label" for="accept_terms">
+                                        <input id="accept_terms" type="checkbox" name="accept_terms" value="1"
+                                            required {{ old('accept_terms') ? 'checked' : '' }}>
+                                        <span>I agree to the <a href="{{ route('public.terms') }}" target="_blank" rel="noopener noreferrer" class="purchase-terms-link">Terms &amp; Conditions</a>.</span>
+                                    </label>
+                                    @error('accept_terms')
+                                        <div class="field-error" role="alert">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <button

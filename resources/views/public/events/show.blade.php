@@ -2948,6 +2948,7 @@
         </p>
 
         <div class="footer-links">
+            <a href="{{ route('public.terms') }}">Terms &amp; Conditions</a>
             <a href="{{ route('home') }}">
                 Home
             </a>

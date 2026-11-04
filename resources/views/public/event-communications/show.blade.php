@@ -685,6 +685,10 @@
             <a href="{{ url('/') }}">
                 eLive Events
             </a>
+
+            <a href="{{ route('public.terms') }}">
+                Terms &amp; Conditions
+            </a>
         </nav>
 
         <div class="footer-divider"></div>

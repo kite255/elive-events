@@ -120,6 +120,80 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('Email address (optional)');
     }
 
+    public function test_public_footers_include_terms_link(): void
+    {
+        $views = [
+            'welcome',
+            'public.events.index',
+            'public.events.show',
+            'public.tickets.order',
+            'public.tickets.show',
+            'public.donations.index',
+            'public.donations.show',
+            'public.merchandise.index',
+            'public.events.register',
+            'public.events.success',
+            'public.attendees.show',
+            'public.event-communications.show',
+        ];
+
+        foreach ($views as $view) {
+            $path = resource_path('views/'.str_replace('.', '/', $view).'.blade.php');
+            $this->assertFileExists($path);
+            $this->assertStringContainsString(
+                "route('public.terms')",
+                (string) file_get_contents($path),
+                $view.' must link to the public policy.'
+            );
+        }
+    }
+
+    public function test_public_terms_links_and_archived_versions(): void
+    {
+        $event = $this->createEvent();
+        $this->createTicketType($event);
+
+        $this->get(route('public.terms'))
+            ->assertOk()
+            ->assertSee('Last updated: 4 November 2026')
+            ->assertSee('ticket-purchase-2026-11-04-2')
+            ->assertSee('To ask about a refund or cancellation');
+
+        $this->get(route('public.terms.version', ['version' => 'ticket-purchase-2026-11-04']))
+            ->assertOk()
+            ->assertSee('Ticket Purchase Terms')
+            ->assertDontSee('Last updated: 4 November 2026');
+
+        $this->get(route('public.terms.version', ['version' => 'invalid']))
+            ->assertNotFound();
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertSee('name="accept_terms"', false)
+            ->assertSee('href="'.route('public.terms').'"', false);
+
+        $this->get(route('home'))->assertOk()
+            ->assertSee('href="'.route('public.terms').'"', false);
+    }
+
+    public function test_ticket_purchase_is_rejected_without_terms_consent(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $this->from(route('public.tickets.buy', ['event' => $event->slug]))
+            ->post(route('public.tickets.store', ['event' => $event->slug]), [
+                'buyer_name' => 'Unaccepted Buyer',
+                'buyer_phone' => '255700000001',
+                'buyer_email' => 'buyer@example.com',
+                'tickets' => [$ticketType->id => 1],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors(['accept_terms']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
     public function test_buyer_can_create_ticket_order_and_payment(): void
     {
         $event = $this->createEvent();
@@ -144,6 +218,7 @@ class PublicTicketCheckoutTest extends TestCase
                     'buyer_email' =>
                         'buyer@example.com',
 
+                    'accept_terms' => '1',
                     'tickets' => [
                         $ticketType->id => 2,
                     ],
@@ -167,6 +242,20 @@ class PublicTicketCheckoutTest extends TestCase
         $this->assertSame(
             2,
             $order->quantity
+        );
+
+        $this->assertSame(
+            \App\Support\TicketPurchaseTerms::CURRENT_VERSION,
+            data_get($order->metadata, 'purchase_terms_version')
+        );
+        $this->assertNotEmpty(data_get($order->metadata, 'purchase_terms_accepted_at'));
+        $this->assertSame(
+            \App\Support\TicketPurchaseTerms::snapshotHash(),
+            data_get($order->metadata, 'purchase_terms_sha256')
+        );
+        $this->assertSame(
+            route('public.terms.version', ['version' => \App\Support\TicketPurchaseTerms::CURRENT_VERSION]),
+            data_get($order->metadata, 'purchase_terms_archive_url')
         );
 
         $this->assertSame(
@@ -220,7 +309,8 @@ class PublicTicketCheckoutTest extends TestCase
                 'buyer_name' => 'Phone Buyer',
                 'buyer_phone' => '0712345678',
                 'buyer_email' => '',
-                'tickets' => [
+                'accept_terms' => '1',
+                    'tickets' => [
                     $ticketType->id => 1,
                 ],
             ]
@@ -246,7 +336,8 @@ class PublicTicketCheckoutTest extends TestCase
                 'buyer_name' => 'Email Buyer',
                 'buyer_phone' => '',
                 'buyer_email' => 'email.buyer@example.com',
-                'tickets' => [
+                'accept_terms' => '1',
+                    'tickets' => [
                     $ticketType->id => 1,
                 ],
             ]
@@ -277,6 +368,7 @@ class PublicTicketCheckoutTest extends TestCase
                     'buyer_name' => 'No Contact Buyer',
                     'buyer_phone' => '',
                     'buyer_email' => '',
+                    'accept_terms' => '1',
                     'tickets' => [
                         $ticketType->id => 1,
                     ],
@@ -306,6 +398,7 @@ class PublicTicketCheckoutTest extends TestCase
                     'buyer_name' => 'Invalid Phone Buyer',
                     'buyer_phone' => '12345',
                     'buyer_email' => '',
+                    'accept_terms' => '1',
                     'tickets' => [
                         $ticketType->id => 1,
                     ],
@@ -364,6 +457,7 @@ class PublicTicketCheckoutTest extends TestCase
                     'buyer_email' =>
                         'free@example.com',
 
+                    'accept_terms' => '1',
                     'tickets' => [
                         $ticketType->id => 2,
                     ],
@@ -479,7 +573,8 @@ class PublicTicketCheckoutTest extends TestCase
                             '255700000001',
                         'buyer_email' =>
                             'buyer@example.com',
-                        'tickets' => [
+                        'accept_terms' => '1',
+                    'tickets' => [
                             $ticketType->id => 1,
                         ],
                     ]
@@ -519,7 +614,8 @@ class PublicTicketCheckoutTest extends TestCase
                             '255700000001',
                         'buyer_email' =>
                             'buyer@example.com',
-                        'tickets' => [],
+                        'accept_terms' => '1',
+                    'tickets' => [],
                     ]
                 );
 
@@ -568,7 +664,8 @@ class PublicTicketCheckoutTest extends TestCase
                         'buyer_email' =>
                             'buyer@example.com',
 
-                        'tickets' => [
+                        'accept_terms' => '1',
+                    'tickets' => [
                             $otherTicket->id => 1,
                         ],
                     ]
@@ -618,6 +715,7 @@ class PublicTicketCheckoutTest extends TestCase
                     'buyer_email' =>
                         'buyer@example.com',
 
+                    'accept_terms' => '1',
                     'tickets' => [
                         $ticketType->id => 1,
                     ],
