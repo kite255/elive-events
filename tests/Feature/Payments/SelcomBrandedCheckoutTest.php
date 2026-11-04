@@ -243,6 +243,28 @@ class SelcomBrandedCheckoutTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_selcom_processing_status_view_auto_refreshes_without_initiating_payment(): void
+    {
+        $payment = $this->payment();
+        $payment->update([
+            'status' => Payment::STATUS_PROCESSING,
+            'provider_tracking_id' => $payment->reference,
+        ]);
+        $payment->load(['event', 'gateway', 'ticketOrder']);
+
+        $html = view('public.payments.status', [
+            'payment' => $payment,
+            'checkoutUnavailable' => false,
+        ])->render();
+
+        $this->assertStringContainsString('window.location.reload()', $html);
+        $this->assertStringContainsString('25000', $html);
+        $this->assertStringContainsString('This page also checks automatically', $html);
+
+        Http::assertNothingSent();
+        $this->assertNull($payment->fresh()->paid_at);
+    }
+
     public function test_invalid_phone_is_rejected_without_provider_request(): void
     {
         $payment = $this->payment();
