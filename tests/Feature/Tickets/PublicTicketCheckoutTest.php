@@ -120,6 +120,24 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('Email address');
     }
 
+    public function test_public_ticket_terms_page_is_accessible_and_linked_from_checkout(): void
+    {
+        $event = $this->createEvent();
+        $this->createTicketType($event);
+
+        $this->get(route('public.terms'))
+            ->assertOk()
+            ->assertSee('Ticket Purchase Terms')
+            ->assertSee('Refunds and cancellations')
+            ->assertSee('ticket-purchase-2026-11-04')
+            ->assertSee('Draft for review.');
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertSee('href="'.route('public.terms').'"', false)
+            ->assertSee('name="accept_terms"', false);
+    }
+
     public function test_ticket_checkout_requires_explicit_terms_acceptance(): void
     {
         $event = $this->createEvent();
