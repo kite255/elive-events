@@ -902,6 +902,14 @@
             font-size: 25px;
         }
 
+        .purchase-terms { margin-top: 18px; padding: 14px; border: 1px solid var(--elive-border); border-radius: 12px; background: #F8FAFC; }
+        .purchase-terms-label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.55; color: #344054; cursor: pointer; }
+        .purchase-terms-label input { width: 18px; height: 18px; flex: 0 0 18px; margin: 2px 0 0; accent-color: var(--elive-blue); }
+        .purchase-terms-details { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--elive-muted); }
+        .purchase-terms-details summary { color: var(--elive-blue); font-weight: 800; cursor: pointer; }
+        .purchase-terms-details p { margin: 8px 0 0; }
+        .purchase-terms .field-error { margin-top: 8px; }
+
         .checkout-button {
             width: 100%;
 
@@ -1622,6 +1630,22 @@
                                         {{ $displayCurrency }} 0
                                     </strong>
 
+                                </div>
+
+                                <div class="purchase-terms">
+                                    <label class="purchase-terms-label" for="accept_terms">
+                                        <input id="accept_terms" type="checkbox" name="accept_terms" value="1"
+                                            required {{ old('accept_terms') ? 'checked' : '' }}
+                                            aria-describedby="purchase-terms-details">
+                                        <span>I agree to the <strong>Terms &amp; Conditions</strong> for this ticket purchase.</span>
+                                    </label>
+                                    <details class="purchase-terms-details" id="purchase-terms-details">
+                                        <summary>Read ticket purchase conditions</summary>
+                                        <p>Review your event details, ticket types, quantities and total before continuing. Tickets are issued only after payment is confirmed. Ticket entry is subject to the event's stated conditions. If an event changes or a refund is requested, the applicable organizer policy and consumer rights apply. Keep your ticket and QR code secure.</p>
+                                    </details>
+                                    @error('accept_terms')
+                                        <div class="field-error" role="alert">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <button
