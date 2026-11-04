@@ -129,6 +129,22 @@ class SelcomBrandedCheckoutTest extends TestCase
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
     }
 
+    public function test_checkout_views_of_different_orders_do_not_share_a_rate_limit(): void
+    {
+        $first = $this->payment();
+        $second = $this->payment();
+        Http::fake();
+
+        // Formerly the thirtieth IP-wide request could block another buyer.
+        for ($i = 0; $i < 30; $i++) {
+            $this->get(route('payments.pay', $first))->assertOk();
+        }
+
+        $this->get(route('payments.pay', $second))->assertOk();
+        $this->get(route('payments.pay', $first))->assertOk();
+        Http::assertNothingSent();
+    }
+
     public function test_qr_checkout_initializes_one_order_and_shows_provider_token(): void
     {
         $payment = $this->payment();
