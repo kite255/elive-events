@@ -105,7 +105,7 @@ class SelcomBrandedCheckoutTest extends TestCase
             ->assertOk()
             ->assertSee('Mobile Money')
             ->assertSee('Pay with QR Code')
-            ->assertSee('Scan with a compatible banking or payment app. Availability varies by provider.')
+            ->assertSee('Scan using a compatible banking or mobile-money app.')
             ->assertDontSee('QR Code / Payment Token')
             ->assertSee('e.g. 255712345678')
             ->assertSee('Never enter your mobile money PIN on this website.')
