@@ -846,9 +846,11 @@
 
             <div class="notice">
                 Payment confirmation can take a short time depending
-                on the payment method. You can safely use
-                <strong>Check Again</strong>
-                to refresh the status.
+                on the payment method. You can use
+                <strong>Check Again</strong> to refresh the status.
+                @if ($payment->gateway?->code === 'selcom' && filled($payment->provider_tracking_id))
+                    This page also checks automatically about every 25 seconds while it is visible.
+                @endif
             </div>
 
         @elseif (
@@ -867,6 +869,24 @@
     </div>
 
 </div>
+
+
+@if (
+    ! $checkoutUnavailable
+    && ($payment->isPending() || $payment->isProcessing())
+    && $payment->gateway?->code === 'selcom'
+    && filled($payment->provider_tracking_id)
+)
+    <script>
+        // A status refresh is not a payment initiation; never retry wallet authorization.
+        // Only poll while the tab is visible, at most once every 25 seconds.
+        window.setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+                window.location.reload();
+            }
+        }, 25000);
+    </script>
+@endif
 
 </body>
 </html>
