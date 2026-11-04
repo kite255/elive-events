@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\TicketOrder;
-use Illuminate\Contracts\View\View;
+use Illuminate\Http\Response;
 
 class PublicTicketOrderController extends Controller
 {
     public function show(
         string $token
-    ): View {
+    ): Response {
         $order =
             TicketOrder::query()
                 ->with([
@@ -46,7 +46,7 @@ class PublicTicketOrderController extends Controller
                 ->sortBy('id')
                 ->values();
 
-        return view(
+        return response()->view(
             'public.tickets.order',
             [
                 'order' =>
@@ -58,6 +58,7 @@ class PublicTicketOrderController extends Controller
                 'tickets' =>
                     $tickets,
             ]
-        );
+        )->header('Cache-Control', 'private, no-store')
+          ->header('Referrer-Policy', 'no-referrer');
     }
 }
