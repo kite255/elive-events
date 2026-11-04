@@ -20,6 +20,29 @@
                 @endforelse
             </select>
         </section>
+        @php($payout = $this->payoutSummary())
+        @if ($payout)
+            <section class="rounded-xl border-2 border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-800 dark:bg-indigo-950/40" aria-label="Organizer payout balance">
+                <h2 class="text-lg font-bold text-indigo-950 dark:text-indigo-100">Remaining Organizer Balance</h2>
+                <p class="mt-2 text-3xl font-bold tracking-tight text-indigo-950 dark:text-white">{{ $formatMoney($payout['remaining_unpaid']) }}</p>
+                <p class="mt-1 text-sm text-indigo-800 dark:text-indigo-200">Unpaid ticket earnings after completed payouts; includes funds reserved for existing requests.</p>
+                <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-lg bg-white p-4 dark:bg-gray-900">
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Reserved for Pending Requests</p>
+                        <p class="mt-1 text-xl font-semibold">{{ $formatMoney($payout['reserved_requests']) }}</p>
+                    </div>
+                    <div class="rounded-lg bg-white p-4 dark:bg-gray-900">
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Available for New Requests</p>
+                        <p class="mt-1 text-xl font-semibold text-emerald-700 dark:text-emerald-400">{{ $formatMoney($payout['available_for_request']) }}</p>
+                    </div>
+                    <div class="rounded-lg bg-white p-4 dark:bg-gray-900">
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Already Paid Out</p>
+                        <p class="mt-1 text-xl font-semibold">{{ $formatMoney($payout['paid_out']) }}</p>
+                    </div>
+                </div>
+                <p class="mt-3 text-xs text-indigo-800 dark:text-indigo-200">Based on net ticket earnings minus completed payouts and reserved payout requests. These are system ledger balances, not actual bank-account balances. Merchandise sales are excluded.</p>
+            </section>
+        @endif
         <div class="grid gap-4 md:grid-cols-2">
             <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
                 <h2 class="text-lg font-semibold">Ticket Finance</h2>
