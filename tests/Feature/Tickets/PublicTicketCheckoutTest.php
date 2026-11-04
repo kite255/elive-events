@@ -125,6 +125,14 @@ class PublicTicketCheckoutTest extends TestCase
         $event = $this->createEvent();
         $this->createTicketType($event);
 
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('href="'.route('public.terms').'"', false);
+
+        $this->get(route('public.events.index'))
+            ->assertOk()
+            ->assertSee('href="'.route('public.terms').'"', false);
+
         $this->get(route('public.terms'))
             ->assertOk()
             ->assertSee('Ticket Purchase Terms')
