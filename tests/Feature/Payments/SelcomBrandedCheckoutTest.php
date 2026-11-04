@@ -147,10 +147,9 @@ class SelcomBrandedCheckoutTest extends TestCase
             ->assertSee('NBC Kiganjani')
             ->assertSee('NMB Mkononi')
             ->assertSee('Selcom Pesa')
-            ->assertSee('M-Pesa')
-            ->assertSee('Mixx by Yas')
-            ->assertSee('Airtel Money')
-            ->assertSee('Compatibility with this Selcom QR may vary.')
+            ->assertSee('Scan using a compatible app, such as CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.')
+            ->assertSee('App compatibility may vary. Verify the merchant and amount before confirming payment.')
+            ->assertDontSee('&#128274;', false)
             ->assertSee('Check Payment Status');
 
         $this->assertSame(Payment::STATUS_PROCESSING, $payment->fresh()->status);
