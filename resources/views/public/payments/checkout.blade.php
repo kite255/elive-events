@@ -20,7 +20,7 @@
         label.field{font-weight:650;font-size:14px;display:block;margin:18px 0 8px}
         input[type=tel]{display:block;width:100%;border:1px solid #cdd7e4;border-radius:10px;padding:14px;font-size:16px}
         button,.button{display:block;width:100%;background:var(--navy);color:#fff;border:0;border-radius:12px;padding:15px;font-weight:700;font-size:15px;cursor:pointer;text-align:center;text-decoration:none}
-        button:disabled{opacity:.45;cursor:not-allowed}.helper{text-align:center;color:var(--muted);font-size:13px;line-height:1.6;margin-top:12px}
+        button:disabled{opacity:.45;cursor:not-allowed}.helper{text-align:center;color:var(--muted);font-size:14px;line-height:1.55;margin-top:12px}
         .notice{background:#fff7e6;color:#854d0e;padding:14px;border-radius:10px;margin-bottom:18px;line-height:1.6}
         .success{background:#effaf2;color:#166534}.token{background:#f3f6fb;font-size:22px;letter-spacing:.08em;font-weight:800;word-break:break-all;padding:16px;border-radius:10px;text-align:center}
         .qr{display:block;width:220px;max-width:100%;height:auto;margin:15px auto}
@@ -28,31 +28,31 @@
         .qr-app-guidance strong{font-size:14px;color:var(--navy)}
         .qr-app-guidance p{font-size:13px;color:#475569;margin:6px 0}
         .qr-app-guidance small{display:block;font-size:12px;color:var(--muted)}
-        .footer{border-top:1px solid var(--border);padding-top:18px;margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
+        .footer{border-top:1px solid var(--border);padding-top:20px;margin-top:24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7}.footer a{display:inline-flex;align-items:center;min-height:40px;font-size:14px;font-weight:700}.footer .powered{display:block}
         .payment-networks{margin:18px 0;padding:14px;background:#f8fafc;border:1px solid var(--border);border-radius:12px}
         .payment-networks-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px}
         .wallet-logos{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:10px;width:100%}
-        .wallet-logo{flex:1 1 0;min-width:0;height:56px;background:transparent;border:0;box-shadow:none;display:flex;align-items:center;justify-content:center;padding:0}
-        .wallet-logo img{display:block;width:auto;max-width:100%;height:auto;max-height:42px;object-fit:contain;margin:0 auto;background:transparent}
+        .wallet-logo{flex:1 1 0;min-width:0;height:60px;background:transparent;border:0;box-shadow:none;display:flex;align-items:center;justify-content:center;padding:0}
+        .wallet-logo img{display:block;width:auto;max-width:100%;height:auto;max-height:48px;object-fit:contain;margin:0 auto;background:transparent}
         .wallet-logo span{font-size:12px;font-weight:700;text-align:center;color:var(--navy)}
         .tips-panel{margin:16px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;background:#f8fafc;padding:18px 12px;border:1px solid var(--border);border-radius:12px}
         .tips-panel img{display:block;width:190px;max-width:100%;height:auto;object-fit:contain;margin:0 auto}
         .tips-panel span{max-width:400px;color:var(--muted);font-size:12px;line-height:1.5}
-        .network-note{font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.5}
+        .network-note{font-size:13px;color:var(--muted);margin:12px 0 0;line-height:1.5}.phone-help{text-align:left;margin:9px 0 0}.waiting-state{border:1px solid #b7d8ea;background:#edf7fd;color:#164e72;border-radius:12px;padding:18px;margin:0 0 16px;line-height:1.55}.waiting-state strong{display:block;font-size:17px;color:var(--navy);margin-bottom:5px}.waiting-state p{margin:0;font-size:14px}.waiting-state small{display:block;margin-top:9px;font-size:12px}.payment-networks-title{font-size:14px}
         @media (max-width:650px){
             main{margin:12px auto;padding:12px}
             .card{border-radius:16px;padding:20px 16px}
             h1{font-size:23px}
             .price{font-size:26px}
             .wallet-logos{gap:6px}
-            .wallet-logo{height:42px;padding:0}
-            .wallet-logo img{max-height:32px}
+            .wallet-logo{height:46px;padding:0}
+            .wallet-logo img{max-height:38px}
             .tips-panel img{width:160px}
         }
         @media (max-width:390px){
             .wallet-logos{gap:4px}
-            .wallet-logo{height:36px;padding:0}
-            .wallet-logo img{max-height:26px}
+            .wallet-logo{height:38px;padding:0}
+            .wallet-logo img{max-height:30px}
             .payment-networks{padding:8px}
         }
         [hidden]{display:none!important}a{color:var(--blue)}
@@ -75,7 +75,15 @@
         <a class="button" href="{{ route('payments.status', $payment) }}">Check Payment Status</a>
     @elseif($payment->isProcessing())
         @if(filled(data_get($payment->metadata, 'wallet_attempted_at')))
-            <div class="notice success">A mobile payment authorization was requested. Check your phone and approve the payment there. A request is not proof of payment.</div>
+            <div class="waiting-state" role="status" aria-live="polite"><strong>Waiting for Payment Confirmation</strong><p>Check your phone and approve the mobile money payment request. Your tickets will be issued only after Selcom confirms payment.</p><small>If you have already paid, do not send another payment request.</small></div>
+            <script>
+                // Navigate to the existing read-only status route; never re-initiate a wallet prompt.
+                window.setTimeout(() => {
+                    if (document.visibilityState === 'visible') {
+                        window.location.replace(@json(route('payments.status', $payment)));
+                    }
+                }, 12000);
+            </script>
         @elseif(data_get($payment->metadata, 'checkout_method') === 'qr')
             <h2>Pay with QR Code</h2>
             <div class="tips-panel">
@@ -123,7 +131,7 @@
                 <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
                     placeholder="e.g. 255712345678" maxlength="24" value="{{ old('phone') }}"
                     aria-describedby="phone-help">
-                <p class="helper" id="phone-help">You will authorize payment securely on your phone. Do not enter your PIN on this website.</p>
+                <p class="helper phone-help" id="phone-help">Approve the payment request on your phone. Never enter your mobile money PIN on this website.</p>
             </div>
             <div id="wallet-networks" class="payment-networks">
                 <div class="payment-networks-title">Mobile money networks</div>
@@ -143,7 +151,7 @@
                         </div>
                     @endforeach
                 </div>
-                <p class="network-note">Supported payment channels depend on Selcom merchant activation. Enter your number to request mobile payment.</p>
+                <p class="network-note">Enter your mobile money number to receive a payment request. Network availability depends on Selcom activation.</p>
             </div>
             @error('phone')<div class="notice" role="alert">{{ $message }}</div>@enderror
             @error('method')<div class="notice" role="alert">{{ $message }}</div>@enderror
@@ -171,7 +179,7 @@
         <div class="notice">This payment can no longer be initiated. Check its status for details.</div>
         <a class="button" href="{{ route('payments.status', $payment) }}">View Payment Status</a>
     @endif
-    <div class="footer">Payment securely processed by Selcom. Tickets are issued only after confirmed payment.<br>
+    <div class="footer"><span class="powered">&#128274; Secure payments powered by Selcom. Tickets are issued after confirmed payment.</span>
         <a href="{{ route('payments.status', $payment) }}">View payment status</a>
     </div>
 </div></main>
