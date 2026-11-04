@@ -4,10 +4,11 @@ namespace App\Support;
 
 final class TicketPurchaseTerms
 {
-    public const CURRENT_VERSION = 'ticket-purchase-2026-11-04';
+    public const CURRENT_VERSION = 'ticket-purchase-2026-11-04-2';
 
     public const ARCHIVED_VERSIONS = [
         'ticket-purchase-2026-11-04',
+        'ticket-purchase-2026-11-04-2',
     ];
 
     public static function versionedView(string $version): string
