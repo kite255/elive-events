@@ -138,7 +138,9 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('Ticket Purchase Terms')
             ->assertSee('Refunds and cancellations')
             ->assertSee('ticket-purchase-2026-11-04')
-            ->assertSee('Draft for review.');
+            ->assertSee('Effective date: 4 November 2026')
+            ->assertDontSee('Draft for review.')
+            ->assertDontSee('noindex, nofollow');
 
         $this->get(route('public.tickets.buy', ['event' => $event->slug]))
             ->assertOk()
