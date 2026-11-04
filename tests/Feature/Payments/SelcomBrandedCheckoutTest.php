@@ -108,6 +108,9 @@ class SelcomBrandedCheckoutTest extends TestCase
             ->assertSee('Scan the QR code using a supported payment app.')
             ->assertDontSee('QR Code / Payment Token')
             ->assertSee('e.g. 255712345678')
+            ->assertSee('Never enter your mobile money PIN on this website.')
+            ->assertSee('Enter your mobile money number to receive a payment request.')
+            ->assertSee('Secure payments powered by Selcom')
             ->assertDontSee('Debit / Credit Card');
 
         $html = $response->getContent();
@@ -215,6 +218,12 @@ class SelcomBrandedCheckoutTest extends TestCase
             'phone' => '0712345678',
         ])->assertRedirect(route('payments.pay', $payment));
 
+        $this->get(route('payments.pay', $payment))
+            ->assertOk()
+            ->assertSee('Waiting for Payment Confirmation')
+            ->assertSee('Your tickets will be issued only after Selcom confirms payment.')
+            ->assertSee('Check Payment Status');
+
         $fresh = $payment->fresh();
         $this->assertSame(Payment::STATUS_PROCESSING, $fresh->status);
         $this->assertNull($fresh->paid_at);
@@ -232,6 +241,28 @@ class SelcomBrandedCheckoutTest extends TestCase
         ])->assertRedirect(route('payments.pay', $payment));
 
         Http::assertSentCount(2);
+    }
+
+    public function test_selcom_processing_status_view_auto_refreshes_without_initiating_payment(): void
+    {
+        $payment = $this->payment();
+        $payment->update([
+            'status' => Payment::STATUS_PROCESSING,
+            'provider_tracking_id' => $payment->reference,
+        ]);
+        $payment->load(['event', 'gateway', 'ticketOrder']);
+
+        $html = view('public.payments.status', [
+            'payment' => $payment,
+            'checkoutUnavailable' => false,
+        ])->render();
+
+        $this->assertStringContainsString('window.location.reload()', $html);
+        $this->assertStringContainsString('25000', $html);
+        $this->assertStringContainsString('This page also checks automatically', $html);
+
+        Http::assertNothingSent();
+        $this->assertNull($payment->fresh()->paid_at);
     }
 
     public function test_invalid_phone_is_rejected_without_provider_request(): void
