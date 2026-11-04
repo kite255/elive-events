@@ -145,6 +145,21 @@ class SelcomBrandedCheckoutTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_qr_selection_explains_supported_app_examples_before_payment_submission(): void
+    {
+        $payment = $this->payment();
+        Http::fake();
+
+        $response = $this->get(route('payments.pay', $payment))
+            ->assertOk()
+            ->assertSee('id="qr-selection-guidance"', false)
+            ->assertSee('CRDB SimBanking, NBC Kiganjani, NMB Mkononi, or Selcom Pesa.')
+            ->assertSee('qrSelectionGuidance.hidden = mobile;');
+
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        Http::assertNothingSent();
+    }
+
     public function test_qr_checkout_initializes_one_order_and_shows_provider_token(): void
     {
         $payment = $this->payment();
