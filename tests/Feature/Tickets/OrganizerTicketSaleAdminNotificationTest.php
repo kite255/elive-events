@@ -69,13 +69,19 @@ class OrganizerTicketSaleAdminNotificationTest extends TestCase
             ->where('purpose', 'organizer_ticket_sale')
             ->get();
 
-        $this->assertCount(1, $logs);
-        $this->assertSame($admin->email, $logs->first()->recipient);
-        $this->assertStringContainsString('Jane Buyer', $logs->first()->message);
-        $this->assertStringContainsString('jane@example.com', $logs->first()->message);
-        $this->assertStringContainsString('+255712345678', $logs->first()->message);
-        $this->assertStringContainsString('47,500.00', $logs->first()->message);
-        Queue::assertPushed(SendAutomaticCommunicationJob::class, 1);
+        $this->assertCount(2, $logs);
+        $this->assertEqualsCanonicalizing(
+            [$admin->email, 'elivehq@gmail.com'],
+            $logs->pluck('recipient')->all()
+        );
+        foreach ($logs as $log) {
+            $this->assertStringContainsString('Jane Buyer', $log->message);
+            $this->assertStringContainsString('jane@example.com', $log->message);
+            $this->assertStringContainsString('+255712345678', $log->message);
+            $this->assertStringContainsString('47,500.00', $log->message);
+        }
+        $this->assertFalse($logs->pluck('recipient')->contains('ordinary@example.com'));
+        Queue::assertPushed(SendAutomaticCommunicationJob::class, 2);
     }
 
     public function test_branded_email_includes_buyer_and_financial_summary(): void
