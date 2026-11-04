@@ -144,7 +144,7 @@
             </label>
             <label class="method">
                 <input type="radio" name="method" value="qr" {{ old('method') === 'qr' ? 'checked' : '' }}>
-                <span><strong>Pay with QR Code</strong><small>Scan with a compatible banking or payment app. Availability varies by provider.</small></span>
+                <span><strong>Pay with QR Code</strong><small>Scan using a compatible banking or mobile-money app.</small></span>
             </label>
             <div id="phone-container">
                 <label for="phone" class="field">Mobile Money Number</label>
