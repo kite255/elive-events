@@ -156,7 +156,8 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('I agree to the')
             ->assertSee('Terms &amp; Conditions', false)
             ->assertSee('name="accept_terms"', false)
-            ->assertSee('Read ticket purchase conditions');
+            ->assertSee('I agree to the')
+            ->assertDontSee('Read ticket purchase conditions');
 
         $this->from('/events/'.$event->slug.'/tickets')
             ->post('/events/'.$event->slug.'/tickets', [
