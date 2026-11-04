@@ -172,6 +172,11 @@ class PublicTicketController extends Controller
                     'max:255',
                 ],
 
+                'accept_terms' => [
+                    'required',
+                    'accepted',
+                ],
+
                 'tickets' => [
                     'required',
                     'array',
@@ -259,6 +264,16 @@ class PublicTicketController extends Controller
 
                     items: $items
                 );
+
+        // Audit the exact version of terms accepted at checkout.
+        $order->update([
+            'metadata' => array_merge($order->metadata ?? [], [
+                'purchase_terms_accepted_at' => now()->toIso8601String(),
+                'purchase_terms_version' => \App\Support\TicketPurchaseTerms::CURRENT_VERSION,
+                'purchase_terms_sha256' => \App\Support\TicketPurchaseTerms::snapshotHash(),
+                'purchase_terms_archive_url' => route('public.terms.version', ['version' => \App\Support\TicketPurchaseTerms::CURRENT_VERSION]),
+            ]),
+        ]);
 
         $payment =
             $this->paymentService
