@@ -177,6 +177,25 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('name="accept_terms"', false);
     }
 
+    public function test_published_terms_are_available_at_permanent_versioned_url(): void
+    {
+        $version = \App\Support\TicketPurchaseTerms::CURRENT_VERSION;
+
+        $this->get(route('public.terms.version', ['version' => $version]))
+            ->assertOk()
+            ->assertSee('Ticket Purchase Terms')
+            ->assertSee('Refunds and cancellations')
+            ->assertSee($version);
+
+        $this->get(route('public.terms.version', ['version' => 'unknown-policy']))
+            ->assertNotFound();
+
+        $this->assertMatchesRegularExpression(
+            '/^[a-f0-9]{64}$/',
+            \App\Support\TicketPurchaseTerms::snapshotHash()
+        );
+    }
+
     public function test_ticket_checkout_requires_explicit_terms_acceptance(): void
     {
         $event = $this->createEvent();
@@ -258,6 +277,15 @@ class PublicTicketCheckoutTest extends TestCase
             data_get($order->metadata, 'purchase_terms_version')
         );
         $this->assertNotEmpty(data_get($order->metadata, 'purchase_terms_accepted_at'));
+
+        $this->assertSame(
+            \App\Support\TicketPurchaseTerms::snapshotHash(),
+            data_get($order->metadata, 'purchase_terms_sha256')
+        );
+        $this->assertSame(
+            route('public.terms.version', ['version' => \App\Support\TicketPurchaseTerms::CURRENT_VERSION]),
+            data_get($order->metadata, 'purchase_terms_archive_url')
+        );
 
         $this->assertSame(
             '100000.00',

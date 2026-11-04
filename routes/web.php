@@ -34,6 +34,10 @@ Route::get('/admin/payouts/{payout}/transfer-proof', PayoutTransferProofControll
 Route::view('/terms-and-conditions', 'public.legal.ticket-terms')
     ->name('public.terms');
 
+Route::get('/terms-and-conditions/versions/{version}', function (string $version) {
+    return view(\App\Support\TicketPurchaseTerms::versionedView($version));
+})->name('public.terms.version');
+
 Route::post('/payments/selcom/webhook', SelcomWebhookController::class)
     ->name('payments.selcom.webhook');
 

@@ -308,7 +308,9 @@ class PublicTicketController extends Controller
         $order->update([
             'metadata' => array_merge($order->metadata ?? [], [
                 'purchase_terms_accepted_at' => now()->toIso8601String(),
-                'purchase_terms_version' => 'ticket-purchase-2026-11-04',
+                'purchase_terms_version' => \App\Support\TicketPurchaseTerms::CURRENT_VERSION,
+                'purchase_terms_sha256' => \App\Support\TicketPurchaseTerms::snapshotHash(),
+                'purchase_terms_archive_url' => route('public.terms.version', ['version' => \App\Support\TicketPurchaseTerms::CURRENT_VERSION]),
             ]),
         ]);
 
