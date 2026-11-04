@@ -32,7 +32,16 @@ class OrganizerTicketSaleNotificationService
 
             $ticketOrganizerEmails = $event->ticketingManagers()->pluck('users.email');
 
-            $recipients = $ownerEmails->concat($ticketOrganizerEmails)
+            // Notify platform administrators as well as authorized event organizers.
+            // Other organizations' admins are not global recipients.
+            $adminEmails = User::query()
+                ->where('is_super_admin', true)
+                ->orWhereRaw('LOWER(email) = ?', [strtolower(User::SYSTEM_ADMIN_EMAIL)])
+                ->pluck('email');
+
+            $recipients = $ownerEmails
+                ->concat($ticketOrganizerEmails)
+                ->concat($adminEmails)
                 ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
                 ->map(fn ($email) => strtolower(trim($email)))
                 ->unique()->values();
@@ -44,6 +53,9 @@ class OrganizerTicketSaleNotificationService
             $message = "A ticket purchase has been confirmed on eLive Events.\n\n"
                 ."Event: {$event->name}\n"
                 ."Order: {$order->order_number}\n"
+                ."Buyer name: ".(filled($order->buyer_name) ? trim($order->buyer_name) : 'Not provided')."\n"
+                ."Buyer email: ".(filled($order->buyer_email) ? trim($order->buyer_email) : 'Not provided')."\n"
+                ."Buyer phone: ".(filled($order->buyer_phone) ? trim($order->buyer_phone) : 'Not provided')."\n"
                 ."Tickets: {$details}\n"
                 ."Quantity: {$order->quantity}\n"
                 ."Total paid: {$order->currency} ".number_format((float) $order->total, 2)."\n"
