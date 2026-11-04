@@ -108,6 +108,9 @@ class SelcomBrandedCheckoutTest extends TestCase
             ->assertSee('Scan the QR code using a supported payment app.')
             ->assertDontSee('QR Code / Payment Token')
             ->assertSee('e.g. 255712345678')
+            ->assertSee('Never enter your mobile money PIN on this website.')
+            ->assertSee('Enter your mobile money number to receive a payment request.')
+            ->assertSee('Secure payments powered by Selcom')
             ->assertDontSee('Debit / Credit Card');
 
         $html = $response->getContent();
@@ -214,6 +217,12 @@ class SelcomBrandedCheckoutTest extends TestCase
             'method' => 'mobile',
             'phone' => '0712345678',
         ])->assertRedirect(route('payments.pay', $payment));
+
+        $this->get(route('payments.pay', $payment))
+            ->assertOk()
+            ->assertSee('Waiting for Payment Confirmation')
+            ->assertSee('Your tickets will be issued only after Selcom confirms payment.')
+            ->assertSee('Check Payment Status');
 
         $fresh = $payment->fresh();
         $this->assertSame(Payment::STATUS_PROCESSING, $fresh->status);
