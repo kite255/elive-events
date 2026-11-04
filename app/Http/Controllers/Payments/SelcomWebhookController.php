@@ -48,7 +48,8 @@ class SelcomWebhookController extends Controller
         Log::info('Selcom webhook provider verification completed.', [
             'payment_id' => $payment->getKey(),
             'payment_status' => $payment->status,
-            'fulfillment_queued_or_completed' => $payment->isCompleted(),
+            'payment_completed' => $payment->isCompleted(),
+            'fulfilled' => $payment->isFulfilled(),
         ]);
 
         return response()->json(['message' => 'Accepted']);
