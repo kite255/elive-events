@@ -350,7 +350,7 @@ Route::get(
     ]
 )
     ->middleware(
-        'throttle:30,1'
+        'throttle:payment-checkout-view'
     )
     ->name(
         'payments.pay'
