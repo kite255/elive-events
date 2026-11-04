@@ -79,6 +79,7 @@ class SelcomBrandedCheckoutTest extends TestCase
                     'result' => 'SUCCESS',
                     'data' => [[
                         'payment_gateway_url' => base64_encode('https://gateway.example.test/pay/abc'),
+                        'qr' => '000201' . str_repeat('1234567890', 23) . '6304ABCD',
                         'payment_token' => 'TOKEN-1234',
                     ]],
                 ]);
@@ -138,6 +139,14 @@ class SelcomBrandedCheckoutTest extends TestCase
             ->assertSee('TOKEN-1234')
             ->assertSee('Alternatively, use this payment token:')
             ->assertSee('Pay with QR Code')
+            ->assertSee('CRDB SimBanking')
+            ->assertSee('NBC Kiganjani')
+            ->assertSee('NMB Mkononi')
+            ->assertSee('Selcom Pesa')
+            ->assertSee('M-Pesa')
+            ->assertSee('Mixx by Yas')
+            ->assertSee('Airtel Money')
+            ->assertSee('Compatibility with this Selcom QR may vary.')
             ->assertSee('Check Payment Status');
 
         $this->assertSame(Payment::STATUS_PROCESSING, $payment->fresh()->status);
