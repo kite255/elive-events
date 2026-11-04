@@ -100,6 +100,23 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertSee('data-maximum="5"', false);
     }
 
+    public function test_ticket_hero_uses_event_date_and_reservation_settings(): void
+    {
+        $event = $this->createEvent();
+        $event->update(['starts_at' => '2026-11-29 18:00:00']);
+        $event->ticketSetting->update(['reservation_minutes' => 12]);
+        $this->createTicketType($event);
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertSee('29 Nov 2026')
+            ->assertSee('After you continue to payment, your tickets are held for up to')
+            ->assertSee('12 minutes')
+            ->assertSee('Ticketing powered by')
+            ->assertSee('eLive')
+            ->assertDontSee('22 Nov 2026');
+    }
+
     public function test_ticket_page_explains_contact_requirement(): void
     {
         $event = $this->createEvent();
