@@ -335,35 +335,14 @@
         }
 
         .hero-meta span {
-            padding:
-                8px
-                12px;
-
-            border:
-                1px solid
-                rgba(255, 255, 255, .16);
-
-            border-radius: 999px;
-
-            background:
-                rgba(255, 255, 255, .08);
-
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: none;
+            color: rgba(255, 255, 255, .88);
             font-size: 13px;
-            font-weight: 700;
-            overflow-wrap: anywhere;
-        }
-
-        .hero-powered-by {
-            margin: 16px 0 0;
-            color: rgba(255, 255, 255, .68);
-            font-size: 12px;
             font-weight: 600;
-            letter-spacing: .01em;
-        }
-
-        .hero-powered-by strong {
-            color: #FFFFFF;
-            font-weight: 800;
+            overflow-wrap: anywhere;
         }
 
         .reservation-notice {
@@ -1075,10 +1054,7 @@
             }
 
             .hero-meta span {
-                padding:
-                    6px
-                    9px;
-
+                padding: 0;
                 font-size: 12px;
             }
 
@@ -1092,15 +1068,8 @@
             }
 
             .reservation-notice {
-                margin:
-                    14px
-                    20px
-                    20px;
-
-                padding:
-                    10px
-                    12px;
-
+                margin: 14px 20px 20px;
+                padding: 0;
                 font-size: 12px;
                 line-height: 1.45;
             }
@@ -1208,10 +1177,6 @@
                         @endif
 
                     </div>
-
-                    <p class="hero-powered-by">
-                        Ticketing powered by <strong>eLive</strong>
-                    </p>
 
                 </div>
 
