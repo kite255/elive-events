@@ -110,6 +110,8 @@ class PublicTicketCheckoutTest extends TestCase
         $this->get(route('public.tickets.buy', ['event' => $event->slug]))
             ->assertOk()
             ->assertSee('22 Nov 2026')
+            ->assertSee('class="hero-meta-icon"', false)
+            ->assertSee('class="hero-meta-item"', false)
             ->assertSee('Tickets are reserved for')
             ->assertSee('after proceeding to payment.')
             ->assertSee('12 minutes')
