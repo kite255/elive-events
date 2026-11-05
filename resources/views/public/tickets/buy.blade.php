@@ -294,9 +294,9 @@
             grid-area: content;
 
             padding:
-                38px
-                40px
-                14px;
+                24px
+                34px
+                8px;
         }
 
         .eyebrow {
@@ -317,16 +317,16 @@
             margin: 0;
 
             font-size: clamp(
-                32px,
-                5vw,
-                52px
+                30px,
+                3.4vw,
+                44px
             );
 
             line-height: 1.06;
         }
 
         .hero-meta {
-            margin-top: 18px;
+            margin-top: 14px;
 
             display: flex;
             flex-wrap: wrap;
@@ -352,7 +352,7 @@
             align-items: flex-start;
             gap: 9px;
 
-            margin: 0 40px 28px;
+            margin: 0 34px 22px;
             padding: 0;
 
             border: 0;
@@ -387,20 +387,16 @@
 
         .hero-visual {
             grid-area: visual;
-
-            min-height: 320px;
-
-            background: #EAF6FB;
+            min-width: 0;
+            min-height: 0;
+            align-self: center;
         }
 
         .hero-image {
-            width: 100%;
-            height: 100%;
-
-            object-fit: contain;
-            object-position: center;
-
             display: block;
+            width: 100%;
+            height: auto;
+            object-fit: contain;
         }
 
         .hero-placeholder {
@@ -986,7 +982,8 @@
 
             .hero-visual {
                 min-height: 0;
-                aspect-ratio: 16 / 9;
+                aspect-ratio: auto;
+                align-self: stretch;
             }
 
             .hero-placeholder {
@@ -1060,7 +1057,7 @@
 
             .hero-visual {
                 min-height: 0;
-                aspect-ratio: 16 / 9;
+                aspect-ratio: auto;
             }
 
             .hero-placeholder {
