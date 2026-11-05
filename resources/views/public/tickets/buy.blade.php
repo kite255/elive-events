@@ -327,22 +327,38 @@
 
         .hero-meta {
             margin-top: 14px;
-
             display: flex;
+            align-items: center;
             flex-wrap: wrap;
-
-            gap: 8px;
+            column-gap: 20px;
+            row-gap: 10px;
         }
 
-        .hero-meta span {
+        .hero-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
             padding: 0;
             border: 0;
-            border-radius: 0;
             background: none;
             color: rgba(255, 255, 255, .88);
             font-size: 13px;
             font-weight: 600;
             overflow-wrap: anywhere;
+        }
+
+        .hero-meta-icon {
+            display: block;
+            flex: 0 0 16px;
+            width: 16px;
+            height: 16px;
+            color: #80D4FA;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .reservation-notice {
@@ -1047,11 +1063,11 @@
 
             .hero-meta {
                 margin-top: 16px;
-                gap: 7px;
+                column-gap: 16px;
+                row-gap: 10px;
             }
 
-            .hero-meta span {
-                padding: 0;
+            .hero-meta-item {
                 font-size: 12px;
             }
 
@@ -1156,19 +1172,31 @@
                     <div class="hero-meta">
 
                         @if ($eventStart)
-                            <span>
+                            <span class="hero-meta-item">
+                                <svg class="hero-meta-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                                    <path d="M16 3v4M8 3v4M3 10h18"></path>
+                                </svg>
                                 {{ $eventStart->format('d M Y') }}
                             </span>
                         @endif
 
                         @if ($event->venue)
-                            <span>
+                            <span class="hero-meta-item">
+                                <svg class="hero-meta-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"></path>
+                                    <circle cx="12" cy="10" r="2.5"></circle>
+                                </svg>
                                 {{ $event->venue }}
                             </span>
                         @endif
 
                         @if ($event->organization)
-                            <span>
+                            <span class="hero-meta-item">
+                                <svg class="hero-meta-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3.1a4 4 0 0 1 0 7.8M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                </svg>
                                 {{ $event->organization->name }}
                             </span>
                         @endif
