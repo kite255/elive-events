@@ -123,6 +123,10 @@ class PublicTicketController extends Controller
                 'reservationMinutes' =>
                     $settings
                         ->reservationMinutes(),
+
+                'cardPaymentAvailable' =>
+                    $this->defaultGatewayForEvent($event)?->code === 'selcom'
+                    && $this->cardGatewayForEvent($event) !== null,
             ]
         );
     }
@@ -178,6 +182,11 @@ class PublicTicketController extends Controller
                 'accept_terms' => [
                     'required',
                     'accepted',
+                ],
+
+                'payment_option' => [
+                    'nullable',
+                    'in:mobile_money,card',
                 ],
 
                 'tickets' => [
@@ -254,16 +263,20 @@ class PublicTicketController extends Controller
             default => null,
         };
 
-        // Resolve the gateway with the same organization-first fallback as PaymentService.
-        // A globally configured Selcom default must enforce Selcom phone validation too.
-        $defaultGateway = PaymentGateway::query()
-            ->where('is_enabled', true)
-            ->where('is_default', true)
-            ->where(fn ($query) => $query
-                ->where('organization_id', $event->organization_id)
-                ->orWhereNull('organization_id'))
-            ->orderByRaw('CASE WHEN organization_id = ? THEN 0 ELSE 1 END', [(int) $event->organization_id])
-            ->first();
+        // Selcom remains default. The optional card checkout is only offered
+        // when an enabled, authorized Pesapal gateway is available.
+        $defaultGateway = $this->defaultGatewayForEvent($event);
+        $paymentOption = $validated['payment_option'] ?? 'mobile_money';
+        $cardGateway = $paymentOption === 'card'
+            ? $this->cardGatewayForEvent($event)
+            : null;
+
+        if ($paymentOption === 'card'
+            && ($defaultGateway?->code !== 'selcom' || ! $cardGateway)) {
+            throw ValidationException::withMessages([
+                'payment_option' => 'Card checkout is not currently available.',
+            ]);
+        }
 
         $selectedIds = collect($items)->pluck('ticket_type_id')->all();
         $containsPaidTickets = TicketType::query()
@@ -272,7 +285,8 @@ class PublicTicketController extends Controller
             ->where('price', '>', 0)
             ->exists();
 
-        if ($containsPaidTickets && $defaultGateway?->code === 'selcom') {
+        if ($containsPaidTickets && $defaultGateway?->code === 'selcom'
+            && $paymentOption !== 'card') {
             $errors = [];
             if (blank($validated['buyer_email'] ?? null)) {
                 $errors['buyer_email'] = 'Email is required for paid ticket checkout.';
@@ -321,7 +335,8 @@ class PublicTicketController extends Controller
         $payment =
             $this->paymentService
                 ->createForTicketOrder(
-                    $order
+                    $order,
+                    $containsPaidTickets ? $cardGateway : null
                 );
 
         if ($payment->isCompleted()) {
@@ -349,6 +364,32 @@ class PublicTicketController extends Controller
                 'payments.pay',
                 $payment
             );
+    }
+
+    private function defaultGatewayForEvent(Event $event): ?PaymentGateway
+    {
+        return PaymentGateway::query()
+            ->where('is_enabled', true)
+            ->where('is_default', true)
+            ->where(function ($query) use ($event): void {
+                $query->where('organization_id', $event->organization_id)
+                    ->orWhereNull('organization_id');
+            })
+            ->orderByRaw('CASE WHEN organization_id = ? THEN 0 ELSE 1 END', [(int) $event->organization_id])
+            ->first();
+    }
+
+    private function cardGatewayForEvent(Event $event): ?PaymentGateway
+    {
+        return PaymentGateway::query()
+            ->where('is_enabled', true)
+            ->where('code', 'pesapal')
+            ->where(function ($query) use ($event): void {
+                $query->where('organization_id', $event->organization_id)
+                    ->orWhereNull('organization_id');
+            })
+            ->orderByRaw('CASE WHEN organization_id = ? THEN 0 ELSE 1 END', [(int) $event->organization_id])
+            ->first();
     }
 
     /**
