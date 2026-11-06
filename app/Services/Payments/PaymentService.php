@@ -242,7 +242,8 @@ class PaymentService
                 $event,
                 $gateway,
                 $amount,
-                $isFree
+                $isFree,
+                $selectedGateway
             ): Payment {
                 $lockedOrder =
                     TicketOrder::query()
@@ -370,6 +371,13 @@ class PaymentService
 
                         'is_free' =>
                             $isFree,
+
+                        // A buyer's preference is not proof of the method used.
+                        // The verified provider response supplies payment_method.
+                        'checkout_preference' =>
+                            $selectedGateway?->code === 'pesapal'
+                                ? 'card'
+                                : 'default',
                     ],
                 ]);
             }

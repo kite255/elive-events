@@ -1717,7 +1717,7 @@
                                                 {{ old('payment_option') === 'card' ? 'checked' : '' }}>
                                             <span>
                                                 <strong>Pay with Card</strong>
-                                                <small>Continue to Pesapal checkout. Available methods may vary.</small>
+                                                <small>On Pesapal, choose Visa or Mastercard. Pesapal may also show other payment methods.</small>
                                             </span>
                                         </label>
                                         @error('payment_option')
