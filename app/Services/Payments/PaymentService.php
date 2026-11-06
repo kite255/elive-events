@@ -158,7 +158,8 @@ class PaymentService
      * idempotent fulfillment pipeline without contacting a gateway.
      */
     public function createForTicketOrder(
-        TicketOrder $order
+        TicketOrder $order,
+        ?PaymentGateway $selectedGateway = null
     ): Payment {
         $order->loadMissing([
             'event.organization',
@@ -210,12 +211,30 @@ class PaymentService
 
         $isFree = $amount === 0.0;
 
-        $gateway =
-            $isFree
-                ? null
-                : $this->defaultGatewayForOrganization(
+        $gateway = null;
+
+        if (! $isFree) {
+            if ($selectedGateway) {
+                // Validate the requested gateway in the service too: callers
+                // must never select disabled or unrelated merchant accounts.
+                $gateway = PaymentGateway::query()
+                    ->whereKey($selectedGateway->getKey())
+                    ->where('is_enabled', true)
+                    ->where(function ($query) use ($event): void {
+                        $query->where('organization_id', $event->organization_id)
+                            ->orWhereNull('organization_id');
+                    })
+                    ->first();
+
+                if (! $gateway || ! in_array($gateway->code, ['selcom', 'pesapal'], true)) {
+                    throw new RuntimeException('Selected payment gateway is unavailable.');
+                }
+            } else {
+                $gateway = $this->defaultGatewayForOrganization(
                     (int) $event->organization_id
                 );
+            }
+        }
 
         return DB::transaction(
             function () use (
