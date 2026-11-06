@@ -377,7 +377,8 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertOk()
             ->assertSee('name="payment_option"', false)
             ->assertSee('value="card"', false)
-            ->assertSee('Pay with Card');
+            ->assertSee('Pay with Card')
+            ->assertSee('On Pesapal, choose Visa or Mastercard.');
 
         $this->post(route('public.tickets.store', ['event' => $event->slug]), [
             'buyer_name' => 'Card Buyer',
@@ -391,6 +392,8 @@ class PublicTicketCheckoutTest extends TestCase
         $payment = Payment::query()->latest('id')->firstOrFail();
         $this->assertSame('pesapal', $payment->gateway->code);
         $this->assertSame(Payment::STATUS_PENDING, $payment->status);
+        $this->assertSame('card', data_get($payment->metadata, 'checkout_preference'));
+        $this->assertNull($payment->payment_method);
     }
 
     public function test_default_selcom_is_preserved_when_card_is_not_selected(): void
@@ -419,7 +422,9 @@ class PublicTicketCheckoutTest extends TestCase
             'tickets' => [$ticketType->id => 1],
         ])->assertRedirect();
 
-        $this->assertSame('selcom', Payment::query()->latest('id')->firstOrFail()->gateway->code);
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('selcom', $payment->gateway->code);
+        $this->assertSame('default', data_get($payment->metadata, 'checkout_preference'));
     }
 
     public function test_card_checkout_is_rejected_when_pesapal_is_not_ready(): void
