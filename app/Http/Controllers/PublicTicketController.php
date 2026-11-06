@@ -381,6 +381,13 @@ class PublicTicketController extends Controller
 
     private function cardGatewayForEvent(Event $event): ?PaymentGateway
     {
+        // Do not advertise card checkout before Pesapal can create orders.
+        if (blank(config('services.pesapal.consumer_key'))
+            || blank(config('services.pesapal.consumer_secret'))
+            || blank(config('services.pesapal.ipn_id'))) {
+            return null;
+        }
+
         return PaymentGateway::query()
             ->where('is_enabled', true)
             ->where('code', 'pesapal')
