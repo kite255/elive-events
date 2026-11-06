@@ -29,6 +29,7 @@ class PesapalCallbackController extends Controller
 
         $payment = Payment::query()
             ->where('reference', $merchantReference)
+            ->whereHas('gateway', fn ($query) => $query->where('code', 'pesapal'))
             ->firstOrFail();
 
         try {

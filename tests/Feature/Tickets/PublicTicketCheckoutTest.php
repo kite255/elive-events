@@ -354,6 +354,49 @@ class PublicTicketCheckoutTest extends TestCase
         );
     }
 
+    public function test_pesapal_notifications_cannot_reconcile_selcom_payments(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Selcom Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'selcom@example.com',
+            'accept_terms' => '1',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('selcom', $payment->gateway->code);
+
+        $parameters = [
+            'OrderTrackingId' => 'pesapal-fake-tracking',
+            'OrderMerchantReference' => $payment->reference,
+            'OrderNotificationType' => 'IPNCHANGE',
+        ];
+
+        $this->get(route('payments.pesapal.callback', $parameters))
+            ->assertNotFound();
+
+        $this->get(route('payments.pesapal.ipn', $parameters))
+            ->assertOk()
+            ->assertJsonPath('status', 500);
+
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertNull($payment->fresh()->provider_tracking_id);
+    }
+
     public function test_enabled_pesapal_is_available_as_optional_card_checkout(): void
     {
         $event = $this->createEvent();
