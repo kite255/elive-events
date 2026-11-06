@@ -354,6 +354,108 @@ class PublicTicketCheckoutTest extends TestCase
         );
     }
 
+    public function test_enabled_pesapal_is_available_as_optional_card_checkout(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertSee('name="payment_option"', false)
+            ->assertSee('value="card"', false)
+            ->assertSee('Pay with Card');
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Card Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'card@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'card',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('pesapal', $payment->gateway->code);
+        $this->assertSame(Payment::STATUS_PENDING, $payment->status);
+    }
+
+    public function test_default_selcom_is_preserved_when_card_is_not_selected(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Mobile Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'mobile@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'mobile_money',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $this->assertSame('selcom', Payment::query()->latest('id')->firstOrFail()->gateway->code);
+    }
+
+    public function test_card_checkout_is_rejected_when_pesapal_is_not_ready(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+        PaymentGateway::query()->where('code', 'pesapal')
+            ->update(['is_default' => false, 'is_enabled' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertDontSee('value="card"', false);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Unavailable Card',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'card@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'card',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertSessionHasErrors(['payment_option']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
     public function test_global_selcom_default_validates_paid_ticket_phone(): void
     {
         $event = $this->createEvent();
