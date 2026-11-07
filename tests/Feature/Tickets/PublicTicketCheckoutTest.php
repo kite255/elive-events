@@ -431,6 +431,47 @@ class PublicTicketCheckoutTest extends TestCase
         $this->assertDatabaseCount('ticket_orders', 0);
     }
 
+    public function test_production_does_not_expose_pesapal_sandbox_checkout(): void
+    {
+        $event = $this->createEvent();
+        $this->createTicketType($event);
+
+        PaymentGateway::query()->where('code', 'pesapal')
+            ->update(['is_default' => false, 'environment' => 'sandbox']);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'live',
+        ]);
+
+        config()->set('services.pesapal.ticket_card_checkout_enabled', true);
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $originalEnvironment = $this->app->environment();
+        $this->app['env'] = 'production';
+
+        try {
+            config()->set('services.pesapal.environment', 'sandbox');
+            $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+                ->assertOk()
+                ->assertDontSee('value="card"', false);
+
+            config()->set('services.pesapal.environment', 'live');
+            // Live credentials alone are insufficient while the database
+            // gateway still points to a Pesapal sandbox merchant.
+            $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+                ->assertOk()
+                ->assertDontSee('value="card"', false);
+        } finally {
+            $this->app['env'] = $originalEnvironment;
+        }
+    }
+
     public function test_enabled_pesapal_is_available_as_optional_card_checkout(): void
     {
         $event = $this->createEvent();
