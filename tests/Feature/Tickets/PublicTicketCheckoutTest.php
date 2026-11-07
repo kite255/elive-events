@@ -505,11 +505,23 @@ class PublicTicketCheckoutTest extends TestCase
             ->whereIn('status', [Payment::STATUS_PENDING, Payment::STATUS_PROCESSING])
             ->count());
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('already has a pending payment with another gateway');
+        try {
+            $returned = app(\App\Services\Payments\PaymentService::class)
+                ->createForTicketOrder($payment->ticketOrder, $pesapal);
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('already has a pending payment with another gateway', $exception->getMessage());
+            return;
+        }
 
-        app(\App\Services\Payments\PaymentService::class)
-            ->createForTicketOrder($payment->ticketOrder, $pesapal);
+        $this->fail('Unexpected cross-gateway retry: ' . json_encode([
+            'previous_gateway_id' => $payment->payment_gateway_id,
+            'requested_gateway_id' => $pesapal->id,
+            'returned_gateway_id' => $returned->payment_gateway_id,
+            'returned_payment_id' => $returned->id,
+            'previous_event_id' => $payment->event_id,
+            'order_event_id' => $payment->ticketOrder?->event_id,
+            'previous_status' => $payment->status,
+        ]));
     }
 
     public function test_retry_of_pending_payment_with_same_gateway_is_reused(): void
