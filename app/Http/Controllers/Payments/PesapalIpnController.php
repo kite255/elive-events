@@ -86,6 +86,7 @@ class PesapalIpnController extends Controller
                     'reference',
                     $merchantReference
                 )
+                ->whereHas('gateway', fn ($query) => $query->where('code', 'pesapal'))
                 ->first();
 
         if (! $payment) {
