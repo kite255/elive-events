@@ -928,6 +928,53 @@
         .purchase-terms-link:focus-visible { outline: 3px solid var(--elive-blue); outline-offset: 2px; }
         .purchase-terms .field-error { margin-top: 8px; }
 
+        .payment-choice {
+            margin-top: 18px;
+        }
+
+        .payment-choice-title {
+            margin: 0 0 10px;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--elive-navy);
+        }
+
+        .payment-choice-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border: 1px solid var(--elive-border);
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            line-height: 1.45;
+        }
+
+        .payment-choice-label:has(input:checked) {
+            border-color: var(--elive-blue);
+            background: #F0F8FF;
+        }
+
+        .payment-choice-label input {
+            flex: 0 0 17px;
+            width: 17px;
+            height: 17px;
+            margin-top: 2px;
+            accent-color: var(--elive-blue);
+        }
+
+        .payment-choice-label strong,
+        .payment-choice-label small {
+            display: block;
+        }
+
+        .payment-choice-label small {
+            font-size: 12px;
+            font-weight: 400;
+            color: var(--elive-muted);
+        }
+
         .checkout-button {
             width: 100%;
 
@@ -1653,6 +1700,31 @@
                                     </strong>
 
                                 </div>
+
+                                @if ($cardPaymentAvailable)
+                                    <div class="payment-choice" role="group" aria-labelledby="payment-choice-title">
+                                        <p class="payment-choice-title" id="payment-choice-title">Payment method</p>
+                                        <label class="payment-choice-label">
+                                            <input type="radio" name="payment_option" value="mobile_money"
+                                                {{ old('payment_option', 'mobile_money') !== 'card' ? 'checked' : '' }}>
+                                            <span>
+                                                <strong>Mobile Money / QR</strong>
+                                                <small>Pay securely with Selcom</small>
+                                            </span>
+                                        </label>
+                                        <label class="payment-choice-label">
+                                            <input type="radio" name="payment_option" value="card"
+                                                {{ old('payment_option') === 'card' ? 'checked' : '' }}>
+                                            <span>
+                                                <strong>Pay with Card</strong>
+                                                <small>On Pesapal, choose Visa or Mastercard. Pesapal may also show other payment methods.</small>
+                                            </span>
+                                        </label>
+                                        @error('payment_option')
+                                            <div class="field-error" role="alert">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                @endif
 
                                 <div class="purchase-terms">
                                     <label class="purchase-terms-label" for="accept_terms">
