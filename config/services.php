@@ -104,6 +104,9 @@ return [
 
     'pesapal' => [
 
+        // Disabled by default until live card checkout and ticket issuance are verified.
+        'ticket_card_checkout_enabled' => (bool) env('PESAPAL_TICKET_CARD_CHECKOUT_ENABLED', false),
+
         /*
         |----------------------------------------------------------------------
         | Environment
