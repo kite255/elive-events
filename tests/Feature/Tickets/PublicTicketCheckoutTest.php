@@ -354,6 +354,269 @@ class PublicTicketCheckoutTest extends TestCase
         );
     }
 
+    public function test_pesapal_notifications_cannot_reconcile_selcom_payments(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Selcom Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'selcom@example.com',
+            'accept_terms' => '1',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('selcom', $payment->gateway->code);
+
+        $parameters = [
+            'OrderTrackingId' => 'pesapal-fake-tracking',
+            'OrderMerchantReference' => $payment->reference,
+            'OrderNotificationType' => 'IPNCHANGE',
+        ];
+
+        $this->get(route('payments.pesapal.callback', $parameters))
+            ->assertNotFound();
+
+        $this->get(route('payments.pesapal.ipn', $parameters))
+            ->assertOk()
+            ->assertJsonPath('status', 500);
+
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertNull($payment->fresh()->provider_tracking_id);
+    }
+
+    public function test_card_checkout_is_disabled_by_default_in_production_release(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+        config()->set('services.pesapal.ticket_card_checkout_enabled', false);
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertDontSee('value="card"', false);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Disabled Card Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'disabled@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'card',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertSessionHasErrors(['payment_option']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
+    public function test_enabled_pesapal_is_available_as_optional_card_checkout(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        config()->set('services.pesapal.ticket_card_checkout_enabled', true);
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertSee('name="payment_option"', false)
+            ->assertSee('value="card"', false)
+            ->assertSee('Pay with Card')
+            ->assertSee('On Pesapal, choose Visa or Mastercard.');
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Card Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'card@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'card',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('pesapal', $payment->gateway->code);
+        $this->assertSame(Payment::STATUS_PENDING, $payment->status);
+        $this->assertSame('card', data_get($payment->metadata, 'checkout_preference'));
+        $this->assertNull($payment->payment_method);
+    }
+
+    public function test_default_selcom_is_preserved_when_card_is_not_selected(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+        PaymentGateway::query()->where('code', 'pesapal')->update(['is_default' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+        config()->set('services.pesapal.ticket_card_checkout_enabled', true);
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Mobile Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'mobile@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'mobile_money',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('selcom', $payment->gateway->code);
+        $this->assertSame('default', data_get($payment->metadata, 'checkout_preference'));
+    }
+
+    public function test_pending_selcom_ticket_payment_cannot_be_reused_as_pesapal(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $pesapal = PaymentGateway::query()->where('code', 'pesapal')->firstOrFail();
+        $pesapal->update(['is_default' => false]);
+
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Retry Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'retry@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'mobile_money',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('selcom', $payment->gateway->code);
+        $this->assertSame(Payment::STATUS_PENDING, $payment->status);
+        $this->assertNotEquals($payment->payment_gateway_id, $pesapal->id);
+        $this->assertSame(1, Payment::query()
+            ->where('ticket_order_id', $payment->ticket_order_id)
+            ->whereIn('status', [Payment::STATUS_PENDING, Payment::STATUS_PROCESSING])
+            ->count());
+
+        try {
+            $returned = app(\App\Services\Payments\PaymentService::class)
+                ->createForTicketOrder($payment->ticketOrder, $pesapal);
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('already has a pending payment with another gateway', $exception->getMessage());
+            return;
+        }
+
+        $this->fail('Unexpected cross-gateway retry: ' . json_encode([
+            'previous_gateway_id' => $payment->payment_gateway_id,
+            'requested_gateway_id' => $pesapal->id,
+            'returned_gateway_id' => $returned->payment_gateway_id,
+            'returned_payment_id' => $returned->id,
+            'previous_event_id' => $payment->event_id,
+            'order_event_id' => $payment->ticketOrder?->event_id,
+            'previous_status' => $payment->status,
+        ]));
+    }
+
+    public function test_retry_of_pending_payment_with_same_gateway_is_reused(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Same Gateway Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'same@example.com',
+            'accept_terms' => '1',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+
+        $retry = app(\App\Services\Payments\PaymentService::class)
+            ->createForTicketOrder($payment->ticketOrder, $payment->gateway);
+
+        $this->assertSame($payment->id, $retry->id);
+        $this->assertSame(1, Payment::query()->where('ticket_order_id', $payment->ticket_order_id)->count());
+    }
+
+    public function test_card_checkout_is_rejected_when_pesapal_is_not_ready(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+        PaymentGateway::query()->where('code', 'pesapal')
+            ->update(['is_default' => false, 'is_enabled' => false]);
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+        config()->set('services.pesapal.ticket_card_checkout_enabled', true);
+        config()->set('services.pesapal.consumer_key', 'test-key');
+        config()->set('services.pesapal.consumer_secret', 'test-secret');
+        config()->set('services.pesapal.ipn_id', 'test-ipn');
+
+        $this->get(route('public.tickets.buy', ['event' => $event->slug]))
+            ->assertOk()
+            ->assertDontSee('value="card"', false);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Unavailable Card',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'card@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'card',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertSessionHasErrors(['payment_option']);
+
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
     public function test_global_selcom_default_validates_paid_ticket_phone(): void
     {
         $event = $this->createEvent();
