@@ -304,6 +304,16 @@ class PaymentService
                         ->first();
 
                 if ($existing) {
+                    // An unresolved provider order must never be reused through
+                    // another gateway: its reference and status belong to
+                    // the original provider.
+                    if ((int) $existing->payment_gateway_id !== (int) $gateway?->getKey()) {
+                        throw new RuntimeException(
+                            'This ticket order already has a pending payment with another gateway. '
+                            . 'Complete or cancel that checkout before selecting a different payment method.'
+                        );
+                    }
+
                     return $existing;
                 }
 
