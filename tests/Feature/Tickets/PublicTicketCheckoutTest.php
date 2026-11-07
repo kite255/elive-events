@@ -470,6 +470,64 @@ class PublicTicketCheckoutTest extends TestCase
         $this->assertSame('default', data_get($payment->metadata, 'checkout_preference'));
     }
 
+    public function test_pending_selcom_ticket_payment_cannot_be_reused_as_pesapal(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $pesapal = PaymentGateway::query()->where('code', 'pesapal')->firstOrFail();
+        $pesapal->update(['is_default' => false]);
+
+        PaymentGateway::query()->create([
+            'organization_id' => null,
+            'name' => 'Selcom',
+            'code' => 'selcom',
+            'is_enabled' => true,
+            'is_default' => true,
+            'environment' => 'sandbox',
+        ]);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Retry Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'retry@example.com',
+            'accept_terms' => '1',
+            'payment_option' => 'mobile_money',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+        $this->assertSame('selcom', $payment->gateway->code);
+
+        $this->expectException(\\RuntimeException::class);
+        $this->expectExceptionMessage('already has a pending payment with another gateway');
+
+        app(\\App\\Services\\Payments\\PaymentService::class)
+            ->createForTicketOrder($payment->ticketOrder, $pesapal);
+    }
+
+    public function test_retry_of_pending_payment_with_same_gateway_is_reused(): void
+    {
+        $event = $this->createEvent();
+        $ticketType = $this->createTicketType($event);
+
+        $this->post(route('public.tickets.store', ['event' => $event->slug]), [
+            'buyer_name' => 'Same Gateway Buyer',
+            'buyer_phone' => '0712345678',
+            'buyer_email' => 'same@example.com',
+            'accept_terms' => '1',
+            'tickets' => [$ticketType->id => 1],
+        ])->assertRedirect();
+
+        $payment = Payment::query()->latest('id')->firstOrFail();
+
+        $retry = app(\\App\\Services\\Payments\\PaymentService::class)
+            ->createForTicketOrder($payment->ticketOrder, $payment->gateway);
+
+        $this->assertSame($payment->id, $retry->id);
+        $this->assertSame(1, Payment::query()->where('ticket_order_id', $payment->ticket_order_id)->count());
+    }
+
     public function test_card_checkout_is_rejected_when_pesapal_is_not_ready(): void
     {
         $event = $this->createEvent();
