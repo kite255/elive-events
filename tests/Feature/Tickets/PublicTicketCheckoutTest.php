@@ -498,6 +498,12 @@ class PublicTicketCheckoutTest extends TestCase
 
         $payment = Payment::query()->latest('id')->firstOrFail();
         $this->assertSame('selcom', $payment->gateway->code);
+        $this->assertSame(Payment::STATUS_PENDING, $payment->status);
+        $this->assertNotEquals($payment->payment_gateway_id, $pesapal->id);
+        $this->assertSame(1, Payment::query()
+            ->where('ticket_order_id', $payment->ticket_order_id)
+            ->whereIn('status', [Payment::STATUS_PENDING, Payment::STATUS_PROCESSING])
+            ->count());
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('already has a pending payment with another gateway');
