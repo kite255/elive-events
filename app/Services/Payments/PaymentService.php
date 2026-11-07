@@ -158,7 +158,8 @@ class PaymentService
      * idempotent fulfillment pipeline without contacting a gateway.
      */
     public function createForTicketOrder(
-        TicketOrder $order
+        TicketOrder $order,
+        ?PaymentGateway $selectedGateway = null
     ): Payment {
         $order->loadMissing([
             'event.organization',
@@ -210,12 +211,30 @@ class PaymentService
 
         $isFree = $amount === 0.0;
 
-        $gateway =
-            $isFree
-                ? null
-                : $this->defaultGatewayForOrganization(
+        $gateway = null;
+
+        if (! $isFree) {
+            if ($selectedGateway) {
+                // Validate the requested gateway in the service too: callers
+                // must never select disabled or unrelated merchant accounts.
+                $gateway = PaymentGateway::query()
+                    ->whereKey($selectedGateway->getKey())
+                    ->where('is_enabled', true)
+                    ->where(function ($query) use ($event): void {
+                        $query->where('organization_id', $event->organization_id)
+                            ->orWhereNull('organization_id');
+                    })
+                    ->first();
+
+                if (! $gateway || ! in_array($gateway->code, ['selcom', 'pesapal'], true)) {
+                    throw new RuntimeException('Selected payment gateway is unavailable.');
+                }
+            } else {
+                $gateway = $this->defaultGatewayForOrganization(
                     (int) $event->organization_id
                 );
+            }
+        }
 
         return DB::transaction(
             function () use (
@@ -223,7 +242,8 @@ class PaymentService
                 $event,
                 $gateway,
                 $amount,
-                $isFree
+                $isFree,
+                $selectedGateway
             ): Payment {
                 $lockedOrder =
                     TicketOrder::query()
@@ -284,6 +304,16 @@ class PaymentService
                         ->first();
 
                 if ($existing) {
+                    // An unresolved provider order must never be reused through
+                    // another gateway: its reference and status belong to
+                    // the original provider.
+                    if ((int) $existing->payment_gateway_id !== (int) $gateway?->getKey()) {
+                        throw new RuntimeException(
+                            'This ticket order already has a pending payment with another gateway. '
+                            . 'Complete or cancel that checkout before selecting a different payment method.'
+                        );
+                    }
+
                     return $existing;
                 }
 
@@ -351,6 +381,13 @@ class PaymentService
 
                         'is_free' =>
                             $isFree,
+
+                        // A buyer's preference is not proof of the method used.
+                        // The verified provider response supplies payment_method.
+                        'checkout_preference' =>
+                            $selectedGateway?->code === 'pesapal'
+                                ? 'card'
+                                : 'default',
                     ],
                 ]);
             }
