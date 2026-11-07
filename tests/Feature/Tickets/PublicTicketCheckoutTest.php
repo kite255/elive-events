@@ -499,10 +499,10 @@ class PublicTicketCheckoutTest extends TestCase
         $payment = Payment::query()->latest('id')->firstOrFail();
         $this->assertSame('selcom', $payment->gateway->code);
 
-        $this->expectException(\\RuntimeException::class);
+        $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('already has a pending payment with another gateway');
 
-        app(\\App\\Services\\Payments\\PaymentService::class)
+        app(\App\Services\Payments\PaymentService::class)
             ->createForTicketOrder($payment->ticketOrder, $pesapal);
     }
 
@@ -521,7 +521,7 @@ class PublicTicketCheckoutTest extends TestCase
 
         $payment = Payment::query()->latest('id')->firstOrFail();
 
-        $retry = app(\\App\\Services\\Payments\\PaymentService::class)
+        $retry = app(\App\Services\Payments\PaymentService::class)
             ->createForTicketOrder($payment->ticketOrder, $payment->gateway);
 
         $this->assertSame($payment->id, $retry->id);
