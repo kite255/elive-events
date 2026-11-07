@@ -496,8 +496,12 @@ class PublicTicketCheckoutTest extends TestCase
             ->assertOk()
             ->assertSee('name="payment_option"', false)
             ->assertSee('value="card"', false)
-            ->assertSee('Pay with Card')
-            ->assertSee('On Pesapal, choose Visa or Mastercard.');
+            ->assertSee('Mobile Money / QR')
+            ->assertSee('Pay securely using mobile money or QR.')
+            ->assertSee('Debit / Credit Card')
+            ->assertSee('Pay using Visa or Mastercard. Additional payment options may be available.')
+            ->assertDontSee('Pay securely with Selcom')
+            ->assertDontSee('On Pesapal, choose Visa or Mastercard.');
 
         $this->post(route('public.tickets.store', ['event' => $event->slug]), [
             'buyer_name' => 'Card Buyer',
