@@ -1709,15 +1709,15 @@
                                                 {{ old('payment_option', 'mobile_money') !== 'card' ? 'checked' : '' }}>
                                             <span>
                                                 <strong>Mobile Money / QR</strong>
-                                                <small>Pay securely with Selcom</small>
+                                                <small>Pay securely using mobile money or QR.</small>
                                             </span>
                                         </label>
                                         <label class="payment-choice-label">
                                             <input type="radio" name="payment_option" value="card"
                                                 {{ old('payment_option') === 'card' ? 'checked' : '' }}>
                                             <span>
-                                                <strong>Pay with Card</strong>
-                                                <small>On Pesapal, choose Visa or Mastercard. Pesapal may also show other payment methods.</small>
+                                                <strong>Debit / Credit Card</strong>
+                                                <small>Pay using Visa or Mastercard. Additional payment options may be available.</small>
                                             </span>
                                         </label>
                                         @error('payment_option')
