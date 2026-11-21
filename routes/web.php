@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EventReportDownloadController;
 use App\Http\Controllers\PayoutTransferProofController;
 
 use App\Http\Controllers\BadgePrintController;
@@ -787,3 +788,8 @@ Route::get(
 Route::get('/admin/payouts/{payout}/transfer-proof', PayoutTransferProofController::class)
     ->whereNumber('payout')
     ->name('admin.payouts.transfer-proof');
+
+Route::get('/admin/events/{event:id}/reports/download', EventReportDownloadController::class)
+    ->middleware('auth')
+    ->whereNumber('event')
+    ->name('admin.events.reports.download');
