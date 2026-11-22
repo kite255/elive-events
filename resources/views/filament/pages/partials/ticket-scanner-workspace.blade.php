@@ -534,11 +534,10 @@
                 <div class="elive-scanner-result-details">
                     <div class="elive-scanner-ticket" x-show="result?.ticket">
                         <div>
-                            @if ($withAttendance)
-                                <p class="elive-scanner-holder" x-text="result?.ticket?.holder_name || 'Name unavailable'"></p>
-                            @else
+                            <p class="elive-scanner-holder" x-text="result?.ticket?.holder_name || 'Name unavailable'"></p>
+                            @unless ($withAttendance)
                                 <p class="elive-scanner-detail-label">Ticket number</p>
-                            @endif
+                            @endunless
                             <p class="elive-scanner-number" x-text="result?.ticket?.ticket_number"></p>
                         </div>
                         <div class="elive-scanner-ticket-type" x-show="result?.ticket_type">

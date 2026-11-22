@@ -290,9 +290,13 @@ class TicketScannerAttendanceTest extends TestCase
             ->assertJsonPath('ticket.ticket_number', $ticket->ticket_number)
             ->assertJsonPath('ticket_type', 'Regular')
             ->assertJsonStructure(['checked_in_time_eat'])
-            ->assertJsonMissingPath('ticket.holder_name');
+            ->assertJsonPath('ticket.holder_name', $ticket->holder_name)
+            ->assertJsonMissingPath('ticket.holder_email')
+            ->assertJsonMissingPath('ticket.holder_phone');
         $this->postJson($link, ['qr_token' => $ticket->ticket_number])
-            ->assertOk()->assertJsonPath('status', 'already_used');
+            ->assertOk()
+            ->assertJsonPath('status', 'already_used')
+            ->assertJsonPath('ticket.holder_name', $ticket->holder_name);
         $this->assertDatabaseCount('ticket_check_ins', 1);
         $this->assertDatabaseHas('ticket_check_ins', [
             'ticket_id' => $ticket->id,

@@ -197,7 +197,7 @@ class TicketScannerController extends Controller
             $result['undo_token'] = $undoToken;
         }
 
-        return $this->scannerResponse($result, ['ticket_number'])->header('Cache-Control', 'private, no-store');
+        return $this->scannerResponse($result, ['holder_name', 'ticket_number'])->header('Cache-Control', 'private, no-store');
     }
 
     private function undoShared(Request $request, Event $event, TicketCheckInService $service): JsonResponse
