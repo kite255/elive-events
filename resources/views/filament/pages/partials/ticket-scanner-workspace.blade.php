@@ -9,6 +9,8 @@
             manualOpen: false,
             result: null,
             busy: false,
+            confirmingUndo: false,
+            undoError: '',
 
             cameraActive: false,
             cameraStarting: false,
@@ -30,22 +32,7 @@
                 this.result = null;
 
                 try {
-                    const response = await fetch(
-                        @js($scanUrl),
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document
-                                    .querySelector('meta[name=csrf-token]')
-                                    ?.getAttribute('content') ?? '',
-                            },
-                            body: JSON.stringify({
-                                qr_token: qr,
-                            }),
-                        }
-                    );
+                    const response = await this.sendScannerRequest({ qr_token: qr });
 
                     if (response.status === 401 || response.status === 419) {
                         this.result = {
@@ -98,6 +85,48 @@
                 }
             },
 
+            sendScannerRequest(payload) {
+                return fetch(@js($scanUrl), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') ?? '',
+                    },
+                    body: JSON.stringify(payload),
+                });
+            },
+
+            async undoCheckIn() {
+                if (! this.confirmingUndo || this.busy || ! this.result?.undo_token) {
+                    return;
+                }
+
+                this.busy = true;
+                this.undoError = '';
+
+                try {
+                    const response = await this.sendScannerRequest({ undo_token: this.result.undo_token });
+
+                    if (! response.ok) {
+                        if (response.status === 403 || response.status === 409) {
+                            this.result.undo_token = null;
+                            this.undoError = 'This check-in can no longer be undone here. Ask an event administrator to review it.';
+                        } else {
+                            this.undoError = 'Unable to undo this check-in. Try again.';
+                        }
+                        return;
+                    }
+
+                    this.result = await response.json();
+                } catch {
+                    this.undoError = 'Unable to reach the ticket scanner. Try again.';
+                } finally {
+                    this.busy = false;
+                    this.confirmingUndo = false;
+                }
+            },
+
             scanNext() {
                 if (this.busy) {
                     return;
@@ -107,6 +136,8 @@
                 this.manualQr = '';
                 this.manualOpen = false;
                 this.lastDetectedAt = Date.now();
+                this.confirmingUndo = false;
+                this.undoError = '';
             },
 
             openManual() {
@@ -272,6 +303,10 @@
                     return 'elive-scanner-result--approved';
                 }
 
+                if (this.result?.status === 'check_in_undone') {
+                    return 'elive-scanner-result--undone';
+                }
+
                 if (this.result?.status === 'already_used') {
                     return 'elive-scanner-result--duplicate';
                 }
@@ -290,6 +325,10 @@
 
                 if (this.result.status === 'checked_in') {
                     return 'Entry approved';
+                }
+
+                if (this.result.status === 'check_in_undone') {
+                    return 'Check-in undone';
                 }
 
                 if (this.result.status === 'already_used') {
@@ -333,7 +372,7 @@
         </header>
 
         @if ($assignedEvent)
-            <p class="elive-scanner-muted">{{ $assignedEvent }}</p>
+            <p class="elive-scanner-assigned-event">{{ $assignedEvent }}</p>
         @endif
 
         @if ($withAttendance)
@@ -436,7 +475,22 @@
                 </div>
             </div>
 
-            <button type="button" class="elive-scanner-button" x-show="result" x-on:click="scanNext()" x-cloak>
+            @unless ($withAttendance)
+                <div class="elive-scanner-undo" x-show="result?.undo_token || undoError" x-cloak>
+                    <button type="button" class="elive-scanner-link" x-show="! confirmingUndo && result?.undo_token"
+                        x-on:click="confirmingUndo = true; undoError = ''">Undo Check-in</button>
+                    <div x-show="confirmingUndo" role="group" aria-label="Confirm undo check-in">
+                        <p>Mark this ticket as ready to scan again?</p>
+                        <button type="button" class="elive-scanner-link" x-on:click="confirmingUndo = false"
+                            x-bind:disabled="busy">Cancel</button>
+                        <button type="button" class="elive-scanner-button" x-on:click="undoCheckIn()"
+                            x-bind:disabled="busy">Confirm Undo</button>
+                    </div>
+                    <p x-show="undoError" x-text="undoError" role="alert"></p>
+                </div>
+            @endunless
+
+            <button type="button" class="elive-scanner-button" x-show="result" x-on:click="scanNext()" x-bind:disabled="busy" x-cloak>
                 Scan Next
             </button>
             <button

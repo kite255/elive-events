@@ -5,8 +5,11 @@ namespace Tests\Feature\Tickets;
 use App\Filament\Gate\GateTicketScanner;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\TicketScanner;
+use App\Filament\Resources\AuditLogs\Pages\ListAuditLogs;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\RelationManagers\EventStaffRelationManager;
+use App\Filament\Resources\Tickets\Pages\ListTickets;
+use App\Models\AuditLog;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\Ticket;
@@ -14,6 +17,7 @@ use App\Models\TicketOrder;
 use App\Models\TicketOrderItem;
 use App\Models\TicketType;
 use App\Models\User;
+use App\Services\Tickets\TicketCheckInService;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -264,6 +268,8 @@ class TicketScannerAttendanceTest extends TestCase
         $this->postJson($endpoint, ['qr_token' => $qr])->assertForbidden();
         $this->get($link)->assertOk()
             ->assertSee($event->name)
+            ->assertSee('Undo Check-in')
+            ->assertSee('Confirm Undo')
             ->assertDontSee('Another event')
             ->assertDontSee('Checked In', false);
         $this->assertGuest();
@@ -301,6 +307,120 @@ class TicketScannerAttendanceTest extends TestCase
         $this->get($modified)->assertForbidden();
         $this->postJson($modified, ['qr_token' => $qr])->assertForbidden();
         $this->assertDatabaseCount('ticket_check_ins', 0);
+    }
+
+    public function test_shared_scanner_can_undo_its_latest_check_in_and_scan_the_ticket_again(): void
+    {
+        ['event' => $event, 'ticket' => $ticket, 'rawQrToken' => $qr] = $this->createIssuedTicket();
+        $link = URL::temporarySignedRoute('gate.shared-scanner', now()->addHour(), $event, absolute: false);
+        $anotherLink = URL::temporarySignedRoute('gate.shared-scanner', now()->addHours(2), $event, absolute: false);
+
+        $undoToken = $this->postJson($link, ['qr_token' => $qr])
+            ->assertOk()
+            ->assertJsonPath('status', 'checked_in')
+            ->json('undo_token');
+        $this->assertIsString($undoToken);
+
+        $this->postJson($anotherLink, ['undo_token' => $undoToken])->assertForbidden();
+        $this->postJson($link, ['undo_token' => $undoToken])
+            ->assertOk()
+            ->assertJsonPath('status', 'check_in_undone');
+
+        $this->assertSame(Ticket::STATUS_ISSUED, $ticket->fresh()->status);
+        $this->assertNull($ticket->fresh()->used_at);
+        $this->assertDatabaseMissing('ticket_check_ins', ['ticket_id' => $ticket->id]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'ticket.check_in_undone',
+            'event_id' => $event->id,
+            'subject_id' => $ticket->id,
+            'actor_id' => null,
+        ]);
+
+        $newScan = $this->postJson($link, ['qr_token' => $qr])->assertJsonPath('status', 'checked_in');
+        $this->assertNotSame($undoToken, $newScan->json('undo_token'));
+        $this->postJson($link, ['undo_token' => $undoToken])->assertForbidden();
+        $this->assertSame(Ticket::STATUS_USED, $ticket->fresh()->status);
+    }
+
+    public function test_shared_scanner_does_not_offer_undo_for_a_ticket_already_checked_in(): void
+    {
+        ['event' => $event, 'ticket' => $ticket, 'rawQrToken' => $qr] = $this->createIssuedTicket();
+        $link = URL::temporarySignedRoute('gate.shared-scanner', now()->addHour(), $event, absolute: false);
+
+        $this->postJson($link, ['qr_token' => $qr])->assertJsonPath('status', 'checked_in');
+        $this->flushSession();
+
+        $this->postJson($link, ['qr_token' => $qr])
+            ->assertJsonPath('status', 'already_used')
+            ->assertJsonMissingPath('undo_token');
+        $this->postJson($link, ['undo_token' => Str::random(48)])->assertForbidden();
+        $this->assertDatabaseHas('ticket_check_ins', ['ticket_id' => $ticket->id]);
+    }
+
+    public function test_old_shared_undo_cannot_reverse_a_new_check_in_on_the_same_ticket(): void
+    {
+        ['event' => $event, 'ticket' => $ticket, 'rawQrToken' => $qr] = $this->createIssuedTicket();
+        $link = URL::temporarySignedRoute('gate.shared-scanner', now()->addHour(), $event, absolute: false);
+        $undoToken = $this->postJson($link, ['qr_token' => $qr])->assertJsonPath('status', 'checked_in')->json('undo_token');
+
+        $service = app(TicketCheckInService::class);
+        $this->assertTrue($service->undoCheckIn($event->id, $ticket->id, actor: User::factory()->create()));
+        $service->checkInByCredential($qr, $event->id);
+
+        $this->postJson($link, ['undo_token' => $undoToken])
+            ->assertConflict()
+            ->assertJsonPath('status', 'check_in_changed');
+
+        $this->assertSame(Ticket::STATUS_USED, $ticket->fresh()->status);
+        $this->assertDatabaseHas('ticket_check_ins', ['ticket_id' => $ticket->id]);
+    }
+
+    public function test_event_admin_can_reset_an_earlier_ticket_check_in_from_all_tickets(): void
+    {
+        $this->withoutVite();
+        ['event' => $event, 'ticket' => $ticket, 'rawQrToken' => $qr] = $this->createIssuedTicket();
+        $link = URL::temporarySignedRoute('gate.shared-scanner', now()->addHour(), $event, absolute: false);
+        $this->postJson($link, ['qr_token' => $qr])->assertJsonPath('status', 'checked_in');
+        $administrator = User::factory()->create(['is_super_admin' => true]);
+        $this->actingAs($administrator);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ListTickets::class)
+            ->callAction(TestAction::make('undo_check_in')->table($ticket))
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(Ticket::STATUS_ISSUED, $ticket->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'ticket.check_in_undone',
+            'subject_id' => $ticket->id,
+            'actor_id' => $administrator->id,
+        ]);
+
+        $audit = AuditLog::query()->where('action', 'ticket.check_in_undone')->sole();
+        Livewire::test(ListAuditLogs::class)
+            ->searchTable($ticket->order->order_number)
+            ->assertCanSeeTableRecords([$audit]);
+    }
+
+    public function test_admin_confirmation_cannot_undo_a_replacement_check_in(): void
+    {
+        $this->withoutVite();
+        ['event' => $event, 'ticket' => $ticket, 'rawQrToken' => $qr] = $this->createIssuedTicket();
+        $administrator = User::factory()->create(['is_super_admin' => true]);
+        $this->actingAs($administrator);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $service = app(TicketCheckInService::class);
+        $service->checkInByCredential($qr);
+        $list = Livewire::test(ListTickets::class)->mountAction(TestAction::make('undo_check_in')->table($ticket));
+
+        $this->assertTrue($service->undoCheckIn($event->id, $ticket->id, actor: $administrator));
+        $service->checkInByCredential($qr);
+        $list->callMountedAction()->assertHasNoActionErrors();
+
+        $this->assertSame(Ticket::STATUS_USED, $ticket->fresh()->status);
+        $this->assertDatabaseCount('ticket_check_ins', 1);
+        $this->assertDatabaseCount('audit_logs', 1);
     }
 
     private function createIssuedTicket(): array
