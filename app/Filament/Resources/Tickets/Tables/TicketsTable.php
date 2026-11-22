@@ -17,6 +17,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Js;
 use RuntimeException;
 
@@ -50,6 +51,7 @@ class TicketsTable
                 TextColumn::make('holder_name')
                     ->label('Holder Name')
                     ->searchable()
+                    ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('order.buyer_phone')
@@ -80,6 +82,7 @@ class TicketsTable
                 TextColumn::make('order.order_number')
                     ->label('Order')
                     ->searchable()
+                    ->sortable()
                     ->copyable()
                     ->placeholder('—'),
 
@@ -111,12 +114,17 @@ class TicketsTable
                     ->label('Check-in')
                     ->state(fn (Ticket $record): string => $record->used_at ? 'Checked In' : 'Not Checked In')
                     ->badge()
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        new Expression('CASE WHEN tickets.used_at IS NULL THEN 0 ELSE 1 END'),
+                        $direction,
+                    ))
                     ->color(fn (string $state): string => $state === 'Checked In' ? 'success' : 'gray'),
 
                 TextColumn::make('used_at')
                     ->label('Checked In At')
                     ->dateTime('d M Y, H:i')
                     ->placeholder('—')
+                    ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('issued_at')
@@ -128,6 +136,7 @@ class TicketsTable
             ->filters([
                 SelectFilter::make('event_id')
                     ->label('Event')
+                    ->multiple()
                     ->options(
                         Event::query()
                             ->accessibleBy(auth()->user())
@@ -139,16 +148,22 @@ class TicketsTable
 
                 SelectFilter::make('ticket_type_id')
                     ->label('Ticket Type')
-                    ->options(
-                        TicketType::query()
-                            ->whereHas('event', fn ($query) => $query->accessibleBy(auth()->user()))
-                            ->orderBy('name')
-                            ->pluck('name', 'id')
+                    ->multiple()
+                    ->options(fn (): array => TicketType::query()
+                        ->whereHas('event', fn ($query) => $query->accessibleBy(auth()->user()))
+                        ->with('event:id,name')
+                        ->orderBy('name')
+                        ->get(['id', 'event_id', 'name'])
+                        ->mapWithKeys(fn (TicketType $type): array => [
+                            $type->id => $type->name.' ('.$type->event->name.')',
+                        ])
+                        ->all(),
                     )
                     ->searchable()
                     ->preload(),
 
                 SelectFilter::make('status')
+                    ->multiple()
                     ->options([
                         Ticket::STATUS_ISSUED => 'Issued',
                         Ticket::STATUS_USED => 'Used',
