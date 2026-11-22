@@ -268,6 +268,9 @@ class TicketScannerAttendanceTest extends TestCase
         $this->postJson($endpoint, ['qr_token' => $qr])->assertForbidden();
         $this->get($link)->assertOk()
             ->assertSee($event->name)
+            ->assertSee('elive-scanner--shared', false)
+            ->assertSee('Ready for next ticket')
+            ->assertSee('Checked in at')
             ->assertSee('Undo Check-in')
             ->assertSee('Confirm Undo')
             ->assertDontSee('Another event')
@@ -283,6 +286,8 @@ class TicketScannerAttendanceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'checked_in')
             ->assertJsonPath('ticket.ticket_number', $ticket->ticket_number)
+            ->assertJsonPath('ticket_type', 'Regular')
+            ->assertJsonStructure(['checked_in_time_eat'])
             ->assertJsonMissingPath('ticket.holder_name');
         $this->postJson($link, ['qr_token' => $ticket->ticket_number])
             ->assertOk()->assertJsonPath('status', 'already_used');
