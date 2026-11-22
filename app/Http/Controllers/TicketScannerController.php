@@ -14,6 +14,11 @@ class TicketScannerController extends Controller
         Request $request,
         TicketCheckInService $ticketCheckInService
     ): JsonResponse {
+        $user = $request->user();
+        $gateScanner = $request->routeIs('gate.ticket-scanner.scan');
+
+        abort_unless($gateScanner ? $user->canUseGateScanner() : ! $user->is_gate_staff, 403);
+
         $validated = $request->validate([
             'qr_token' => [
                 'required',
@@ -99,7 +104,7 @@ class TicketScannerController extends Controller
         if (
             $ticket
             && ! $ticket->event?->canBeCheckedInBy(
-                $request->user()
+                $user
             )
         ) {
             abort(403);
@@ -159,6 +164,10 @@ class TicketScannerController extends Controller
                     ->timezone('Africa/Dar_es_Salaam')
                     ->format('d M Y, H:i').' EAT';
             }
+        }
+
+        if ($gateScanner && $scannedTicket instanceof Ticket) {
+            $result['ticket'] = $scannedTicket->only(['holder_name', 'ticket_number']);
         }
 
         return response()->json($result);

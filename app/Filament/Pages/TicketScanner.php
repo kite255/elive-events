@@ -71,7 +71,7 @@ class TicketScanner extends Page
     #[Computed]
     public function attendanceEvents(): Collection
     {
-        $user = Auth::user();
+        $user = static::scannerUser();
         abort_unless($user instanceof User && static::canAccess(), 403);
 
         return Event::query()
@@ -119,19 +119,26 @@ class TicketScanner extends Page
         return null;
     }
 
+    protected static function scannerUser(): ?User
+    {
+        return Auth::user();
+    }
+
     public static function canAccess(): bool
     {
-        $user = Auth::user();
+        $user = static::scannerUser();
 
-        if (! $user) {
-            return false;
-        }
+        return $user && ! $user->is_gate_staff && ! $user->isTicketOrganizer();
+    }
 
-        if ($user->isTicketOrganizer()) {
-            return false;
-        }
+    public function getScanUrl(): string
+    {
+        return route('admin.ticket-scanner.scan');
+    }
 
-        return true;
+    public function getAssignedEventLabel(): ?string
+    {
+        return null;
     }
 
     public static function shouldRegisterNavigation(): bool

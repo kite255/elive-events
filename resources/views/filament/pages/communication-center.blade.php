@@ -811,7 +811,6 @@
             && filled($campaignName)
             && filled($message)
             && $validRecipients > 0
-            && ! $this->isWhatsAppChannel()
             && (
                 ! $this->isEmailChannel()
                 || filled($subject)
@@ -827,7 +826,7 @@
                 </h2>
 
                 <p class="elive-hero-text">
-                    Build Email, SMS, and WhatsApp campaigns, preview recipients,
+                    Build email and SMS campaigns, preview recipients,
                     send a test, then queue delivery through the communications worker.
                 </p>
 
@@ -1029,6 +1028,7 @@
                                 @enderror
                             </div>
 
+                            @unless($this->isTicketBuyerAudience())
                             {{-- Category --}}
                             <div class="elive-field">
 
@@ -1058,6 +1058,8 @@
                                     </div>
                                 @enderror
                             </div>
+
+                            @endunless
 
                             {{-- Template --}}
                             <div class="elive-field elive-field-full">
@@ -1116,7 +1118,7 @@
 
                                     <input
                                         type="text"
-                                        wire:model="subject"
+                                        wire:model.live.debounce.300ms="subject"
                                         class="elive-input"
                                         placeholder="Important Update – #EVENT_NAME#"
                                     >
@@ -1182,13 +1184,13 @@
 
                                 <div class="elive-help">
                                     Personalize your message using placeholders.
-                                    Actual attendee values are inserted when the
+                                    Recipient details are inserted when the
                                     campaign is processed.
                                 </div>
 
                                 <div class="elive-placeholder-box">
 
-                                    @foreach ([
+                                    @foreach ($this->isTicketBuyerAudience() ? $this->ticketBuyerPlaceholders() : [
                                         '#NAME#',
                                         '#PHONE#',
                                         '#EMAIL#',
@@ -1217,6 +1219,13 @@
 
                             </div>
 
+                            @if($sample = $this->ticketBuyerTestPreview())
+                                <div class="elive-field elive-field-full">
+                                    <strong>Sample recipient preview</strong>
+                                    <div class="elive-help" style="white-space:pre-wrap;">{{ $sample }}</div>
+                                </div>
+                            @endif
+
                             {{-- Test Communication --}}
                             <div class="elive-field elive-field-full">
 
@@ -1227,20 +1236,16 @@
                                         <div class="elive-test-title">
                                             @if ($this->isSmsChannel())
                                                 Send Test SMS
-                                            @elseif ($this->isEmailChannel())
-                                                Send Test Email
                                             @else
-                                                WhatsApp Test
+                                                Send Test Email
                                             @endif
                                         </div>
 
                                         <div class="elive-test-description">
                                             @if ($this->isSmsChannel())
                                                 Send the current SMS to one phone number before launching the campaign.
-                                            @elseif ($this->isEmailChannel())
-                                                Send the current branded eLive Events email to one address before launching the campaign.
                                             @else
-                                                Bulk WhatsApp campaign sending is not enabled from this screen yet.
+                                                Send the current branded eLive Events email to one address before launching the campaign.
                                             @endif
                                         </div>
 
@@ -1323,7 +1328,7 @@
 
                                                 <input
                                                     type="email"
-                                                    wire:model="testEmail"
+                                                    wire:model.live.debounce.300ms="testEmail"
                                                     class="elive-input"
                                                     placeholder="name@example.com"
                                                 >
@@ -1424,6 +1429,7 @@
                                 <button
                                     type="button"
                                     wire:click="queueCampaign"
+                                    wire:confirm="Queue this campaign for the selected recipients?"
                                     wire:loading.attr="disabled"
                                     wire:target="queueCampaign"
                                     class="elive-btn elive-btn-primary"
@@ -1812,6 +1818,12 @@
 
                         </div>
 
+                        @if ($this->isTicketBuyerAudience() && ($preview['above_three_sms_segments'] ?? 0) > 0)
+                            <div class="elive-warning" style="margin-top:14px;">
+                                {{ number_format($preview['above_three_sms_segments']) }} ticket-buyer messages exceed three SMS segments after personalization.
+                            </div>
+                        @endif
+
                         @if ($this->isSmsChannel() && $segmentCount > 1)
 
                             <div
@@ -1823,7 +1835,8 @@
                                     {{ number_format($segmentCount) }}
                                     SMS segments
                                 </strong>
-                                per recipient. Shortening the message can
+                                {{ $this->isTicketBuyerAudience() ? 'for the longest personalized message.' : 'per recipient.' }}
+                                Shortening the message can
                                 reduce SMS usage and cost.
                             </div>
 

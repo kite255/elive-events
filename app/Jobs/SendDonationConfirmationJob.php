@@ -88,8 +88,15 @@ class SendDonationConfirmationJob implements ShouldQueue
         $subject = $log->subject ?: 'Donation confirmation';
         $body = (string) $log->message;
 
-        Mail::raw(
-            $body,
+        Mail::send(
+            ['html' => 'emails.elive', 'raw' => $body],
+            [
+                'subject' => $subject,
+                'messageBody' => $body,
+                'emailLabel' => 'Donation confirmation',
+                'attendee' => null,
+                'event' => null,
+            ],
             function (Message $message) use ($log, $subject): void {
                 $message
                     ->to($log->recipient)

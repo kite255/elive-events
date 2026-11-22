@@ -89,6 +89,14 @@ class TicketAccessMessageFactory
         ];
     }
 
+    public function renderForOrder(string $message, TicketOrder $order, ?string $ticketsUrl = null): string
+    {
+        $order->loadMissing(['event', 'items.ticketType']);
+        $ticketsUrl ??= route('public.ticket-orders.show', ['token' => $order->public_token]);
+
+        return $this->render($message, $this->placeholders($order, $ticketsUrl));
+    }
+
     /** @return array<string, string> */
     private function placeholders(
         TicketOrder $order,

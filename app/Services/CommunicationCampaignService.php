@@ -9,6 +9,8 @@ use App\Models\CommunicationCampaignRecipient;
 use App\Models\CommunicationLog;
 use App\Models\CommunicationTemplate;
 use App\Models\Event;
+use App\Models\TicketOrder;
+use App\Services\Tickets\TicketAccessMessageFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,7 @@ use RuntimeException;
 
 class CommunicationCampaignService
 {
+    public const PAID_TICKET_BUYERS = 'paid_ticket_buyers';
     /*
     |--------------------------------------------------------------------------
     | Audience Preview
@@ -34,8 +37,42 @@ class CommunicationCampaignService
         Event $event,
         string $audience = 'all',
         ?int $categoryId = null,
-        string $channel = CommunicationTemplate::CHANNEL_SMS
+        string $channel = CommunicationTemplate::CHANNEL_SMS,
+        ?string $message = null
     ): array {
+        if ($audience === self::PAID_TICKET_BUYERS) {
+            $total = $valid = $aboveThree = $segments = $maxSegments = 0;
+            $countSegments = $channel === CommunicationTemplate::CHANNEL_SMS && filled($message);
+            $factory = app(TicketAccessMessageFactory::class);
+            $sms = $countSegments ? app(SmsService::class) : null;
+            $orders = $this->ticketBuyerQuery($event)->when($countSegments, fn (Builder $query) => $query->with('items.ticketType'));
+
+            foreach ($orders->lazyById(500) as $order) {
+                $total++;
+                if ($this->ticketBuyerRecipient($order, $channel) === null) {
+                    continue;
+                }
+
+                $valid++;
+                if ($sms) {
+                    $order->setRelation('event', $event);
+                    $count = $sms->segmentCount($factory->renderForOrder((string) $message, $order));
+                    $segments += $count;
+                    $maxSegments = max($maxSegments, $count);
+                    $aboveThree += (int) ($count > 3);
+                }
+            }
+
+            return [
+                'total' => $total,
+                'valid' => $valid,
+                'invalid' => $total - $valid,
+                'sms_segments' => $segments,
+                'max_sms_segments' => $maxSegments,
+                'above_three_sms_segments' => $aboveThree,
+            ];
+        }
+
         $query =
             $this->audienceQuery(
                 $event,
@@ -253,6 +290,10 @@ class CommunicationCampaignService
             );
         }
 
+        if ($audience === self::PAID_TICKET_BUYERS && ! in_array($channel, ['sms', 'email'], true)) {
+            throw new RuntimeException('Choose SMS or email for paid ticket buyers.');
+        }
+
         return DB::transaction(
             function () use (
                 $event,
@@ -265,6 +306,25 @@ class CommunicationCampaignService
                 $template,
                 $createdBy
             ): CommunicationCampaign {
+                $ticketBuyerCampaign = $audience === self::PAID_TICKET_BUYERS;
+
+                if ($ticketBuyerCampaign) {
+                    Event::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+                    $duplicate = CommunicationCampaign::query()
+                        ->where('event_id', $event->id)
+                        ->where('channel', $channel)
+                        ->whereNotIn('status', [CommunicationCampaign::STATUS_CANCELLED, CommunicationCampaign::STATUS_FAILED])
+                        ->where('recipient_filter->audience', $audience)
+                        ->where('name', $name)
+                        ->where('message', $message)
+                        ->where('subject', $subject)
+                        ->first();
+
+                    if ($duplicate) {
+                        return $duplicate;
+                    }
+                }
+
                 /*
                 |--------------------------------------------------------------------------
                 | Create Campaign
@@ -340,16 +400,15 @@ class CommunicationCampaignService
                 |--------------------------------------------------------------------------
                 */
 
-                $this->audienceQuery(
-                    $event,
-                    $audience,
-                    $categoryId
-                )
-                    ->with([
+                $query = $ticketBuyerCampaign
+                    ? $this->ticketBuyerQuery($event)
+                    : $this->audienceQuery($event, $audience, $categoryId)->with([
                         'event.organization',
                         'category:id,name',
                         'badgeType:id,name',
-                    ])
+                    ]);
+
+                $query
                     ->orderBy(
                         'id'
                     )
@@ -366,8 +425,10 @@ class CommunicationCampaignService
                             &$queuedCount,
                             &$failedCount
                         ): void {
-                            foreach ($attendees as $attendee) {
+                            foreach ($attendees as $member) {
                                 $totalRecipients++;
+                                $order = $member instanceof TicketOrder ? $member : null;
+                                $attendee = $order ? null : $member;
 
                                 /*
                                 |--------------------------------------------------------------------------
@@ -376,18 +437,12 @@ class CommunicationCampaignService
                                 */
 
                                 $renderedMessage =
-                                    $this->renderMessage(
-                                        $message,
-                                        $attendee
-                                    );
+                                    $order ? $message : $this->renderMessage($message, $attendee);
 
                                 $renderedSubject =
                                     $channel
                                     === CommunicationTemplate::CHANNEL_EMAIL
-                                        ? $this->renderNullableMessage(
-                                            $subject,
-                                            $attendee
-                                        )
+                                        ? ($order ? $subject : $this->renderNullableMessage($subject, $attendee))
                                         : null;
 
                                 /*
@@ -397,27 +452,23 @@ class CommunicationCampaignService
                                 */
 
                                 $recipient =
-                                    $this->recipientForChannel(
-                                        $attendee,
-                                        $channel
-                                    );
+                                    $order
+                                        ? $this->ticketBuyerRecipient($order, $channel)
+                                        : $this->recipientForChannel($attendee, $channel);
 
                                 if (blank($recipient)) {
                                     CommunicationCampaignRecipient::create([
                                         'communication_campaign_id' =>
                                             $campaign->id,
 
-                                        'attendee_id' =>
-                                            $attendee->id,
+                                        'attendee_id' => $attendee?->id,
+                                        'ticket_order_id' => $order?->id,
 
                                         'status' =>
                                             CommunicationCampaignRecipient::STATUS_SKIPPED,
 
                                         'recipient' =>
-                                            $this->rawRecipientForChannel(
-                                                $attendee,
-                                                $channel
-                                            ),
+                                            $order ? null : $this->rawRecipientForChannel($attendee, $channel),
 
                                         'rendered_subject' =>
                                             $renderedSubject,
@@ -457,8 +508,9 @@ class CommunicationCampaignService
                                         'event_id' =>
                                             $campaign->event_id,
 
-                                        'attendee_id' =>
-                                            $attendee->id,
+                                        'attendee_id' => $attendee?->id,
+                                        'ticket_order_id' => $order?->id,
+                                        'purpose' => $order ? CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN : null,
 
                                         'communication_campaign_id' =>
                                             $campaign->id,
@@ -492,8 +544,8 @@ class CommunicationCampaignService
                                     'communication_campaign_id' =>
                                         $campaign->id,
 
-                                    'attendee_id' =>
-                                        $attendee->id,
+                                    'attendee_id' => $attendee?->id,
+                                    'ticket_order_id' => $order?->id,
 
                                     'communication_log_id' =>
                                         $log->id,
@@ -582,7 +634,7 @@ class CommunicationCampaignService
                             : now(),
                 ]);
 
-                return $campaign->fresh();
+                return $campaign->refresh();
             }
         );
     }
@@ -592,6 +644,35 @@ class CommunicationCampaignService
     | Audience Query
     |--------------------------------------------------------------------------
     */
+
+    private function ticketBuyerQuery(Event $event): Builder
+    {
+        return TicketOrder::query()
+            ->where('event_id', $event->id)
+            ->where('status', TicketOrder::STATUS_PAID)
+            ->whereNotNull('public_token')
+            ->where('public_token', '!=', '');
+    }
+
+    public function ticketBuyerRecipient(TicketOrder $order, string $channel): ?string
+    {
+        if (! $order->isPaid() || blank($order->public_token)) {
+            return null;
+        }
+
+        if ($channel === CommunicationTemplate::CHANNEL_EMAIL) {
+            $email = strtolower(trim((string) $order->buyer_email));
+
+            return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+        }
+
+        $phones = app(PhoneNumberService::class);
+        if ($channel === CommunicationTemplate::CHANNEL_SMS && $phones->isValid($order->buyer_phone)) {
+            return $phones->normalize($order->buyer_phone);
+        }
+
+        return null;
+    }
 
     public function audienceQuery(
         Event $event,

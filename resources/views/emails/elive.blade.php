@@ -52,11 +52,6 @@
                 line-height: 1.35 !important;
             }
 
-            .header-event-venue {
-                font-size: 13px !important;
-                line-height: 1.5 !important;
-            }
-
             .hero-image {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -115,6 +110,34 @@
     $resolvedHeroImageUrl = $heroImageUrl ?? null;
     $resolvedHeroTitle = $heroTitle ?? null;
     $resolvedHeroDate = $heroDate ?? null;
+    $body = trim((string) ($messageBody ?? ''));
+    $label = $emailLabel ?? 'Event Communication';
+    $isReminder = preg_match('/\breminders?\b/i', $label.' '.($subject ?? '')) === 1;
+    $bodyHasGreeting = preg_match('/\A(?:dear|hello|hi|habari)\b[^\r\n]*[,!:]\s*(?:\R|$)/i', $body) === 1;
+    $bodyHasSignature = preg_match('/(?:^|\R)\s*(?:the )?elive events(?: team)?[.!]?\s*\z/i', $body) === 1;
+
+    $venue = trim((string) $event?->venue);
+    $start = $event?->starts_at;
+    $end = $event?->ends_at;
+    $multiDay = $start && $end && ! $start->isSameDay($end);
+    $contains = fn (array $values): bool => \Illuminate\Support\Str::contains($body, $values, ignoreCase: true);
+    $containsDate = fn ($date): bool => $contains([
+        $date->format('d M Y'),
+        $date->format('j M Y'),
+        $date->format('d F Y'),
+        $date->format('j F Y'),
+    ]);
+
+    $details = [];
+    if ($venue !== '' && ! in_array($venue, ['-', '–', '—'], true) && ! $contains([$venue])) {
+        $details['Venue'] = $venue;
+    }
+    if ($start && (! $containsDate($start) || ($multiDay && ! $containsDate($end)))) {
+        $details['Date'] = $start->format('d M Y').($multiDay ? ' – '.$end->format('d M Y') : '');
+    }
+    if ($start && ! $contains([$start->format('h:i A'), $start->format('g:i A'), $start->format('H:i')])) {
+        $details['Time'] = $start->format('h:i A');
+    }
 @endphp
 
 <table
@@ -196,42 +219,13 @@
                                     >
                                 </td>
 
-                                <td
-                                    class="brand-event-cell"
-                                    width="65%"
-                                    valign="middle"
-                                    align="right"
-                                    style="
-                                        width:65%;
-                                        text-align:right;
-                                    "
-                                >
-                                    <div
-                                        class="header-event-name"
-                                        style="
-                                            font-size:14px;
-                                            line-height:1.4;
-                                            font-weight:700;
-                                            color:#161943;
-                                        "
-                                    >
-                                        {{ $event?->name ?? 'eLive Events' }}
-                                    </div>
-
-                                    @if($event?->venue)
-                                        <div
-                                            class="header-event-venue"
-                                            style="
-                                                margin-top:3px;
-                                                font-size:12px;
-                                                line-height:1.45;
-                                                color:#667085;
-                                            "
-                                        >
-                                            {{ $event->venue }}
+                                @if(filled($resolvedHeroImageUrl) && $event?->name && $event->name !== $resolvedHeroTitle)
+                                    <td class="brand-event-cell" width="65%" valign="middle" align="right" style="width:65%;text-align:right;">
+                                        <div class="header-event-name" style="font-size:14px;line-height:1.4;font-weight:700;color:#161943;">
+                                            {{ $event->name }}
                                         </div>
-                                    @endif
-                                </td>
+                                    </td>
+                                @endif
                             </tr>
                         </table>
                     </td>
@@ -343,18 +337,20 @@
                                 color:#FFFFFF;
                             "
                         >
-                            <div
-                                style="
-                                    font-size:12px;
-                                    line-height:1.4;
-                                    text-transform:uppercase;
-                                    letter-spacing:2px;
-                                    color:#D8DCE6;
-                                    margin-bottom:10px;
-                                "
-                            >
-                                {{ $emailLabel ?? 'Event Communication' }}
-                            </div>
+                            @unless($isReminder)
+                                <div
+                                    style="
+                                        font-size:12px;
+                                        line-height:1.4;
+                                        text-transform:uppercase;
+                                        letter-spacing:2px;
+                                        color:#D8DCE6;
+                                        margin-bottom:10px;
+                                    "
+                                >
+                                    {{ $label }}
+                                </div>
+                            @endunless
 
                             <div
                                 class="event-title"
@@ -367,30 +363,6 @@
                             >
                                 {{ $event?->name ?? 'eLive Events' }}
                             </div>
-
-                            @if($event?->starts_at)
-                                <div
-                                    style="
-                                        font-size:14px;
-                                        line-height:1.6;
-                                        margin-top:14px;
-                                        color:#E7E9F0;
-                                    "
-                                >
-                                    {{ $event->starts_at->format('d M Y') }}
-
-                                    @if(
-                                        $event->ends_at
-                                        && ! $event->starts_at->isSameDay($event->ends_at)
-                                    )
-                                        – {{ $event->ends_at->format('d M Y') }}
-                                    @endif
-
-                                    @if($event?->venue)
-                                        &nbsp; • &nbsp; {{ $event->venue }}
-                                    @endif
-                                </div>
-                            @endif
                         </td>
                     </tr>
                 @endif
@@ -468,7 +440,7 @@
                             color:#161943;
                         "
                     >
-                        @if($attendee)
+                        @if($attendee && ! $bodyHasGreeting)
                             <div
                                 style="
                                     font-size:22px;
@@ -491,7 +463,15 @@
                                     line-height:1.75;
                                 "
                             >
-                                {!! nl2br(e($messageBody)) !!}
+                                @if(filled($ticketCampaignUrl ?? null))
+                                    {!! nl2br(str_replace(
+                                        e($ticketCampaignUrl),
+                                        '<a href="'.e($ticketCampaignUrl).'">'.e($ticketCampaignUrl).'</a>',
+                                        e($messageBody),
+                                    )) !!}
+                                @else
+                                    {!! nl2br(e($messageBody)) !!}
+                                @endif
                             </div>
                         @endif
                     </td>
@@ -502,181 +482,28 @@
                 {{-- EVENT INFORMATION                                         --}}
                 {{-- ========================================================= --}}
 
-                @if($event)
+                @if($details !== [])
                     <tr>
-                        <td
-                            class="email-padding"
-                            style="padding:0 45px 30px;"
-                        >
+                        <td class="email-padding" style="padding:0 45px 30px;">
                             <table
                                 role="presentation"
                                 width="100%"
                                 cellspacing="0"
                                 cellpadding="0"
                                 border="0"
-                                style="
-                                    width:100%;
-                                    background:#F7FAFC;
-                                    border:1px solid #E6E8EF;
-                                    border-radius:12px;
-                                    overflow:hidden;
-                                "
+                                style="width:100%;background:#F7FAFC;border:1px solid #E6E8EF;border-radius:12px;"
                             >
                                 <tr>
-                                    <td
-                                        width="50%"
-                                        valign="top"
-                                        class="detail-column"
-                                        style="
-                                            width:50%;
-                                            padding:20px;
-                                            border-bottom:1px solid #E6E8EF;
-                                            box-sizing:border-box;
-                                        "
-                                    >
-                                        <div
-                                            style="
-                                                font-size:11px;
-                                                line-height:1.4;
-                                                color:#667085;
-                                                text-transform:uppercase;
-                                                letter-spacing:.5px;
-                                            "
-                                        >
-                                            Category
-                                        </div>
-
-                                        <div
-                                            style="
-                                                margin-top:6px;
-                                                font-size:15px;
-                                                line-height:1.5;
-                                                font-weight:700;
-                                                color:#161943;
-                                            "
-                                        >
-                                            {{ $attendee?->category?->name ?? '-' }}
-                                        </div>
-                                    </td>
-
-                                    <td
-                                        width="50%"
-                                        valign="top"
-                                        class="detail-column"
-                                        style="
-                                            width:50%;
-                                            padding:20px;
-                                            border-bottom:1px solid #E6E8EF;
-                                            box-sizing:border-box;
-                                        "
-                                    >
-                                        <div
-                                            style="
-                                                font-size:11px;
-                                                line-height:1.4;
-                                                color:#667085;
-                                                text-transform:uppercase;
-                                                letter-spacing:.5px;
-                                            "
-                                        >
-                                            Venue
-                                        </div>
-
-                                        <div
-                                            style="
-                                                margin-top:6px;
-                                                font-size:15px;
-                                                line-height:1.5;
-                                                font-weight:700;
-                                                color:#161943;
-                                            "
-                                        >
-                                            {{ $event->venue ?? '-' }}
-                                        </div>
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <td
-                                        width="50%"
-                                        valign="top"
-                                        class="detail-column"
-                                        style="
-                                            width:50%;
-                                            padding:20px;
-                                            box-sizing:border-box;
-                                        "
-                                    >
-                                        <div
-                                            style="
-                                                font-size:11px;
-                                                line-height:1.4;
-                                                color:#667085;
-                                                text-transform:uppercase;
-                                                letter-spacing:.5px;
-                                            "
-                                        >
-                                            Date
-                                        </div>
-
-                                        <div
-                                            style="
-                                                margin-top:6px;
-                                                font-size:15px;
-                                                line-height:1.5;
-                                                font-weight:700;
-                                                color:#161943;
-                                            "
-                                        >
-                                            @if($event->starts_at)
-                                                {{ $event->starts_at->format('d M Y') }}
-
-                                                @if(
-                                                    $event->ends_at
-                                                    && ! $event->starts_at->isSameDay($event->ends_at)
-                                                )
-                                                    – {{ $event->ends_at->format('d M Y') }}
-                                                @endif
-                                            @else
-                                                -
-                                            @endif
-                                        </div>
-                                    </td>
-
-                                    <td
-                                        width="50%"
-                                        valign="top"
-                                        class="detail-column"
-                                        style="
-                                            width:50%;
-                                            padding:20px;
-                                            box-sizing:border-box;
-                                        "
-                                    >
-                                        <div
-                                            style="
-                                                font-size:11px;
-                                                line-height:1.4;
-                                                color:#667085;
-                                                text-transform:uppercase;
-                                                letter-spacing:.5px;
-                                            "
-                                        >
-                                            Time
-                                        </div>
-
-                                        <div
-                                            style="
-                                                margin-top:6px;
-                                                font-size:15px;
-                                                line-height:1.5;
-                                                font-weight:700;
-                                                color:#161943;
-                                            "
-                                        >
-                                            {{ $event->starts_at?->format('h:i A') ?? '-' }}
-                                        </div>
-                                    </td>
+                                    @foreach($details as $detailLabel => $value)
+                                        <td class="detail-column" valign="top" style="padding:16px 20px;">
+                                            <div style="font-size:11px;line-height:1.4;color:#667085;text-transform:uppercase;letter-spacing:.5px;">
+                                                {{ $detailLabel }}
+                                            </div>
+                                            <div style="margin-top:6px;font-size:15px;line-height:1.5;font-weight:700;color:#161943;">
+                                                {{ $value }}
+                                            </div>
+                                        </td>
+                                    @endforeach
                                 </tr>
                             </table>
                         </td>
@@ -786,23 +613,25 @@
                 {{-- SIGNATURE                                                 --}}
                 {{-- ========================================================= --}}
 
-                <tr>
-                    <td
-                        class="email-padding"
-                        style="
-                            padding:8px 45px 36px;
-                            font-size:15px;
-                            line-height:1.7;
-                            color:#475467;
-                        "
-                    >
-                        Thank you,<br>
+                @unless($bodyHasSignature)
+                    <tr>
+                        <td
+                            class="email-padding"
+                            style="
+                                padding:8px 45px 36px;
+                                font-size:15px;
+                                line-height:1.7;
+                                color:#475467;
+                            "
+                        >
+                            Thank you,<br>
 
-                        <strong style="color:#161943;">
-                            eLive Events
-                        </strong>
-                    </td>
-                </tr>
+                            <strong style="color:#161943;">
+                                eLive Events
+                            </strong>
+                        </td>
+                    </tr>
+                @endunless
 
 
                 {{-- ========================================================= --}}

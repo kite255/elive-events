@@ -478,7 +478,7 @@
             <div class="elive-login-form-header">
 
                 <p class="eyebrow">
-                    Login Portal
+                    {{ filament()->getCurrentOrDefaultPanel()->getId() === 'gate' ? 'Gate Staff' : 'Login Portal' }}
                 </p>
 
                 <h2>
@@ -486,7 +486,11 @@
                 </h2>
 
                 <p>
-                    Sign in to continue to your eLive Events dashboard.
+                    @if (filament()->getCurrentOrDefaultPanel()->getId() === 'gate')
+                        Sign in to open the Ticket Scanner for your assigned event.
+                    @else
+                        Sign in to continue to your eLive Events dashboard.
+                    @endif
                 </p>
 
             </div>

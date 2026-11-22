@@ -33,15 +33,17 @@ class LogsRelationManager extends RelationManager
                 fn (Builder $query): Builder =>
                     $query->with([
                         'attendee',
+                        'ticketOrder',
                         'campaignRecipient',
                     ])
             )
             ->columns([
                 TextColumn::make('attendee.full_name')
-                    ->label('Attendee')
+                    ->label('Attendee / Buyer')
+                    ->default(fn (CommunicationLog $record): ?string => $record->ticketOrder?->buyer_name)
                     ->searchable()
                     ->sortable()
-                    ->placeholder('Unknown attendee')
+                    ->placeholder('—')
                     ->limit(28),
 
                 TextColumn::make('recipient')

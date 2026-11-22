@@ -4,12 +4,14 @@ namespace App\Filament\Resources\Events\RelationManagers;
 
 use App\Models\Event;
 use App\Models\User;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\AttachAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DetachAction;
 use Filament\Actions\DetachBulkAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -18,6 +20,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class EventStaffRelationManager extends RelationManager
 {
@@ -77,9 +81,11 @@ class EventStaffRelationManager extends RelationManager
                     ->label('Event Role')
                     ->badge()
                     ->formatStateUsing(
-                        fn (?string $state): string =>
-                            static::roleOptions()[$state]
-                                ?? static::formatValue($state)
+                        fn (?string $state, User $record): string =>
+                            $record->is_gate_staff && $state === User::ORGANIZATION_ROLE_CHECK_IN_OFFICER
+                                ? 'Gate Staff'
+                                : (static::roleOptions()[$state]
+                                ?? static::formatValue($state))
                     ),
 
                 TextColumn::make('pivot.status')
@@ -116,6 +122,63 @@ class EventStaffRelationManager extends RelationManager
                     ->placeholder('Never'),
             ])
             ->headerActions([
+                Action::make('create_gate_staff')
+                    ->label('Create Gate Staff')
+                    ->modalHeading('Create Gate Staff Account')
+                    ->modalDescription('This account can use the Ticket Scanner for the assigned event.')
+                    ->modalSubmitActionLabel('Create Account')
+                    ->authorize(fn (): bool => $this->canCreateGateStaff())
+                    ->schema([
+                        TextInput::make('name')->required()->maxLength(255),
+                        TextInput::make('email')
+                            ->email()
+                            ->required()
+                            ->maxLength(255)
+                            ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                                if (User::query()->whereRaw('LOWER(email) = ?', [Str::lower(trim($value))])->exists()) {
+                                    $fail('An account already uses this email address.');
+                                }
+                            }),
+                        TextInput::make('password')
+                            ->password()
+                            ->required()
+                            ->minLength(12)
+                            ->maxLength(72),
+                        TextInput::make('password_confirmation')
+                            ->label('Confirm password')
+                            ->password()
+                            ->required()
+                            ->same('password')
+                            ->dehydrated(false),
+                    ])
+                    ->action(function (array $data): void {
+                        abort_unless($this->canCreateGateStaff(), 403);
+
+                        $event = $this->event();
+                        $data['email'] = Str::lower(trim($data['email']));
+
+                        DB::transaction(function () use ($data, $event): void {
+                            $user = new User($data);
+                            $user->forceFill(['is_gate_staff' => true])->save();
+
+                            $user->organizations()->attach($event->organization_id, [
+                                'role' => User::ORGANIZATION_ROLE_MEMBER,
+                                'status' => User::ORGANIZATION_STATUS_ACTIVE,
+                            ]);
+
+                            $event->assignUser($user, User::ORGANIZATION_ROLE_CHECK_IN_OFFICER);
+                        });
+
+                        Notification::make()
+                            ->title('Gate staff account created')
+                            ->success()
+                            ->actions([
+                                Action::make('gate_sign_in')
+                                    ->label('Gate Staff sign-in')
+                                    ->url(route('filament.gate.auth.login'), shouldOpenInNewTab: true),
+                            ])
+                            ->send();
+                    }),
                 AttachAction::make()
                     ->label('Assign Staff')
                     ->modalHeading('Assign Staff to Event')
@@ -356,6 +419,11 @@ class EventStaffRelationManager extends RelationManager
         return $user->canManageOrganization(
             $ownerRecord->organization_id
         );
+    }
+
+    private function canCreateGateStaff(): bool
+    {
+        return $this->event()->organization_id !== null && $this->canManageStaff();
     }
 
     private function canManageStaff(): bool

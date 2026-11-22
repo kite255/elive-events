@@ -30,7 +30,7 @@
 
                 try {
                     const response = await fetch(
-                        @js(route('admin.ticket-scanner.scan')),
+                        @js($this->getScanUrl()),
                         {
                             method: 'POST',
                             headers: {
@@ -328,6 +328,10 @@
             <span class="elive-scanner-brand"><strong>eLive</strong> Events</span>
             <h1>Ticket Scanner</h1>
         </header>
+
+        @if ($assignedEvent = $this->getAssignedEventLabel())
+            <p class="elive-scanner-muted">{{ $assignedEvent }}</p>
+        @endif
 
         <nav aria-label="Ticket scanner views" class="elive-scanner-tabs">
             @foreach (['scan' => 'Scan', 'checked_in' => 'Checked In', 'pending' => 'Pending'] as $tab => $label)

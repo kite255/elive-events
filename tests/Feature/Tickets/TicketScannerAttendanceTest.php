@@ -2,7 +2,11 @@
 
 namespace Tests\Feature\Tickets;
 
+use App\Filament\Gate\GateTicketScanner;
+use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\TicketScanner;
+use App\Filament\Resources\Events\Pages\EditEvent;
+use App\Filament\Resources\Events\RelationManagers\EventStaffRelationManager;
 use App\Models\Event;
 use App\Models\Organization;
 use App\Models\Ticket;
@@ -10,7 +14,10 @@ use App\Models\TicketOrder;
 use App\Models\TicketOrderItem;
 use App\Models\TicketType;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -97,6 +104,128 @@ class TicketScannerAttendanceTest extends TestCase
             ->assertJsonPath('ticket_type', 'Premium Access')
             ->assertJsonStructure(['checked_in_at']);
 
+        $this->assertDatabaseCount('ticket_check_ins', 1);
+    }
+
+    public function test_event_administrator_can_create_a_gate_account_from_event_staff(): void
+    {
+        $this->withoutVite();
+        ['organization' => $organization, 'event' => $event] = $this->createIssuedTicket();
+        $administrator = User::factory()->create();
+        $administrator->organizations()->attach($organization->id, [
+            'role' => User::ORGANIZATION_ROLE_ADMIN,
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+        ]);
+        $this->actingAs($administrator);
+
+        $staff = Livewire::test(EventStaffRelationManager::class, [
+            'ownerRecord' => $event,
+            'pageClass' => EditEvent::class,
+        ]);
+
+        $staff->callAction(TestAction::make('create_gate_staff')->table(), data: [
+            'name' => 'Front Gate Operator',
+            'email' => 'gate@example.test',
+            'password' => 'strong-test-password',
+            'password_confirmation' => 'strong-test-password',
+        ])->assertHasNoActionErrors();
+
+        $gateStaff = User::query()->where('email', 'gate@example.test')->sole();
+        $this->assertTrue(Hash::check('strong-test-password', $gateStaff->password));
+        $this->assertSame([$event->id], $gateStaff->checkInEvents()->pluck('events.id')->all());
+        $this->assertTrue($gateStaff->hasActiveOrganizationAccess($organization->id));
+        $this->assertFalse($gateStaff->isSuperAdmin());
+
+        $staff->callAction(TestAction::make('create_gate_staff')->table(), data: [
+            'name' => 'Another Operator',
+            'email' => 'GATE@example.test',
+            'password' => 'another-strong-password',
+            'password_confirmation' => 'another-strong-password',
+        ])->assertHasActionErrors(['email']);
+
+        $this->assertTrue(Hash::check('strong-test-password', $gateStaff->fresh()->password));
+    }
+
+    public function test_gate_staff_can_sign_in_and_land_on_the_scanner(): void
+    {
+        $this->withoutVite();
+        ['organization' => $organization, 'event' => $event] = $this->createIssuedTicket();
+        $gateStaff = User::factory()->create(['is_gate_staff' => true, 'password' => 'strong-test-password']);
+        $gateStaff->organizations()->attach($organization->id, [
+            'role' => User::ORGANIZATION_ROLE_MEMBER,
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+        ]);
+        $event->assignUser($gateStaff, User::ORGANIZATION_ROLE_CHECK_IN_OFFICER);
+
+        $this->get('/gate/ticket-scanner')->assertRedirect('/gate/login');
+        $this->get('/gate/login')->assertOk();
+
+        Filament::setCurrentPanel(Filament::getPanel('gate'));
+        $this->withSession(['url.intended' => url('/admin/events')]);
+
+        Livewire::test(Login::class)
+            ->fillForm(['email' => $gateStaff->email, 'password' => 'strong-test-password'])
+            ->call('authenticate')
+            ->assertHasNoErrors()
+            ->assertRedirect('/gate');
+
+        $this->assertAuthenticatedAs($gateStaff, 'gate');
+        $this->assertGuest('web');
+        $this->get('/gate')->assertRedirect('/gate/ticket-scanner');
+        $this->get('/gate/ticket-scanner')->assertOk();
+
+        $event->suspendAssignedUser($gateStaff);
+
+        $this->get('/gate/login')->assertOk();
+        $this->assertGuest('gate');
+    }
+
+    public function test_gate_account_only_accesses_the_scanner_and_assigned_event(): void
+    {
+        $this->withoutVite();
+        ['organization' => $organization, 'event' => $event, 'ticket' => $ticket] = $this->createIssuedTicket();
+        ['event' => $otherEvent, 'ticket' => $otherTicket] = $this->createIssuedTicket();
+        $otherEvent->update(['name' => 'Unassigned Concert', 'organization_id' => $organization->id]);
+        $gateStaff = User::factory()->create(['is_gate_staff' => true]);
+        $gateStaff->organizations()->attach($organization->id, [
+            'role' => User::ORGANIZATION_ROLE_MEMBER,
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+        ]);
+        $event->assignUser($gateStaff, User::ORGANIZATION_ROLE_CHECK_IN_OFFICER);
+
+        $this->actingAs($gateStaff, 'web');
+        $this->get('/admin')->assertForbidden();
+        $this->get('/admin/ticket-scanner')->assertForbidden();
+        $this->postJson('/admin/ticket-scanner/scan', ['qr_token' => $ticket->ticket_number])
+            ->assertForbidden();
+
+        $this->actingAs($gateStaff, 'gate');
+        $this->get('/gate/ticket-scanner')->assertOk()->assertSee($event->name);
+        $this->get('/gate/events')->assertNotFound();
+
+        Livewire::test(GateTicketScanner::class)
+            ->call('showAttendance', 'pending')
+            ->assertSee($ticket->ticket_number)
+            ->assertDontSee($otherEvent->name)
+            ->set('attendanceEventId', (string) $otherEvent->id)
+            ->assertDontSee($otherTicket->ticket_number);
+
+        $this->postJson('/gate/ticket-scanner/scan', ['qr_token' => $otherTicket->ticket_number])
+            ->assertForbidden();
+        $this->postJson('/gate/ticket-scanner/scan', ['qr_token' => $ticket->ticket_number])
+            ->assertOk()
+            ->assertJsonPath('status', 'checked_in')
+            ->assertJsonMissingPath('ticket.holder_email');
+        $this->assertDatabaseHas('ticket_check_ins', [
+            'ticket_id' => $ticket->id,
+            'checked_in_by' => $gateStaff->id,
+        ]);
+
+        $event->suspendAssignedUser($gateStaff);
+
+        $this->get('/gate/ticket-scanner')->assertForbidden();
+        $this->postJson('/gate/ticket-scanner/scan', ['qr_token' => $ticket->ticket_number])
+            ->assertForbidden();
         $this->assertDatabaseCount('ticket_check_ins', 1);
     }
 
