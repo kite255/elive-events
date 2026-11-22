@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Tickets;
 
+use App\Filament\Resources\Tickets\Pages\ListTickets;
 use App\Filament\Resources\Tickets\TicketResource;
 use App\Models\Event;
 use App\Models\Organization;
@@ -10,6 +11,7 @@ use App\Models\TicketOrder;
 use App\Models\TicketType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AllTicketsResourceTest extends TestCase
@@ -53,6 +55,14 @@ class AllTicketsResourceTest extends TestCase
 
         $this->assertSame([$assignedTicket->id], $ids);
         $this->assertNotContains($otherTicket->id, $ids);
+
+        $download = Livewire::test(ListTickets::class)
+            ->callAction('download_tickets_csv')
+            ->assertFileDownloaded();
+
+        $csv = base64_decode($download->effects['download']['content'], true);
+        $this->assertStringContainsString($assignedTicket->ticket_number, $csv);
+        $this->assertStringNotContainsString($otherTicket->ticket_number, $csv);
     }
 
     public function test_ticket_model_hides_qr_credentials_from_serialization(): void
@@ -64,6 +74,52 @@ class AllTicketsResourceTest extends TestCase
         $this->assertArrayNotHasKey('qr_token_hash', $array);
         $this->assertArrayNotHasKey('qr_token_encrypted', $array);
         $this->assertArrayHasKey('public_token', $array);
+    }
+
+    public function test_ticket_type_filter_accepts_multiple_types(): void
+    {
+        [, $regular] = $this->makeTicket('Regular');
+        [, $vip] = $this->makeTicket('VIP');
+        [, $excluded] = $this->makeTicket('Excluded');
+        $this->actingAs(User::factory()->create(['is_super_admin' => true]));
+
+        Livewire::test(ListTickets::class)
+            ->filterTable('ticket_type_id', [$regular->ticket_type_id, $vip->ticket_type_id])
+            ->assertCanSeeTableRecords([$regular, $vip])
+            ->assertCanNotSeeTableRecords([$excluded]);
+    }
+
+    public function test_csv_download_matches_the_sorted_and_filtered_ticket_list(): void
+    {
+        [, $regular] = $this->makeTicket('MatchRegular');
+        [, $vip] = $this->makeTicket('MatchVIP');
+        [, $cancelled] = $this->makeTicket('MatchCancelled');
+        [, $unmatched] = $this->makeTicket('Separate');
+        $vip->ticketType->update(['name' => 'VIP']);
+        $vip->update(['holder_name' => '=1+1']);
+        $cancelled->update(['status' => Ticket::STATUS_CANCELLED]);
+        $this->actingAs(User::factory()->create(['is_super_admin' => true]));
+
+        $page = Livewire::test(ListTickets::class)
+            ->filterTable('status', [Ticket::STATUS_ISSUED])
+            ->searchTable('MatchVIP Buyer')
+            ->assertCanSeeTableRecords([$vip])
+            ->assertCanNotSeeTableRecords([$regular, $cancelled, $unmatched]);
+
+        $download = $page->searchTable('Match')
+            ->sortTable('ticketType.name', 'desc')
+            ->set('tableRecordsPerPage', 1)
+            ->callAction('download_tickets_csv');
+
+        $download->assertFileDownloaded();
+        $csv = base64_decode($download->effects['download']['content'], true);
+        $this->assertStringContainsString($vip->ticket_number, $csv);
+        $this->assertStringContainsString($regular->ticket_number, $csv);
+        $this->assertLessThan(strpos($csv, $regular->ticket_number), strpos($csv, $vip->ticket_number));
+        $this->assertStringNotContainsString($cancelled->ticket_number, $csv);
+        $this->assertStringNotContainsString($unmatched->ticket_number, $csv);
+        $this->assertStringNotContainsString($vip->public_token, $csv);
+        $this->assertStringContainsString("'=1+1", $csv);
     }
 
     private function makeTicket(string $suffix): array
