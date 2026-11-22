@@ -2,10 +2,17 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\Event;
+use App\Models\TicketOrder;
 use App\Models\User;
 use App\Notifications\PayoutEmailTestNotification;
+use App\Services\Tickets\TicketAccessMessageFactory;
 use Illuminate\Support\Facades\Notification as MailNotification;
+use Illuminate\Mail\Message;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Livewire\Attributes\Computed;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -25,6 +32,9 @@ class SystemEmailSettings extends Page
 
     public bool $payoutEnabled = false;
     public string $payoutEmails = '';
+    public string $testEmail = '';
+    public string $testEmailLayout = 'system';
+    public string $testEventId = '';
 
     public static function canAccess(): bool
     {
@@ -39,10 +49,101 @@ class SystemEmailSettings extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+        $this->testEmail = (string) auth()->user()->email;
         $settings = DB::table('system_notification_settings')->where('id', 1)->first();
         $this->payoutEnabled = (bool) ($settings?->payout_request_emails_enabled ?? false);
         $recipients = json_decode($settings?->payout_request_recipients ?? '[]', true);
         $this->payoutEmails = implode("\n", is_array($recipients) ? $recipients : []);
+    }
+
+    #[Computed]
+    public function testEvents(): Collection
+    {
+        abort_unless(static::canAccess(), 403);
+
+        return Event::query()->orderByDesc('starts_at')->orderByDesc('id')->pluck('name', 'id');
+    }
+
+    public function sendTestEmail(TicketAccessMessageFactory $factory): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $this->testEmail = trim($this->testEmail);
+        $this->validate([
+            'testEmail' => ['required', 'email:rfc', 'max:254'],
+            'testEmailLayout' => ['required', 'in:system,ticket'],
+            'testEventId' => ['exclude_unless:testEmailLayout,ticket', 'nullable', 'integer', 'exists:events,id'],
+        ]);
+
+        $recipient = $this->testEmail;
+        $subject = '[TEST] eLive Events email delivery';
+        $view = 'emails.elive';
+        $data = [
+            'subject' => $subject,
+            'messageBody' => 'This is a test email from eLive Events System Email Settings.',
+            'emailLabel' => 'Email delivery test',
+            'attendee' => null,
+            'event' => null,
+        ];
+
+        if ($this->testEmailLayout === 'ticket') {
+            $event = $this->testEventId !== ''
+                ? Event::query()->findOrFail((int) $this->testEventId)
+                : new Event(['name' => 'Sample eLive Event', 'venue' => 'Sample Event Venue']);
+
+            $order = new TicketOrder([
+                'buyer_name' => 'Sample Guest',
+                'order_number' => 'TEST-ORDER',
+                'quantity' => 1,
+                'total' => 0,
+                'currency' => 'TZS',
+            ]);
+            $order->setRelation('event', $event);
+            $order->setRelation('items', collect());
+
+            $ticketsUrl = route('public.ticket-recovery.show');
+            $preview = $factory->make($order, $ticketsUrl);
+            $subject = '[TEST] '.$preview['email_subject'];
+            $view = 'emails.ticket-access';
+            $data = [
+                'subject' => $subject,
+                'body' => "Test only. This sample does not open a real ticket.\n\n".$preview['email_body'],
+                'order' => $order,
+                'event' => $event,
+                'ticketsUrl' => $ticketsUrl,
+            ];
+        }
+
+        try {
+            $sent = Mail::send(
+                $view,
+                $data,
+                fn (Message $message) => $message->to($recipient)->subject($subject),
+            );
+
+            if ($sent === null) {
+                Notification::make()->title('Test email was not sent')
+                    ->body('The application did not pass the message to the configured mailer.')
+                    ->warning()->send();
+                return;
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+            Notification::make()->title('Test email failed')
+                ->body('Check your mail configuration and application logs for details.')
+                ->danger()->send();
+            return;
+        }
+
+        $mailer = (string) config('mail.default');
+        $localOnly = in_array(config("mail.mailers.{$mailer}.transport"), ['log', 'array'], true);
+
+        Notification::make()
+            ->title($localOnly ? 'Test email rendered' : 'Test email accepted by the mailer')
+            ->body($localOnly
+                ? "The {$mailer} mailer does not deliver to an inbox."
+                : 'Check the recipient inbox or spam folder to confirm delivery.')
+            ->success()->send();
     }
 
     /**

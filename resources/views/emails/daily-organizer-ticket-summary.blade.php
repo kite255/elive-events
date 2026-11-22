@@ -3,8 +3,10 @@
 <head><meta charset="UTF-8"><title>Your Daily Ticket Sales</title></head>
 <body style="margin:0;background:#f5f8fc;color:#111827;font-family:Arial,sans-serif;">
 <div style="max-width:640px;margin:24px auto;background:#ffffff;border-radius:14px;overflow:hidden;">
-  <div style="padding:28px;background:#007ab2;color:white">
-    <strong style="font-size:20px">eLive Events</strong>
+  <div style="padding:18px 28px;background:#ffffff">
+    @include('emails.partials.brand-logo')
+  </div>
+  <div style="padding:28px;background:#161943;color:white">
     <p style="font-size:12px;letter-spacing:1px">EVENT PERFORMANCE REPORT</p>
     <h1 style="margin:0;font-size:26px">Your Daily Ticket Sales</h1>
     <p>{{ $date }} · Tanzania time</p>
@@ -30,6 +32,7 @@
     </table>
     <p style="font-size:12px;color:#64748b">Only confirmed paid orders are included. Refunded and partially refunded orders are excluded. This is not confirmation of provider settlement or money available for payout.</p>
   </div>
+  <div style="padding:18px 28px;background:#161943;color:#ffffff;font-size:13px;text-align:center">eLive Events</div>
 </div>
 </body>
 </html>
