@@ -13,12 +13,15 @@ use App\Filament\Resources\Events\EventResource;
 use App\Filament\Resources\Events\Widgets\EventOverviewStats;
 use App\Filament\Resources\Events\Widgets\EventSummaryWidget;
 use App\Jobs\GenerateEventBadgesJob;
+use App\Models\Event;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Js;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -29,6 +32,27 @@ class EditEvent extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('share_scanner_link')
+                ->label('Share Scanner Link')
+                ->icon('heroicon-o-link')
+                ->authorize(fn (): bool => $this->getRecord()->canBeManagedBy(auth()->user()))
+                ->visible(fn (): bool => $this->getRecord()->status !== Event::STATUS_CANCELLED)
+                ->modalHeading('Share Ticket Scanner')
+                ->modalDescription('Anyone with this link can check in tickets for this event for 12 hours.')
+                ->schema([
+                    TextInput::make('url')->label('Scanner link')->readOnly()->copyable(),
+                ])
+                ->fillForm(fn (): array => [
+                    'url' => rtrim(config('app.url'), '/').URL::temporarySignedRoute(
+                        'gate.shared-scanner',
+                        now()->addHours(12),
+                        ['event' => $this->getRecord()->getKey()],
+                        absolute: false,
+                    ),
+                ])
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Close'),
+
             ActionGroup::make([
                 Action::make('registration_status')
                     ->label(

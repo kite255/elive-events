@@ -1,3 +1,9 @@
+.elive-shared-scanner-page {
+    background: #f3f4f6;
+    min-height: 100vh;
+    padding: clamp(0.75rem, 3vw, 1.5rem);
+}
+
 .elive-scanner {
     --scanner-navy: #161943;
     --scanner-emerald: #06734f;

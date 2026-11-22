@@ -3,6 +3,7 @@
 namespace Tests\Feature\Tickets;
 
 use App\Filament\Pages\TicketScanner;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\View;
 use Tests\TestCase;
@@ -29,29 +30,14 @@ class TicketScannerPageTest extends TestCase
 
     public function test_ticket_scanner_view_contains_camera_manual_input_and_result_panel(): void
     {
-        $path = resource_path(
-            'views/filament/pages/ticket-scanner.blade.php'
-        );
+        $this->withoutVite();
+        $this->actingAs(User::factory()->create(['is_super_admin' => true]));
 
-        $contents = file_get_contents($path);
-
-        $this->assertStringContainsString(
-            'ticket-scanner-camera',
-            $contents,
-            'Expected the scanner view to contain a camera area.'
-        );
-
-        $this->assertStringContainsString(
-            'ticket-scanner-manual-input',
-            $contents,
-            'Expected the scanner view to contain a manual QR input fallback.'
-        );
-
-        $this->assertStringContainsString(
-            'ticket-scanner-result',
-            $contents,
-            'Expected the scanner view to contain a scan result panel.'
-        );
+        $this->get('/admin/ticket-scanner')
+            ->assertOk()
+            ->assertSee('id="ticket-scanner-camera"', false)
+            ->assertSee('id="ticket-scanner-manual-input"', false)
+            ->assertSee('id="ticket-scanner-result"', false);
     }
 
     public function test_ticket_scanner_uses_html5_qrcode_for_cross_browser_camera_scanning(): void
@@ -102,7 +88,7 @@ class TicketScannerPageTest extends TestCase
 
         $this->assertStringNotContainsString(
             'BarcodeDetector',
-            $blade,
+            $scannerJs.file_get_contents(resource_path('views/filament/pages/partials/ticket-scanner-workspace.blade.php')),
             'The scanner page should no longer depend on the unsupported native BarcodeDetector API.'
         );
     }
