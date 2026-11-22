@@ -105,7 +105,7 @@
             },
 
             async startCamera() {
-                if (this.cameraActive || this.cameraStarting) {
+                if (this.$wire.attendanceTab !== 'scan' || this.cameraActive || this.cameraStarting) {
                     return;
                 }
 
@@ -159,6 +159,10 @@
                     );
 
                     this.cameraActive = true;
+
+                    if (this.$wire.attendanceTab !== 'scan') {
+                        await this.stopCamera();
+                    }
                 } catch (error) {
                     console.error(
                         'Unable to start ticket scanner camera:',
@@ -230,7 +234,7 @@
             async handleDetectedQr(value) {
                 const qr = (value || '').trim();
 
-                if (! qr || this.busy || this.result) {
+                if (this.$wire.attendanceTab !== 'scan' || ! qr || this.busy || this.result) {
                     return;
                 }
 
@@ -300,279 +304,303 @@
             },
         }"
         x-init="
+            $watch('$wire.attendanceTab', tab => {
+                if (tab !== 'scan' && cameraActive) stopCamera()
+            });
             window.addEventListener(
                 'beforeunload',
                 () => stopCamera()
             )
         "
     >
-        <x-filament::section>
-            <x-slot name="heading">
-                Ticket Scanner
-            </x-slot>
-
-            <x-slot name="description">
-                Scan one QR code per guest. Check the result before tapping Scan Next.
-            </x-slot>
-
-            <div class="grid gap-4 xl:grid-cols-2 xl:gap-6">
-                <div
-                    id="ticket-scanner-camera"
-                    class="rounded-2xl border border-gray-200 bg-gray-950 p-4 shadow-sm dark:border-white/10"
+        <nav aria-label="Ticket scanner views" class="grid grid-cols-3 gap-2">
+            @foreach (['scan' => 'Scan', 'checked_in' => 'Checked In', 'pending' => 'Pending'] as $tab => $label)
+                <x-filament::button
+                    type="button"
+                    :color="$attendanceTab === $tab ? 'primary' : 'gray'"
+                    wire:click="showAttendance('{{ $tab }}')"
+                    wire:loading.attr="disabled"
+                    wire:target="showAttendance"
+                    aria-pressed="{{ $attendanceTab === $tab ? 'true' : 'false' }}"
                 >
-                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h3 class="text-sm font-semibold text-white">
-                                Camera Scanner
-                            </h3>
+                    {{ $label }}
+                </x-filament::button>
+            @endforeach
+        </nav>
 
-                            <p class="mt-1 text-xs text-gray-300">
-                                Position the QR code inside the scanner frame.
-                            </p>
+        @if ($attendanceTab !== 'scan')
+            @include('filament.pages.partials.ticket-scanner-attendance')
+        @endif
+
+        <div wire:ignore x-show="$wire.attendanceTab === 'scan'">
+            <x-filament::section>
+                <x-slot name="heading">
+                    Ticket Scanner
+                </x-slot>
+
+                <x-slot name="description">
+                    Scan one QR code per guest. Check the result before tapping Scan Next.
+                </x-slot>
+
+                <div class="grid gap-4 xl:grid-cols-2 xl:gap-6">
+                    <div
+                        id="ticket-scanner-camera"
+                        class="rounded-2xl border border-gray-200 bg-gray-950 p-4 shadow-sm dark:border-white/10"
+                    >
+                        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-semibold text-white">
+                                    Camera Scanner
+                                </h3>
+
+                                <p class="mt-1 text-xs text-gray-300">
+                                    Position the QR code inside the scanner frame.
+                                </p>
+                            </div>
+
+                            <span
+                                class="rounded-full px-3 py-1 text-xs font-medium"
+                                :class="cameraActive
+                                    ? 'bg-success-500/20 text-success-300'
+                                    : 'bg-gray-800 text-gray-300'"
+                                x-text="cameraActive ? 'Camera active' : 'Camera stopped'"
+                            ></span>
                         </div>
 
-                        <span
-                            class="rounded-full px-3 py-1 text-xs font-medium"
-                            :class="cameraActive
-                                ? 'bg-success-500/20 text-success-300'
-                                : 'bg-gray-800 text-gray-300'"
-                            x-text="cameraActive ? 'Camera active' : 'Camera stopped'"
-                        ></span>
-                    </div>
+                        <div class="overflow-hidden rounded-xl border border-gray-700 bg-black">
+                            <div id="ticket-scanner-camera-reader"></div>
 
-                    <div class="overflow-hidden rounded-xl border border-gray-700 bg-black">
-                        <div id="ticket-scanner-camera-reader"></div>
+                            <div
+                                class="flex min-h-48 sm:min-h-64 items-center justify-center"
+                                x-show="! cameraActive && ! cameraStarting"
+                            >
+                                <div class="max-w-sm px-6 text-center">
+                                    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-white">
+                                        <x-filament::icon
+                                            icon="heroicon-o-qr-code"
+                                            class="h-9 w-9"
+                                        />
+                                    </div>
+
+                                    <p class="mt-4 text-sm font-medium text-white">
+                                        Camera is not running
+                                    </p>
+
+                                    <p class="mt-2 text-xs leading-5 text-gray-400">
+                                        Start the camera to scan ticket QR codes automatically.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex min-h-48 sm:min-h-64 items-center justify-center text-sm text-gray-300"
+                                x-show="cameraStarting"
+                            >
+                                Starting camera...
+                            </div>
+                        </div>
+
+                        <div class="mt-4 grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                x-on:click="startCamera()"
+                                x-bind:disabled="cameraActive || cameraStarting"
+                            >
+                                <span x-show="! cameraStarting">
+                                    Start Camera
+                                </span>
+
+                                <span x-show="cameraStarting">
+                                    Starting...
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="inline-flex items-center justify-center rounded-lg border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                x-on:click="stopCamera()"
+                                x-bind:disabled="! cameraActive"
+                            >
+                                Stop Camera
+                            </button>
+                        </div>
 
                         <div
-                            class="flex min-h-48 sm:min-h-64 items-center justify-center"
-                            x-show="! cameraActive && ! cameraStarting"
+                            class="mt-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-200"
+                            x-show="cameraError"
+                            x-text="cameraError"
+                        ></div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div
+                            id="ticket-scanner-result"
+                            class="rounded-2xl border p-5 shadow-sm transition"
+                            x-bind:class="resultClass()"
                         >
-                            <div class="max-w-sm px-6 text-center">
-                                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-white">
+                            <div class="flex items-start gap-4">
+                                <div
+                                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                                    :class="{
+                                        'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300': !result,
+                                        'bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300': result?.status === 'checked_in',
+                                        'bg-warning-100 text-warning-700 dark:bg-warning-900/50 dark:text-warning-300': result?.status === 'already_used',
+                                        'bg-danger-100 text-danger-700 dark:bg-danger-900/50 dark:text-danger-300':
+                                            result && !['checked_in', 'already_used'].includes(result.status),
+                                    }"
+                                >
+                                    <x-filament::icon
+                                        icon="heroicon-o-check-circle"
+                                        class="h-6 w-6"
+                                        x-show="result?.status === 'checked_in'"
+                                    />
+
+                                    <x-filament::icon
+                                        icon="heroicon-o-exclamation-triangle"
+                                        class="h-6 w-6"
+                                        x-show="result?.status === 'already_used'"
+                                    />
+
                                     <x-filament::icon
                                         icon="heroicon-o-qr-code"
-                                        class="h-9 w-9"
+                                        class="h-6 w-6"
+                                        x-show="! result"
+                                    />
+
+                                    <x-filament::icon
+                                        icon="heroicon-o-x-circle"
+                                        class="h-6 w-6"
+                                        x-show="result && !['checked_in', 'already_used'].includes(result.status)"
                                     />
                                 </div>
 
-                                <p class="mt-4 text-sm font-medium text-white">
-                                    Camera is not running
-                                </p>
+                                <div class="min-w-0 flex-1">
+                                    <div role="status" aria-atomic="true">
+                                        <h3
+                                            class="text-lg font-semibold text-gray-950 dark:text-white"
+                                            x-text="resultTitle()"
+                                        ></h3>
 
-                                <p class="mt-2 text-xs leading-5 text-gray-400">
-                                    Start the camera to scan ticket QR codes automatically.
-                                </p>
+                                        <p
+                                            class="mt-1 text-sm text-gray-600 dark:text-gray-300"
+                                            x-text="result?.message ?? (busy ? 'Verifying the ticket.' : 'Scan a QR code or enter a ticket number.')"
+                                        ></p>
+                                    </div>
+
+                                    <dl
+                                        class="mt-4 grid gap-3 sm:grid-cols-2"
+                                        x-show="result?.ticket"
+                                    >
+                                        <div>
+                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                Ticket
+                                            </dt>
+                                            <dd
+                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
+                                                x-text="result?.ticket?.ticket_number ?? '—'"
+                                            ></dd>
+                                        </div>
+
+                                        <div>
+                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                Holder
+                                            </dt>
+                                            <dd
+                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
+                                                x-text="result?.ticket?.holder_name ?? '—'"
+                                            ></dd>
+                                        </div>
+
+                                        <div>
+                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                Status
+                                            </dt>
+                                            <dd
+                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
+                                                x-text="result?.ticket?.status ?? result?.status ?? '—'"
+                                            ></dd>
+                                        </div>
+
+                                        <div>
+                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                Check-in Time
+                                            </dt>
+                                            <dd
+                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
+                                                x-text="result?.checked_in_at ?? '—'"
+                                            ></dd>
+                                        </div>
+                                    </dl>
+                                </div>
                             </div>
+
+                            <button
+                                type="button"
+                                class="fi-btn fi-btn-size-md fi-btn-color-primary mt-4 inline-flex w-full items-center justify-center rounded-lg bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-500"
+                                x-show="result && !busy"
+                                x-on:click="scanNext()"
+                            >
+                                Scan Next
+                            </button>
                         </div>
 
                         <div
-                            class="flex min-h-48 sm:min-h-64 items-center justify-center text-sm text-gray-300"
-                            x-show="cameraStarting"
+                            id="ticket-scanner-manual-input"
+                            class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
                         >
-                            Starting camera...
-                        </div>
-                    </div>
+                            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">
+                                Enter Ticket Number
+                            </h3>
 
-                    <div class="mt-4 grid grid-cols-2 gap-3">
-                        <button
-                            type="button"
-                            class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-                            x-on:click="startCamera()"
-                            x-bind:disabled="cameraActive || cameraStarting"
-                        >
-                            <span x-show="! cameraStarting">
-                                Start Camera
-                            </span>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                If the camera can’t read the QR code, enter the exact ticket number printed on the ticket.
+                            </p>
 
-                            <span x-show="cameraStarting">
-                                Starting...
-                            </span>
-                        </button>
-
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center rounded-lg border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                            x-on:click="stopCamera()"
-                            x-bind:disabled="! cameraActive"
-                        >
-                            Stop Camera
-                        </button>
-                    </div>
-
-                    <div
-                        class="mt-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-200"
-                        x-show="cameraError"
-                        x-text="cameraError"
-                    ></div>
-                </div>
-
-                <div class="space-y-4">
-                    <div
-                        id="ticket-scanner-result"
-                        class="rounded-2xl border p-5 shadow-sm transition"
-                        x-bind:class="resultClass()"
-                    >
-                        <div class="flex items-start gap-4">
-                            <div
-                                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                                :class="{
-                                    'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300': !result,
-                                    'bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300': result?.status === 'checked_in',
-                                    'bg-warning-100 text-warning-700 dark:bg-warning-900/50 dark:text-warning-300': result?.status === 'already_used',
-                                    'bg-danger-100 text-danger-700 dark:bg-danger-900/50 dark:text-danger-300':
-                                        result && !['checked_in', 'already_used'].includes(result.status),
-                                }"
+                            <form
+                                class="mt-4 space-y-3"
+                                x-on:submit.prevent="submitQr(manualQr)"
                             >
-                                <x-filament::icon
-                                    icon="heroicon-o-check-circle"
-                                    class="h-6 w-6"
-                                    x-show="result?.status === 'checked_in'"
+                                <label
+                                    for="ticket-scanner-manual-value"
+                                    class="sr-only"
+                                >
+                                    Ticket number
+                                </label>
+
+                                <input
+                                    id="ticket-scanner-manual-value"
+                                    type="text"
+                                    x-model="manualQr"
+                                    x-bind:disabled="busy || !!result"
+                                    maxlength="255"
+                                    autocomplete="off"
+                                    autocapitalize="off"
+                                    spellcheck="false"
+                                    placeholder="Ticket number"
+                                    class="block w-full rounded-xl border-gray-300 bg-white text-base text-gray-950 shadow-sm outline-none transition focus:border-primary-500 focus:ring-primary-500 disabled:opacity-50 dark:border-white/10 dark:bg-gray-900"
                                 />
 
-                                <x-filament::icon
-                                    icon="heroicon-o-exclamation-triangle"
-                                    class="h-6 w-6"
-                                    x-show="result?.status === 'already_used'"
-                                />
+                                <div class="flex justify-end">
+                                    <button
+                                        type="submit"
+                                        class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                        x-bind:disabled="busy || !!result || ! manualQr.trim()"
+                                    >
+                                        <span x-show="! busy">
+                                            Check In Ticket
+                                        </span>
 
-                                <x-filament::icon
-                                    icon="heroicon-o-qr-code"
-                                    class="h-6 w-6"
-                                    x-show="! result"
-                                />
-
-                                <x-filament::icon
-                                    icon="heroicon-o-x-circle"
-                                    class="h-6 w-6"
-                                    x-show="result && !['checked_in', 'already_used'].includes(result.status)"
-                                />
-                            </div>
-
-                            <div class="min-w-0 flex-1">
-                                <div role="status" aria-atomic="true">
-                                    <h3
-                                        class="text-lg font-semibold text-gray-950 dark:text-white"
-                                        x-text="resultTitle()"
-                                    ></h3>
-
-                                    <p
-                                        class="mt-1 text-sm text-gray-600 dark:text-gray-300"
-                                        x-text="result?.message ?? (busy ? 'Verifying the ticket.' : 'Scan a QR code or enter a ticket number.')"
-                                    ></p>
+                                        <span x-show="busy">
+                                            Checking…
+                                        </span>
+                                    </button>
                                 </div>
-
-                                <dl
-                                    class="mt-4 grid gap-3 sm:grid-cols-2"
-                                    x-show="result?.ticket"
-                                >
-                                    <div>
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                            Ticket
-                                        </dt>
-                                        <dd
-                                            class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                            x-text="result?.ticket?.ticket_number ?? '—'"
-                                        ></dd>
-                                    </div>
-
-                                    <div>
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                            Holder
-                                        </dt>
-                                        <dd
-                                            class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                            x-text="result?.ticket?.holder_name ?? '—'"
-                                        ></dd>
-                                    </div>
-
-                                    <div>
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                            Status
-                                        </dt>
-                                        <dd
-                                            class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                            x-text="result?.ticket?.status ?? result?.status ?? '—'"
-                                        ></dd>
-                                    </div>
-
-                                    <div>
-                                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                            Check-in Time
-                                        </dt>
-                                        <dd
-                                            class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                            x-text="result?.checked_in_at ?? '—'"
-                                        ></dd>
-                                    </div>
-                                </dl>
-                            </div>
+                            </form>
                         </div>
-
-                        <button
-                            type="button"
-                            class="fi-btn fi-btn-size-md fi-btn-color-primary mt-4 inline-flex w-full items-center justify-center rounded-lg bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-500"
-                            x-show="result && !busy"
-                            x-on:click="scanNext()"
-                        >
-                            Scan Next
-                        </button>
-                    </div>
-
-                    <div
-                        id="ticket-scanner-manual-input"
-                        class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
-                    >
-                        <h3 class="text-sm font-semibold text-gray-950 dark:text-white">
-                            Enter Ticket Number
-                        </h3>
-
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            If the camera can’t read the QR code, enter the exact ticket number printed on the ticket.
-                        </p>
-
-                        <form
-                            class="mt-4 space-y-3"
-                            x-on:submit.prevent="submitQr(manualQr)"
-                        >
-                            <label
-                                for="ticket-scanner-manual-value"
-                                class="sr-only"
-                            >
-                                Ticket number
-                            </label>
-
-                            <input
-                                id="ticket-scanner-manual-value"
-                                type="text"
-                                x-model="manualQr"
-                                x-bind:disabled="busy || !!result"
-                                maxlength="255"
-                                autocomplete="off"
-                                autocapitalize="off"
-                                spellcheck="false"
-                                placeholder="Ticket number"
-                                class="block w-full rounded-xl border-gray-300 bg-white text-base text-gray-950 shadow-sm outline-none transition focus:border-primary-500 focus:ring-primary-500 disabled:opacity-50 dark:border-white/10 dark:bg-gray-900"
-                            />
-
-                            <div class="flex justify-end">
-                                <button
-                                    type="submit"
-                                    class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                    x-bind:disabled="busy || !!result || ! manualQr.trim()"
-                                >
-                                    <span x-show="! busy">
-                                        Check In Ticket
-                                    </span>
-
-                                    <span x-show="busy">
-                                        Checking…
-                                    </span>
-                                </button>
-                            </div>
-                        </form>
                     </div>
                 </div>
-            </div>
-        </x-filament::section>
+            </x-filament::section>
+        </div>
     </div>
 </x-filament-panels::page>
