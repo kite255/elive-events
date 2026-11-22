@@ -102,9 +102,9 @@ class TicketCheckInService
 
                 $checkedInAt = now();
 
-                $checkInId = DB::table(
+                DB::table(
                     'ticket_check_ins'
-                )->insertGetId([
+                )->insert([
                     'event_id' =>
                         $ticket->event_id,
 
@@ -153,19 +153,18 @@ class TicketCheckInService
                     'message' => 'Ticket checked in successfully.',
                     'ticket' => $ticket->fresh(),
                     'checked_in_at' => $checkedInAt,
-                    'check_in_id' => $checkInId,
                 ];
             },
             attempts: 3
         );
     }
 
-    public function undoCheckIn(int $eventId, int $ticketId, ?int $expectedCheckInId = null, ?User $actor = null): bool
+    public function undoCheckIn(int $eventId, int $ticketId, User $actor, ?int $expectedCheckInId = null): bool
     {
         return DB::transaction(function () use ($eventId, $ticketId, $expectedCheckInId, $actor): bool {
             $ticket = Ticket::query()->where('event_id', $eventId)->lockForUpdate()->find($ticketId);
 
-            if ($ticket?->status !== Ticket::STATUS_USED) {
+            if ($ticket?->status !== Ticket::STATUS_USED || ! $ticket->event?->canResetTicketCheckInsBy($actor)) {
                 return false;
             }
 
@@ -183,7 +182,7 @@ class TicketCheckInService
                 [
                     'check_in_id' => $checkIn->id,
                     'order_number' => $ticket->order?->order_number,
-                    'source' => $actor ? 'admin' : 'shared_scanner',
+                    'source' => 'admin',
                 ],
                 [
                     'status' => $ticket->status,

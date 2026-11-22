@@ -1,16 +1,18 @@
     <div
-        class="elive-scanner"
+        class="elive-scanner{{ $withAttendance ? '' : ' elive-scanner--shared' }}"
         x-data="{
+            sharedScanner: @js(! $withAttendance),
+
             isScanTab() {
-                return ! @js($withAttendance) || this.$wire.attendanceTab === 'scan';
+                return this.sharedScanner || this.$wire.attendanceTab === 'scan';
             },
 
             manualQr: '',
             manualOpen: false,
             result: null,
             busy: false,
-            confirmingUndo: false,
-            undoError: '',
+            readyForNext: false,
+            resumeTimer: null,
 
             cameraActive: false,
             cameraStarting: false,
@@ -19,16 +21,19 @@
             html5QrCode: null,
             lastDetectedValue: null,
             lastDetectedAt: 0,
+            lastCodeReleased: false,
+            lastFrameAt: 0,
             scanCooldownMs: 2500,
 
-            async submitQr(value) {
+            async submitQr(value, fromCamera = false) {
                 const qr = (value || '').trim();
 
-                if (! qr || this.busy || this.result) {
+                if (! qr || this.busy || (this.result && ! (fromCamera && this.readyForNext))) {
                     return;
                 }
 
                 this.busy = true;
+                this.clearAutomaticResume();
                 this.result = null;
 
                 try {
@@ -71,6 +76,13 @@
 
                     if (payload?.status === 'checked_in') {
                         this.manualQr = '';
+
+                        if (this.sharedScanner && fromCamera) {
+                            this.resumeTimer = setTimeout(() => {
+                                this.resumeTimer = null;
+                                this.readyForNext = true;
+                            }, 1500);
+                        }
                     }
                 } catch (error) {
                     console.error('Ticket scanner request failed:', error);
@@ -85,6 +97,32 @@
                 }
             },
 
+            clearAutomaticResume() {
+                clearTimeout(this.resumeTimer);
+                this.resumeTimer = null;
+                this.readyForNext = false;
+            },
+
+            cameraReady() {
+                return this.cameraActive
+                    && this.isScanTab()
+                    && ! this.manualOpen
+                    && ! this.busy
+                    && (! this.result || this.readyForNext);
+            },
+
+            cameraInstruction() {
+                if (this.busy) {
+                    return 'Checking ticket…';
+                }
+
+                if (this.readyForNext) {
+                    return 'Ready for next ticket';
+                }
+
+                return this.result ? 'Review the scan result' : 'Align the ticket QR code';
+            },
+
             sendScannerRequest(payload) {
                 return fetch(@js($scanUrl), {
                     method: 'POST',
@@ -97,47 +135,16 @@
                 });
             },
 
-            async undoCheckIn() {
-                if (! this.confirmingUndo || this.busy || ! this.result?.undo_token) {
-                    return;
-                }
-
-                this.busy = true;
-                this.undoError = '';
-
-                try {
-                    const response = await this.sendScannerRequest({ undo_token: this.result.undo_token });
-
-                    if (! response.ok) {
-                        if (response.status === 403 || response.status === 409) {
-                            this.result.undo_token = null;
-                            this.undoError = 'This check-in can no longer be undone here. Ask an event administrator to review it.';
-                        } else {
-                            this.undoError = 'Unable to undo this check-in. Try again.';
-                        }
-                        return;
-                    }
-
-                    this.result = await response.json();
-                } catch {
-                    this.undoError = 'Unable to reach the ticket scanner. Try again.';
-                } finally {
-                    this.busy = false;
-                    this.confirmingUndo = false;
-                }
-            },
-
             scanNext() {
                 if (this.busy) {
                     return;
                 }
 
+                this.clearAutomaticResume();
                 this.result = null;
                 this.manualQr = '';
                 this.manualOpen = false;
                 this.lastDetectedAt = Date.now();
-                this.confirmingUndo = false;
-                this.undoError = '';
             },
 
             openManual() {
@@ -277,34 +284,37 @@
             async handleDetectedQr(value) {
                 const qr = (value || '').trim();
 
-                if (! this.isScanTab() || this.manualOpen || ! qr || this.busy || this.result) {
+                if (! qr) {
                     return;
                 }
 
                 const now = Date.now();
+                if (this.sharedScanner && this.lastDetectedValue
+                    && (qr !== this.lastDetectedValue || now - this.lastFrameAt >= 650)) {
+                    this.lastCodeReleased = true;
+                }
+                this.lastFrameAt = now;
 
-                if (
-                    this.lastDetectedValue === qr
-                    && (
-                        now - this.lastDetectedAt
-                    ) < this.scanCooldownMs
-                ) {
+                if (! this.cameraReady()) {
+                    return;
+                }
+
+                if (this.lastDetectedValue === qr && (this.sharedScanner
+                    ? ! this.lastCodeReleased
+                    : now - this.lastDetectedAt < this.scanCooldownMs)) {
                     return;
                 }
 
                 this.lastDetectedValue = qr;
                 this.lastDetectedAt = now;
+                this.lastCodeReleased = false;
 
-                await this.submitQr(qr);
+                await this.submitQr(qr, true);
             },
 
             resultTone() {
                 if (this.result?.status === 'checked_in') {
                     return 'elive-scanner-result--approved';
-                }
-
-                if (this.result?.status === 'check_in_undone') {
-                    return 'elive-scanner-result--undone';
                 }
 
                 if (this.result?.status === 'already_used') {
@@ -325,10 +335,6 @@
 
                 if (this.result.status === 'checked_in') {
                     return 'Entry approved';
-                }
-
-                if (this.result.status === 'check_in_undone') {
-                    return 'Check-in undone';
                 }
 
                 if (this.result.status === 'already_used') {
@@ -367,7 +373,11 @@
         "
     >
         <header class="elive-scanner-heading">
-            <span class="elive-scanner-brand"><strong>eLive</strong> Events</span>
+            @if ($withAttendance)
+                <span class="elive-scanner-brand"><strong>eLive</strong> Events</span>
+            @else
+                <img class="elive-scanner-logo" src="{{ asset('eLive-Logo.png') }}" alt="eLive" width="96" height="38">
+            @endif
             <h1>Ticket Scanner</h1>
         </header>
 
@@ -401,17 +411,19 @@
             <div
                 id="ticket-scanner-camera"
                 class="elive-scanner-camera"
-                :class="{ 'elive-scanner-camera--result': !!result }"
+                :class="{ 'elive-scanner-camera--result': ! sharedScanner && !!result }"
             >
                 <div id="ticket-scanner-camera-reader"></div>
                 <div class="elive-scanner-camera-idle" x-show="! cameraActive">
                     <span x-text="cameraStarting ? 'Starting camera…' : 'Camera is off'"></span>
                 </div>
 
-                <span class="elive-scanner-camera-status" x-show="cameraActive && ! result" x-cloak>Camera active</span>
+                @if ($withAttendance)
+                    <span class="elive-scanner-camera-status" x-show="cameraActive && ! result" x-cloak>Camera active</span>
+                @endif
                 <div
                     class="elive-scanner-guides"
-                    :class="{ 'elive-scanner-guides--live': cameraActive && ! result && scanGuideSize }"
+                    :class="{ 'elive-scanner-guides--live': cameraActive && (sharedScanner || ! result) && scanGuideSize }"
                     :style="{ '--scanner-guide-size': scanGuideSize + 'px' }"
                     aria-hidden="true"
                 >
@@ -419,10 +431,17 @@
                 </div>
             </div>
 
-            <p class="elive-scanner-camera-error" x-show="cameraError" x-text="cameraError" x-cloak role="alert"></p>
-            <p class="elive-scanner-instruction" x-show="! result" x-text="busy ? 'Checking ticket…' : 'Align the ticket QR code'" role="status"></p>
+            @unless ($withAttendance)
+                <p class="elive-scanner-camera-instruction" x-show="cameraActive && ! manualOpen"
+                    x-text="cameraInstruction()" x-cloak></p>
+            @endunless
 
-            <div class="elive-scanner-controls" x-show="! result">
+            <p class="elive-scanner-camera-error" x-show="cameraError" x-text="cameraError" x-cloak role="alert"></p>
+            @if ($withAttendance)
+                <p class="elive-scanner-instruction" x-show="! result" x-text="busy ? 'Checking ticket…' : 'Align the ticket QR code'" role="status"></p>
+            @endif
+
+            <div class="elive-scanner-controls" x-show="sharedScanner ? ! manualOpen : ! result">
                 <button
                     type="button"
                     class="elive-scanner-button"
@@ -437,6 +456,10 @@
                     x-on:click="stopCamera()"
                     x-cloak
                 >Stop Camera</button>
+                @unless ($withAttendance)
+                    <button type="button" class="elive-scanner-manual-toggle" x-bind:disabled="busy"
+                        x-on:click="openManual()">Enter Ticket Number</button>
+                @endunless
             </div>
 
             <div
@@ -453,9 +476,10 @@
                 <div class="elive-scanner-result-details">
                     <div class="elive-scanner-ticket" x-show="result?.ticket">
                         <div>
-                            @if ($withAttendance)
-                                <p class="elive-scanner-holder" x-text="result?.ticket?.holder_name || 'Name unavailable'"></p>
-                            @endif
+                            <p class="elive-scanner-holder" x-text="result?.ticket?.holder_name || 'Name unavailable'"></p>
+                            @unless ($withAttendance)
+                                <p class="elive-scanner-detail-label">Ticket number</p>
+                            @endunless
                             <p class="elive-scanner-number" x-text="result?.ticket?.ticket_number"></p>
                         </div>
                         <div class="elive-scanner-ticket-type" x-show="result?.ticket_type">
@@ -467,6 +491,12 @@
                             ></span>
                         </div>
                     </div>
+                    @unless ($withAttendance)
+                        <p class="elive-scanner-checked-at"
+                            x-show="result?.status === 'checked_in' && result?.checked_in_time_eat">
+                            Checked in at <strong x-text="result?.checked_in_time_eat"></strong>
+                        </p>
+                    @endunless
                     <div class="elive-scanner-duplicate-details" x-show="result?.status === 'already_used'">
                         <p x-show="result?.checked_in_time_eat">Previous check-in <strong x-text="result?.checked_in_time_eat"></strong></p>
                         <p class="elive-scanner-warning">Do not admit again</p>
@@ -475,32 +505,19 @@
                 </div>
             </div>
 
-            @unless ($withAttendance)
-                <div class="elive-scanner-undo" x-show="result?.undo_token || undoError" x-cloak>
-                    <button type="button" class="elive-scanner-link" x-show="! confirmingUndo && result?.undo_token"
-                        x-on:click="confirmingUndo = true; undoError = ''">Undo Check-in</button>
-                    <div x-show="confirmingUndo" role="group" aria-label="Confirm undo check-in">
-                        <p>Mark this ticket as ready to scan again?</p>
-                        <button type="button" class="elive-scanner-link" x-on:click="confirmingUndo = false"
-                            x-bind:disabled="busy">Cancel</button>
-                        <button type="button" class="elive-scanner-button" x-on:click="undoCheckIn()"
-                            x-bind:disabled="busy">Confirm Undo</button>
-                    </div>
-                    <p x-show="undoError" x-text="undoError" role="alert"></p>
-                </div>
-            @endunless
-
-            <button type="button" class="elive-scanner-button" x-show="result" x-on:click="scanNext()" x-bind:disabled="busy" x-cloak>
+            <button type="button" class="elive-scanner-button elive-scanner-next" x-show="result" x-on:click="scanNext()" x-bind:disabled="busy" x-cloak>
                 Scan Next
             </button>
-            <button
-                type="button"
-                class="elive-scanner-manual-toggle"
-                :class="{ 'elive-scanner-link': !!result }"
-                x-show="! manualOpen"
-                x-bind:disabled="busy"
-                x-on:click="openManual()"
-            >Enter Ticket Number</button>
+            @if ($withAttendance)
+                <button
+                    type="button"
+                    class="elive-scanner-manual-toggle"
+                    :class="{ 'elive-scanner-link': !!result }"
+                    x-show="! manualOpen"
+                    x-bind:disabled="busy"
+                    x-on:click="openManual()"
+                >Enter Ticket Number</button>
+            @endif
 
             <form id="ticket-scanner-manual-input" class="elive-scanner-manual" x-show="manualOpen" x-on:submit.prevent="submitQr(manualQr)" x-cloak>
                 <label for="ticket-scanner-manual-value">Ticket number</label>
