@@ -497,6 +497,20 @@
 
             {{ $this->content }}
 
+            @if (filament()->hasPasswordReset())
+                <div class="elive-login-back">
+                    <a href="{{ filament()->getRequestPasswordResetUrl() }}">Forgot your password?</a>
+                </div>
+            @endif
+
+            <div class="elive-login-back">
+                @if (filament()->getCurrentOrDefaultPanel()->getId() === 'gate')
+                    <a href="{{ route('filament.admin.auth.login') }}">Admin sign-in</a>
+                @else
+                    <a href="{{ route('filament.gate.auth.login') }}">Gate Staff sign-in</a>
+                @endif
+            </div>
+
             <div class="elive-login-back">
                 <a href="{{ route('home') }}">
                     Back to eLive Events

@@ -2,7 +2,10 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\ChangePassword;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Filament\Pages\Auth\ResetPassword;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -37,6 +40,8 @@ class AdminPanelProvider extends PanelProvider
             */
 
             ->login(Login::class)
+            ->passwordReset(RequestPasswordReset::class, ResetPassword::class)
+            ->profile(ChangePassword::class)
 
             /*
             |--------------------------------------------------------------------------
