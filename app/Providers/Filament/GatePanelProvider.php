@@ -3,7 +3,10 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Gate\GateTicketScanner;
+use App\Filament\Pages\Auth\ChangePassword;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Filament\Pages\Auth\ResetPassword;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -28,6 +31,8 @@ class GatePanelProvider extends PanelProvider
             ->path('gate')
             ->authGuard('gate')
             ->login(Login::class)
+            ->passwordReset(RequestPasswordReset::class, ResetPassword::class)
+            ->profile(ChangePassword::class)
             ->brandName('eLive Events')
             ->brandLogo(asset('eLive-Logo.png'))
             ->brandLogoHeight('2.5rem')
