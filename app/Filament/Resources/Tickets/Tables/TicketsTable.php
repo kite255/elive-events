@@ -278,25 +278,26 @@ class TicketsTable
                     }),
 
                 Action::make('undo_check_in')
-                    ->label('Undo Check-in')
+                    ->label('Mark Unused')
                     ->icon('heroicon-o-arrow-uturn-left')
-                    ->authorize(fn (Ticket $record): bool => $record->event?->canBeManagedBy(auth()->user()) ?? false)
+                    ->authorize(fn (Ticket $record): bool => $record->event?->canResetTicketCheckInsBy(auth()->user()) ?? false)
                     ->visible(fn (Ticket $record): bool => $record->status === Ticket::STATUS_USED)
                     ->requiresConfirmation()
+                    ->modalHeading('Mark ticket as unused?')
                     ->modalDescription('This ticket will be available to scan again.')
                     ->schema([Hidden::make('check_in_id')->rules(['integer'])])
                     ->fillForm(fn (Ticket $record): array => ['check_in_id' => $record->checkIns()->value('id')])
                     ->action(function (Ticket $record, array $data, TicketCheckInService $service): void {
                         $actor = auth()->user();
-                        abort_unless($record->event?->canBeManagedBy($actor), 403);
+                        abort_unless($record->event?->canResetTicketCheckInsBy($actor), 403);
 
                         if (filled($data['check_in_id'] ?? null) && $service->undoCheckIn(
                             $record->event_id,
                             $record->id,
-                            (int) $data['check_in_id'],
                             $actor,
+                            expectedCheckInId: (int) $data['check_in_id'],
                         )) {
-                            Notification::make()->title('Check-in undone')->success()->send();
+                            Notification::make()->title('Ticket marked unused')->success()->send();
 
                             return;
                         }

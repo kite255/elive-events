@@ -310,8 +310,7 @@ Route::get('/gate/shared-scanner/{event}', [TicketScannerController::class, 'sho
     ->name('gate.shared-scanner');
 
 Route::post('/gate/shared-scanner/{event}', [TicketScannerController::class, 'scanShared'])
-    ->middleware(['signed:relative', 'throttle:240,1,shared-scanner-scan'])
-    ->block();
+    ->middleware(['signed:relative', 'throttle:240,1,shared-scanner-scan']);
 
 /*
 |--------------------------------------------------------------------------

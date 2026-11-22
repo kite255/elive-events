@@ -11,9 +11,6 @@
             manualOpen: false,
             result: null,
             busy: false,
-            confirmingUndo: false,
-            undoError: '',
-            latestSharedCheckIn: null,
             readyForNext: false,
             resumeTimer: null,
 
@@ -31,7 +28,7 @@
             async submitQr(value, fromCamera = false) {
                 const qr = (value || '').trim();
 
-                if (! qr || this.busy || this.confirmingUndo || (this.result && ! (fromCamera && this.readyForNext))) {
+                if (! qr || this.busy || (this.result && ! (fromCamera && this.readyForNext))) {
                     return;
                 }
 
@@ -80,16 +77,11 @@
                     if (payload?.status === 'checked_in') {
                         this.manualQr = '';
 
-                        if (this.sharedScanner) {
-                            this.latestSharedCheckIn = payload.undo_token ? payload : null;
-                            this.undoError = '';
-
-                            if (fromCamera) {
-                                this.resumeTimer = setTimeout(() => {
-                                    this.resumeTimer = null;
-                                    this.readyForNext = true;
-                                }, 1500);
-                            }
+                        if (this.sharedScanner && fromCamera) {
+                            this.resumeTimer = setTimeout(() => {
+                                this.resumeTimer = null;
+                                this.readyForNext = true;
+                            }, 1500);
                         }
                     }
                 } catch (error) {
@@ -115,7 +107,6 @@
                 return this.cameraActive
                     && this.isScanTab()
                     && ! this.manualOpen
-                    && ! this.confirmingUndo
                     && ! this.busy
                     && (! this.result || this.readyForNext);
             },
@@ -123,10 +114,6 @@
             cameraInstruction() {
                 if (this.busy) {
                     return 'Checking ticket…';
-                }
-
-                if (this.confirmingUndo) {
-                    return 'Scanning paused';
                 }
 
                 if (this.readyForNext) {
@@ -148,41 +135,6 @@
                 });
             },
 
-            async undoCheckIn() {
-                if (! this.confirmingUndo || this.busy || ! this.latestSharedCheckIn?.undo_token) {
-                    return;
-                }
-
-                this.busy = true;
-                this.undoError = '';
-                const checkIn = this.latestSharedCheckIn;
-
-                try {
-                    const response = await this.sendScannerRequest({ undo_token: checkIn.undo_token });
-
-                    if (! response.ok) {
-                        if (response.status === 403 || response.status === 409) {
-                            this.latestSharedCheckIn = null;
-                            this.undoError = 'This check-in can no longer be undone here. Ask an event administrator to review it.';
-                        } else {
-                            this.undoError = 'Unable to undo this check-in. Try again.';
-                        }
-                        return;
-                    }
-
-                    const payload = await response.json();
-                    this.clearAutomaticResume();
-                    this.latestSharedCheckIn = null;
-                    this.lastDetectedValue = null;
-                    this.result = { ...payload, ticket: checkIn.ticket, ticket_type: checkIn.ticket_type };
-                } catch {
-                    this.undoError = 'Unable to reach the ticket scanner. Try again.';
-                } finally {
-                    this.busy = false;
-                    this.confirmingUndo = false;
-                }
-            },
-
             scanNext() {
                 if (this.busy) {
                     return;
@@ -193,8 +145,6 @@
                 this.manualQr = '';
                 this.manualOpen = false;
                 this.lastDetectedAt = Date.now();
-                this.confirmingUndo = false;
-                this.undoError = '';
             },
 
             openManual() {
@@ -367,10 +317,6 @@
                     return 'elive-scanner-result--approved';
                 }
 
-                if (this.result?.status === 'check_in_undone') {
-                    return 'elive-scanner-result--undone';
-                }
-
                 if (this.result?.status === 'already_used') {
                     return 'elive-scanner-result--duplicate';
                 }
@@ -389,10 +335,6 @@
 
                 if (this.result.status === 'checked_in') {
                     return 'Entry approved';
-                }
-
-                if (this.result.status === 'check_in_undone') {
-                    return 'Check-in undone';
                 }
 
                 if (this.result.status === 'already_used') {
@@ -562,23 +504,6 @@
                     <p x-show="result && ! ['checked_in', 'already_used'].includes(result.status)" x-text="result?.message"></p>
                 </div>
             </div>
-
-            @unless ($withAttendance)
-                <div class="elive-scanner-undo" x-show="latestSharedCheckIn || undoError" x-cloak>
-                    <button type="button" class="elive-scanner-link"
-                        x-show="! confirmingUndo && latestSharedCheckIn"
-                        x-bind:disabled="busy"
-                        x-on:click="confirmingUndo = true; undoError = ''">Undo Check-in</button>
-                    <div x-show="confirmingUndo" role="group" aria-label="Confirm undo check-in">
-                        <p>Make ticket <strong x-text="latestSharedCheckIn?.ticket?.ticket_number"></strong> available to scan again?</p>
-                        <button type="button" class="elive-scanner-link" x-on:click="confirmingUndo = false"
-                            x-bind:disabled="busy">Cancel</button>
-                        <button type="button" class="elive-scanner-button" x-on:click="undoCheckIn()"
-                            x-bind:disabled="busy">Confirm Undo</button>
-                    </div>
-                    <p x-show="undoError" x-text="undoError" role="alert"></p>
-                </div>
-            @endunless
 
             <button type="button" class="elive-scanner-button" x-show="result && (! sharedScanner || ! cameraActive || result.status !== 'checked_in' || ! readyForNext && ! resumeTimer)"
                 x-on:click="scanNext()" x-bind:disabled="busy" x-cloak>

@@ -9,7 +9,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 class TicketScannerController extends Controller
 {
@@ -178,51 +177,12 @@ class TicketScannerController extends Controller
     {
         abort_if($event->status === Event::STATUS_CANCELLED, 403);
 
-        if ($request->has('undo_token')) {
-            return $this->undoShared($request, $event, $service);
-        }
+        abort_if($request->has('undo_token'), 403);
 
         $validated = $request->validate(['qr_token' => ['required', 'string', 'max:255']]);
         $result = $service->checkInByCredential($validated['qr_token'], $event->id);
 
-        if ($result['success']) {
-            $undoToken = Str::random(48);
-            $request->session()->put('shared_scanner_undo', [
-                'token' => $undoToken,
-                'signature' => $request->query('signature'),
-                'event_id' => $event->id,
-                'ticket_id' => $result['ticket']->id,
-                'check_in_id' => $result['check_in_id'],
-            ]);
-            $result['undo_token'] = $undoToken;
-        }
-
         return $this->scannerResponse($result, ['holder_name', 'ticket_number'])->header('Cache-Control', 'private, no-store');
-    }
-
-    private function undoShared(Request $request, Event $event, TicketCheckInService $service): JsonResponse
-    {
-        $validated = $request->validate(['undo_token' => ['required', 'string', 'size:48']]);
-        $undo = $request->session()->get('shared_scanner_undo');
-
-        abort_unless(
-            $undo
-                && $undo['event_id'] === $event->id
-                && hash_equals($undo['signature'], $request->query('signature'))
-                && hash_equals($undo['token'], $validated['undo_token']),
-            403,
-        );
-
-        $undone = $service->undoCheckIn($event->id, $undo['ticket_id'], $undo['check_in_id']);
-        $request->session()->forget('shared_scanner_undo');
-
-        return response()->json([
-            'success' => $undone,
-            'status' => $undone ? 'check_in_undone' : 'check_in_changed',
-            'message' => $undone
-                ? 'This ticket is ready to scan again.'
-                : 'This check-in has already changed. Ask an event administrator to review it.',
-        ], $undone ? 200 : 409)->header('Cache-Control', 'private, no-store');
     }
 
     private function scannerResponse(array $result, ?array $ticketFields): JsonResponse
@@ -242,8 +202,6 @@ class TicketScannerController extends Controller
         if ($ticketFields !== null && $scannedTicket instanceof Ticket) {
             $result['ticket'] = $scannedTicket->only($ticketFields);
         }
-
-        unset($result['check_in_id']);
 
         return response()->json($result);
     }
