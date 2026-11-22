@@ -1438,6 +1438,10 @@ class Event extends Model
             return false;
         }
 
+        if ($user->is_gate_staff) {
+            return $user->gateScannerEvents()->whereKey($this->getKey())->exists();
+        }
+
         if ($user->isSuperAdmin()) {
             return true;
         }

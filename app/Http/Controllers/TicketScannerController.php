@@ -6,6 +6,7 @@ use App\Models\Ticket;
 use App\Services\Tickets\TicketCheckInService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class TicketScannerController extends Controller
 {
@@ -13,6 +14,11 @@ class TicketScannerController extends Controller
         Request $request,
         TicketCheckInService $ticketCheckInService
     ): JsonResponse {
+        $user = $request->user();
+        $gateScanner = $request->routeIs('gate.ticket-scanner.scan');
+
+        abort_unless($gateScanner ? $user->canUseGateScanner() : ! $user->is_gate_staff, 403);
+
         $validated = $request->validate([
             'qr_token' => [
                 'required',
@@ -98,7 +104,7 @@ class TicketScannerController extends Controller
         if (
             $ticket
             && ! $ticket->event?->canBeCheckedInBy(
-                $request->user()
+                $user
             )
         ) {
             abort(403);
@@ -148,8 +154,22 @@ class TicketScannerController extends Controller
                 $checkInCredential
             );
 
-        return response()->json(
-            $result
-        );
+        $scannedTicket = $result['ticket'] ?? null;
+
+        if ($scannedTicket instanceof Ticket) {
+            $result['ticket_type'] = $scannedTicket->ticketType?->name;
+
+            if ($checkedInAt = $result['checked_in_at'] ?? null) {
+                $result['checked_in_time_eat'] = Carbon::parse($checkedInAt)
+                    ->timezone('Africa/Dar_es_Salaam')
+                    ->format('d M Y, H:i').' EAT';
+            }
+        }
+
+        if ($gateScanner && $scannedTicket instanceof Ticket) {
+            $result['ticket'] = $scannedTicket->only(['holder_name', 'ticket_number']);
+        }
+
+        return response()->json($result);
     }
 }

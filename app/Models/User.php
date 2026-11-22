@@ -104,6 +104,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
+            'is_gate_staff' => 'boolean',
         ];
     }
 
@@ -771,8 +772,29 @@ class User extends Authenticatable implements FilamentUser
     |--------------------------------------------------------------------------
     */
 
+    public function gateScannerEvents(): BelongsToMany
+    {
+        return $this->checkInEvents()->whereIn(
+            'events.organization_id',
+            $this->activeOrganizations()->select('organizations.id')->getQuery(),
+        );
+    }
+
+    public function canUseGateScanner(): bool
+    {
+        return $this->is_gate_staff && $this->gateScannerEvents()->exists();
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
+        if ($panel->getId() === 'gate') {
+            return $this->canUseGateScanner();
+        }
+
+        if ($this->is_gate_staff) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages\Auth;
 
+use App\Models\User;
+use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
@@ -28,6 +30,47 @@ class Login extends BaseLogin
     */
 
     protected string $view = 'filament.pages.auth.login';
+
+    public function mount(): void
+    {
+        $guard = filament()->auth();
+
+        if (
+            filament()->getCurrentOrDefaultPanel()->getId() === 'gate'
+            && ($user = $guard->user()) instanceof User
+            && ! $user->canUseGateScanner()
+        ) {
+            $guard->logout();
+            session()->regenerate();
+        }
+
+        $this->forgetOtherPanelRedirect();
+
+        parent::mount();
+    }
+
+    public function authenticate(): ?LoginResponse
+    {
+        $this->forgetOtherPanelRedirect();
+
+        return parent::authenticate();
+    }
+
+    private function forgetOtherPanelRedirect(): void
+    {
+        $intended = session('url.intended');
+
+        if (! is_string($intended)) {
+            return;
+        }
+
+        $path = parse_url($intended, PHP_URL_PATH);
+        $panelPath = '/'.filament()->getCurrentOrDefaultPanel()->getPath();
+
+        if ($path !== $panelPath && ! str_starts_with((string) $path, $panelPath.'/')) {
+            session()->forget('url.intended');
+        }
+    }
 
     /*
     |--------------------------------------------------------------------------

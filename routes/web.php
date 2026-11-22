@@ -301,6 +301,10 @@ Route::post(
         'admin.ticket-scanner.scan'
     );
 
+Route::post('/gate/ticket-scanner/scan', [TicketScannerController::class, 'scan'])
+    ->middleware(['auth:gate', 'throttle:120,1'])
+    ->name('gate.ticket-scanner.scan');
+
 /*
 |--------------------------------------------------------------------------
 | Authenticated Event Communication Preview
