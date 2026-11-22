@@ -79,6 +79,27 @@ class TicketScannerAttendanceTest extends TestCase
             ->assertDontSee($ticket->ticket_number);
     }
 
+    public function test_scanner_returns_the_real_ticket_type_for_a_check_in_and_repeat_scan(): void
+    {
+        $this->actingAs(User::factory()->create(['is_super_admin' => true]));
+        ['ticket' => $ticket, 'ticketType' => $type, 'rawQrToken' => $credential] = $this->createIssuedTicket();
+        $type->update(['name' => 'Premium Access']);
+
+        $this->postJson(route('admin.ticket-scanner.scan'), ['qr_token' => $credential])
+            ->assertOk()
+            ->assertJsonPath('status', 'checked_in')
+            ->assertJsonPath('ticket.ticket_number', $ticket->ticket_number)
+            ->assertJsonPath('ticket_type', 'Premium Access');
+
+        $this->postJson(route('admin.ticket-scanner.scan'), ['qr_token' => $ticket->ticket_number])
+            ->assertOk()
+            ->assertJsonPath('status', 'already_used')
+            ->assertJsonPath('ticket_type', 'Premium Access')
+            ->assertJsonStructure(['checked_in_at']);
+
+        $this->assertDatabaseCount('ticket_check_ins', 1);
+    }
+
     private function createIssuedTicket(): array
     {
         $organization = Organization::query()->create([

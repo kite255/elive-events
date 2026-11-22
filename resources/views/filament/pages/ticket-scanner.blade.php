@@ -2,15 +2,17 @@
 
 <x-filament-panels::page>
     <div
-        class="space-y-6"
+        class="elive-scanner"
         x-data="{
             manualQr: '',
+            manualOpen: false,
             result: null,
             busy: false,
 
             cameraActive: false,
             cameraStarting: false,
             cameraError: null,
+            scanGuideSize: 0,
             html5QrCode: null,
             lastDetectedValue: null,
             lastDetectedAt: 0,
@@ -77,6 +79,7 @@
                     const payload = await response.json();
 
                     this.result = payload;
+                    this.manualOpen = false;
 
                     if (payload?.status === 'checked_in') {
                         this.manualQr = '';
@@ -101,7 +104,14 @@
 
                 this.result = null;
                 this.manualQr = '';
+                this.manualOpen = false;
                 this.lastDetectedAt = Date.now();
+            },
+
+            openManual() {
+                this.scanNext();
+                this.manualOpen = true;
+                this.$nextTick(() => this.$refs.ticketNumber.focus());
             },
 
             async startCamera() {
@@ -143,6 +153,7 @@
                                 );
 
                                 const size = Math.floor(edge * 0.72);
+                                this.scanGuideSize = size;
 
                                 return {
                                     width: size,
@@ -234,7 +245,7 @@
             async handleDetectedQr(value) {
                 const qr = (value || '').trim();
 
-                if (this.$wire.attendanceTab !== 'scan' || ! qr || this.busy || this.result) {
+                if (this.$wire.attendanceTab !== 'scan' || this.manualOpen || ! qr || this.busy || this.result) {
                     return;
                 }
 
@@ -255,20 +266,16 @@
                 await this.submitQr(qr);
             },
 
-            resultClass() {
-                if (! this.result) {
-                    return 'border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900';
+            resultTone() {
+                if (this.result?.status === 'checked_in') {
+                    return 'elive-scanner-result--approved';
                 }
 
-                if (this.result.status === 'checked_in') {
-                    return 'border-success-300 bg-success-50 dark:border-success-700 dark:bg-success-950/40';
+                if (this.result?.status === 'already_used') {
+                    return 'elive-scanner-result--duplicate';
                 }
 
-                if (this.result.status === 'already_used') {
-                    return 'border-warning-300 bg-warning-50 dark:border-warning-700 dark:bg-warning-950/40';
-                }
-
-                return 'border-danger-300 bg-danger-50 dark:border-danger-700 dark:bg-danger-950/40';
+                return 'elive-scanner-result--error';
             },
 
             resultTitle() {
@@ -285,7 +292,7 @@
                 }
 
                 if (this.result.status === 'already_used') {
-                    return 'Already used';
+                    return 'Already checked in';
                 }
 
                 if (this.result.status === 'ticket_not_found') {
@@ -298,6 +305,10 @@
 
                 if (this.result.status === 'unauthenticated') {
                     return 'Session expired';
+                }
+
+                if (this.result.status === 'ticket_not_usable') {
+                    return 'Entry unavailable';
                 }
 
                 return 'Scan failed';
@@ -313,294 +324,138 @@
             )
         "
     >
-        <nav aria-label="Ticket scanner views" class="grid grid-cols-3 gap-2">
+        <header class="elive-scanner-heading">
+            <span class="elive-scanner-brand"><strong>eLive</strong> Events</span>
+            <h1>Ticket Scanner</h1>
+        </header>
+
+        <nav aria-label="Ticket scanner views" class="elive-scanner-tabs">
             @foreach (['scan' => 'Scan', 'checked_in' => 'Checked In', 'pending' => 'Pending'] as $tab => $label)
-                <x-filament::button
+                <button
                     type="button"
-                    :color="$attendanceTab === $tab ? 'primary' : 'gray'"
                     wire:click="showAttendance('{{ $tab }}')"
                     wire:loading.attr="disabled"
                     wire:target="showAttendance"
                     aria-pressed="{{ $attendanceTab === $tab ? 'true' : 'false' }}"
                 >
                     {{ $label }}
-                </x-filament::button>
+                </button>
             @endforeach
         </nav>
 
         @if ($attendanceTab !== 'scan')
-            @include('filament.pages.partials.ticket-scanner-attendance')
+            <div wire:key="scanner-attendance-{{ $attendanceTab }}">
+                @include('filament.pages.partials.ticket-scanner-attendance')
+            </div>
         @endif
 
-        <div wire:ignore x-show="$wire.attendanceTab === 'scan'">
-            <x-filament::section>
-                <x-slot name="heading">
-                    Ticket Scanner
-                </x-slot>
+        <div wire:ignore wire:key="scanner-camera-workspace" x-show="$wire.attendanceTab === 'scan'" class="elive-scanner-workspace">
+            <div
+                id="ticket-scanner-camera"
+                class="elive-scanner-camera"
+                :class="{ 'elive-scanner-camera--result': !!result }"
+            >
+                <div id="ticket-scanner-camera-reader"></div>
+                <div class="elive-scanner-camera-idle" x-show="! cameraActive">
+                    <span x-text="cameraStarting ? 'Starting camera…' : 'Camera is off'"></span>
+                </div>
 
-                <x-slot name="description">
-                    Scan one QR code per guest. Check the result before tapping Scan Next.
-                </x-slot>
+                <span class="elive-scanner-camera-status" x-show="cameraActive && ! result" x-cloak>Camera active</span>
+                <div
+                    class="elive-scanner-guides"
+                    :class="{ 'elive-scanner-guides--live': cameraActive && ! result && scanGuideSize }"
+                    :style="{ '--scanner-guide-size': scanGuideSize + 'px' }"
+                    aria-hidden="true"
+                >
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            </div>
 
-                <div class="grid gap-4 xl:grid-cols-2 xl:gap-6">
-                    <div
-                        id="ticket-scanner-camera"
-                        class="rounded-2xl border border-gray-200 bg-gray-950 p-4 shadow-sm dark:border-white/10"
-                    >
-                        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <h3 class="text-sm font-semibold text-white">
-                                    Camera Scanner
-                                </h3>
+            <p class="elive-scanner-camera-error" x-show="cameraError" x-text="cameraError" x-cloak role="alert"></p>
+            <p class="elive-scanner-instruction" x-show="! result" x-text="busy ? 'Checking ticket…' : 'Align the ticket QR code'" role="status"></p>
 
-                                <p class="mt-1 text-xs text-gray-300">
-                                    Position the QR code inside the scanner frame.
-                                </p>
-                            </div>
+            <div class="elive-scanner-controls" x-show="! result">
+                <button
+                    type="button"
+                    class="elive-scanner-button"
+                    x-show="! cameraActive"
+                    x-bind:disabled="cameraStarting"
+                    x-on:click="startCamera()"
+                >Start Camera</button>
+                <button
+                    type="button"
+                    class="elive-scanner-link"
+                    x-show="cameraActive"
+                    x-on:click="stopCamera()"
+                    x-cloak
+                >Stop Camera</button>
+            </div>
 
+            <div
+                id="ticket-scanner-result"
+                class="elive-scanner-result"
+                :class="resultTone()"
+                x-show="result"
+                x-cloak
+                role="status"
+                aria-atomic="true"
+            >
+                <h2 class="elive-scanner-result-title" x-text="resultTitle()"></h2>
+
+                <div class="elive-scanner-result-details">
+                    <div class="elive-scanner-ticket" x-show="result?.ticket">
+                        <div>
+                            <p class="elive-scanner-holder" x-text="result?.ticket?.holder_name || 'Name unavailable'"></p>
+                            <p class="elive-scanner-number" x-text="result?.ticket?.ticket_number"></p>
+                        </div>
+                        <div class="elive-scanner-ticket-type" x-show="result?.ticket_type">
+                            <p>Ticket type</p>
                             <span
-                                class="rounded-full px-3 py-1 text-xs font-medium"
-                                :class="cameraActive
-                                    ? 'bg-success-500/20 text-success-300'
-                                    : 'bg-gray-800 text-gray-300'"
-                                x-text="cameraActive ? 'Camera active' : 'Camera stopped'"
+                                class="elive-scanner-badge"
+                                :class="{ 'elive-scanner-badge--vip': result?.ticket_type?.trim().toLowerCase() === 'vip' }"
+                                x-text="result?.ticket_type"
                             ></span>
                         </div>
-
-                        <div class="overflow-hidden rounded-xl border border-gray-700 bg-black">
-                            <div id="ticket-scanner-camera-reader"></div>
-
-                            <div
-                                class="flex min-h-48 sm:min-h-64 items-center justify-center"
-                                x-show="! cameraActive && ! cameraStarting"
-                            >
-                                <div class="max-w-sm px-6 text-center">
-                                    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-white">
-                                        <x-filament::icon
-                                            icon="heroicon-o-qr-code"
-                                            class="h-9 w-9"
-                                        />
-                                    </div>
-
-                                    <p class="mt-4 text-sm font-medium text-white">
-                                        Camera is not running
-                                    </p>
-
-                                    <p class="mt-2 text-xs leading-5 text-gray-400">
-                                        Start the camera to scan ticket QR codes automatically.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div
-                                class="flex min-h-48 sm:min-h-64 items-center justify-center text-sm text-gray-300"
-                                x-show="cameraStarting"
-                            >
-                                Starting camera...
-                            </div>
-                        </div>
-
-                        <div class="mt-4 grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                x-on:click="startCamera()"
-                                x-bind:disabled="cameraActive || cameraStarting"
-                            >
-                                <span x-show="! cameraStarting">
-                                    Start Camera
-                                </span>
-
-                                <span x-show="cameraStarting">
-                                    Starting...
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
-                                class="inline-flex items-center justify-center rounded-lg border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                                x-on:click="stopCamera()"
-                                x-bind:disabled="! cameraActive"
-                            >
-                                Stop Camera
-                            </button>
-                        </div>
-
-                        <div
-                            class="mt-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-200"
-                            x-show="cameraError"
-                            x-text="cameraError"
-                        ></div>
                     </div>
-
-                    <div class="space-y-4">
-                        <div
-                            id="ticket-scanner-result"
-                            class="rounded-2xl border p-5 shadow-sm transition"
-                            x-bind:class="resultClass()"
-                        >
-                            <div class="flex items-start gap-4">
-                                <div
-                                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                                    :class="{
-                                        'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300': !result,
-                                        'bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300': result?.status === 'checked_in',
-                                        'bg-warning-100 text-warning-700 dark:bg-warning-900/50 dark:text-warning-300': result?.status === 'already_used',
-                                        'bg-danger-100 text-danger-700 dark:bg-danger-900/50 dark:text-danger-300':
-                                            result && !['checked_in', 'already_used'].includes(result.status),
-                                    }"
-                                >
-                                    <x-filament::icon
-                                        icon="heroicon-o-check-circle"
-                                        class="h-6 w-6"
-                                        x-show="result?.status === 'checked_in'"
-                                    />
-
-                                    <x-filament::icon
-                                        icon="heroicon-o-exclamation-triangle"
-                                        class="h-6 w-6"
-                                        x-show="result?.status === 'already_used'"
-                                    />
-
-                                    <x-filament::icon
-                                        icon="heroicon-o-qr-code"
-                                        class="h-6 w-6"
-                                        x-show="! result"
-                                    />
-
-                                    <x-filament::icon
-                                        icon="heroicon-o-x-circle"
-                                        class="h-6 w-6"
-                                        x-show="result && !['checked_in', 'already_used'].includes(result.status)"
-                                    />
-                                </div>
-
-                                <div class="min-w-0 flex-1">
-                                    <div role="status" aria-atomic="true">
-                                        <h3
-                                            class="text-lg font-semibold text-gray-950 dark:text-white"
-                                            x-text="resultTitle()"
-                                        ></h3>
-
-                                        <p
-                                            class="mt-1 text-sm text-gray-600 dark:text-gray-300"
-                                            x-text="result?.message ?? (busy ? 'Verifying the ticket.' : 'Scan a QR code or enter a ticket number.')"
-                                        ></p>
-                                    </div>
-
-                                    <dl
-                                        class="mt-4 grid gap-3 sm:grid-cols-2"
-                                        x-show="result?.ticket"
-                                    >
-                                        <div>
-                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                Ticket
-                                            </dt>
-                                            <dd
-                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                                x-text="result?.ticket?.ticket_number ?? '—'"
-                                            ></dd>
-                                        </div>
-
-                                        <div>
-                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                Holder
-                                            </dt>
-                                            <dd
-                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                                x-text="result?.ticket?.holder_name ?? '—'"
-                                            ></dd>
-                                        </div>
-
-                                        <div>
-                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                Status
-                                            </dt>
-                                            <dd
-                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                                x-text="result?.ticket?.status ?? result?.status ?? '—'"
-                                            ></dd>
-                                        </div>
-
-                                        <div>
-                                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                Check-in Time
-                                            </dt>
-                                            <dd
-                                                class="mt-1 text-sm font-semibold text-gray-950 dark:text-white"
-                                                x-text="result?.checked_in_at ?? '—'"
-                                            ></dd>
-                                        </div>
-                                    </dl>
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                class="fi-btn fi-btn-size-md fi-btn-color-primary mt-4 inline-flex w-full items-center justify-center rounded-lg bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-500"
-                                x-show="result && !busy"
-                                x-on:click="scanNext()"
-                            >
-                                Scan Next
-                            </button>
-                        </div>
-
-                        <div
-                            id="ticket-scanner-manual-input"
-                            class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
-                        >
-                            <h3 class="text-sm font-semibold text-gray-950 dark:text-white">
-                                Enter Ticket Number
-                            </h3>
-
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                If the camera can’t read the QR code, enter the exact ticket number printed on the ticket.
-                            </p>
-
-                            <form
-                                class="mt-4 space-y-3"
-                                x-on:submit.prevent="submitQr(manualQr)"
-                            >
-                                <label
-                                    for="ticket-scanner-manual-value"
-                                    class="sr-only"
-                                >
-                                    Ticket number
-                                </label>
-
-                                <input
-                                    id="ticket-scanner-manual-value"
-                                    type="text"
-                                    x-model="manualQr"
-                                    x-bind:disabled="busy || !!result"
-                                    maxlength="255"
-                                    autocomplete="off"
-                                    autocapitalize="off"
-                                    spellcheck="false"
-                                    placeholder="Ticket number"
-                                    class="block w-full rounded-xl border-gray-300 bg-white text-base text-gray-950 shadow-sm outline-none transition focus:border-primary-500 focus:ring-primary-500 disabled:opacity-50 dark:border-white/10 dark:bg-gray-900"
-                                />
-
-                                <div class="flex justify-end">
-                                    <button
-                                        type="submit"
-                                        class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                        x-bind:disabled="busy || !!result || ! manualQr.trim()"
-                                    >
-                                        <span x-show="! busy">
-                                            Check In Ticket
-                                        </span>
-
-                                        <span x-show="busy">
-                                            Checking…
-                                        </span>
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                    <div class="elive-scanner-duplicate-details" x-show="result?.status === 'already_used'">
+                        <p x-show="result?.checked_in_time_eat">Previous check-in <strong x-text="result?.checked_in_time_eat"></strong></p>
+                        <p class="elive-scanner-warning">Do not admit again</p>
                     </div>
+                    <p x-show="result && ! ['checked_in', 'already_used'].includes(result.status)" x-text="result?.message"></p>
                 </div>
-            </x-filament::section>
+            </div>
+
+            <button type="button" class="elive-scanner-button" x-show="result" x-on:click="scanNext()" x-cloak>
+                Scan Next
+            </button>
+            <button
+                type="button"
+                class="elive-scanner-manual-toggle"
+                :class="{ 'elive-scanner-link': !!result }"
+                x-show="! manualOpen"
+                x-bind:disabled="busy"
+                x-on:click="openManual()"
+            >Enter Ticket Number</button>
+
+            <form id="ticket-scanner-manual-input" class="elive-scanner-manual" x-show="manualOpen" x-on:submit.prevent="submitQr(manualQr)" x-cloak>
+                <label for="ticket-scanner-manual-value">Ticket number</label>
+                <input
+                    id="ticket-scanner-manual-value"
+                    type="text"
+                    x-ref="ticketNumber"
+                    x-model="manualQr"
+                    x-bind:disabled="busy || !!result"
+                    maxlength="255"
+                    autocomplete="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    placeholder="Enter the number printed on the ticket"
+                >
+                <div class="elive-scanner-manual-actions">
+                    <button type="button" class="elive-scanner-link" x-on:click="manualOpen = false">Cancel</button>
+                    <button type="submit" class="elive-scanner-button" x-bind:disabled="busy || !!result || ! manualQr.trim()">Check In Ticket</button>
+                </div>
+            </form>
         </div>
     </div>
 </x-filament-panels::page>

@@ -8,6 +8,7 @@ use App\Models\User;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -111,6 +112,11 @@ class TicketScanner extends Page
         }
 
         return $query->orderByDesc('id')->paginate(20, pageName: 'attendancePage');
+    }
+
+    public function getHeading(): string|Htmlable|null
+    {
+        return null;
     }
 
     public static function canAccess(): bool

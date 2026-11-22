@@ -6,6 +6,7 @@ use App\Models\Ticket;
 use App\Services\Tickets\TicketCheckInService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class TicketScannerController extends Controller
 {
@@ -148,8 +149,18 @@ class TicketScannerController extends Controller
                 $checkInCredential
             );
 
-        return response()->json(
-            $result
-        );
+        $scannedTicket = $result['ticket'] ?? null;
+
+        if ($scannedTicket instanceof Ticket) {
+            $result['ticket_type'] = $scannedTicket->ticketType?->name;
+
+            if ($checkedInAt = $result['checked_in_at'] ?? null) {
+                $result['checked_in_time_eat'] = Carbon::parse($checkedInAt)
+                    ->timezone('Africa/Dar_es_Salaam')
+                    ->format('d M Y, H:i').' EAT';
+            }
+        }
+
+        return response()->json($result);
     }
 }
