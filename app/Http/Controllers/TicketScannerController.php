@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Event;
 use App\Models\Ticket;
 use App\Services\Tickets\TicketCheckInService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 
 class TicketScannerController extends Controller
@@ -154,6 +156,35 @@ class TicketScannerController extends Controller
                 $checkInCredential
             );
 
+        return $this->scannerResponse($result, $gateScanner ? ['holder_name', 'ticket_number'] : null);
+    }
+
+    public function showShared(Request $request, Event $event): Response
+    {
+        abort_if($event->status === Event::STATUS_CANCELLED, 403);
+
+        return response()->view('gate.shared-ticket-scanner', [
+            'scanUrl' => $request->getRequestUri(),
+            'assignedEvent' => $event->name,
+        ], 200, [
+            'Cache-Control' => 'private, no-store',
+            'Referrer-Policy' => 'no-referrer',
+            'X-Robots-Tag' => 'noindex, nofollow',
+        ]);
+    }
+
+    public function scanShared(Request $request, Event $event, TicketCheckInService $service): JsonResponse
+    {
+        abort_if($event->status === Event::STATUS_CANCELLED, 403);
+
+        $validated = $request->validate(['qr_token' => ['required', 'string', 'max:255']]);
+        $result = $service->checkInByCredential($validated['qr_token'], $event->id);
+
+        return $this->scannerResponse($result, ['ticket_number'])->header('Cache-Control', 'private, no-store');
+    }
+
+    private function scannerResponse(array $result, ?array $ticketFields): JsonResponse
+    {
         $scannedTicket = $result['ticket'] ?? null;
 
         if ($scannedTicket instanceof Ticket) {
@@ -166,8 +197,8 @@ class TicketScannerController extends Controller
             }
         }
 
-        if ($gateScanner && $scannedTicket instanceof Ticket) {
-            $result['ticket'] = $scannedTicket->only(['holder_name', 'ticket_number']);
+        if ($ticketFields !== null && $scannedTicket instanceof Ticket) {
+            $result['ticket'] = $scannedTicket->only($ticketFields);
         }
 
         return response()->json($result);

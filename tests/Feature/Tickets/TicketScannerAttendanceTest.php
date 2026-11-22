@@ -18,6 +18,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -227,6 +228,79 @@ class TicketScannerAttendanceTest extends TestCase
         $this->postJson('/gate/ticket-scanner/scan', ['qr_token' => $ticket->ticket_number])
             ->assertForbidden();
         $this->assertDatabaseCount('ticket_check_ins', 1);
+    }
+
+    public function test_event_editor_can_generate_a_shareable_scanner_link(): void
+    {
+        $this->withoutVite();
+        ['event' => $event] = $this->createIssuedTicket();
+        $this->actingAs(User::factory()->create(['is_super_admin' => true]));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $editor = Livewire::test(EditEvent::class, ['record' => $event->getRouteKey()])
+            ->assertActionVisible('share_scanner_link')
+            ->mountAction('share_scanner_link');
+
+        $link = $editor->get('mountedActions.0.data.url');
+        $this->assertIsString($link);
+        parse_str(parse_url($link, PHP_URL_QUERY), $query);
+        $this->assertEqualsWithDelta(now()->addHours(12)->timestamp, $query['expires'], 5);
+
+        auth()->logout();
+        $this->get($link)->assertOk()->assertSee($event->name)
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+    }
+
+    public function test_shared_scanner_accepts_only_tickets_for_its_signed_event(): void
+    {
+        $this->withoutVite();
+        ['event' => $event, 'ticket' => $ticket, 'rawQrToken' => $qr] = $this->createIssuedTicket();
+        ['event' => $otherEvent, 'ticket' => $otherTicket, 'rawQrToken' => $otherQr] = $this->createIssuedTicket();
+        $otherEvent->update(['name' => 'Another event']);
+        $endpoint = route('gate.shared-scanner', $event, absolute: false);
+        $link = URL::temporarySignedRoute('gate.shared-scanner', now()->addHour(), $event, absolute: false);
+
+        $this->get($endpoint)->assertForbidden();
+        $this->postJson($endpoint, ['qr_token' => $qr])->assertForbidden();
+        $this->get($link)->assertOk()
+            ->assertSee($event->name)
+            ->assertDontSee('Another event')
+            ->assertDontSee('Checked In', false);
+        $this->assertGuest();
+
+        foreach ([$otherQr, $otherTicket->ticket_number] as $unalignedTicket) {
+            $this->postJson($link, ['qr_token' => $unalignedTicket])
+                ->assertOk()->assertJsonPath('status', 'ticket_not_found');
+        }
+
+        $this->postJson($link, ['qr_token' => $qr])
+            ->assertOk()
+            ->assertJsonPath('status', 'checked_in')
+            ->assertJsonPath('ticket.ticket_number', $ticket->ticket_number)
+            ->assertJsonMissingPath('ticket.holder_name');
+        $this->postJson($link, ['qr_token' => $ticket->ticket_number])
+            ->assertOk()->assertJsonPath('status', 'already_used');
+        $this->assertDatabaseCount('ticket_check_ins', 1);
+        $this->assertDatabaseHas('ticket_check_ins', [
+            'ticket_id' => $ticket->id,
+            'event_id' => $event->id,
+            'checked_in_by' => null,
+        ]);
+    }
+
+    public function test_shared_scanner_rejects_expired_or_modified_links(): void
+    {
+        ['event' => $event, 'rawQrToken' => $qr] = $this->createIssuedTicket();
+        ['event' => $otherEvent] = $this->createIssuedTicket();
+        $expired = URL::temporarySignedRoute('gate.shared-scanner', now()->subMinute(), $event, absolute: false);
+        $valid = URL::temporarySignedRoute('gate.shared-scanner', now()->addHour(), $event, absolute: false);
+        $modified = str_replace("/{$event->id}?", "/{$otherEvent->id}?", $valid);
+
+        $this->get($expired)->assertForbidden();
+        $this->postJson($expired, ['qr_token' => $qr])->assertForbidden();
+        $this->get($modified)->assertForbidden();
+        $this->postJson($modified, ['qr_token' => $qr])->assertForbidden();
+        $this->assertDatabaseCount('ticket_check_ins', 0);
     }
 
     private function createIssuedTicket(): array

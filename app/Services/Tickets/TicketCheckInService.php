@@ -17,21 +17,27 @@ class TicketCheckInService
     }
 
     public function checkInByCredential(
-        string $credential
+        string $credential,
+        ?int $eventId = null,
     ): array {
         $credential = trim(
             $credential
         );
 
         return DB::transaction(
-            function () use ($credential): array {
+            function () use ($credential, $eventId): array {
                 $qrTokenHash = hash(
                     'sha256',
                     $credential
                 );
 
-                $ticket = Ticket::query()
-                    ->lockForUpdate()
+                $tickets = Ticket::query()->lockForUpdate();
+
+                if ($eventId !== null) {
+                    $tickets->where('event_id', $eventId);
+                }
+
+                $ticket = (clone $tickets)
                     ->where(
                         'qr_token_hash',
                         $qrTokenHash
@@ -39,8 +45,7 @@ class TicketCheckInService
                     ->first();
 
                 if (! $ticket) {
-                    $ticket = Ticket::query()
-                        ->lockForUpdate()
+                    $ticket = (clone $tickets)
                         ->where(
                             'ticket_number',
                             $credential
@@ -107,7 +112,7 @@ class TicketCheckInService
                         null,
 
                     'checked_in_by' =>
-                        Auth::id(),
+                        $eventId === null ? Auth::id() : null,
 
                     'method' =>
                         'qr',
@@ -122,7 +127,7 @@ class TicketCheckInService
                         request()->ip(),
 
                     'note' =>
-                        null,
+                        $eventId === null ? null : 'Shared scanner link',
 
                     'created_at' =>
                         $checkedInAt,

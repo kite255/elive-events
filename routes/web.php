@@ -305,6 +305,13 @@ Route::post('/gate/ticket-scanner/scan', [TicketScannerController::class, 'scan'
     ->middleware(['auth:gate', 'throttle:120,1'])
     ->name('gate.ticket-scanner.scan');
 
+Route::get('/gate/shared-scanner/{event}', [TicketScannerController::class, 'showShared'])
+    ->middleware(['signed:relative', 'throttle:60,1,shared-scanner-page'])
+    ->name('gate.shared-scanner');
+
+Route::post('/gate/shared-scanner/{event}', [TicketScannerController::class, 'scanShared'])
+    ->middleware(['signed:relative', 'throttle:240,1,shared-scanner-scan']);
+
 /*
 |--------------------------------------------------------------------------
 | Authenticated Event Communication Preview
