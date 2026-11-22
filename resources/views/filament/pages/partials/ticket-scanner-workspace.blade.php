@@ -431,7 +431,11 @@
         "
     >
         <header class="elive-scanner-heading">
-            <span class="elive-scanner-brand"><strong>eLive</strong> Events</span>
+            @if ($withAttendance)
+                <span class="elive-scanner-brand"><strong>eLive</strong> Events</span>
+            @else
+                <img class="elive-scanner-logo" src="{{ asset('eLive-Logo.png') }}" alt="eLive" width="96" height="38">
+            @endif
             <h1>Ticket Scanner</h1>
         </header>
 

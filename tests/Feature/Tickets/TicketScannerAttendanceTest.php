@@ -269,6 +269,8 @@ class TicketScannerAttendanceTest extends TestCase
         $this->get($link)->assertOk()
             ->assertSee($event->name)
             ->assertSee('elive-scanner--shared', false)
+            ->assertSee('eLive-Logo.png')
+            ->assertDontSee('Confirm Check-in')
             ->assertSee('Ready for next ticket')
             ->assertSee('Checked in at')
             ->assertSee('Undo Check-in')

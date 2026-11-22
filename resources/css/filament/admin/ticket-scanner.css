@@ -451,3 +451,10 @@
 .elive-scanner--shared .elive-scanner-undo [role='group'] p {
     grid-column: 1 / -1;
 }
+
+.elive-scanner-logo {
+    display: block;
+    height: auto;
+    object-fit: contain;
+    width: 6rem;
+}
