@@ -36,7 +36,10 @@ class AuditLogsTable
                     ->label('Resource')
                     ->formatStateUsing(fn (?string $state): string => class_basename((string) $state)),
                 TextColumn::make('reference')
-                    ->searchable()
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query
+                        ->where(fn (Builder $reference): Builder => $reference
+                            ->whereLike('reference', '%'.$search.'%')
+                            ->orWhereLike('metadata->order_number', '%'.$search.'%')))
                     ->placeholder('—'),
                 TextColumn::make('ip_address')
                     ->label('IP')
