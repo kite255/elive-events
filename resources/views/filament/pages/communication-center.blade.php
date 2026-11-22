@@ -1116,7 +1116,7 @@
 
                                     <input
                                         type="text"
-                                        wire:model="subject"
+                                        wire:model.live.debounce.300ms="subject"
                                         class="elive-input"
                                         placeholder="Important Update – #EVENT_NAME#"
                                     >
@@ -1323,7 +1323,7 @@
 
                                                 <input
                                                     type="email"
-                                                    wire:model="testEmail"
+                                                    wire:model.live.debounce.300ms="testEmail"
                                                     class="elive-input"
                                                     placeholder="name@example.com"
                                                 >
