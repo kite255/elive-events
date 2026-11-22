@@ -19,7 +19,7 @@
             async submitQr(value) {
                 const qr = (value || '').trim();
 
-                if (! qr || this.busy) {
+                if (! qr || this.busy || this.result) {
                     return;
                 }
 
@@ -44,7 +44,7 @@
                         }
                     );
 
-                    if (response.status === 401) {
+                    if (response.status === 401 || response.status === 419) {
                         this.result = {
                             success: false,
                             status: 'unauthenticated',
@@ -92,6 +92,16 @@
                 } finally {
                     this.busy = false;
                 }
+            },
+
+            scanNext() {
+                if (this.busy) {
+                    return;
+                }
+
+                this.result = null;
+                this.manualQr = '';
+                this.lastDetectedAt = Date.now();
             },
 
             async startCamera() {
@@ -165,7 +175,7 @@
                         || errorText.includes('notallowed')
                     ) {
                         this.cameraError =
-                            'Camera permission was denied. Allow camera access or use the manual QR input.';
+                            'Camera permission was denied. Allow camera access or enter the ticket number.';
                     } else if (
                         error?.name === 'NotFoundError'
                         || errorText.includes('notfound')
@@ -177,10 +187,10 @@
                         errorText.includes('html5-qrcode')
                     ) {
                         this.cameraError =
-                            'The QR scanner could not load. Rebuild the frontend assets and refresh this page.';
+                            'The QR scanner could not load. Refresh the page or enter the ticket number.';
                     } else {
                         this.cameraError =
-                            'Unable to start the camera. Use the manual QR input if needed.';
+                            'Unable to start the camera. Enter the ticket number to check in the guest.';
                     }
 
                     await this.stopCamera();
@@ -220,7 +230,7 @@
             async handleDetectedQr(value) {
                 const qr = (value || '').trim();
 
-                if (! qr || this.busy) {
+                if (! qr || this.busy || this.result) {
                     return;
                 }
 
@@ -258,6 +268,10 @@
             },
 
             resultTitle() {
+                if (this.busy) {
+                    return 'Checking ticket…';
+                }
+
                 if (! this.result) {
                     return 'Ready to scan';
                 }
@@ -298,10 +312,10 @@
             </x-slot>
 
             <x-slot name="description">
-                Scan a secure eLive ticket QR code or enter the ticket credential manually.
+                Scan one QR code per guest. Check the result before tapping Scan Next.
             </x-slot>
 
-            <div class="grid gap-6 xl:grid-cols-2">
+            <div class="grid gap-4 xl:grid-cols-2 xl:gap-6">
                 <div
                     id="ticket-scanner-camera"
                     class="rounded-2xl border border-gray-200 bg-gray-950 p-4 shadow-sm dark:border-white/10"
@@ -326,12 +340,11 @@
                         ></span>
                     </div>
 
-                    <div
-                        id="ticket-scanner-camera-reader"
-                        class="min-h-[360px] overflow-hidden rounded-xl border border-gray-700 bg-black"
-                    >
+                    <div class="overflow-hidden rounded-xl border border-gray-700 bg-black">
+                        <div id="ticket-scanner-camera-reader"></div>
+
                         <div
-                            class="flex min-h-[360px] items-center justify-center"
+                            class="flex min-h-48 sm:min-h-64 items-center justify-center"
                             x-show="! cameraActive && ! cameraStarting"
                         >
                             <div class="max-w-sm px-6 text-center">
@@ -353,14 +366,14 @@
                         </div>
 
                         <div
-                            class="flex min-h-[360px] items-center justify-center text-sm text-gray-300"
+                            class="flex min-h-48 sm:min-h-64 items-center justify-center text-sm text-gray-300"
                             x-show="cameraStarting"
                         >
                             Starting camera...
                         </div>
                     </div>
 
-                    <div class="mt-4 flex flex-wrap gap-3">
+                    <div class="mt-4 grid grid-cols-2 gap-3">
                         <button
                             type="button"
                             class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
@@ -393,58 +406,7 @@
                     ></div>
                 </div>
 
-                <div class="space-y-6">
-                    <div
-                        id="ticket-scanner-manual-input"
-                        class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
-                    >
-                        <h3 class="text-sm font-semibold text-gray-950 dark:text-white">
-                            Manual QR Credential
-                        </h3>
-
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Paste or type the secure QR credential as a fallback.
-                        </p>
-
-                        <form
-                            class="mt-4 space-y-3"
-                            x-on:submit.prevent="submitQr(manualQr)"
-                        >
-                            <label
-                                for="ticket-scanner-manual-value"
-                                class="sr-only"
-                            >
-                                Ticket QR credential
-                            </label>
-
-                            <textarea
-                                id="ticket-scanner-manual-value"
-                                x-model="manualQr"
-                                rows="4"
-                                autocomplete="off"
-                                spellcheck="false"
-                                placeholder="Paste scanned QR credential here"
-                                class="block w-full rounded-xl border-gray-300 bg-white text-sm text-gray-950 shadow-sm outline-none transition focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
-                            ></textarea>
-
-                            <div class="flex justify-end">
-                                <button
-                                    type="submit"
-                                    class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                    x-bind:disabled="busy || ! manualQr.trim()"
-                                >
-                                    <span x-show="! busy">
-                                        Validate Ticket
-                                    </span>
-
-                                    <span x-show="busy">
-                                        Validating...
-                                    </span>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
+                <div class="space-y-4">
                     <div
                         id="ticket-scanner-result"
                         class="rounded-2xl border p-5 shadow-sm transition"
@@ -487,15 +449,17 @@
                             </div>
 
                             <div class="min-w-0 flex-1">
-                                <h3
-                                    class="text-base font-semibold text-gray-950 dark:text-white"
-                                    x-text="resultTitle()"
-                                ></h3>
+                                <div role="status" aria-atomic="true">
+                                    <h3
+                                        class="text-lg font-semibold text-gray-950 dark:text-white"
+                                        x-text="resultTitle()"
+                                    ></h3>
 
-                                <p
-                                    class="mt-1 text-sm text-gray-600 dark:text-gray-300"
-                                    x-text="result?.message ?? 'Waiting for a ticket QR code.'"
-                                ></p>
+                                    <p
+                                        class="mt-1 text-sm text-gray-600 dark:text-gray-300"
+                                        x-text="result?.message ?? (busy ? 'Verifying the ticket.' : 'Scan a QR code or enter a ticket number.')"
+                                    ></p>
+                                </div>
 
                                 <dl
                                     class="mt-4 grid gap-3 sm:grid-cols-2"
@@ -543,6 +507,69 @@
                                 </dl>
                             </div>
                         </div>
+
+                        <button
+                            type="button"
+                            class="fi-btn fi-btn-size-md fi-btn-color-primary mt-4 inline-flex w-full items-center justify-center rounded-lg bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-500"
+                            x-show="result && !busy"
+                            x-on:click="scanNext()"
+                        >
+                            Scan Next
+                        </button>
+                    </div>
+
+                    <div
+                        id="ticket-scanner-manual-input"
+                        class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-gray-900"
+                    >
+                        <h3 class="text-sm font-semibold text-gray-950 dark:text-white">
+                            Enter Ticket Number
+                        </h3>
+
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            If the camera can’t read the QR code, enter the exact ticket number printed on the ticket.
+                        </p>
+
+                        <form
+                            class="mt-4 space-y-3"
+                            x-on:submit.prevent="submitQr(manualQr)"
+                        >
+                            <label
+                                for="ticket-scanner-manual-value"
+                                class="sr-only"
+                            >
+                                Ticket number
+                            </label>
+
+                            <input
+                                id="ticket-scanner-manual-value"
+                                type="text"
+                                x-model="manualQr"
+                                x-bind:disabled="busy || !!result"
+                                maxlength="255"
+                                autocomplete="off"
+                                autocapitalize="off"
+                                spellcheck="false"
+                                placeholder="Ticket number"
+                                class="block w-full rounded-xl border-gray-300 bg-white text-base text-gray-950 shadow-sm outline-none transition focus:border-primary-500 focus:ring-primary-500 disabled:opacity-50 dark:border-white/10 dark:bg-gray-900"
+                            />
+
+                            <div class="flex justify-end">
+                                <button
+                                    type="submit"
+                                    class="fi-btn fi-btn-size-md fi-btn-color-primary inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                    x-bind:disabled="busy || !!result || ! manualQr.trim()"
+                                >
+                                    <span x-show="! busy">
+                                        Check In Ticket
+                                    </span>
+
+                                    <span x-show="busy">
+                                        Checking…
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
