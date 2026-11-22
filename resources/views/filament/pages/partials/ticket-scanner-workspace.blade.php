@@ -505,8 +505,7 @@
                 </div>
             </div>
 
-            <button type="button" class="elive-scanner-button" x-show="result && (! sharedScanner || ! cameraActive || result.status !== 'checked_in' || ! readyForNext && ! resumeTimer)"
-                x-on:click="scanNext()" x-bind:disabled="busy" x-cloak>
+            <button type="button" class="elive-scanner-button elive-scanner-next" x-show="result" x-on:click="scanNext()" x-bind:disabled="busy" x-cloak>
                 Scan Next
             </button>
             @if ($withAttendance)

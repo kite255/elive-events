@@ -272,6 +272,7 @@ class TicketScannerAttendanceTest extends TestCase
             ->assertSee('eLive-Logo.png')
             ->assertDontSee('Confirm Check-in')
             ->assertSee('Ready for next ticket')
+            ->assertSee('x-show="result" x-on:click="scanNext()"', false)
             ->assertSee('Checked in at')
             ->assertDontSee('Undo Check-in')
             ->assertDontSee('Mark Unused')

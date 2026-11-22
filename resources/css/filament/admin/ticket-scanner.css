@@ -206,6 +206,12 @@
 
 .elive-scanner-button,
 .elive-scanner-manual-toggle { width: 100%; }
+
+.elive-scanner-next {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+}
 .elive-scanner-manual-toggle { border: 1px solid var(--scanner-navy); }
 .elive-scanner-manual-toggle.elive-scanner-link { border-color: transparent; }
 .elive-scanner-link { text-decoration: underline; text-underline-offset: 0.2em; }
