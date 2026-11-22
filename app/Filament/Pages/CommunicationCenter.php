@@ -6,13 +6,17 @@ use BackedEnum;
 use App\Models\CommunicationCampaign;
 use App\Models\CommunicationTemplate;
 use App\Models\Event;
+use App\Models\TicketOrder;
 use App\Models\User;
 use App\Services\CommunicationCampaignService;
 use App\Services\SmsService;
+use App\Services\Tickets\TicketAccessMessageFactory;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Throwable;
 use UnitEnum;
 
@@ -70,8 +74,10 @@ class CommunicationCenter extends Page
     |--------------------------------------------------------------------------
     */
 
+    #[Locked]
     public array $audienceOptions = [
         'all' => 'All Attendees',
+        CommunicationCampaignService::PAID_TICKET_BUYERS => 'Paid Ticket Buyers',
         'registered' => 'Registered',
         'confirmed' => 'Confirmed',
         'approved' => 'Approved',
@@ -226,7 +232,28 @@ class CommunicationCenter extends Page
 
     public function updatedAudience(): void
     {
+        $this->categoryId = null;
         $this->refreshPreview();
+    }
+
+    public function updatedMessage(): void
+    {
+        if ($this->isTicketBuyerAudience() && $this->isSmsChannel()) {
+            $this->refreshPreview();
+        }
+    }
+
+    public function isTicketBuyerAudience(): bool
+    {
+        return $this->audience === CommunicationCampaignService::PAID_TICKET_BUYERS;
+    }
+
+    public function ticketBuyerPlaceholders(): array
+    {
+        return [
+            '#PURCHASER_NAME#', '#TICKET_LINK#', '#ORDER_REFERENCE#', '#TICKET_COUNT#', '#TICKET_TYPE#',
+            '#EVENT_NAME#', '#EVENT_VENUE#', '#EVENT_DATE#', '#EVENT_TIME#',
+        ];
     }
 
     public function updatedCategoryId(): void
@@ -257,6 +284,8 @@ class CommunicationCenter extends Page
             $template->isEmail()
                 ? (string) ($template->subject ?? '')
                 : null;
+
+        $this->updatedMessage();
 
         $event =
             $this->selectedEvent();
@@ -323,6 +352,10 @@ class CommunicationCenter extends Page
             return 0;
         }
 
+        if ($this->isTicketBuyerAudience()) {
+            return (int) ($this->preview['max_sms_segments'] ?? 0);
+        }
+
         return app(
             SmsService::class
         )->segmentCount(
@@ -332,6 +365,10 @@ class CommunicationCenter extends Page
 
     public function estimatedSmsUnits(): int
     {
+        if ($this->isTicketBuyerAudience()) {
+            return (int) ($this->preview['sms_segments'] ?? 0);
+        }
+
         return
             (int) ($this->preview['valid'] ?? 0)
             * $this->smsSegmentCount();
@@ -362,8 +399,9 @@ class CommunicationCenter extends Page
         )->preview(
             $event,
             $this->audience,
-            $this->categoryId,
-            $this->channel
+            $this->isTicketBuyerAudience() ? null : $this->categoryId,
+            $this->channel,
+            $this->message,
         );
     }
 
@@ -440,10 +478,10 @@ class CommunicationCenter extends Page
             return;
         }
 
-        $testMessage =
-            $this->renderTestMessage(
-                $event
-            );
+        $testMessage = $this->renderTestMessage($event);
+        if ($this->isTicketBuyerAudience()) {
+            $testMessage = 'TEST: '.$testMessage;
+        }
 
         try {
             $result =
@@ -569,6 +607,11 @@ class CommunicationCenter extends Page
                 ]
             );
 
+        if ($this->isTicketBuyerAudience()) {
+            $renderedSubject = '[TEST] '.$this->renderTicketBuyerTest((string) $this->subject, $event);
+            $renderedMessage = "Test only. The link opens the public ticket finder.\n\n".$renderedMessage;
+        }
+
         try {
             Mail::send(
                 'emails.elive',
@@ -581,6 +624,10 @@ class CommunicationCenter extends Page
 
                     'attendee' =>
                         null,
+
+                    'ticketCampaignUrl' => $this->isTicketBuyerAudience()
+                        ? route('public.ticket-recovery.show')
+                        : null,
 
                     'event' =>
                         $event,
@@ -654,6 +701,10 @@ class CommunicationCenter extends Page
     private function renderTestMessage(
         Event $event
     ): string {
+        if ($this->isTicketBuyerAudience()) {
+            return $this->renderTicketBuyerTest($this->message, $event);
+        }
+
         $eventDate =
             $event->starts_at
                 ? $event->starts_at->format(
@@ -713,6 +764,28 @@ class CommunicationCenter extends Page
         );
     }
 
+    public function ticketBuyerTestPreview(): ?string
+    {
+        $event = $this->selectedEvent();
+
+        return $event && $this->isTicketBuyerAudience() && filled($this->message)
+            ? $this->renderTicketBuyerTest($this->message, $event)
+            : null;
+    }
+
+    private function renderTicketBuyerTest(string $message, Event $event): string
+    {
+        $order = new TicketOrder(['buyer_name' => 'Test Buyer', 'order_number' => 'TEST-ORDER', 'quantity' => 2]);
+        $order->setRelation('event', $event);
+        $order->setRelation('items', collect());
+
+        return app(TicketAccessMessageFactory::class)->renderForOrder(
+            $message,
+            $order,
+            route('public.ticket-recovery.show'),
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Queue Communication Campaign
@@ -729,7 +802,7 @@ class CommunicationCenter extends Page
 
             'channel' => [
                 'required',
-                'in:sms,email,whatsapp',
+                'in:sms,email',
             ],
 
             'campaignName' => [
@@ -740,7 +813,7 @@ class CommunicationCenter extends Page
 
             'audience' => [
                 'required',
-                'in:all,registered,confirmed,approved,pending_approval,waitlisted,checked_in,not_checked_in',
+                Rule::in(array_keys($this->audienceOptions)),
             ],
 
             'categoryId' => [
@@ -768,6 +841,18 @@ class CommunicationCenter extends Page
                 'max:10000',
             ],
         ]);
+
+        if ($this->isTicketBuyerAudience()) {
+            foreach (['subject', 'message'] as $field) {
+                preg_match_all('/#[A-Z_]+#/', (string) $this->{$field}, $placeholders);
+                $unsupported = array_diff($placeholders[0], $this->ticketBuyerPlaceholders());
+                if ($unsupported !== []) {
+                    $this->addError($field, 'Unsupported ticket buyer placeholders: '.implode(', ', array_unique($unsupported)).'.');
+
+                    return;
+                }
+            }
+        }
 
         $event =
             $this->selectedEvent();
@@ -809,7 +894,8 @@ class CommunicationCenter extends Page
         }
 
         if (
-            $this->categoryId
+            ! $this->isTicketBuyerAudience()
+            && $this->categoryId
             && ! $this->categories()->contains(
                 fn ($category): bool =>
                     (int) $category->getKey()
@@ -859,14 +945,11 @@ class CommunicationCenter extends Page
                         name: $this->campaignName,
                         message: $this->message,
                         audience: $this->audience,
-                        categoryId: $this->categoryId,
+                        categoryId: $this->isTicketBuyerAudience() ? null : $this->categoryId,
                         template: $template,
                         createdBy: auth()->id()
                     );
-            } elseif (
-                $this->channel
-                === CommunicationTemplate::CHANNEL_EMAIL
-            ) {
+            } else {
                 $campaign =
                     $service->queueEmailCampaign(
                         event: $event,
@@ -874,17 +957,14 @@ class CommunicationCenter extends Page
                         subject: (string) $this->subject,
                         message: $this->message,
                         audience: $this->audience,
-                        categoryId: $this->categoryId,
+                        categoryId: $this->isTicketBuyerAudience() ? null : $this->categoryId,
                         template: $template,
                         createdBy: auth()->id()
                     );
-            } else {
-                Notification::make()
-                    ->title(
-                        'WhatsApp campaigns are not enabled from this screen yet'
-                    )
-                    ->warning()
-                    ->send();
+            }
+
+            if ($this->isTicketBuyerAudience() && ! $campaign->wasRecentlyCreated) {
+                Notification::make()->title('This campaign was already queued')->warning()->send();
 
                 return;
             }
@@ -1121,12 +1201,6 @@ class CommunicationCenter extends Page
             === CommunicationTemplate::CHANNEL_EMAIL;
     }
 
-    public function isWhatsAppChannel(): bool
-    {
-        return $this->channel
-            === CommunicationTemplate::CHANNEL_WHATSAPP;
-    }
-
     public function recipientLabel(): string
     {
         return match ($this->channel) {
@@ -1146,7 +1220,7 @@ class CommunicationCenter extends Page
 
     public function channelOptions(): array
     {
-        return CommunicationTemplate::channelOptions();
+        return array_intersect_key(CommunicationTemplate::channelOptions(), array_flip(['sms', 'email']));
     }
 
     public function channelLabel(): string

@@ -7,6 +7,8 @@ use App\Models\CommunicationCampaignRecipient;
 use App\Models\CommunicationLog;
 use App\Models\EventCommunication;
 use App\Services\SmsService;
+use App\Services\CommunicationCampaignService;
+use App\Services\Tickets\TicketAccessMessageFactory;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -96,6 +98,20 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             return;
         }
 
+        $order = null;
+        if ($communicationLog->purpose === CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN) {
+            $order = $communicationLog->ticketOrder;
+            if (! $order
+                || (int) $order->event_id !== (int) $communicationLog->event_id
+                || app(CommunicationCampaignService::class)->ticketBuyerRecipient($order, $communicationLog->channel) !== $communicationLog->recipient
+            ) {
+                $communicationLog->markFailed('Ticket order or buyer contact is no longer eligible for this campaign.');
+                $this->syncCampaignLifecycle($communicationLog);
+
+                return;
+            }
+        }
+
         $this->incrementRecipientAttempts(
             $communicationLog
         );
@@ -111,22 +127,36 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 $communicationLog
             );
 
+            $deliveryLog = $communicationLog;
+            if ($order) {
+                $renderer = app(TicketAccessMessageFactory::class);
+                $deliveryLog = clone $communicationLog;
+                $deliveryLog->message = $renderer->renderForOrder((string) $communicationLog->message, $order);
+                if ($communicationLog->subject !== null) {
+                    $deliveryLog->subject = str_replace(
+                        ["\r", "\n"],
+                        ' ',
+                        $renderer->renderForOrder($communicationLog->subject, $order),
+                    );
+                }
+            }
+
             $providerMessageId = match (
                 $communicationLog->channel
             ) {
                 CommunicationLog::CHANNEL_SMS =>
                     $this->sendSms(
-                        $communicationLog
+                        $deliveryLog
                     ),
 
                 CommunicationLog::CHANNEL_EMAIL =>
                     $this->sendEmail(
-                        $communicationLog
+                        $deliveryLog
                     ),
 
                 CommunicationLog::CHANNEL_WHATSAPP =>
                     $this->sendWhatsApp(
-                        $communicationLog
+                        $deliveryLog
                     ),
 
                 default =>
@@ -968,6 +998,10 @@ class SendAutomaticCommunicationJob implements ShouldQueue
 
                 'event' =>
                     $event,
+
+                'ticketCampaignUrl' => $communicationLog->purpose === CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN
+                    ? route('public.ticket-orders.show', ['token' => $communicationLog->ticketOrder->public_token])
+                    : null,
 
                 'emailLabel' =>
                     $emailLabel,
