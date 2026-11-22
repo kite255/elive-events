@@ -3,8 +3,10 @@
 <head><meta charset="UTF-8"><title>Daily Ticket Summary</title></head>
 <body style="margin:0;background:#f5f8fc;font-family:Arial,sans-serif;color:#111827;">
 <div style="max-width:680px;margin:24px auto;background:white;border-radius:14px;overflow:hidden">
+  <div style="padding:18px 28px;background:#ffffff">
+    @include('emails.partials.brand-logo')
+  </div>
   <div style="padding:28px;background:#161943;color:#ffffff">
-    <strong style="font-size:20px">eLive Events</strong>
     <p style="font-size:12px;letter-spacing:1px;color:#cbd5e1">PLATFORM DAILY SALES REPORT</p>
     <h1 style="margin:0;font-size:26px">Daily Ticket Summary</h1>
     <p>{{ $reportDate }} · Tanzania time · All events</p>
@@ -32,6 +34,7 @@
     </table>
     <p style="font-size:12px;color:#64748b">Only orders currently marked paid are counted. Pending, refunded and partially refunded orders are excluded. These figures are not proof of provider settlement or available payout funds.</p>
   </div>
+  <div style="padding:18px 28px;background:#161943;color:#ffffff;font-size:13px;text-align:center">eLive Events</div>
 </div>
 </body>
 </html>

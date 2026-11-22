@@ -8,6 +8,7 @@ use App\Notifications\PayoutEmailTestNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -81,6 +82,57 @@ class SystemEmailSettingsTest extends TestCase
 
         Livewire::test(SystemEmailSettings::class)->call('sendTest')->assertHasNoErrors();
         Notification::assertNothingSent();
+    }
+
+    public function test_super_admin_can_send_a_branded_test_to_one_address_without_enabling_payouts(): void
+    {
+        config(['mail.default' => 'array']);
+        $this->actingAs(User::factory()->create(['is_super_admin' => true]));
+
+        Livewire::test(SystemEmailSettings::class)
+            ->set('testEmail', 'preview@example.com')
+            ->call('sendTestEmail')
+            ->assertHasNoErrors();
+
+        $messages = Mail::mailer('array')->getSymfonyTransport()->messages();
+        $this->assertCount(1, $messages);
+        $message = $messages->first()->getOriginalMessage();
+        $this->assertSame('preview@example.com', $message->getTo()[0]->getAddress());
+        $this->assertStringStartsWith('[TEST]', $message->getSubject());
+        $this->assertStringContainsString('/eLive-Logo.png', $message->getHtmlBody());
+        $this->assertDatabaseCount('system_notification_settings', 0);
+    }
+
+    public function test_ticket_delivery_test_uses_a_sample_order_and_a_safe_link(): void
+    {
+        config(['mail.default' => 'array']);
+        $this->actingAs(User::factory()->create(['is_super_admin' => true]));
+
+        Livewire::test(SystemEmailSettings::class)
+            ->set('testEmail', 'preview@example.com')
+            ->set('testEmailLayout', 'ticket')
+            ->call('sendTestEmail')
+            ->assertHasNoErrors();
+
+        $messages = Mail::mailer('array')->getSymfonyTransport()->messages();
+        $this->assertCount(1, $messages);
+        $message = $messages->first()->getOriginalMessage();
+        $html = $message->getHtmlBody();
+        $this->assertStringStartsWith('[TEST]', $message->getSubject());
+        $this->assertStringContainsString('TEST-ORDER', $html);
+        $this->assertStringContainsString('View My Tickets', $html);
+        $this->assertStringContainsString('/events/tickets/find', $html);
+        $this->assertStringNotContainsString('/events/tickets/order/', $html);
+        $this->assertDatabaseCount('ticket_orders', 0);
+    }
+
+    public function test_default_notification_email_uses_elive_branding(): void
+    {
+        $message = (new PayoutEmailTestNotification)->toMail((object) []);
+        $html = (string) $message->render();
+
+        $this->assertStringContainsString('/eLive-Logo.png', $html);
+        $this->assertStringContainsString('Payout alert email test', $html);
     }
 
     public function test_non_admin_cannot_dispatch_test_emails(): void
