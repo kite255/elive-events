@@ -463,7 +463,15 @@
                                     line-height:1.75;
                                 "
                             >
-                                {!! nl2br(e($messageBody)) !!}
+                                @if(filled($ticketCampaignUrl ?? null))
+                                    {!! nl2br(str_replace(
+                                        e($ticketCampaignUrl),
+                                        '<a href="'.e($ticketCampaignUrl).'">'.e($ticketCampaignUrl).'</a>',
+                                        e($messageBody),
+                                    )) !!}
+                                @else
+                                    {!! nl2br(e($messageBody)) !!}
+                                @endif
                             </div>
                         @endif
                     </td>

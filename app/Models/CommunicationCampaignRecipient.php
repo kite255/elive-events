@@ -37,6 +37,7 @@ class CommunicationCampaignRecipient extends Model
     protected $fillable = [
         'communication_campaign_id',
         'attendee_id',
+        'ticket_order_id',
         'communication_log_id',
 
         'status',

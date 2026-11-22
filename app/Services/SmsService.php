@@ -667,34 +667,27 @@ class SmsService
         );
     }
 
-    /**
-     * Estimate the number of SMS segments.
-     *
-     * MVP calculation:
-     *
-     * 1 SMS       = 160 characters
-     * Multipart   = 153 characters per SMS
-     */
-    public function segmentCount(
-        string $message
-    ): int {
-        $length = mb_strlen(
-            trim(
-                $message
-            )
-        );
+    public function segmentCount(string $message): int
+    {
+        $message = trim($message);
+        $basic = '£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
+            ."\n\r@";
+        $extended = "\f^{}\\[~]|€";
+        $septets = 0;
 
-        if ($length === 0) {
-            return 0;
+        foreach (mb_str_split($message) as $character) {
+            if (str_contains($basic, $character)) {
+                $septets++;
+            } elseif (str_contains($extended, $character)) {
+                $septets += 2;
+            } else {
+                $units = intdiv(strlen(mb_convert_encoding($message, 'UTF-16BE', 'UTF-8')), 2);
+
+                return $units <= 70 ? 1 : (int) ceil($units / 67);
+            }
         }
 
-        if ($length <= 160) {
-            return 1;
-        }
-
-        return (int) ceil(
-            $length / 153
-        );
+        return $septets <= 160 ? (int) ($septets > 0) : (int) ceil($septets / 153);
     }
 
     /**
