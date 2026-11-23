@@ -708,7 +708,7 @@ class CommunicationCenter extends Page
                     'alertMessage' =>
                         null,
 
-                    'heroImageUrl' => $this->emailPosterUrl(),
+                    'campaignPosterUrl' => $this->emailPosterUrl(),
                     'actionUrl' => $this->emailActionUrl ?: null,
                     'actionLabel' => $this->emailActionLabel ?: null,
                     'actionButtonColor' => str_starts_with($this->emailActionUrl, 'https://open.spotify.com/') ? '#1DB954' : '#007AB2',
