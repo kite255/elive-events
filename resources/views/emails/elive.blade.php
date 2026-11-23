@@ -369,6 +369,16 @@
 
 
                 {{-- ========================================================= --}}
+                {{-- CAMPAIGN POSTER BELOW THE STANDARD EVENT HEADER            --}}
+                {{-- ========================================================= --}}
+                @if(filled($campaignPosterUrl ?? null))
+                    <tr><td style="padding:0;line-height:0;font-size:0;background:#FFFFFF;">
+                        <img src="{{ $campaignPosterUrl }}" alt="Event thank-you poster" width="680"
+                            style="display:block;width:100%;max-width:680px;height:auto;border:0;outline:none;">
+                    </td></tr>
+                @endif
+
+                {{-- ========================================================= --}}
                 {{-- OPTIONAL ALERT                                            --}}
                 {{-- ========================================================= --}}
 
@@ -545,7 +555,7 @@
                                 <tr>
                                     <td
                                         align="center"
-                                        bgcolor="#007AB2"
+                                        bgcolor="{{ $actionButtonColor ?? '#007AB2' }}"
                                         style="border-radius:8px;"
                                     >
                                         <a
@@ -553,7 +563,7 @@
                                             target="_blank"
                                             style="
                                                 display:inline-block;
-                                                background:#007AB2;
+                                                background:{{ $actionButtonColor ?? '#007AB2' }};
                                                 color:#FFFFFF;
                                                 text-decoration:none;
                                                 font-size:15px;
@@ -563,7 +573,7 @@
                                                 border-radius:8px;
                                             "
                                         >
-                                            {{ $actionLabel }}
+                                            @if($actionPlayIcon ?? false)<span style="display:inline-block;background:#FFFFFF;color:#1DB954;border-radius:50%;font-size:10px;line-height:14px;text-align:center;width:14px;height:14px;margin-right:7px;vertical-align:middle;">&#9654;</span>@endif{{ $actionLabel }}
                                         </a>
                                     </td>
                                 </tr>
@@ -645,7 +655,7 @@
                         style="
                             background:#161943;
                             color:#FFFFFF;
-                            padding:28px 30px;
+                            padding:20px 18px;
                             font-size:12px;
                             line-height:1.8;
                         "
@@ -665,22 +675,16 @@
                             Smart Events. Seamless Experience.
                         </span>
 
-                        <br><br>
-
-                        <a
-                            href="https://events.elive.co.tz"
-                            target="_blank"
-                            style="
-                                color:#FF9800;
-                                text-decoration:none;
-                                font-weight:700;
-                            "
-                        >
-                            events.elive.co.tz
-                        </a>
-
                         <br>
 
+                        <span style="color:#D8DCE6;line-height:2.2;">
+                            <a href="tel:+255745939140" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">&#9742;&nbsp; +255 745 939 140</a>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            <a href="mailto:info@elive.co.tz" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">&#9993;&nbsp; info@elive.co.tz</a>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            <a href="https://events.elive.co.tz" target="_blank" style="color:#FF9800;text-decoration:none;font-weight:700;white-space:nowrap;">&#9678;&nbsp; events.elive.co.tz</a>
+                        </span>
+                        <br>
                         <span style="color:#D8DCE6;">
                             © {{ date('Y') }} eLive Events. All rights reserved.
                         </span>
