@@ -92,7 +92,7 @@ return [
     */
 
     'temporary_file_upload' => [
-        'disk' => env('LIVEWIRE_UPLOAD_DISK', 'public'),
+        'disk' => env('LIVEWIRE_UPLOAD_DISK', 'local'),
 
         'rules' => [
             'file',
@@ -122,7 +122,7 @@ return [
             'wma',
         ],
 
-        'max_upload_time' => 10,
+        'max_upload_time' => 20,
 
         'cleanup' => true,
     ],
