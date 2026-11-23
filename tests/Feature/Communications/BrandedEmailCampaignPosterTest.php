@@ -44,4 +44,34 @@ class BrandedEmailCampaignPosterTest extends TestCase
         $this->assertStringNotContainsString('Listen on Spotify', $html);
         $this->assertStringContainsString('Another Event', $html);
     }
+
+    public function test_thank_you_campaign_hides_past_event_details_and_duplicate_signature(): void
+    {
+        $event = new Event([
+            'name' => 'The Revived Way Album Launch Concert',
+            'venue' => 'Masaki Wellspring Hub',
+            'starts_at' => '2026-11-22 16:00:00',
+            'ends_at' => '2026-11-22 22:00:00',
+        ]);
+
+        $html = view('emails.elive', [
+            'subject' => 'Thank You for Being Part of The Revived Way',
+            'event' => $event,
+            'attendee' => null,
+            'messageBody' => "Dear Test Buyer,\\n\\nThank you!\\n\\nBlessings,\\nRevived Music Ministries",
+            'emailLabel' => 'Event Communication',
+            'thankYouCampaign' => true,
+            'actionUrl' => 'https://open.spotify.com/album/13nND3Cb2ZIek3XEPdH8Jr',
+            'actionLabel' => 'Listen on Spotify',
+            'actionButtonColor' => '#1DB954',
+            'actionPlayIcon' => true,
+        ])->render();
+
+        $this->assertStringNotContainsString('Masaki Wellspring Hub', $html);
+        $this->assertStringNotContainsString('04:00 PM', $html);
+        $this->assertStringNotContainsString('Thank you,<br>', $html);
+        $this->assertStringContainsString('Revived Music Ministries', $html);
+        $this->assertStringContainsString('Listen on Spotify', $html);
+        $this->assertStringNotContainsString('&#9742;', $html);
+    }
 }

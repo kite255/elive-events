@@ -338,6 +338,16 @@ class CommunicationCenter extends Page
         $this->refreshPreview();
     }
 
+    private function isRevivedWayThankYouCampaign(): bool
+    {
+        $event = $this->selectedEvent();
+
+        return $this->channel === CommunicationTemplate::CHANNEL_EMAIL
+            && $event !== null
+            && str_contains(strtolower($event->name), 'revived way')
+            && str_contains(strtolower($this->campaignName), 'thank you and spotify release');
+    }
+
     private function resetEmailArtwork(): void
     {
         $this->emailPoster = null;
@@ -349,7 +359,12 @@ class CommunicationCenter extends Page
     private function saveEmailPoster(): void
     {
         if ($this->emailPoster !== null) {
-            $this->emailPosterPath = $this->emailPoster->store('event-campaign-posters', 'public');
+            $path = $this->emailPoster->store('event-campaign-posters', 'public');
+            if (! is_string($path) || $path === '') {
+                throw new \RuntimeException('Poster could not be saved. Check public storage permissions.');
+            }
+
+            $this->emailPosterPath = $path;
             $this->emailPoster = null;
         }
     }
@@ -588,7 +603,7 @@ class CommunicationCenter extends Page
     public function sendTestEmail(): void
     {
         $this->validate([
-            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'emailActionUrl' => ['nullable', 'url', 'starts_with:https://', 'max:2048'],
             'emailActionLabel' => ['nullable', 'string', 'max:80'],
             'eventId' => [
@@ -711,6 +726,7 @@ class CommunicationCenter extends Page
                         null,
 
                     'campaignPosterUrl' => $this->emailPosterUrl(),
+                    'thankYouCampaign' => $this->isRevivedWayThankYouCampaign(),
                     'actionUrl' => $this->emailActionUrl ?: null,
                     'actionLabel' => $this->emailActionLabel ?: null,
                     'actionButtonColor' => str_starts_with($this->emailActionUrl, 'https://open.spotify.com/') ? '#1DB954' : '#007AB2',
@@ -860,7 +876,7 @@ class CommunicationCenter extends Page
     public function queueCampaign(): void
     {
         $this->validate([
-            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
             'emailActionUrl' => ['nullable', 'url', 'starts_with:https://', 'max:2048'],
             'emailActionLabel' => ['nullable', 'string', 'max:80'],
             'eventId' => [

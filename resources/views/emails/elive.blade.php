@@ -113,6 +113,7 @@
     $body = trim((string) ($messageBody ?? ''));
     $label = $emailLabel ?? 'Event Communication';
     $isReminder = preg_match('/\breminders?\b/i', $label.' '.($subject ?? '')) === 1;
+    $isThankYouCampaign = (bool) ($thankYouCampaign ?? false);
     $bodyHasGreeting = preg_match('/\A(?:dear|hello|hi|habari)\b[^\r\n]*[,!:]\s*(?:\R|$)/i', $body) === 1;
     $bodyHasSignature = preg_match('/(?:^|\R)\s*(?:the )?elive events(?: team)?[.!]?\s*\z/i', $body) === 1;
 
@@ -129,13 +130,13 @@
     ]);
 
     $details = [];
-    if ($venue !== '' && ! in_array($venue, ['-', '–', '—'], true) && ! $contains([$venue])) {
+    if (! $isThankYouCampaign && $venue !== '' && ! in_array($venue, ['-', '–', '—'], true) && ! $contains([$venue])) {
         $details['Venue'] = $venue;
     }
-    if ($start && (! $containsDate($start) || ($multiDay && ! $containsDate($end)))) {
+    if (! $isThankYouCampaign && $start && (! $containsDate($start) || ($multiDay && ! $containsDate($end)))) {
         $details['Date'] = $start->format('d M Y').($multiDay ? ' – '.$end->format('d M Y') : '');
     }
-    if ($start && ! $contains([$start->format('h:i A'), $start->format('g:i A'), $start->format('H:i')])) {
+    if (! $isThankYouCampaign && $start && ! $contains([$start->format('h:i A'), $start->format('g:i A'), $start->format('H:i')])) {
         $details['Time'] = $start->format('h:i A');
     }
 @endphp
@@ -573,7 +574,7 @@
                                                 border-radius:8px;
                                             "
                                         >
-                                            @if($actionPlayIcon ?? false)<span style="display:inline-block;background:#FFFFFF;color:#1DB954;border-radius:50%;font-size:10px;line-height:14px;text-align:center;width:14px;height:14px;margin-right:7px;vertical-align:middle;">&#9654;</span>@endif{{ $actionLabel }}
+                                            @if($actionPlayIcon ?? false)<span style="display:inline-block;background:#FFFFFF;border-radius:50%;width:14px;height:14px;line-height:14px;text-align:center;vertical-align:middle;margin-right:7px;"><span style="display:inline-block;width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:6px solid #1DB954;vertical-align:middle;margin-left:2px;"></span></span>@endif{{ $actionLabel }}
                                         </a>
                                     </td>
                                 </tr>
@@ -623,7 +624,7 @@
                 {{-- SIGNATURE                                                 --}}
                 {{-- ========================================================= --}}
 
-                @unless($bodyHasSignature)
+                @unless($bodyHasSignature || $isThankYouCampaign)
                     <tr>
                         <td
                             class="email-padding"
@@ -678,11 +679,11 @@
                         <br>
 
                         <span style="color:#D8DCE6;line-height:2.2;">
-                            <a href="tel:+255745939140" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">&#9742;&nbsp; +255 745 939 140</a>
+                            <a href="tel:+255745939140" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">Phone: +255 745 939 140</a>
                             &nbsp;&nbsp;|&nbsp;&nbsp;
-                            <a href="mailto:info@elive.co.tz" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">&#9993;&nbsp; info@elive.co.tz</a>
+                            <a href="mailto:info@elive.co.tz" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">Email: info@elive.co.tz</a>
                             &nbsp;&nbsp;|&nbsp;&nbsp;
-                            <a href="https://events.elive.co.tz" target="_blank" style="color:#FF9800;text-decoration:none;font-weight:700;white-space:nowrap;">&#9678;&nbsp; events.elive.co.tz</a>
+                            <a href="https://events.elive.co.tz" target="_blank" style="color:#FF9800;text-decoration:none;font-weight:700;white-space:nowrap;">Web: events.elive.co.tz</a>
                         </span>
                         <br>
                         <span style="color:#D8DCE6;">

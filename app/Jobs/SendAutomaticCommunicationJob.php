@@ -977,6 +977,8 @@ class SendAutomaticCommunicationJob implements ShouldQueue
         */
 
         $campaignArtwork = $communicationLog->campaign?->recipient_filter ?? [];
+        $thankYouCampaign = $communicationLog->purpose === CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN
+            && str_contains(strtolower((string) ($communicationLog->campaign?->name ?? '')), 'thank you and spotify release');
         $posterPath = $campaignArtwork['email_poster_path'] ?? null;
         $posterUrl = is_string($posterPath) && str_starts_with($posterPath, 'event-campaign-posters/')
             && \Illuminate\Support\Facades\Storage::disk('public')->exists($posterPath)
@@ -1023,6 +1025,7 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     null,
 
                 'campaignPosterUrl' => $posterUrl,
+                'thankYouCampaign' => $thankYouCampaign,
                 'actionUrl' => $campaignActionUrl,
                 'actionLabel' => $campaignActionLabel,
                 'actionButtonColor' => $spotifyAction ? '#1DB954' : '#007AB2',
