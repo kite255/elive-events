@@ -672,7 +672,9 @@ class CommunicationCenter extends Page
 
         if ($this->isTicketBuyerAudience()) {
             $renderedSubject = '[TEST] '.$this->renderTicketBuyerTest((string) $this->subject, $event);
-            $renderedMessage = "Test only. The link opens the public ticket finder.\n\n".$renderedMessage;
+            if (str_contains($this->message, '#TICKET_LINK#')) {
+                $renderedMessage = "Test only. The link opens the public ticket finder.\n\n".$renderedMessage;
+            }
         }
 
         try {
