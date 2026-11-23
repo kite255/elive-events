@@ -976,6 +976,16 @@ class SendAutomaticCommunicationJob implements ShouldQueue
         |--------------------------------------------------------------------------
         */
 
+        $campaignArtwork = $communicationLog->campaign?->recipient_filter ?? [];
+        $posterPath = $campaignArtwork['email_poster_path'] ?? null;
+        $posterUrl = is_string($posterPath) && str_starts_with($posterPath, 'event-campaign-posters/')
+            && \Illuminate\Support\Facades\Storage::disk('public')->exists($posterPath)
+                ? url(\Illuminate\Support\Facades\Storage::disk('public')->url($posterPath))
+                : null;
+        $campaignActionUrl = $campaignArtwork['email_action_url'] ?? null;
+        $campaignActionLabel = $campaignArtwork['email_action_label'] ?? null;
+        $spotifyAction = is_string($campaignActionUrl) && str_starts_with($campaignActionUrl, 'https://open.spotify.com/');
+
         $emailLabel =
             str_contains(
                 strtolower($subject),
@@ -1012,11 +1022,11 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 'alertMessage' =>
                     null,
 
-                'actionUrl' =>
-                    null,
-
-                'actionLabel' =>
-                    null,
+                'heroImageUrl' => $posterUrl,
+                'actionUrl' => $campaignActionUrl,
+                'actionLabel' => $campaignActionLabel,
+                'actionButtonColor' => $spotifyAction ? '#1DB954' : '#007AB2',
+                'actionPlayIcon' => $spotifyAction,
 
                 'actionIntro' =>
                     null,

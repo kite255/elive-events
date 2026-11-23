@@ -1104,6 +1104,15 @@
                                 @endif
                             </div>
 
+                            @if ($this->isEmailChannel() && $this->selectedEvent && str_contains(strtolower($this->selectedEvent->name), 'revived way'))
+                                <div class="elive-field elive-field-full">
+                                    <button type="button" wire:click="loadRevivedWayThankYou" class="elive-button" style="padding:12px 18px;border-radius:8px;background:#161943;color:white;">
+                                        Prepare Revived Way Thank-you Email
+                                    </button>
+                                    <div class="elive-help">Loads the thank-you message and Spotify link. Upload the provided poster below and send a test before queuing.</div>
+                                </div>
+                            @endif
+
                             {{-- Email Subject --}}
                             @if ($this->isEmailChannel())
                                 <div class="elive-field elive-field-full">
@@ -1135,6 +1144,26 @@
                                         are rendered for each attendee.
                                     </div>
 
+                                </div>
+                            @endif
+
+                            @if ($this->isEmailChannel())
+                                <div class="elive-field elive-field-full">
+                                    <label class="elive-label" for="campaign-poster">Email poster (optional)</label>
+                                    <input id="campaign-poster" type="file" wire:model="emailPoster" accept="image/png,image/jpeg,image/webp" class="elive-input">
+                                    <div wire:loading wire:target="emailPoster" class="elive-help">Uploading image…</div>
+                                    @if($emailPosterPath)<div class="elive-help">Poster uploaded and saved for this campaign.</div>@endif
+                                    @error('emailPoster')<div class="elive-error">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="elive-field elive-field-full">
+                                    <label class="elive-label">Button URL (optional)</label>
+                                    <input type="url" wire:model="emailActionUrl" class="elive-input" placeholder="https://open.spotify.com/album/…">
+                                    @error('emailActionUrl')<div class="elive-error">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="elive-field elive-field-full">
+                                    <label class="elive-label">Button text (optional)</label>
+                                    <input type="text" wire:model="emailActionLabel" class="elive-input" placeholder="Listen on Spotify" maxlength="80">
+                                    @error('emailActionLabel')<div class="elive-error">{{ $message }}</div>@enderror
                                 </div>
                             @endif
 

@@ -173,7 +173,10 @@ class CommunicationCampaignService
         string $audience = 'all',
         ?int $categoryId = null,
         ?CommunicationTemplate $template = null,
-        ?int $createdBy = null
+        ?int $createdBy = null,
+        ?string $emailPosterPath = null,
+        ?string $emailActionUrl = null,
+        ?string $emailActionLabel = null
     ): CommunicationCampaign {
         $subject =
             trim(
@@ -195,7 +198,10 @@ class CommunicationCampaignService
             audience: $audience,
             categoryId: $categoryId,
             template: $template,
-            createdBy: $createdBy
+            createdBy: $createdBy,
+            emailPosterPath: $emailPosterPath,
+            emailActionUrl: $emailActionUrl,
+            emailActionLabel: $emailActionLabel
         );
     }
 
@@ -214,7 +220,10 @@ class CommunicationCampaignService
         string $audience = 'all',
         ?int $categoryId = null,
         ?CommunicationTemplate $template = null,
-        ?int $createdBy = null
+        ?int $createdBy = null,
+        ?string $emailPosterPath = null,
+        ?string $emailActionUrl = null,
+        ?string $emailActionLabel = null
     ): CommunicationCampaign {
         $name =
             trim(
@@ -304,7 +313,10 @@ class CommunicationCampaignService
                 $audience,
                 $categoryId,
                 $template,
-                $createdBy
+                $createdBy,
+                $emailPosterPath,
+                $emailActionUrl,
+                $emailActionLabel
             ): CommunicationCampaign {
                 $ticketBuyerCampaign = $audience === self::PAID_TICKET_BUYERS;
 
@@ -369,6 +381,9 @@ class CommunicationCampaignService
 
                             'category_id' =>
                                 $categoryId,
+                            'email_poster_path' => $channel === CommunicationTemplate::CHANNEL_EMAIL ? $emailPosterPath : null,
+                            'email_action_url' => $channel === CommunicationTemplate::CHANNEL_EMAIL ? $emailActionUrl : null,
+                            'email_action_label' => $channel === CommunicationTemplate::CHANNEL_EMAIL ? $emailActionLabel : null,
                         ],
 
                         'total_recipients' =>

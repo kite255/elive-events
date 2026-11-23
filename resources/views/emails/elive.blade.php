@@ -545,7 +545,7 @@
                                 <tr>
                                     <td
                                         align="center"
-                                        bgcolor="#007AB2"
+                                        bgcolor="{{ $actionButtonColor ?? '#007AB2' }}"
                                         style="border-radius:8px;"
                                     >
                                         <a
@@ -553,7 +553,7 @@
                                             target="_blank"
                                             style="
                                                 display:inline-block;
-                                                background:#007AB2;
+                                                background:{{ $actionButtonColor ?? '#007AB2' }};
                                                 color:#FFFFFF;
                                                 text-decoration:none;
                                                 font-size:15px;
@@ -563,7 +563,7 @@
                                                 border-radius:8px;
                                             "
                                         >
-                                            {{ $actionLabel }}
+                                            @if($actionPlayIcon ?? false)<span style="display:inline-block;background:#FFFFFF;color:#1DB954;border-radius:50%;font-size:10px;line-height:14px;text-align:center;width:14px;height:14px;margin-right:7px;vertical-align:middle;">&#9654;</span>@endif{{ $actionLabel }}
                                         </a>
                                     </td>
                                 </tr>

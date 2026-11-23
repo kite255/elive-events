@@ -15,6 +15,8 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Livewire\WithFileUploads;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Throwable;
@@ -22,6 +24,8 @@ use UnitEnum;
 
 class CommunicationCenter extends Page
 {
+    use WithFileUploads;
+
     protected static string|BackedEnum|null $navigationIcon =
         'heroicon-o-megaphone';
 
@@ -57,6 +61,14 @@ class CommunicationCenter extends Page
     public ?string $subject = null;
 
     public string $message = '';
+
+    public $emailPoster = null;
+
+    public ?string $emailPosterPath = null;
+
+    public string $emailActionUrl = '';
+
+    public string $emailActionLabel = '';
 
     /*
     |--------------------------------------------------------------------------
@@ -201,6 +213,7 @@ class CommunicationCenter extends Page
         $this->categoryId = null;
         $this->message = '';
         $this->subject = null;
+        $this->resetEmailArtwork();
 
         if ($event = $this->selectedEvent()) {
             $this->campaignName =
@@ -219,6 +232,7 @@ class CommunicationCenter extends Page
         $this->templateId = null;
         $this->subject = null;
         $this->message = '';
+        $this->resetEmailArtwork();
 
         if ($event = $this->selectedEvent()) {
             $this->campaignName =
@@ -312,6 +326,7 @@ class CommunicationCenter extends Page
         $this->message = '';
         $this->testPhone = '';
         $this->testEmail = '';
+        $this->resetEmailArtwork();
 
         $this->campaignName = $event
             ? $this->defaultCampaignName(
@@ -320,6 +335,49 @@ class CommunicationCenter extends Page
             : '';
 
         $this->resetValidation();
+        $this->refreshPreview();
+    }
+
+    private function resetEmailArtwork(): void
+    {
+        $this->emailPoster = null;
+        $this->emailPosterPath = null;
+        $this->emailActionUrl = '';
+        $this->emailActionLabel = '';
+    }
+
+    private function saveEmailPoster(): void
+    {
+        if ($this->emailPoster !== null) {
+            $this->emailPosterPath = $this->emailPoster->store('event-campaign-posters', 'public');
+            $this->emailPoster = null;
+        }
+    }
+
+    private function emailPosterUrl(): ?string
+    {
+        if (! $this->emailPosterPath || ! Storage::disk('public')->exists($this->emailPosterPath)) {
+            return null;
+        }
+
+        return url(Storage::disk('public')->url($this->emailPosterPath));
+    }
+
+    public function loadRevivedWayThankYou(): void
+    {
+        $event = $this->selectedEvent();
+        abort_unless($event && str_contains(strtolower($event->name), 'revived way'), 403);
+        $this->authorizeEvent($event);
+
+        $this->channel = CommunicationTemplate::CHANNEL_EMAIL;
+        $this->audience = CommunicationCampaignService::PAID_TICKET_BUYERS;
+        $this->templateId = null;
+        $this->categoryId = null;
+        $this->campaignName = 'The Revived Way - Thank You and Spotify Release';
+        $this->subject = 'Thank You for Being Part of The Revived Way | Album Now on Spotify';
+        $this->message = "Dear #PURCHASER_NAME#,\n\nOn behalf of Revived Music Ministries, thank you for supporting The Revived Way Album Launch Concert. Your presence, prayers, encouragement and support made the celebration special.\n\nThe Revived Way album is now on Spotify! Stream, share and be blessed through the music.\n\nWe pray that these songs continue to inspire and encourage you. We look forward to worshipping with you again!\n\nBlessings,\nRevived Music Ministries";
+        $this->emailActionUrl = 'https://open.spotify.com/album/13nND3Cb2ZIek3XEPdH8Jr';
+        $this->emailActionLabel = 'Listen on Spotify';
         $this->refreshPreview();
     }
 
@@ -530,6 +588,9 @@ class CommunicationCenter extends Page
     public function sendTestEmail(): void
     {
         $this->validate([
+            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'emailActionUrl' => ['nullable', 'url', 'starts_with:https://', 'max:2048'],
+            'emailActionLabel' => ['nullable', 'string', 'max:80'],
             'eventId' => [
                 'required',
                 'integer',
@@ -577,6 +638,8 @@ class CommunicationCenter extends Page
         $this->authorizeEvent(
             $event
         );
+
+        $this->saveEmailPoster();
 
         $renderedMessage =
             $this->renderTestMessage(
@@ -645,11 +708,11 @@ class CommunicationCenter extends Page
                     'alertMessage' =>
                         null,
 
-                    'actionUrl' =>
-                        null,
-
-                    'actionLabel' =>
-                        null,
+                    'heroImageUrl' => $this->emailPosterUrl(),
+                    'actionUrl' => $this->emailActionUrl ?: null,
+                    'actionLabel' => $this->emailActionLabel ?: null,
+                    'actionButtonColor' => str_starts_with($this->emailActionUrl, 'https://open.spotify.com/') ? '#1DB954' : '#007AB2',
+                    'actionPlayIcon' => str_starts_with($this->emailActionUrl, 'https://open.spotify.com/'),
 
                     'actionIntro' =>
                         null,
@@ -795,6 +858,9 @@ class CommunicationCenter extends Page
     public function queueCampaign(): void
     {
         $this->validate([
+            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'emailActionUrl' => ['nullable', 'url', 'starts_with:https://', 'max:2048'],
+            'emailActionLabel' => ['nullable', 'string', 'max:80'],
             'eventId' => [
                 'required',
                 'integer',
@@ -930,6 +996,10 @@ class CommunicationCenter extends Page
         }
 
         try {
+            if ($this->channel === CommunicationTemplate::CHANNEL_EMAIL) {
+                $this->saveEmailPoster();
+            }
+
             $service =
                 app(
                     CommunicationCampaignService::class
@@ -959,7 +1029,10 @@ class CommunicationCenter extends Page
                         audience: $this->audience,
                         categoryId: $this->isTicketBuyerAudience() ? null : $this->categoryId,
                         template: $template,
-                        createdBy: auth()->id()
+                        createdBy: auth()->id(),
+                        emailPosterPath: $this->emailPosterPath,
+                        emailActionUrl: $this->emailActionUrl ?: null,
+                        emailActionLabel: $this->emailActionLabel ?: null
                     );
             }
 
@@ -988,6 +1061,7 @@ class CommunicationCenter extends Page
             $this->subject = null;
             $this->message = '';
             $this->templateId = null;
+            $this->resetEmailArtwork();
 
             $this->campaignName =
                 $this->defaultCampaignName(
