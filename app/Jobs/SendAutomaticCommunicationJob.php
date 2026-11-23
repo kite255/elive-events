@@ -1022,7 +1022,7 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 'alertMessage' =>
                     null,
 
-                'heroImageUrl' => $posterUrl,
+                'campaignPosterUrl' => $posterUrl,
                 'actionUrl' => $campaignActionUrl,
                 'actionLabel' => $campaignActionLabel,
                 'actionButtonColor' => $spotifyAction ? '#1DB954' : '#007AB2',
