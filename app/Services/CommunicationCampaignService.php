@@ -10,6 +10,7 @@ use App\Models\CommunicationLog;
 use App\Models\CommunicationTemplate;
 use App\Models\Event;
 use App\Models\TicketOrder;
+use App\Models\User;
 use App\Services\Tickets\TicketAccessMessageFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -40,6 +41,10 @@ class CommunicationCampaignService
         string $channel = CommunicationTemplate::CHANNEL_SMS,
         ?string $message = null
     ): array {
+        $event = Event::query()->findOrFail($event->getKey());
+        $this->authorizeCampaignEvent($event);
+        $this->validateAudience($event, $audience, $categoryId);
+
         if ($audience === self::PAID_TICKET_BUYERS) {
             $total = $valid = $aboveThree = $segments = $maxSegments = 0;
             $countSegments = $channel === CommunicationTemplate::CHANNEL_SMS && filled($message);
@@ -225,6 +230,13 @@ class CommunicationCampaignService
         ?string $emailActionUrl = null,
         ?string $emailActionLabel = null
     ): CommunicationCampaign {
+        $event = Event::query()->findOrFail($event->getKey());
+        $this->authorizeCampaignEvent($event, $createdBy);
+        $this->validateAudience($event, $audience, $categoryId);
+        if ($template) {
+            $template = CommunicationTemplate::query()->findOrFail($template->getKey());
+        }
+
         $name =
             trim(
                 $name
@@ -660,6 +672,35 @@ class CommunicationCampaignService
     |--------------------------------------------------------------------------
     */
 
+    private function authorizeCampaignEvent(Event $event, ?int $createdBy = null): void
+    {
+        $authenticated = auth()->user();
+        if ($authenticated !== null && (! $authenticated instanceof User
+            || ($createdBy !== null && (int) $authenticated->getKey() !== $createdBy)
+            || ! $authenticated->canManageEventCommunication($event))) {
+            throw new RuntimeException('You are not allowed to manage communications for this event.');
+        }
+
+        if ($createdBy !== null) {
+            $actor = User::query()->find($createdBy);
+            if (! $actor || ! $actor->canManageEventCommunication($event)) {
+                throw new RuntimeException('You are not allowed to manage communications for this event.');
+            }
+        }
+    }
+
+    private function validateAudience(Event $event, string $audience, ?int $categoryId): void
+    {
+        if (! in_array($audience, ['all', 'registered', 'confirmed', 'approved', 'pending_approval', 'waitlisted', 'checked_in', 'not_checked_in', self::PAID_TICKET_BUYERS], true)) {
+            throw new RuntimeException('Unsupported campaign audience.');
+        }
+
+        if ($categoryId !== null && ($audience === self::PAID_TICKET_BUYERS
+            || ! $event->attendeeCategories()->whereKey($categoryId)->exists())) {
+            throw new RuntimeException('The selected category does not belong to this campaign audience.');
+        }
+    }
+
     private function ticketBuyerQuery(Event $event): Builder
     {
         return TicketOrder::query()
@@ -694,6 +735,9 @@ class CommunicationCampaignService
         string $audience = 'all',
         ?int $categoryId = null
     ): Builder {
+        $this->authorizeCampaignEvent($event);
+        $this->validateAudience($event, $audience, $categoryId);
+
         return Attendee::query()
             ->where(
                 'event_id',
