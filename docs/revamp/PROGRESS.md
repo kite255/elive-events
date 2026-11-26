@@ -24,3 +24,12 @@ Documentation-only initial phase. No business logic, migrations, deployments or 
 - Browser-test designer recovery and resolve the invalid local Regular template; audit staging template assets separately.
 - Record staging acceptance results and rollback/backup readiness before any production deployment.
 - Phase 3 remains open. No staging or production deployment performed as part of this checkpoint.
+
+## 2026-11-27 — Registration fulfillment and local PostgreSQL checkpoint
+- Original EVENT_WORKSPACE.md restored byte-for-byte in 9191116.
+- Registration fulfillment now checks event organization and approval (2761141), serializes attempts by attendee using a 300-second cache lock and reuses an existing badge (85d00c2). Local security tests passed; shared-cache multi-worker and lock expiry behavior remain unverified. This is not a durable database claim.
+- Read-only completed-unfulfilled audit added (97fdb28); explicit single-registration recovery with historical provider evidence, conflict checks and independent operator verification added (0f7ee06). No automatic retries or live provider verification by recovery command.
+- User confirmed 30 local PostgreSQL migrations applied, no pending migrations reported, three background containers restarted, and default 15-minute audit returned zero matching completed unfulfilled payments. Worker execution and backup restoration not yet verified.
+- User-run suite at 644da31: 832 passed, 4 skipped, 3561 assertions, 46.08s; targeted recovery tests 4 passed, 14 assertions. New confirmed recovery execution/replay test at 3ecff17 remains unexecuted.
+- Main/staging divergence was inspected locally: at earlier c4ffffd checkpoint main-only 201 and integration-only 460 commits; staging-only 0 and integration-only 160. Recheck before release; do not merge blindly.
+- Remaining gates: isolated PostgreSQL merchandise concurrency tests, shared Redis locking, durable recovery and dispatch gaps, worker/scheduler and backup restore validation, designer browser checks and staging acceptance. Original Phase 3 design foundation remains pending; no production or staging deployment performed here.
