@@ -7,6 +7,8 @@ use App\Models\CommunicationCampaignRecipient;
 use App\Models\CommunicationLog;
 use App\Models\EventCommunication;
 use App\Services\SmsService;
+use App\Services\CommunicationCampaignService;
+use App\Services\Tickets\TicketAccessMessageFactory;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -96,6 +98,20 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             return;
         }
 
+        $order = null;
+        if ($communicationLog->purpose === CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN) {
+            $order = $communicationLog->ticketOrder;
+            if (! $order
+                || (int) $order->event_id !== (int) $communicationLog->event_id
+                || app(CommunicationCampaignService::class)->ticketBuyerRecipient($order, $communicationLog->channel) !== $communicationLog->recipient
+            ) {
+                $communicationLog->markFailed('Ticket order or buyer contact is no longer eligible for this campaign.');
+                $this->syncCampaignLifecycle($communicationLog);
+
+                return;
+            }
+        }
+
         $this->incrementRecipientAttempts(
             $communicationLog
         );
@@ -111,22 +127,36 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 $communicationLog
             );
 
+            $deliveryLog = $communicationLog;
+            if ($order) {
+                $renderer = app(TicketAccessMessageFactory::class);
+                $deliveryLog = clone $communicationLog;
+                $deliveryLog->message = $renderer->renderForOrder((string) $communicationLog->message, $order);
+                if ($communicationLog->subject !== null) {
+                    $deliveryLog->subject = str_replace(
+                        ["\r", "\n"],
+                        ' ',
+                        $renderer->renderForOrder($communicationLog->subject, $order),
+                    );
+                }
+            }
+
             $providerMessageId = match (
                 $communicationLog->channel
             ) {
                 CommunicationLog::CHANNEL_SMS =>
                     $this->sendSms(
-                        $communicationLog
+                        $deliveryLog
                     ),
 
                 CommunicationLog::CHANNEL_EMAIL =>
                     $this->sendEmail(
-                        $communicationLog
+                        $deliveryLog
                     ),
 
                 CommunicationLog::CHANNEL_WHATSAPP =>
                     $this->sendWhatsApp(
-                        $communicationLog
+                        $deliveryLog
                     ),
 
                 default =>
@@ -946,6 +976,18 @@ class SendAutomaticCommunicationJob implements ShouldQueue
         |--------------------------------------------------------------------------
         */
 
+        $campaignArtwork = $communicationLog->campaign?->recipient_filter ?? [];
+        $thankYouCampaign = $communicationLog->purpose === CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN
+            && str_contains(strtolower((string) ($communicationLog->campaign?->name ?? '')), 'thank you and spotify release');
+        $posterPath = $campaignArtwork['email_poster_path'] ?? null;
+        $posterUrl = is_string($posterPath) && str_starts_with($posterPath, 'event-campaign-posters/')
+            && \Illuminate\Support\Facades\Storage::disk('public')->exists($posterPath)
+                ? url(\Illuminate\Support\Facades\Storage::disk('public')->url($posterPath))
+                : null;
+        $campaignActionUrl = $campaignArtwork['email_action_url'] ?? null;
+        $campaignActionLabel = $campaignArtwork['email_action_label'] ?? null;
+        $spotifyAction = is_string($campaignActionUrl) && str_starts_with($campaignActionUrl, 'https://open.spotify.com/');
+
         $emailLabel =
             str_contains(
                 strtolower($subject),
@@ -969,6 +1011,10 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 'event' =>
                     $event,
 
+                'ticketCampaignUrl' => $communicationLog->purpose === CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN
+                    ? route('public.ticket-orders.show', ['token' => $communicationLog->ticketOrder->public_token])
+                    : null,
+
                 'emailLabel' =>
                     $emailLabel,
 
@@ -978,11 +1024,12 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 'alertMessage' =>
                     null,
 
-                'actionUrl' =>
-                    null,
-
-                'actionLabel' =>
-                    null,
+                'campaignPosterUrl' => $posterUrl,
+                'thankYouCampaign' => $thankYouCampaign,
+                'actionUrl' => $campaignActionUrl,
+                'actionLabel' => $campaignActionLabel,
+                'actionButtonColor' => $spotifyAction ? '#1DB954' : '#007AB2',
+                'actionPlayIcon' => $spotifyAction,
 
                 'actionIntro' =>
                     null,
