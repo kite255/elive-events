@@ -21,8 +21,8 @@
     --elive-muted: #64748b;
 }
 
-.fi-body,
-.fi-main {
+:root:not(.dark) .fi-body,
+:root:not(.dark) .fi-main {
     background:
         linear-gradient(
             180deg,
@@ -102,13 +102,13 @@
 
 
 /* Stable dark sidebar: baseline wins over Filament light-theme link surfaces. */
-.fi-sidebar { background: #161943; border-right-color: #343958; }
+.fi-sidebar { background: var(--elive-navy) !important; border-right-color: #343958; }
 .fi-sidebar-nav { padding-inline: .75rem; }
 
 .fi-sidebar .fi-sidebar-item .fi-sidebar-item-button,
 .fi-sidebar .fi-sidebar-item > a,
 .fi-sidebar .fi-sidebar-item .fi-sidebar-item-button:visited {
-    background: #161943 !important;
+    background: var(--elive-navy) !important;
     background-image: none !important;
     box-shadow: none !important;
     color: #e7ecff !important;
@@ -155,7 +155,7 @@
 }
 
 .fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-label { font-weight: 700; }
-.fi-sidebar .fi-sidebar-item-button:focus-visible { outline: 2px solid #ff9800; outline-offset: 2px; }
+.fi-sidebar .fi-sidebar-item-button:focus-visible { outline: 2px solid var(--elive-orange); outline-offset: 2px; }
 /* Group headings expand locally via Alpine; prevent a light flash during toggle. */
 .fi-sidebar .fi-sidebar-group-button {
     background: transparent !important;
@@ -194,4 +194,47 @@
 @media (max-width: 640px) {
     .fi-page { max-width: 100%; }
     .fi-wi-stats-overview-stat { border-radius: 14px; }
+}
+
+/* Keep native Filament foregrounds and custom surfaces in the same mode. */
+.dark {
+    --elive-bg: #0f172a;
+    --elive-surface: #111827;
+    --elive-border: #334155;
+    --elive-muted: #cbd5e1;
+}
+
+.dark .fi-body,
+.dark .fi-main {
+    background: var(--elive-bg);
+}
+
+.dark .elive-dashboard-navy { color: #e7ecff; }
+.dark .elive-dashboard-blue { color: #7dd3fc; }
+.dark .elive-dashboard-orange { color: #ffb74d; }
+
+/* Sidebar header needs a light logo surface: the original wordmark is navy. */
+.fi-sidebar-header .fi-logo {
+    background: #fff;
+    border-radius: 8px;
+    padding: 0.25rem 0.5rem;
+    box-sizing: content-box;
+}
+
+/* Filament dashboard widgets occupy separate full-width rows so that the
+   stats widget does not squeeze its own inner grid into half a page. */
+.fi-dashboard-page .fi-widgets > .fi-wi {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+.fi-dashboard-page .fi-wi-stats-overview-stats-ctn {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 1rem;
+}
+
+.fi-dashboard-page .fi-wi-stats-overview-stat {
+    min-width: 0;
+    padding: 1rem;
 }
