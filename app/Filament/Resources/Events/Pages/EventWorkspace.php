@@ -111,6 +111,14 @@ class EventWorkspace extends Page
             ];
         }
 
+        if ($ticketingConfigured && \App\Filament\Resources\TicketTypes\TicketTypeResource::authorizedEvents($user)->whereKey($event->id)->exists()) {
+            $links[] = [
+                'label' => 'Ticket types',
+                'icon' => 'heroicon-o-ticket',
+                'url' => \App\Filament\Resources\TicketTypes\TicketTypeResource::getUrl('index', ['event_id' => $event->id]),
+            ];
+        }
+
         if (($event->canManageRegistrationBy($user) || $event->canViewReportsBy($user))
             && \App\Filament\Resources\Attendees\AttendeeResource::canViewAny()) {
             $links[] = [
