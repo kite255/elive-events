@@ -162,7 +162,7 @@ class TicketDesignerBackgroundTest extends TestCase
         );
     }
 
-    public function test_background_image_can_be_removed_from_active_page(): void
+    public function test_background_image_can_be_detached_without_deleting_storage_asset(): void
     {
         Storage::fake('public');
 
@@ -224,7 +224,8 @@ class TicketDesignerBackgroundTest extends TestCase
             $page->background_image_path
         );
 
-        Storage::disk('public')->assertMissing(
+        // Detaching a background must not delete an asset that may be shared.
+        Storage::disk('public')->assertExists(
             $storedPath
         );
     }
