@@ -25,9 +25,9 @@ class GlobalDashboardWidgetsTest extends TestCase
         $this->assertSame([
             DashboardEventSwitcher::class,
             EventOperationsOverview::class,
+            DashboardQuickActions::class,
             DashboardRevenueSummary::class,
             DashboardUpcomingEvents::class,
-            DashboardQuickActions::class,
         ], (new Dashboard())->getWidgets());
     }
 
