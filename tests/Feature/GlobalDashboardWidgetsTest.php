@@ -2,6 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\Dashboard;
+use App\Filament\Widgets\DashboardEventSwitcher;
+use App\Filament\Widgets\DashboardQuickActions;
+use App\Filament\Widgets\EventOperationsOverview;
 use App\Filament\Widgets\DashboardActionRequired;
 use App\Filament\Widgets\DashboardRecentActivity;
 use App\Filament\Widgets\DashboardRevenueSummary;
@@ -15,6 +19,17 @@ use Tests\TestCase;
 class GlobalDashboardWidgetsTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_global_dashboard_only_registers_approved_compact_widgets(): void
+    {
+        $this->assertSame([
+            DashboardEventSwitcher::class,
+            EventOperationsOverview::class,
+            DashboardRevenueSummary::class,
+            DashboardUpcomingEvents::class,
+            DashboardQuickActions::class,
+        ], (new Dashboard())->getWidgets());
+    }
 
     public function test_dashboard_event_widgets_only_return_authorized_events(): void
     {
@@ -56,6 +71,10 @@ class GlobalDashboardWidgetsTest extends TestCase
 
         $this->assertFalse(DashboardUpcomingEvents::canView());
         $this->assertFalse(DashboardRecentActivity::canView());
+        $this->assertFalse(DashboardEventSwitcher::canView());
+        $this->assertFalse(EventOperationsOverview::canView());
+        $this->assertFalse(DashboardQuickActions::canView());
+        $this->assertFalse(DashboardRevenueSummary::canView());
         $this->assertFalse(DashboardActionRequired::canView());
     }
 
