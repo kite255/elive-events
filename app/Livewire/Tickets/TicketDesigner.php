@@ -24,9 +24,17 @@ class TicketDesigner extends Component
 
     public string $templateName = '';
 
+    #[Locked]
     public int $canvasWidth = 1080;
 
+    #[Locked]
     public int $canvasHeight = 1350;
+
+    #[Locked]
+    public int $recoveryRevision = 0;
+
+    #[Locked]
+    public ?string $recoveryNotice = null;
 
     #[Locked]
     public array $pages = [];
@@ -223,6 +231,93 @@ class TicketDesigner extends Component
 
         $this->activePageId =
             $activePageId;
+    }
+
+
+    public function recoverOffCanvasElements(): void
+    {
+        $this->recoveryNotice = null;
+        if ($this->activePageId === null || ! $this->findTemplatePage($this->activePageId)) {
+            $this->addError('activePageId', 'Select a page belonging to this template.');
+            return;
+        }
+
+        $template = app(TicketDesignerService::class)->loadTemplate($this->templateType, $this->templateId);
+        $cw = (int) $template->width;
+        $ch = (int) $template->height;
+        if ($cw !== $this->canvasWidth || $ch !== $this->canvasHeight) {
+            $this->addError('definition', 'Canvas dimensions changed. Reload the designer before recovering elements.');
+            return;
+        }
+        if ($cw < 300 || $cw > 4000 || $ch < 300 || $ch > 4000) {
+            $this->addError('definition', 'Canvas dimensions are invalid.');
+            return;
+        }
+
+        $count = 0;
+        foreach ($this->elements as $index => $element) {
+            if (! is_array($element)) {
+                continue;
+            }
+            foreach (['x', 'y', 'width', 'height'] as $key) {
+                if (! is_numeric($element[$key] ?? null) || ! is_finite((float) $element[$key])) {
+                    continue 2;
+                }
+            }
+            $rotation = $element['rotation'] ?? 0;
+            if (! is_numeric($rotation) || ! is_finite((float) $rotation) || abs((float) $rotation) > 360) {
+                continue;
+            }
+
+            $x = (float) $element['x'];
+            $y = (float) $element['y'];
+            $w = (float) $element['width'];
+            $h = (float) $element['height'];
+            if ($w <= 0 || $h <= 0) {
+                continue;
+            }
+            $qr = ($element['type'] ?? null) === 'qr';
+            $angle = deg2rad((float) $rotation);
+            $cos = abs(cos($angle));
+            $sin = abs(sin($angle));
+            $bw = $cos * $w + $sin * $h;
+            $bh = $sin * $w + $cos * $h;
+            $cx = $x + $w / 2;
+            $cy = $y + $h / 2;
+            $outside = $cx + $bw / 2 <= 0 || $cy + $bh / 2 <= 0
+                || $cx - $bw / 2 >= $cw || $cy - $bh / 2 >= $ch;
+            $clippedQr = $qr && ($cx - $bw / 2 < -0.001 || $cy - $bh / 2 < -0.001
+                || $cx + $bw / 2 > $cw + 0.001 || $cy + $bh / 2 > $ch + 0.001);
+            if (! $outside && ! $clippedQr) {
+                continue;
+            }
+
+            if ($qr) {
+                $w = $h = min($w, $h);
+            }
+            $factor = min(1, $cw / ($cos * $w + $sin * $h), $ch / ($sin * $w + $cos * $h));
+            $w *= $factor;
+            $h *= $factor;
+            $bw = $cos * $w + $sin * $h;
+            $bh = $sin * $w + $cos * $h;
+            $cx = max($bw / 2, min($cx, $cw - $bw / 2));
+            $cy = max($bh / 2, min($cy, $ch - $bh / 2));
+            $this->elements[$index] = array_replace($element, [
+                'x' => $cx - $w / 2, 'y' => $cy - $h / 2,
+                'width' => $w, 'height' => $h,
+            ]);
+            $count++;
+        }
+
+        if ($count > 0) {
+            $this->isDirty = true;
+            $this->recoveryRevision++;
+            $this->selectElement($this->selectedElementId);
+            $this->resetErrorBag('definition');
+            $this->recoveryNotice = $count.' element(s) recovered. Review placement and overlap before saving.';
+        } else {
+            $this->recoveryNotice = 'No recoverable off-canvas elements found. Other validation errors may remain.';
+        }
     }
 
     public function save(): bool
@@ -1362,6 +1457,7 @@ class TicketDesigner extends Component
 
         $this->isDirty =
             false;
+        $this->recoveryNotice = null;
     }
 
     protected function pageBelongsToTemplate(
