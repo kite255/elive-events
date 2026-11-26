@@ -108,6 +108,17 @@ class TicketOrderResource extends Resource
         return $query->whereHas(
             'event',
             fn (Builder $eventQuery): Builder => $eventQuery->accessibleBy($user)
+                ->where(function (Builder $scope) use ($user): void {
+                    $scope->whereIn('events.organization_id', $user->activeOrganizations()
+                        ->where(function (Builder $membership): void {
+                            $membership->where('organization_user.is_owner', true)
+                                ->orWhereIn('organization_user.role', [
+                                    User::ORGANIZATION_ROLE_OWNER,
+                                    User::ORGANIZATION_ROLE_ADMIN,
+                                ]);
+                        })->select('organizations.id')->getQuery())
+                        ->orWhereIn('events.id', $user->eventManagerEvents()->select('events.id')->getQuery());
+                })
         );
     }
 
