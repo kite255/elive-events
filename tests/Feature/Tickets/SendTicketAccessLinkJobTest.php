@@ -119,4 +119,72 @@ class SendTicketAccessLinkJobTest extends TestCase
                 ) === $order->public_token
         );
     }
+
+    private function queuedSms(): CommunicationLog
+    {
+        $organization = Organization::create(['name' => 'Delivery security']);
+        $event = Event::create(['organization_id' => $organization->id, 'name' => 'Delivery event', 'status' => Event::STATUS_ACTIVE]);
+        $order = TicketOrder::create([
+            'event_id' => $event->id, 'order_number' => 'SEC-'.uniqid(),
+            'buyer_name' => 'Buyer', 'buyer_phone' => '255712345678',
+            'quantity' => 1, 'subtotal' => 1000, 'total' => 1000,
+            'currency' => 'TZS', 'status' => TicketOrder::STATUS_PAID, 'paid_at' => now(),
+        ]);
+        return CommunicationLog::create([
+            'event_id' => $event->id, 'ticket_order_id' => $order->id,
+            'purpose' => CommunicationLog::PURPOSE_TICKET_ACCESS,
+            'channel' => CommunicationLog::CHANNEL_SMS, 'recipient' => '255712345678',
+            'message' => 'Ticket delivery', 'status' => CommunicationLog::STATUS_QUEUED,
+        ]);
+    }
+
+    public function test_replayed_job_does_not_submit_twice(): void
+    {
+        $log = $this->queuedSms();
+        $this->mock(\App\Services\SmsService::class)
+            ->shouldReceive('send')->once()->andReturn(['provider_message_id' => 'sms-test']);
+        $job = new SendTicketAccessLinkJob($log->id);
+        app()->call([$job, 'handle']);
+        app()->call([$job, 'handle']);
+        $this->assertSame(CommunicationLog::STATUS_SENT, $log->fresh()->status);
+        $this->assertSame(1, $log->fresh()->attempt_count);
+    }
+
+    public function test_uncertain_submission_is_not_retried_or_marked_failed(): void
+    {
+        $log = $this->queuedSms();
+        $this->mock(\App\Services\SmsService::class)
+            ->shouldReceive('send')->once()->andThrow(new \RuntimeException('Provider timeout'));
+        $job = new SendTicketAccessLinkJob($log->id);
+        app()->call([$job, 'handle']);
+        app()->call([$job, 'handle']);
+        $job->failed(new \RuntimeException('Late failure callback'));
+        $this->assertSame(CommunicationLog::STATUS_SENDING, $log->fresh()->status);
+        $this->assertStringContainsString('uncertain', $log->fresh()->error);
+        $this->assertSame(1, $log->fresh()->attempt_count);
+    }
+
+    public function test_late_failure_does_not_overwrite_delivered_status(): void
+    {
+        $log = $this->queuedSms();
+        $log->markSent('sms-confirmed');
+        $log->markDelivered();
+        (new SendTicketAccessLinkJob($log->id))->failed(new \RuntimeException('Late failure'));
+        $this->assertSame(CommunicationLog::STATUS_DELIVERED, $log->fresh()->status);
+        $this->assertSame('sms-confirmed', $log->fresh()->provider_message_id);
+        $this->assertNull($log->fresh()->failed_at);
+    }
+
+    public function test_cross_event_delivery_is_not_submitted(): void
+    {
+        $log = $this->queuedSms();
+        $other = Event::create([
+            'organization_id' => $log->event->organization_id,
+            'name' => 'Other event', 'status' => Event::STATUS_ACTIVE,
+        ]);
+        $log->update(['event_id' => $other->id]);
+        $this->mock(\App\Services\SmsService::class)->shouldNotReceive('send');
+        app()->call([new SendTicketAccessLinkJob($log->id), 'handle']);
+        $this->assertNull($log->fresh()->sent_at);
+    }
 }
