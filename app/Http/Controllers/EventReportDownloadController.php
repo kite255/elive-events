@@ -14,7 +14,7 @@ class EventReportDownloadController
     public function __invoke(Request $request, Event $event, EventReportArchive $archive): BinaryFileResponse
     {
         $user = $request->user();
-        abort_unless($user instanceof User && $user->isSuperAdmin(), 403);
+        abort_unless($user instanceof User && ! $user->is_gate_staff && $user->isSuperAdmin(), 403);
 
         $path = $archive->create($event);
         $filename = (Str::slug($event->slug ?: $event->name) ?: 'event-'.$event->getKey()).'-event-reports.zip';
