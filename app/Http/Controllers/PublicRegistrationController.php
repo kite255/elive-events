@@ -400,6 +400,37 @@ class PublicRegistrationController extends Controller
         );
     }
 
+    public function resumePayment(Event $event, string $attendee): RedirectResponse
+    {
+        abort_unless(preg_match('/\\A[A-Za-z0-9]{32}\\z/', $attendee) === 1, 404);
+
+        $participant = Attendee::query()
+            ->where('event_id', $event->id)
+            ->where('public_token', $attendee)
+            ->firstOrFail();
+
+        abort_unless($participant->isApproved(), 403);
+
+        try {
+            $payment = app(PaymentService::class)->createForAttendee($participant);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return redirect()->route('public.registration.success', [
+                'event' => $event->slug,
+                'attendee' => $participant->public_token,
+            ])->with('error', 'Payment is currently unavailable. Please contact the event organizer.');
+        }
+
+        $canStart = $payment->isPending()
+            && blank($payment->provider_tracking_id)
+            && blank(data_get($payment->metadata, 'checkout_attempted_at'));
+
+        return redirect()->route($canStart ? 'payments.pay' : 'payments.status', [
+            'payment' => $payment->reference,
+        ]);
+    }
+
     public function success(
         Event $event,
         string $attendee
@@ -436,17 +467,19 @@ class PublicRegistrationController extends Controller
         |
         */
 
-        $payment = Payment::query()
-            ->where(
-                'event_id',
-                $event->id
-            )
-            ->where(
-                'attendee_id',
-                $attendee->id
-            )
+        $registrationPayments = Payment::query()
+            ->where('event_id', $event->id)
+            ->where('attendee_id', $attendee->id)
+            ->whereNull('ticket_order_id')
+            ->whereNull('ticket_upgrade_id')
+            ->whereNull('donation_id')
+            ->whereNull('merchandise_order_id');
+
+        $payment = (clone $registrationPayments)
+            ->where('status', Payment::STATUS_COMPLETED)
             ->latest('id')
-            ->first();
+            ->first()
+            ?? $registrationPayments->latest('id')->first();
 
         return view(
             'public.events.success',
