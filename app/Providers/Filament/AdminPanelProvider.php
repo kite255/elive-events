@@ -125,6 +125,10 @@ class AdminPanelProvider extends PanelProvider
                 for: 'App\\Filament\\Pages'
             )
 
+            ->navigation(function (): \Filament\Navigation\NavigationBuilder|bool {
+                return \App\Services\EventWorkspaceNavigation::build();
+            })
+
             ->navigationGroups([
                 'Events & Registration',
                 'Ticketing',
