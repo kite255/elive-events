@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\TicketTypes\Tables;
 
-use App\Models\Event;
+use App\Filament\Resources\TicketTypes\TicketTypeResource;
 use App\Models\Ticket;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -114,7 +114,7 @@ class TicketTypesTable
                 SelectFilter::make('event_id')
                     ->label('Event')
                     ->options(
-                        Event::query()
+                        TicketTypeResource::authorizedEvents(auth()->user())
                             ->orderBy('name')
                             ->pluck('name', 'id')
                     )
@@ -199,7 +199,7 @@ class TicketTypesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make()
+                    DeleteBulkAction::make()->authorizeIndividualRecords('delete')
                         ->visible(
                             fn (): bool =>
                                 ! auth()->user()?->isTicketOrganizer()
