@@ -1722,6 +1722,7 @@ class Event extends Model
                 [
                     'pending_approval',
                     'registered',
+                    'approved',
                     'confirmed',
                     'checked_in',
                 ]
@@ -1736,6 +1737,7 @@ class Event extends Model
                 'status',
                 [
                     'registered',
+                    'approved',
                     'confirmed',
                     'checked_in',
                 ]
