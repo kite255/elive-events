@@ -332,21 +332,51 @@ class CommunicationCampaignService
             ): CommunicationCampaign {
                 $ticketBuyerCampaign = $audience === self::PAID_TICKET_BUYERS;
 
-                if ($ticketBuyerCampaign) {
-                    Event::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
-                    $duplicate = CommunicationCampaign::query()
-                        ->where('event_id', $event->id)
-                        ->where('channel', $channel)
-                        ->whereNotIn('status', [CommunicationCampaign::STATUS_CANCELLED, CommunicationCampaign::STATUS_FAILED])
-                        ->where('recipient_filter->audience', $audience)
-                        ->where('name', $name)
-                        ->where('message', $message)
-                        ->where('subject', $subject)
-                        ->first();
+                $event = Event::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+                $this->authorizeCampaignEvent($event, $createdBy);
+                $this->validateAudience($event, $audience, $categoryId);
 
-                    if ($duplicate) {
-                        return $duplicate;
+                $duplicates = CommunicationCampaign::query()
+                    ->where('event_id', $event->id)
+                    ->where('type', 'manual_campaign')
+                    ->where('channel', $channel)
+                    ->where('recipient_filter->audience', $audience)
+                    ->where('name', $name)
+                    ->where('message', $message)
+                    ->where('subject', $subject)
+                    ->where(function (Builder $query): void {
+                        $query->whereNotIn('status', [CommunicationCampaign::STATUS_CANCELLED, CommunicationCampaign::STATUS_FAILED])
+                            ->orWhere('sent_count', '>', 0)
+                            ->orWhere('delivered_count', '>', 0);
+                    });
+
+                // Preserve the existing ticket buyer protection. For attendees,
+                // allow a deliberate follow-up after the earlier campaign finishes
+                // and the short duplicate-submission window expires.
+                if (! $ticketBuyerCampaign) {
+                    $cooldown = max(1, (int) config('messaging.campaign_duplicate_cooldown_seconds', 60));
+                    $duplicates->where(function (Builder $query) use ($cooldown): void {
+                        $query->whereIn('status', [
+                            CommunicationCampaign::STATUS_SCHEDULED,
+                            CommunicationCampaign::STATUS_QUEUED,
+                            CommunicationCampaign::STATUS_PROCESSING,
+                        ])->orWhere('created_at', '>=', now()->subSeconds($cooldown));
+                    });
+                }
+
+                foreach ($duplicates->latest('id')->lazy() as $duplicate) {
+                    if ($duplicate->categoryId() !== $categoryId) {
+                        continue;
                     }
+
+                    if ($channel === CommunicationTemplate::CHANNEL_EMAIL
+                        && (data_get($duplicate->recipient_filter, 'email_poster_path') !== $emailPosterPath
+                            || data_get($duplicate->recipient_filter, 'email_action_url') !== $emailActionUrl
+                            || data_get($duplicate->recipient_filter, 'email_action_label') !== $emailActionLabel)) {
+                        continue;
+                    }
+
+                    return $duplicate;
                 }
 
                 /*
