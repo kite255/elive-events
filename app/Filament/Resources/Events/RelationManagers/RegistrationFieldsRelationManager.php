@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Events\RelationManagers;
 
 use App\Models\Event;
-use App\Services\EventPresetService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -32,7 +31,8 @@ class RegistrationFieldsRelationManager extends RelationManager
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
         return $ownerRecord instanceof Event
-            && (EventPresetService::usesRegistration($ownerRecord->event_type));
+            && $ownerRecord->canBeManagedBy(auth()->user())
+            && ((bool) $ownerRecord->registration_is_open || $ownerRecord->paymentsAreEnabled() || $ownerRecord->registrationFields()->exists() || $ownerRecord->attendees()->where('registration_source', 'public')->exists());
     }
 
     protected static string $relationship = 'registrationFields';
