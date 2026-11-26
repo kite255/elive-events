@@ -49,15 +49,17 @@ class EventWorkspaceNavigation
 
         $links = collect(EventWorkspace::linksFor($event))->keyBy('label');
         foreach ([
-            'Event management' => ['Attendees', 'Ticket orders'],
-            'Operations' => ['Check-in station', 'Communications'],
+            'Event management' => ['Registration', 'Attendees', 'Ticket orders', 'Programme'],
+            'Operations' => ['Check-in station', 'Badge templates', 'Badge types', 'Communications'],
             'Configuration' => ['Event settings'],
         ] as $heading => $labels) {
             $items = [];
             foreach ($labels as $label) {
                 if ($link = $links->get($label)) {
                     $items[] = NavigationItem::make($label)->icon($link['icon'])->url($link['url'])
-                        ->isActiveWhen(fn (): bool => request()->url() === strtok($link['url'], '?'));
+                        ->isActiveWhen(fn (): bool => request()->url() === strtok($link['url'], '?')
+                            && ($name !== 'filament.admin.resources.events.edit'
+                                || (string) request()->query('relation', '') === ($link['relation'] ?? '')));
                 }
             }
             if ($items !== []) {
