@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Widgets\DashboardActionRequired;
 use App\Filament\Widgets\DashboardRecentActivity;
+use App\Filament\Widgets\DashboardRevenueSummary;
 use App\Filament\Widgets\DashboardUpcomingEvents;
 use App\Models\Event;
 use App\Models\Organization;
@@ -43,6 +44,7 @@ class GlobalDashboardWidgetsTest extends TestCase
         $this->assertSame([$allowed->id], (new DashboardUpcomingEvents())->upcomingEvents()->modelKeys());
         $this->assertSame([$allowed->id], (new DashboardRecentActivity())->recentEvents()->modelKeys());
         $this->assertFalse(DashboardActionRequired::canView());
+        $this->assertFalse(DashboardRevenueSummary::canView());
     }
 
     public function test_gate_staff_are_excluded_even_with_super_admin_flag(): void
