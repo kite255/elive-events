@@ -14,9 +14,13 @@ class EventOperationsOverview extends StatsOverviewWidget
 {
     protected static ?int $sort = -20;
 
+    protected int|string|array $columnSpan = 'full';
+
+    protected string $view = 'filament.widgets.event-operations-overview';
+
     protected function getColumns(): int|array
     {
-        return 4;
+        return 5;
     }
 
     public static function canView(): bool
@@ -41,8 +45,7 @@ class EventOperationsOverview extends StatsOverviewWidget
         $ids = $events->select('events.id');
 
         $stats = [
-            Stat::make('My accessible events', number_format((clone $ids)->count()))
-                ->description('Events available to your account')
+            Stat::make('Events', number_format((clone $ids)->count()))
                 ->icon('heroicon-o-calendar-days'),
         ];
 
@@ -56,23 +59,21 @@ class EventOperationsOverview extends StatsOverviewWidget
                 ->whereIn('event_id', clone $ids)
                 ->where('status', TicketOrder::STATUS_PAID);
 
-            $stats[] = Stat::make('Paid ticket orders', number_format((clone $paid)->count()))
-                ->description('Confirmed orders from accessible events')
-                ->icon('heroicon-o-ticket');
-            $stats[] = Stat::make('Tickets sold', number_format((int) (clone $paid)->sum('quantity')))
-                ->description('Tickets in paid orders')
+            $stats[] = Stat::make('Paid orders', number_format((clone $paid)->count()))
                 ->icon('heroicon-o-shopping-cart');
+            $stats[] = Stat::make('Tickets sold', number_format((int) (clone $paid)->sum('quantity')))
+                ->icon('heroicon-o-ticket');
         }
 
         if (! $user->isTicketOrganizer()) {
-            $stats[] = Stat::make('Registered attendees', number_format(
+            $stats[] = Stat::make('Attendees', number_format(
                 Attendee::query()->whereIn('event_id', clone $ids)->count()
-            ))->description('Registration records in accessible events')
+            ))
                 ->icon('heroicon-o-users');
 
-            $stats[] = Stat::make('Attendees checked in', number_format(
+            $stats[] = Stat::make('Checked in', number_format(
                 CheckIn::query()->whereIn('event_id', clone $ids)->distinct('attendee_id')->count('attendee_id')
-            ))->description('Unique attendees checked in across accessible events')
+            ))
                 ->icon('heroicon-o-qr-code');
         }
 
