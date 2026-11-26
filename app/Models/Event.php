@@ -976,18 +976,18 @@ class Event extends Model
         $managedOrganizationIds =
             $user
                 ->activeOrganizations()
-                ->wherePivotIn(
-                    'role',
-                    [
-                        User::ORGANIZATION_ROLE_OWNER,
-                        User::ORGANIZATION_ROLE_ADMIN,
-                    ]
-                )
+                ->where(function (Builder $membership): void {
+                    $membership->where('organization_user.is_owner', true)
+                        ->orWhereIn('organization_user.role', [
+                            User::ORGANIZATION_ROLE_OWNER,
+                            User::ORGANIZATION_ROLE_ADMIN,
+                        ]);
+                })
                 ->pluck(
                     'organizations.id'
                 );
 
-        return $query->where(
+        return $query->whereIn('events.organization_id', $user->activeOrganizations()->select('organizations.id')->getQuery())->where(
             function (
                 Builder $query
             ) use (
@@ -1416,7 +1416,7 @@ class Event extends Model
             return true;
         }
 
-        if (! $this->organization_id) {
+        if (! $this->organization_id || ! $user->hasActiveOrganizationAccess($this->organization_id)) {
             return false;
         }
 
