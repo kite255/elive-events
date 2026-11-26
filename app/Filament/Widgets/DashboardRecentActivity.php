@@ -17,14 +17,12 @@ class DashboardRecentActivity extends Widget
 
     public static function canView(): bool
     {
-        $user = auth()->user();
-
-        return $user instanceof User && ! $user->is_gate_staff;
+        return false;
     }
 
     public function recentEvents(): Collection
     {
-        abort_unless(static::canView(), 403);
+        abort_unless(auth()->user() instanceof User && ! auth()->user()->is_gate_staff, 403);
         $user = auth()->user();
 
         $query = Event::query()->accessibleBy($user);
