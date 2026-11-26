@@ -309,6 +309,14 @@ class PaymentFulfillmentService
             throw new RuntimeException('Attendee does not belong to the payment event.');
         }
 
+        if ((int) $event->organization_id !== (int) $payment->organization_id) {
+            throw new RuntimeException('Attendee event does not belong to the payment organization.');
+        }
+
+        if (! $attendee->isApproved()) {
+            throw new RuntimeException('Registration is no longer eligible for fulfillment. Payment requires manual reconciliation.');
+        }
+
         $settings = $event->paymentSetting;
 
         if (
