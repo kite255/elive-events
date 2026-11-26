@@ -44,10 +44,10 @@ class AdminPanelProvider extends PanelProvider
             |--------------------------------------------------------------------------
             */
 
-            ->brandName('eLive Events')
-            ->brandLogo(asset('eLive-Logo.png'))
-            ->brandLogoHeight('2.5rem')
-            ->favicon(asset('favicon.ico'))
+            ->brandName(config('brand.product'))
+            ->brandLogo(asset(config('brand.logo')))
+            ->brandLogoHeight(config('brand.logo_height'))
+            ->favicon(asset(config('brand.favicon')))
 
             /*
             |--------------------------------------------------------------------------
@@ -60,8 +60,8 @@ class AdminPanelProvider extends PanelProvider
             */
 
             ->font(
-                'Creato Display',
-                url: asset('css/creato-font.css'),
+                config('brand.font'),
+                url: asset(config('brand.font_stylesheet')),
                 provider: LocalFontProvider::class,
             )
 
@@ -96,7 +96,7 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->colors([
-                'primary' => Color::hex('#161943'),
+                'primary' => Color::hex(config('brand.colors.primary')),
                 'info' => Color::hex('#007AB2'),
                 'warning' => Color::hex('#FF9800'),
 
