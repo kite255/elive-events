@@ -74,7 +74,8 @@ class AttendeesTable
                 IconColumn::make('badge_path')
                     ->label('Badge File')
                     ->boolean()
-                    ->getStateUsing(fn ($record): bool => filled($record->badge_path)),
+                    ->getStateUsing(fn ($record): bool => filled($record->badge_path))
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('event_sequence')
                     ->label('Seq.')
@@ -150,7 +151,7 @@ class AttendeesTable
                         'pending_approval' => 'warning',
                         'waitlisted' => 'warning',
                         'registered' => 'gray',
-                        'confirmed' => 'success',
+                        'confirmed', 'approved' => 'success',
                         'checked_in' => 'info',
                         'cancelled', 'rejected' => 'danger',
                         default => 'gray',
@@ -160,6 +161,7 @@ class AttendeesTable
                         'waitlisted' => 'Waitlisted',
                         'registered' => 'Registered',
                         'confirmed' => 'Confirmed',
+                        'approved' => 'Approved',
                         'checked_in' => 'Checked In',
                         'cancelled' => 'Cancelled',
                         'rejected' => 'Rejected',
@@ -190,7 +192,8 @@ class AttendeesTable
                     ->label('Public Link')
                     ->boolean()
                     ->getStateUsing(fn ($record): bool => filled($record->public_token))
-                    ->visible(fn (): bool => Schema::hasColumn('attendees', 'public_token')),
+                    ->visible(fn (): bool => Schema::hasColumn('attendees', 'public_token'))
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('attendance_status')
                     ->label('Attendance')
@@ -212,7 +215,8 @@ class AttendeesTable
                             'attended' => 'success',
                             default => 'gray',
                         }
-                    ),
+                    )
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('email')
                     ->label('Email')
@@ -224,7 +228,7 @@ class AttendeesTable
                     ->label('Organization')
                     ->searchable()
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('position')
                     ->label('Position')
@@ -314,6 +318,7 @@ class AttendeesTable
                         'waitlisted' => 'Waitlisted',
                         'registered' => 'Registered',
                         'confirmed' => 'Confirmed',
+                        'approved' => 'Approved',
                         'checked_in' => 'Checked In',
                         'cancelled' => 'Cancelled',
                         'rejected' => 'Rejected',
@@ -561,9 +566,12 @@ class AttendeesTable
                         ->modalHeading('Approve registration?')
                         ->modalDescription('This attendee will be approved and a badge will be generated.')
                         ->action(function ($record): void {
-                            $record->forceFill([
-                                'status' => 'registered',
-                            ])->save();
+                            try {
+                                $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'pending_approval', 'registered');
+                            } catch (\Illuminate\Validation\ValidationException $exception) {
+                                Notification::make()->title('Registration not changed')->body($exception->validator->errors()->first())->warning()->send();
+                                return;
+                            }
 
                             try {
                                 self::generateBadgeForRecord($record);
@@ -593,9 +601,12 @@ class AttendeesTable
                         ->modalHeading('Move attendee from waitlist?')
                         ->modalDescription('This attendee will be moved from waitlist to registered. A badge will be generated.')
                         ->action(function ($record): void {
-                            $record->forceFill([
-                                'status' => 'registered',
-                            ])->save();
+                            try {
+                                $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'waitlisted', 'registered');
+                            } catch (\Illuminate\Validation\ValidationException $exception) {
+                                Notification::make()->title('Registration not changed')->body($exception->validator->errors()->first())->warning()->send();
+                                return;
+                            }
 
                             try {
                                 self::generateBadgeForRecord($record);
@@ -629,9 +640,12 @@ class AttendeesTable
                         ->modalHeading('Reject registration?')
                         ->modalDescription('This attendee will be marked as rejected. Their badge will not be released.')
                         ->action(function ($record): void {
-                            $record->forceFill([
-                                'status' => 'rejected',
-                            ])->save();
+                            try {
+                                $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), $record->status, 'rejected');
+                            } catch (\Illuminate\Validation\ValidationException $exception) {
+                                Notification::make()->title('Registration not changed')->body($exception->validator->errors()->first())->warning()->send();
+                                return;
+                            }
 
                             Notification::make()
                                 ->title('Registration rejected')
@@ -713,6 +727,7 @@ class AttendeesTable
                         ->modalHeading('Approve selected registrations?')
                         ->modalDescription('Selected pending attendees will be approved. Badges will be generated where possible.')
                         ->action(function (Collection $records): void {
+                            $transitionSkipped = 0;
                             $approved = 0;
                             $badgesGenerated = 0;
                             $badgeFailed = 0;
@@ -722,9 +737,12 @@ class AttendeesTable
                                     continue;
                                 }
 
-                                $record->forceFill([
-                                    'status' => 'registered',
-                                ])->save();
+                                try {
+                                    $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'pending_approval', 'registered');
+                                } catch (\Illuminate\Validation\ValidationException $exception) {
+                                    $transitionSkipped++;
+                                    continue;
+                                }
 
                                 $approved++;
 
@@ -743,6 +761,9 @@ class AttendeesTable
                                 body: "Approved: {$approved}. Badges generated: {$badgesGenerated}. Badge failed: {$badgeFailed}.",
                                 failed: $badgeFailed
                             );
+                            if ($transitionSkipped > 0) {
+                                Notification::make()->title('Registrations skipped')->body("{$transitionSkipped} selected records could not be changed because their status or capacity no longer permits it.")->warning()->send();
+                            }
                         }),
 
                     BulkAction::make('move_waitlist_to_registered')
@@ -753,6 +774,7 @@ class AttendeesTable
                         ->modalHeading('Move selected waitlisted attendees?')
                         ->modalDescription('Selected waitlisted attendees will be moved to registered. Badges will be generated where possible.')
                         ->action(function (Collection $records): void {
+                            $transitionSkipped = 0;
                             $moved = 0;
                             $badgesGenerated = 0;
                             $badgeFailed = 0;
@@ -762,9 +784,12 @@ class AttendeesTable
                                     continue;
                                 }
 
-                                $record->forceFill([
-                                    'status' => 'registered',
-                                ])->save();
+                                try {
+                                    $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'waitlisted', 'registered');
+                                } catch (\Illuminate\Validation\ValidationException $exception) {
+                                    $transitionSkipped++;
+                                    continue;
+                                }
 
                                 $moved++;
 
@@ -783,6 +808,9 @@ class AttendeesTable
                                 body: "Moved: {$moved}. Badges generated: {$badgesGenerated}. Badge failed: {$badgeFailed}.",
                                 failed: $badgeFailed
                             );
+                            if ($transitionSkipped > 0) {
+                                Notification::make()->title('Registrations skipped')->body("{$transitionSkipped} selected records could not be changed because their status or capacity no longer permits it.")->warning()->send();
+                            }
                         }),
 
                     BulkAction::make('reject_registrations')
@@ -793,6 +821,7 @@ class AttendeesTable
                         ->modalHeading('Reject selected registrations?')
                         ->modalDescription('Selected attendees will be marked as rejected.')
                         ->action(function (Collection $records): void {
+                            $transitionSkipped = 0;
                             $rejected = 0;
 
                             foreach ($records as $record) {
@@ -804,9 +833,12 @@ class AttendeesTable
                                     continue;
                                 }
 
-                                $record->forceFill([
-                                    'status' => 'rejected',
-                                ])->save();
+                                try {
+                                    $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), $record->status, 'rejected');
+                                } catch (\Illuminate\Validation\ValidationException $exception) {
+                                    $transitionSkipped++;
+                                    continue;
+                                }
 
                                 $rejected++;
                             }
@@ -816,6 +848,9 @@ class AttendeesTable
                                 ->body($rejected . ' attendee(s) rejected.')
                                 ->success()
                                 ->send();
+                            if ($transitionSkipped > 0) {
+                                Notification::make()->title('Registrations skipped')->body("{$transitionSkipped} selected records could not be changed because their status or capacity no longer permits it.")->warning()->send();
+                            }
                         }),
 
                     BulkAction::make('generate_badges')

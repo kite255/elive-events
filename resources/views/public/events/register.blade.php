@@ -936,6 +936,37 @@
                 transition: none !important;
             }
         }
+
+        /* Compact, accessible registration layout; retain configurable event colors. */
+        .elive-platform-header {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 4px 14px;}
+        .elive-platform-brand {display:flex;align-items:center;gap:9px;color:#161943;font-weight:800;text-decoration:none;}
+        .elive-platform-brand img {width:32px;height:32px;object-fit:contain;}
+        .elive-platform-label {font-size:12px;color:#475569;}
+        .elive-heading > div {min-width:0 !important;overflow-wrap:anywhere;}
+        .elive-shell {backdrop-filter:none;box-shadow:0 12px 36px rgba(22,25,67,.08) !important;}
+        form > div {box-shadow:none !important;}
+        form > div:hover {box-shadow:none !important;transform:none;}
+        .elive-form-intro {display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:24px 0 0;}
+        .elive-form-intro strong {font-size:18px;color:var(--elive-primary);}
+        .elive-form-intro span {font-size:13px;color:#475569;}
+        .elive-form-notice {margin:16px 0;padding:12px 14px;border:1px solid #fecaca;background:#fff7f7;color:#991b1b;border-radius:12px;}
+        .elive-form-notice[hidden] {display:none !important;}
+        [data-submit-button]:disabled {opacity:.7;cursor:not-allowed;}
+        .elive-footer a {color:inherit;text-underline-offset:3px;}
+        @media(max-width:720px) {
+            .elive-heading {flex-wrap:nowrap !important;gap:12px !important;}
+            .elive-heading img {flex-shrink:0;width:48px !important;height:48px !important;}
+            .elive-title {font-size:24px !important;}
+            .elive-content {padding:18px 14px !important;}
+            form > div {padding:15px !important;}
+            form input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),form select,form textarea {font-size:16px !important;min-width:0;}
+            form div[style*="minmax(240px"],form div[style*="minmax(250px"],.elive-session-grid {grid-template-columns:minmax(0,1fr) !important;}
+            .event-summary > div {box-shadow:none;}
+        }
+        @media(max-width:360px) {
+            .elive-platform-label {display:none;}
+            .elive-heading {flex-wrap:wrap !important;}
+        }
     </style>
 
 </head>
@@ -948,6 +979,13 @@
 ">
     <div class="elive-page" style="min-height: 100vh; padding: 28px 16px;">
         <div class="elive-container" style="max-width: 980px; margin: 0 auto;">
+            <header class="elive-platform-header">
+                <a class="elive-platform-brand" href="{{ url('/') }}">
+                    <img src="{{ asset('eLive-Logo.png') }}" alt="" width="32" height="32">
+                    <span>eLive Events</span>
+                </a>
+                <span class="elive-platform-label">Event registration</span>
+            </header>
             <div class="elive-shell" style="
                 background: #ffffff;
                 border-radius: 24px;
@@ -1047,7 +1085,7 @@
                     </div>
 
                     @if (session('error'))
-                        <div style="
+                        <div role="alert" style="
                             margin-top: 22px;
                             background: #fee2e2;
                             color: #991b1b;
@@ -1122,8 +1160,25 @@
                             </div>
                         @endif
 
+                        <div class="elive-form-intro">
+                            <strong>{{ $isFull && $waitlistEnabled ? 'Waitlist registration' : 'Registration form' }}</strong>
+                            <span>Fields marked * are required.</span>
+                        </div>
                         <form method="POST" action="{{ route('public.registration.store', $event) }}" data-registration-form style="margin-top: 28px;">
                             @csrf
+                            <p class="elive-form-notice" data-form-notice role="alert" tabindex="-1" hidden></p>
+                            @if (filled($event->registration_access_code_hash))
+                                <div id="field-registration-access-code" class="@error('registration_access_code') elive-field-invalid @enderror">
+                                    <h2>Restricted registration</h2>
+                                    <p style="font-size:14px;color:var(--elive-muted)">Enter the access code provided by the event organizer.</p>
+                                    <label for="registration-access-code">Access code *</label>
+                                    <input id="registration-access-code" name="registration_access_code" type="password" autocomplete="off" maxlength="72" required aria-invalid="{{ $errors->has('registration_access_code') ? 'true' : 'false' }}" style="padding:12px">
+                                    @error('registration_access_code')
+                                        <p role="alert" style="color:#b91c1c;font-size:13px">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+
 
                             @php
                                 /*
@@ -1222,8 +1277,9 @@
 
                                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
                                     <div id="field-full-name" class="@error('full_name') elive-field-invalid @enderror">
-                                        <label style="display:block;font-weight:800;margin-bottom:7px;">Full Name *</label>
+                                        <label for="registration-full-name" style="display:block;font-weight:800;margin-bottom:7px;">Full Name *</label>
                                         <input
+                                            id="registration-full-name" aria-invalid="{{ $errors->has('full_name') ? 'true' : 'false' }}"
                                             name="full_name"
                                             value="{{ old('full_name') }}"
                                             required
@@ -1239,7 +1295,7 @@
 
                                     @if ($standardFields['phone']['show'])
                                         <div id="field-phone" class="@error('phone') elive-field-invalid @enderror">
-                                            <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                            <label for="registration-phone" style="display:block;font-weight:800;margin-bottom:7px;">
                                                 Phone Number
                                                 @if ($standardFields['phone']['required'])
                                                     <span style="color:#dc2626;">*</span>
@@ -1247,7 +1303,8 @@
                                             </label>
                                             <input
                                                 type="tel"
-                                                name="phone"
+                                                id="registration-phone" aria-invalid="{{ $errors->has('phone') ? 'true' : 'false' }}"
+                                            name="phone"
                                                 value="{{ old('phone') }}"
                                                 placeholder="255712345678"
                                                 inputmode="tel"
@@ -1265,7 +1322,7 @@
 
                                     @if ($standardFields['email']['show'])
                                         <div id="field-email" class="@error('email') elive-field-invalid @enderror">
-                                            <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                            <label for="registration-email" style="display:block;font-weight:800;margin-bottom:7px;">
                                                 Email Address
                                                 @if ($standardFields['email']['required'])
                                                     <span style="color:#dc2626;">*</span>
@@ -1273,7 +1330,8 @@
                                             </label>
                                             <input
                                                 type="email"
-                                                name="email"
+                                                id="registration-email" aria-invalid="{{ $errors->has('email') ? 'true' : 'false' }}"
+                                            name="email"
                                                 value="{{ old('email') }}"
                                                 autocomplete="email"
                                                 @required($standardFields['email']['required'])
@@ -1318,14 +1376,15 @@
                                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
                                         @if ($standardFields['organization']['show'])
                                             <div id="field-organization-name" class="@error('organization_name') elive-field-invalid @enderror">
-                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                <label for="registration-organization-name" style="display:block;font-weight:800;margin-bottom:7px;">
                                                     {{ $organizationFieldLabel }}
                                                     @if ($standardFields['organization']['required'])
                                                         <span style="color:#dc2626;">*</span>
                                                     @endif
                                                 </label>
                                                 <input
-                                                    name="organization_name"
+                                                    id="registration-organization-name" aria-invalid="{{ $errors->has('organization_name') ? 'true' : 'false' }}"
+                                            name="organization_name"
                                                     value="{{ old('organization_name') }}"
                                                     @required($standardFields['organization']['required'])
                                                     style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
@@ -1340,14 +1399,15 @@
 
                                         @if ($standardFields['position']['show'])
                                             <div id="field-position" class="@error('position') elive-field-invalid @enderror">
-                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                <label for="registration-position" style="display:block;font-weight:800;margin-bottom:7px;">
                                                     {{ $positionFieldLabel }}
                                                     @if ($standardFields['position']['required'])
                                                         <span style="color:#dc2626;">*</span>
                                                     @endif
                                                 </label>
                                                 <input
-                                                    name="position"
+                                                    id="registration-position" aria-invalid="{{ $errors->has('position') ? 'true' : 'false' }}"
+                                            name="position"
                                                     value="{{ old('position') }}"
                                                     @required($standardFields['position']['required'])
                                                     style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;"
@@ -1362,7 +1422,7 @@
 
                                         @if ($standardFields['category']['show'])
                                             <div id="field-category-id" class="@error('category_id') elive-field-invalid @enderror">
-                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                <label for="registration-category-id" style="display:block;font-weight:800;margin-bottom:7px;">
                                                     {{ $categoryFieldLabel }}
                                                     @if ($standardFields['category']['required'])
                                                         <span style="color:#dc2626;">*</span>
@@ -1371,7 +1431,8 @@
 
                                                 @if ($availableCategories->isNotEmpty())
                                                     <select
-                                                        name="category_id"
+                                                        id="registration-category-id" aria-invalid="{{ $errors->has('category_id') ? 'true' : 'false' }}"
+                                            name="category_id"
                                                         @required($standardFields['category']['required'])
                                                         style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
                                                     >
@@ -1409,14 +1470,15 @@
 
                                         @if ($standardFields['badge_type']['show'] && $availableBadgeTypes->isNotEmpty())
                                             <div id="field-badge-type-id" class="@error('badge_type_id') elive-field-invalid @enderror">
-                                                <label style="display:block;font-weight:800;margin-bottom:7px;">
+                                                <label for="registration-badge-type-id" style="display:block;font-weight:800;margin-bottom:7px;">
                                                     Badge Type
                                                     @if ($standardFields['badge_type']['required'])
                                                         <span style="color:#dc2626;">*</span>
                                                     @endif
                                                 </label>
                                                 <select
-                                                    name="badge_type_id"
+                                                    id="registration-badge-type-id" aria-invalid="{{ $errors->has('badge_type_id') ? 'true' : 'false' }}"
+                                            name="badge_type_id"
                                                     @required($standardFields['badge_type']['required'])
                                                     style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:14px;padding:12px;font-size:15px;background:white;"
                                                 >
@@ -3034,7 +3096,12 @@
             ) {
                 event.preventDefault();
 
-                window.alert('Please select at least one event day.');
+                const notice = registrationForm.querySelector('[data-form-notice]');
+                if (notice) {
+                    notice.textContent = 'Please select at least one event day.';
+                    notice.hidden = false;
+                    notice.focus();
+                }
 
                 return;
             }
@@ -3141,6 +3208,14 @@
             refreshVisibility();
         });
 
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted && submitButton) {
+                submitButton.disabled = false;
+                submitButton.style.opacity = '';
+                submitButton.style.cursor = '';
+                refreshSubmitLabel();
+            }
+        });
         refreshSubmitLabel();
         refreshPaymentTotal();
     });

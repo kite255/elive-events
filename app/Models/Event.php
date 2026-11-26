@@ -24,6 +24,8 @@ class Event extends Model
     public const STAFF_STATUS_INACTIVE = 'inactive';
     public const STAFF_STATUS_SUSPENDED = 'suspended';
 
+    protected $hidden = ['registration_access_code_hash'];
+
     protected $fillable = [
         'organization_id',
         'name',
@@ -70,6 +72,7 @@ class Event extends Model
         'session_check_in_enabled',
 
         'registration_is_open',
+        'registration_access_code_hash',
         'registration_requires_approval',
         'registration_banner_image_path',
         'social_share_image_path',
@@ -1722,6 +1725,7 @@ class Event extends Model
                 [
                     'pending_approval',
                     'registered',
+                    'approved',
                     'confirmed',
                     'checked_in',
                 ]
@@ -1736,6 +1740,7 @@ class Event extends Model
                 'status',
                 [
                     'registered',
+                    'approved',
                     'confirmed',
                     'checked_in',
                 ]

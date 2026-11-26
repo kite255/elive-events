@@ -12,7 +12,7 @@ use App\Models\EventSession;
 use App\Models\MerchandiseVariant;
 use App\Models\Payment;
 use App\Services\AutomaticCommunicationService;
-use App\Services\BadgeGenerationService;
+use App\Jobs\GeneratePublicRegistrationBadge;
 use App\Services\PhoneNumberService;
 use App\Services\Payments\PaymentService;
 use Illuminate\Database\Eloquent\Collection;
@@ -85,6 +85,11 @@ class PublicRegistrationController extends Controller
 
     public function store(Request $request, Event $event): RedirectResponse
     {
+        // Prevent validation redirects from flashing the secret into session input.
+        $accessCode = $request->input('registration_access_code');
+        $request->request->remove('registration_access_code');
+        $request->query->remove('registration_access_code');
+
         $event->load([
             'organization',
             'registrationFields',
@@ -145,24 +150,6 @@ class PublicRegistrationController extends Controller
             ? strtolower(trim($validated['email'] ?? ''))
             : '';
 
-        $duplicateReason = $this->duplicateRegistrationReason(
-            $event,
-            $fullName,
-            $email
-        );
-
-        if ($duplicateReason) {
-            return back()
-                ->withInput()
-                ->with('error', $duplicateReason);
-        }
-
-        $status = match (true) {
-            $isFull && $waitlistEnabled => 'waitlisted',
-            $event->registration_requires_approval => 'pending_approval',
-            default => 'registered',
-        };
-
         /*
         |--------------------------------------------------------------------------
         | Participant type and badge resolution
@@ -214,10 +201,51 @@ class PublicRegistrationController extends Controller
                     $fullName,
                     $phone,
                     $email,
-                    $status,
+                    $accessCode,
                     $categoryId,
                     $badgeTypeId
                 ): Attendee {
+                    // Re-read admission settings and capacity while holding the event lock.
+                    $lockedEvent = Event::query()
+                        ->whereKey($event->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    if (! $lockedEvent->registration_is_open) {
+                        throw ValidationException::withMessages([
+                            'full_name' => 'Registration for this event is currently closed.',
+                        ]);
+                    }
+
+                    if (filled($lockedEvent->registration_access_code_hash)
+                        && (! is_string($accessCode) || strlen($accessCode) > 72
+                            || ! \Illuminate\Support\Facades\Hash::check($accessCode, $lockedEvent->registration_access_code_hash))) {
+                        throw ValidationException::withMessages([
+                            'registration_access_code' => 'Enter the valid access code provided by the event organizer.',
+                        ]);
+                    }
+
+                    $status = $lockedEvent->nextRegistrationStatus();
+
+                    if ($status === 'closed') {
+                        throw ValidationException::withMessages([
+                            'full_name' => 'Registration is full. The event has reached its capacity.',
+                        ]);
+                    }
+
+                    $duplicateReason = $this->duplicateRegistrationReason(
+                        $event,
+                        $fullName,
+                        $phone,
+                        $email
+                    );
+
+                    if ($duplicateReason) {
+                        throw ValidationException::withMessages([
+                            'full_name' => $duplicateReason,
+                        ]);
+                    }
+
                     $attendee = Attendee::create([
                         'event_id' => $event->id,
                         'category_id' => $categoryId,
@@ -301,6 +329,7 @@ class PublicRegistrationController extends Controller
         */
 
         $attendee->refresh();
+        $status = $attendee->status;
 
         /*
         |--------------------------------------------------------------------------
@@ -339,7 +368,7 @@ class PublicRegistrationController extends Controller
                     'public.registration.success',
                     [
                         'event' => $event,
-                        'attendee' => $attendee,
+                        'attendee' => $attendee->public_token,
                     ]
                 )->with(
                     'error',
@@ -352,10 +381,11 @@ class PublicRegistrationController extends Controller
             $event->registration_auto_generate_badge
             && $status === 'registered'
         ) {
-            app(BadgeGenerationService::class)
-                ->generateForAttendee($attendee);
-
-            $attendee->refresh();
+            try {
+                GeneratePublicRegistrationBadge::dispatch($attendee->id)->afterCommit();
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
 
         /*
@@ -380,19 +410,55 @@ class PublicRegistrationController extends Controller
             'public.registration.success',
             [
                 'event' => $event,
-                'attendee' => $attendee,
+                'attendee' => $attendee->public_token,
             ]
         );
     }
 
+    public function resumePayment(Event $event, string $attendee): RedirectResponse
+    {
+        abort_unless(preg_match('/\\A[A-Za-z0-9]{32}\\z/', $attendee) === 1, 404);
+
+        $participant = Attendee::query()
+            ->where('event_id', $event->id)
+            ->where('public_token', $attendee)
+            ->firstOrFail();
+
+        abort_unless($participant->isApproved(), 403);
+
+        try {
+            $payment = app(PaymentService::class)->createForAttendee($participant);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return redirect()->route('public.registration.success', [
+                'event' => $event->slug,
+                'attendee' => $participant->public_token,
+            ])->with('error', 'Payment is currently unavailable. Please contact the event organizer.');
+        }
+
+        $canStart = $payment->isPending()
+            && blank($payment->provider_tracking_id)
+            && blank(data_get($payment->metadata, 'checkout_attempted_at'));
+
+        return redirect()->route($canStart ? 'payments.pay' : 'payments.status', [
+            'payment' => $payment->reference,
+        ]);
+    }
+
     public function success(
         Event $event,
-        Attendee $attendee
+        string $attendee
     ): View {
         abort_unless(
-            (int) $attendee->event_id === (int) $event->id,
+            preg_match('/\\A[A-Za-z0-9]{32}\\z/', $attendee) === 1,
             404
         );
+
+        $attendee = Attendee::query()
+            ->where('event_id', $event->id)
+            ->where('public_token', $attendee)
+            ->firstOrFail();
 
         $event->load([
             'organization',
@@ -416,17 +482,19 @@ class PublicRegistrationController extends Controller
         |
         */
 
-        $payment = Payment::query()
-            ->where(
-                'event_id',
-                $event->id
-            )
-            ->where(
-                'attendee_id',
-                $attendee->id
-            )
+        $registrationPayments = Payment::query()
+            ->where('event_id', $event->id)
+            ->where('attendee_id', $attendee->id)
+            ->whereNull('ticket_order_id')
+            ->whereNull('ticket_upgrade_id')
+            ->whereNull('donation_id')
+            ->whereNull('merchandise_order_id');
+
+        $payment = (clone $registrationPayments)
+            ->where('status', Payment::STATUS_COMPLETED)
             ->latest('id')
-            ->first();
+            ->first()
+            ?? $registrationPayments->latest('id')->first();
 
         return view(
             'public.events.success',
@@ -1365,51 +1433,33 @@ class PublicRegistrationController extends Controller
     protected function duplicateRegistrationReason(
         Event $event,
         string $fullName,
+        ?string $phone,
         ?string $email
     ): ?string {
-        $normalizedName = strtolower(
-            trim($fullName)
-        );
+        // Names and shared contact details are not unique on their own.
+        // Without a contact method, identity cannot be established reliably.
+        if (blank($phone) && blank($email)) {
+            return null;
+        }
 
-        $nameExists = Attendee::query()
+        $duplicate = Attendee::query()
             ->where('event_id', $event->id)
-            ->whereNotIn('status', [
-                'rejected',
-                'cancelled',
-            ])
-            ->whereRaw(
-                'LOWER(TRIM(full_name)) = ?',
-                [$normalizedName]
-            )
+            ->whereNotIn('status', ['rejected', 'cancelled'])
+            ->whereRaw('LOWER(TRIM(full_name)) = ?', [mb_strtolower(trim($fullName))])
+            ->where(function ($query) use ($phone, $email): void {
+                if (filled($phone)) {
+                    $query->where('phone', $phone);
+                }
+
+                if (filled($email)) {
+                    $query->orWhereRaw('LOWER(TRIM(email)) = ?', [mb_strtolower(trim($email))]);
+                }
+            })
             ->exists();
 
-        if ($nameExists) {
-            return 'This attendee name is already registered for this event. Please verify the name or contact the event organizer.';
-        }
-
-        if (filled($email)) {
-            $normalizedEmail = strtolower(
-                trim($email)
-            );
-
-            $emailExists = Attendee::query()
-                ->where('event_id', $event->id)
-                ->whereNotIn('status', [
-                    'rejected',
-                    'cancelled',
-                ])
-                ->whereRaw(
-                    'LOWER(TRIM(email)) = ?',
-                    [$normalizedEmail]
-                )
-                ->exists();
-
-            if ($emailExists) {
-                return 'This email address is already registered for this event. Please use a different email address or contact the event organizer.';
-            }
-        }
-
-        return null;
+        return $duplicate
+            ? 'A registration with this name and contact information already exists. Please contact the event organizer if you need assistance.'
+            : null;
     }
 
     protected function registrationStats(Event $event): array

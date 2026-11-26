@@ -650,7 +650,7 @@ Route::post(
         PublicRegistrationController::class,
         'store',
     ]
-)->name(
+)->middleware('throttle:10,1')->name(
     'public.registration.store'
 );
 
@@ -663,6 +663,10 @@ Route::get(
 )->name(
     'public.registration.success'
 );
+
+Route::post('/register/{event:slug}/success/{attendee}/payment', [PublicRegistrationController::class, 'resumePayment'])
+    ->middleware('throttle:10,1')
+    ->name('public.registration.payment.resume');
 
 /*
 |--------------------------------------------------------------------------
@@ -718,7 +722,7 @@ Route::post(
         PublicRegistrationController::class,
         'store',
     ]
-)->name(
+)->middleware('throttle:10,1')->name(
     'public.events.register.store'
 );
 

@@ -93,6 +93,7 @@ class AttendeesRelationManager extends RelationManager
                         'waitlisted' => 'Waitlisted',
                         'registered' => 'Registered',
                         'confirmed' => 'Confirmed',
+                        'approved' => 'Approved',
                         'checked_in' => 'Checked In',
                         'cancelled' => 'Cancelled',
                         'rejected' => 'Rejected',
@@ -211,7 +212,7 @@ class AttendeesRelationManager extends RelationManager
                         'pending_approval' => 'warning',
                         'waitlisted' => 'warning',
                         'registered' => 'gray',
-                        'confirmed' => 'success',
+                        'confirmed', 'approved' => 'success',
                         'checked_in' => 'info',
                         'cancelled', 'rejected' => 'danger',
                         default => 'gray',
@@ -221,6 +222,7 @@ class AttendeesRelationManager extends RelationManager
                         'waitlisted' => 'Waitlisted',
                         'registered' => 'Registered',
                         'confirmed' => 'Confirmed',
+                        'approved' => 'Approved',
                         'checked_in' => 'Checked In',
                         'cancelled' => 'Cancelled',
                         'rejected' => 'Rejected',
@@ -264,13 +266,15 @@ class AttendeesRelationManager extends RelationManager
                 IconColumn::make('badge_path')
                     ->label('Badge')
                     ->boolean()
-                    ->getStateUsing(fn ($record): bool => filled($record->badge_path)),
+                    ->getStateUsing(fn ($record): bool => filled($record->badge_path))
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 IconColumn::make('public_token')
                     ->label('Public Link')
                     ->boolean()
                     ->getStateUsing(fn ($record): bool => filled($record->public_token))
-                    ->visible(fn (): bool => DbSchema::hasColumn('attendees', 'public_token')),
+                    ->visible(fn (): bool => DbSchema::hasColumn('attendees', 'public_token'))
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('attendance_status')
                     ->label('Attendance')
@@ -292,13 +296,14 @@ class AttendeesRelationManager extends RelationManager
                             'attended' => 'success',
                             default => 'gray',
                         }
-                    ),
+                    )
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('organization_name')
                     ->label('Organization')
                     ->searchable()
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('position')
                     ->label('Position')
@@ -376,6 +381,7 @@ class AttendeesRelationManager extends RelationManager
                         'waitlisted' => 'Waitlisted',
                         'registered' => 'Registered',
                         'confirmed' => 'Confirmed',
+                        'approved' => 'Approved',
                         'checked_in' => 'Checked In',
                         'cancelled' => 'Cancelled',
                         'rejected' => 'Rejected',
@@ -525,9 +531,12 @@ class AttendeesRelationManager extends RelationManager
                         ->modalHeading('Approve registration?')
                         ->modalDescription('This attendee will be approved and their badge will be generated.')
                         ->action(function ($record): void {
-                            $record->forceFill([
-                                'status' => 'registered',
-                            ])->save();
+                            try {
+                                $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'pending_approval', 'registered');
+                            } catch (\Illuminate\Validation\ValidationException $exception) {
+                                Notification::make()->title('Registration not changed')->body($exception->validator->errors()->first())->warning()->send();
+                                return;
+                            }
 
                             try {
                                 app(BadgeGenerationService::class)->generateForAttendee(
@@ -557,9 +566,12 @@ class AttendeesRelationManager extends RelationManager
                         ->modalHeading('Move attendee from waitlist?')
                         ->modalDescription('This attendee will be moved from waitlist to registered. A badge will be generated.')
                         ->action(function ($record): void {
-                            $record->forceFill([
-                                'status' => 'registered',
-                            ])->save();
+                            try {
+                                $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'waitlisted', 'registered');
+                            } catch (\Illuminate\Validation\ValidationException $exception) {
+                                Notification::make()->title('Registration not changed')->body($exception->validator->errors()->first())->warning()->send();
+                                return;
+                            }
 
                             try {
                                 app(BadgeGenerationService::class)->generateForAttendee(
@@ -593,9 +605,12 @@ class AttendeesRelationManager extends RelationManager
                         ->modalHeading('Reject registration?')
                         ->modalDescription('This attendee will be marked as rejected.')
                         ->action(function ($record): void {
-                            $record->forceFill([
-                                'status' => 'rejected',
-                            ])->save();
+                            try {
+                                $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), $record->status, 'rejected');
+                            } catch (\Illuminate\Validation\ValidationException $exception) {
+                                Notification::make()->title('Registration not changed')->body($exception->validator->errors()->first())->warning()->send();
+                                return;
+                            }
 
                             Notification::make()
                                 ->title('Registration rejected')
@@ -782,6 +797,7 @@ class AttendeesRelationManager extends RelationManager
                         ->modalHeading('Approve selected registrations?')
                         ->modalDescription('Selected pending attendees will be approved. Badges will be generated where possible.')
                         ->action(function (Collection $records): void {
+                            $transitionSkipped = 0;
                             $approved = 0;
                             $badgesGenerated = 0;
                             $badgeFailed = 0;
@@ -791,9 +807,12 @@ class AttendeesRelationManager extends RelationManager
                                     continue;
                                 }
 
-                                $record->forceFill([
-                                    'status' => 'registered',
-                                ])->save();
+                                try {
+                                    $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'pending_approval', 'registered');
+                                } catch (\Illuminate\Validation\ValidationException $exception) {
+                                    $transitionSkipped++;
+                                    continue;
+                                }
 
                                 $approved++;
 
@@ -814,6 +833,9 @@ class AttendeesRelationManager extends RelationManager
                                 body: "Approved: {$approved}. Badges generated: {$badgesGenerated}. Badge failed: {$badgeFailed}.",
                                 failed: $badgeFailed
                             );
+                            if ($transitionSkipped > 0) {
+                                Notification::make()->title('Registrations skipped')->body("{$transitionSkipped} selected records could not be changed because their status or capacity no longer permits it.")->warning()->send();
+                            }
                         }),
 
                     BulkAction::make('move_waitlist_to_registered')
@@ -824,6 +846,7 @@ class AttendeesRelationManager extends RelationManager
                         ->modalHeading('Move selected waitlisted attendees?')
                         ->modalDescription('Selected waitlisted attendees will be moved to registered. Badges will be generated where possible.')
                         ->action(function (Collection $records): void {
+                            $transitionSkipped = 0;
                             $moved = 0;
                             $badgesGenerated = 0;
                             $badgeFailed = 0;
@@ -833,9 +856,12 @@ class AttendeesRelationManager extends RelationManager
                                     continue;
                                 }
 
-                                $record->forceFill([
-                                    'status' => 'registered',
-                                ])->save();
+                                try {
+                                    $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'waitlisted', 'registered');
+                                } catch (\Illuminate\Validation\ValidationException $exception) {
+                                    $transitionSkipped++;
+                                    continue;
+                                }
 
                                 $moved++;
 
@@ -856,6 +882,9 @@ class AttendeesRelationManager extends RelationManager
                                 body: "Moved: {$moved}. Badges generated: {$badgesGenerated}. Badge failed: {$badgeFailed}.",
                                 failed: $badgeFailed
                             );
+                            if ($transitionSkipped > 0) {
+                                Notification::make()->title('Registrations skipped')->body("{$transitionSkipped} selected records could not be changed because their status or capacity no longer permits it.")->warning()->send();
+                            }
                         }),
 
                     BulkAction::make('reject_registrations')
@@ -866,6 +895,7 @@ class AttendeesRelationManager extends RelationManager
                         ->modalHeading('Reject selected registrations?')
                         ->modalDescription('Selected attendees will be marked as rejected.')
                         ->action(function (Collection $records): void {
+                            $transitionSkipped = 0;
                             $rejected = 0;
 
                             foreach ($records as $record) {
@@ -877,9 +907,12 @@ class AttendeesRelationManager extends RelationManager
                                     continue;
                                 }
 
-                                $record->forceFill([
-                                    'status' => 'rejected',
-                                ])->save();
+                                try {
+                                    $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), $record->status, 'rejected');
+                                } catch (\Illuminate\Validation\ValidationException $exception) {
+                                    $transitionSkipped++;
+                                    continue;
+                                }
 
                                 $rejected++;
                             }
@@ -889,6 +922,9 @@ class AttendeesRelationManager extends RelationManager
                                 ->body($rejected . ' attendee(s) rejected.')
                                 ->success()
                                 ->send();
+                            if ($transitionSkipped > 0) {
+                                Notification::make()->title('Registrations skipped')->body("{$transitionSkipped} selected records could not be changed because their status or capacity no longer permits it.")->warning()->send();
+                            }
                         }),
 
                     BulkAction::make('resend_badges')

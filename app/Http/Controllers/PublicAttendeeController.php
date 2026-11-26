@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendee;
+use App\Models\Payment;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 class PublicAttendeeController extends Controller
 {
-    public function show(string $token): View
+    public function show(string $token): View|RedirectResponse
     {
         $attendee = Attendee::query()
             ->where('public_token', $token)
@@ -21,6 +23,30 @@ class PublicAttendeeController extends Controller
             ->firstOrFail();
 
         $event = $attendee->event;
+
+        // Public registration badges must not be released before required payment.
+        if ($event && in_array($attendee->registration_source, ['public', 'public_form', 'public_registration'], true)) {
+            $settings = $event->paymentSetting;
+            $requiresPayment = $settings?->payments_enabled
+                && (float) $settings->registration_fee > 0;
+
+            $paid = ! $requiresPayment || Payment::query()
+                ->where('event_id', $event->id)
+                ->where('attendee_id', $attendee->id)
+                ->whereNull('ticket_order_id')
+                ->whereNull('ticket_upgrade_id')
+                ->whereNull('donation_id')
+                ->whereNull('merchandise_order_id')
+                ->where('status', Payment::STATUS_COMPLETED)
+                ->exists();
+
+            if (! $attendee->isApproved() || ! $paid) {
+                return redirect()->route('public.registration.success', [
+                    'event' => $event->slug,
+                    'attendee' => $attendee->public_token,
+                ]);
+            }
+        }
 
         return view('public.attendees.show', [
             'attendee' => $attendee,

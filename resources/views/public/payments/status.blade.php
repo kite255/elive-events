@@ -715,7 +715,21 @@
         </div>
 
 
+        @php
+            $isRegistrationPayment = $payment->attendee
+                && ! $payment->ticket_order_id
+                && ! $payment->ticket_upgrade_id
+                && ! $payment->donation_id
+                && ! $payment->merchandise_order_id;
+        @endphp
+
         <div class="actions">
+
+            @if ($isRegistrationPayment && $payment->event && filled($payment->attendee->public_token))
+                <a class="button button-primary" href="{{ route('public.registration.success', ['event' => $payment->event->slug, 'attendee' => $payment->attendee->public_token]) }}">
+                    Return to Registration
+                </a>
+            @endif
 
             @if (
                 ! $checkoutUnavailable
@@ -733,11 +747,10 @@
 
 
             @if (
-                $payment->isFailed()
-                || $payment->status
-                    === \App\Models\Payment::STATUS_CANCELLED
-                || $payment->status
-                    === \App\Models\Payment::STATUS_EXPIRED
+                ! $isRegistrationPayment
+                && ($payment->isFailed()
+                    || $payment->status === \App\Models\Payment::STATUS_CANCELLED
+                    || $payment->status === \App\Models\Payment::STATUS_EXPIRED)
             )
 
                 <a
