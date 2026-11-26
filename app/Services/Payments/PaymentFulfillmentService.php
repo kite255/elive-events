@@ -11,7 +11,9 @@ use App\Services\Tickets\TicketAccessDeliveryService;
 use App\Services\Tickets\TicketAvailabilityService;
 use App\Services\Tickets\TicketIssuanceService;
 use App\Services\Tickets\TicketUpgradeFulfillmentService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -75,9 +77,7 @@ class PaymentFulfillmentService
 
             $payment = $payment->fresh([$relation]);
             if ($relation === 'attendee') {
-                $this->fulfillAttendeePayment($payment);
-                $this->markPaymentFulfilled($payment);
-                return $payment->fresh(['attendee']);
+                return $this->fulfillRegistrationWithLock($payment);
             }
 
             // Notification failures must not undo committed financial changes.
@@ -288,6 +288,51 @@ class PaymentFulfillmentService
         $this->ticketAccessDeliveryService->queueAutomatic($order);
     }
 
+    // File generation and communication dispatch must remain outside the
+    // database transaction. Serialize registration fulfillment by attendee
+    // (not payment ID), including distinct completed payment attempts.
+    private function fulfillRegistrationWithLock(Payment $payment): Payment
+    {
+        $lock = Cache::lock('payment:registration-fulfillment:' . $payment->attendee_id, 300);
+
+        if (! $lock->get()) {
+            throw new RuntimeException('Registration fulfillment is already in progress.');
+        }
+
+        try {
+            $payment = Payment::query()->findOrFail($payment->id);
+
+            if (! $payment->isCompleted()) {
+                throw new RuntimeException('Payment must be completed before fulfillment.');
+            }
+
+            if ($payment->isFulfilled()) {
+                return $payment;
+            }
+
+            $previous = Payment::query()
+                ->where('attendee_id', $payment->attendee_id)
+                ->where('id', '!=', $payment->id)
+                ->whereNull('ticket_order_id')
+                ->whereNull('ticket_upgrade_id')
+                ->whereNull('donation_id')
+                ->whereNull('merchandise_order_id')
+                ->whereNotNull('fulfilled_at')
+                ->exists();
+
+            if ($previous) {
+                throw new RuntimeException('Another payment already fulfilled this registration. Payment requires manual reconciliation.');
+            }
+
+            $this->fulfillAttendeePayment($payment);
+            $this->markPaymentFulfilled($payment);
+
+            return $payment->fresh(['attendee']);
+        } finally {
+            $lock->release();
+        }
+    }
+
     private function fulfillAttendeePayment(Payment $payment): void
     {
         $payment->loadMissing(['attendee.event.paymentSetting']);
@@ -322,6 +367,7 @@ class PaymentFulfillmentService
         if (
             $event->registration_auto_generate_badge
             && (! $settings || $settings->payment_required_before_badge)
+            && (blank($attendee->badge_path) || ! Storage::disk('public')->exists($attendee->badge_path))
         ) {
             $this->badgeGenerationService->generateForAttendee($attendee);
             $attendee->refresh();
