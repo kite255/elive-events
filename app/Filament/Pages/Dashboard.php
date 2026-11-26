@@ -16,9 +16,9 @@ class Dashboard extends BaseDashboard
         return [
             DashboardEventSwitcher::class,
             EventOperationsOverview::class,
+            DashboardQuickActions::class,
             DashboardRevenueSummary::class,
             DashboardUpcomingEvents::class,
-            DashboardQuickActions::class,
         ];
     }
 }
