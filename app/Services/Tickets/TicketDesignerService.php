@@ -5,6 +5,9 @@ namespace App\Services\Tickets;
 use App\Models\EventTicketTemplate;
 use App\Models\OrganizationTicketTemplate;
 use App\Models\TicketTemplatePage;
+use App\Models\TicketTemplateAsset;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -263,6 +266,7 @@ class TicketDesignerService
         TicketTemplatePage $page,
         array $definition
     ): TicketTemplatePage {
+        $page = TicketTemplatePage::query()->findOrFail($page->id);
         $eventTemplateId = $page->event_ticket_template_id;
 
         $organizationTemplateId =
@@ -295,10 +299,65 @@ class TicketDesignerService
             (int) $template->height
         );
 
+        $this->validateAssetReferences($page, $validatedDefinition);
+
         $page->update([
             'definition' => $validatedDefinition,
         ]);
 
         return $page->refresh();
     }
+
+    private function validateAssetReferences(TicketTemplatePage $page, array $definition): void
+    {
+        $eventId = $page->event_ticket_template_id;
+        $organizationId = $page->organization_ticket_template_id;
+        $prefix = 'ticket-template-elements/'.($eventId !== null ? 'event/'.$eventId : 'organization/'.$organizationId).'/';
+        $existing = collect($page->definition['elements'] ?? [])->keyBy('id');
+
+        foreach ($definition['elements'] as $index => $element) {
+            $path = $element['asset_path'] ?? null;
+            $assetId = $element['asset_id'] ?? null;
+            if ($path === null && $assetId === null) {
+                continue;
+            }
+
+            $reject = static function () use ($index): never {
+                throw ValidationException::withMessages([
+                    "elements.{$index}.asset_path" => ['The image asset does not belong to this ticket template.'],
+                ]);
+            };
+
+            if (! in_array($element['type'], ['image', 'logo', 'sponsor_logo'], true)) {
+                $reject();
+            }
+
+            if ($assetId !== null) {
+                if (! is_int($assetId) && (! is_string($assetId) || ! ctype_digit($assetId))) {
+                    $reject();
+                }
+                $asset = TicketTemplateAsset::query()
+                    ->where('event_ticket_template_id', $eventId)
+                    ->where('organization_ticket_template_id', $organizationId)
+                    ->whereIn('asset_type', ['image', 'logo', 'sponsor_logo'])
+                    ->find($assetId);
+                if (! $asset || ($path !== null && $path !== $asset->file_path)) {
+                    $reject();
+                }
+                $path = $asset->file_path;
+            }
+
+            if (! is_string($path) || ! preg_match('~\A ticket-template-elements/(?:[a-z]+/[0-9]+/)?[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)\z~ix', $path)) {
+                $reject();
+            }
+
+            $previous = $existing->get($element['id'], []);
+            $legacy = preg_match('~\Aticket-template-elements/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)\z~i', $path)
+                && ($previous['asset_path'] ?? null) === $path;
+            if (! $legacy && (! str_starts_with($path, $prefix) || ! Storage::disk('public')->exists($path))) {
+                $reject();
+            }
+        }
+    }
+
 }
