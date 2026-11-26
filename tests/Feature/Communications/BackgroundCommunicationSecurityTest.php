@@ -122,7 +122,10 @@ class BackgroundCommunicationSecurityTest extends TestCase
         $communication = $this->communication($this->event());
         $actor = User::factory()->create(['is_super_admin' => true]);
         $job = new QueueEventCommunicationCampaignJob($communication->id, 'sms', createdBy: $actor->id);
-        $actor->update(['is_gate_staff' => true]);
+        $this->assertTrue($actor->fresh()->canManageEventCommunication($communication->event));
+        $actor->forceFill(['is_gate_staff' => true])->save();
+        $this->assertTrue($actor->fresh()->is_gate_staff);
+        $this->assertFalse($actor->fresh()->canManageEventCommunication($communication->event));
 
         $job->handle(app(EventCommunicationCampaignService::class));
 
