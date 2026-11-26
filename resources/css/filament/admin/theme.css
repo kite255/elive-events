@@ -223,59 +223,59 @@
 
 /* Filament dashboard widgets occupy separate full-width rows so that the
    stats widget does not squeeze its own inner grid into half a page. */
-.fi-dashboard-page .fi-widgets > .fi-wi {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-widgets > .fi-wi {
     grid-column: 1 / -1;
     min-width: 0;
 }
 
-.fi-dashboard-page .fi-wi-stats-overview-stats-ctn {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi-stats-overview-stats-ctn {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
     gap: 1rem;
 }
 
-.fi-dashboard-page .fi-wi-stats-overview-stat {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi-stats-overview-stat {
     min-width: 0;
     padding: 1rem;
 }
 
 /* Compact dashboard layout based on the approved eLive dashboard reference. */
-.fi-dashboard-page .fi-wi-stats-overview-stats-ctn {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi-stats-overview-stats-ctn {
     gap: 0.75rem;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
 }
 
-.fi-dashboard-page .fi-wi-stats-overview-stat {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi-stats-overview-stat {
     border-radius: 12px;
     box-shadow: none;
     padding: 0.875rem;
     min-width: 0;
 }
 
-.fi-dashboard-page .fi-wi-stats-overview-stat:hover {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi-stats-overview-stat:hover {
     transform: none;
     box-shadow: none;
 }
 
-.fi-dashboard-page .fi-wi-stats-overview-stat-label {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi-stats-overview-stat-label {
     font-size: 0.875rem;
 }
 
-.fi-dashboard-page .fi-wi-stats-overview-stat-value {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi-stats-overview-stat-value {
     font-size: 1.625rem;
     line-height: 1.25;
 }
 
-.fi-dashboard-page .fi-section {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-section {
     border-radius: 12px;
     box-shadow: none;
 }
 
-.fi-dashboard-page .fi-wi {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-wi {
     min-width: 0;
 }
 
-.fi-dashboard-page .fi-widgets {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-widgets {
     gap: 1rem;
 }
 
@@ -384,63 +384,63 @@
 }
 
 /* Compact global dashboard only: preserve normal page scrolling and mobile reflow. */
-.fi-dashboard-page .fi-widgets {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-widgets {
     gap: 0.625rem;
 }
 
-.fi-dashboard-page .elive-overview-stat {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-overview-stat {
     min-height: 5rem;
     padding: 0.625rem;
     gap: 0.25rem;
 }
 
-.fi-dashboard-page .elive-overview-grid {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-overview-grid {
     gap: 0.5rem;
 }
 
-.fi-dashboard-page .elive-quick-action {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-quick-action {
     min-height: 2.25rem;
     padding-block: 0.375rem;
 }
 
-.fi-dashboard-page .fi-section {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-section {
     border-radius: 10px;
 }
 
-.fi-dashboard-page .fi-section-header,
-.fi-dashboard-page .fi-section-content {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-section-header,
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-section-content {
     padding: 0.75rem;
 }
 
 @media (min-width: 1024px) {
-    .fi-dashboard-page .fi-widgets > .fi-wi:has(.elive-dashboard-compact-panel) {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .fi-widgets > .fi-wi:has(.elive-dashboard-compact-panel) {
         grid-column: span 1 / span 1;
     }
 }
 
 /* Compact dashboard: content-sized rows rather than nested statistic cards. */
-.fi-dashboard-page .elive-sales-row {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-sales-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: .75rem;
 }
-.fi-dashboard-page .elive-sales-row > div {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-sales-row > div {
     display: flex;
     flex-direction: column;
     gap: .2rem;
     min-width: 0;
 }
-.fi-dashboard-page .elive-sales-row strong {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-sales-row strong {
     font-size: 1.25rem;
     line-height: 1.3;
     font-weight: 700;
     overflow-wrap: anywhere;
 }
-.fi-dashboard-page .elive-sales-summary {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-sales-summary {
     display: grid;
     gap: .5rem;
 }
-.fi-dashboard-page .elive-upcoming-row {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
@@ -448,33 +448,33 @@
     padding-block: .5rem;
     font-size: .875rem;
 }
-.fi-dashboard-page .elive-upcoming-row + .elive-upcoming-row {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-row + .elive-upcoming-row {
     border-top: 1px solid var(--elive-border);
 }
-.fi-dashboard-page .elive-upcoming-name {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-name {
     font-weight: 500;
     color: var(--elive-blue);
     overflow-wrap: anywhere;
 }
-.dark .fi-dashboard-page .elive-upcoming-name {
+.dark :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-name {
     color: #7dd3fc;
 }
-.fi-dashboard-page .elive-upcoming-date,
-.fi-dashboard-page .elive-upcoming-status {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-date,
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-status {
     color: var(--elive-muted);
     font-size: .8125rem;
 }
-.fi-dashboard-page .elive-quick-actions-compact {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-quick-actions-compact {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
 }
 @media (max-width: 640px) {
-    .fi-dashboard-page .elive-sales-row {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-sales-row {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .fi-dashboard-page .elive-upcoming-row {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-row {
         grid-template-columns: minmax(0, 1fr) auto;
     }
-    .fi-dashboard-page .elive-upcoming-name {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-upcoming-name {
         grid-column: 1 / -1;
     }
 }
@@ -484,55 +484,101 @@
     border-radius: .5rem;
     font-weight: 500;
 }
-.fi-dashboard-page .elive-dashboard-toolbar {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-dashboard-toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: .5rem;
 }
-.fi-dashboard-page .elive-dashboard-select {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-dashboard-select {
     flex: 1 1 12rem;
     min-width: 0;
 }
-.fi-dashboard-page :is(.elive-dashboard-primary, .elive-dashboard-secondary) {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) :is(.elive-dashboard-primary, .elive-dashboard-secondary) {
     min-height: 2.375rem;
     padding-block: .375rem;
     font-size: .875rem;
     border-radius: .5rem;
     box-shadow: none;
 }
-.fi-dashboard-page .elive-dashboard-secondary {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-dashboard-secondary {
     justify-content: center;
     width: 100%;
     min-width: 0;
     white-space: normal;
 }
-.fi-dashboard-page .elive-dashboard-secondary .fi-icon {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-dashboard-secondary .fi-icon {
     color: var(--elive-blue);
     width: 1.125rem;
     height: 1.125rem;
 }
-.dark .fi-dashboard-page .elive-dashboard-secondary .fi-icon {
+.dark :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-dashboard-secondary .fi-icon {
     color: #7dd3fc;
 }
-.fi-dashboard-page .elive-quick-actions-compact {
+:is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-quick-actions-compact {
     gap: .5rem;
 }
 @media (min-width: 1024px) {
-    .fi-dashboard-page .elive-quick-actions-compact {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-quick-actions-compact {
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
     }
 }
 @media (max-width: 640px) {
-    .fi-dashboard-page .elive-quick-actions-compact {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-quick-actions-compact {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .fi-dashboard-page .elive-dashboard-toolbar > label {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-dashboard-toolbar > label {
         flex-basis: 100%;
     }
 }
 @media (max-width: 340px) {
-    .fi-dashboard-page .elive-quick-actions-compact {
+    :is(.fi-dashboard-page, .fi-page:has(.elive-operations-overview), .fi-page:has(.elive-dashboard-toolbar)) .elive-quick-actions-compact {
         grid-template-columns: minmax(0, 1fr);
     }
+}
+
+/* Explicit widget hooks do not depend on the framework-generated page class. */
+.elive-dashboard-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.elive-dashboard-select { flex: 1 1 12rem; min-width: 0; }
+.elive-dashboard-primary.fi-btn {
+    background-color: var(--elive-navy);
+    color: #fff;
+    border: 1px solid var(--elive-navy);
+    box-shadow: none;
+}
+.elive-dashboard-primary.fi-btn:hover { background-color: #303e74; }
+.elive-dashboard-primary.fi-btn .fi-icon { color: #fff; }
+.elive-dashboard-primary.fi-btn:focus-visible {
+    outline: 2px solid var(--elive-blue);
+    outline-offset: 2px;
+}
+.elive-operations-overview .elive-overview-stat {
+    min-height: 0;
+    padding: .625rem .75rem;
+    gap: .25rem;
+}
+.elive-overview-value { margin-top: .125rem; }
+.elive-sales-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: .5rem;
+}
+.elive-sales-heading .fi-input-wrp { border-radius: .5rem; }
+.elive-sales-panel {
+    background: var(--elive-surface);
+    border: 1px solid var(--elive-border);
+    border-radius: .625rem;
+    padding: .75rem;
+}
+.elive-sales-panel h2 { font-weight: 600; font-size: .9375rem; }
+@media (max-width: 640px) {
+    .elive-dashboard-toolbar > label { flex-basis: 100%; }
 }
