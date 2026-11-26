@@ -36,6 +36,6 @@ class DashboardUpcomingEvents extends Widget
 
         return $query->where('status', Event::STATUS_ACTIVE)
             ->where('starts_at', '>=', now())
-            ->orderBy('starts_at')->orderBy('id')->limit(5)->get();
+            ->orderBy('starts_at')->orderBy('id')->limit(3)->get();
     }
 }
