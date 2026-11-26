@@ -19,7 +19,6 @@ use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Str;
 
 class EventForm
 {
@@ -149,28 +148,11 @@ class EventForm
                         TextInput::make('name')
                             ->label('Event Name')
                             ->required()
-                            ->maxLength(255)
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(
-                                function (
-                                    string $operation,
-                                    $state,
-                                    callable $set
-                                ): void {
-                                    if (
-                                        $operation === 'create'
-                                        && filled($state)
-                                    ) {
-                                        $set(
-                                            'slug',
-                                            Str::slug($state)
-                                        );
-                                    }
-                                }
-                            ),
+                            ->maxLength(255),
 
                         TextInput::make('slug')
-                            ->label('Slug')
+                            ->label('Public URL slug')
+                            ->visible(fn (string $operation): bool => $operation !== 'create')
                             ->required()
                             ->maxLength(255)
                             ->unique(
@@ -193,6 +175,7 @@ class EventForm
 
                         TextInput::make('event_code')
                             ->label('Event Code')
+                            ->visible(fn (string $operation): bool => $operation !== 'create')
                             ->helperText(
                                 'Used for operational numbering and badges. Example: LC26 gives ELV-LC26-000001.'
                             )
@@ -209,63 +192,6 @@ class EventForm
                                         : null
                             )
                             ->nullable(),
-
-                        Select::make('event_type')
-                            ->label('Event Type')
-                            ->options(
-                                EventPresetService::eventTypes()
-                            )
-                            ->searchable()
-                            ->native(false)
-                            ->live()
-                            ->afterStateUpdated(
-                                function (
-                                    $state,
-                                    $old,
-                                    string $operation,
-                                    Get $get,
-                                    Set $set
-                                ): void {
-                                    if ($operation === 'create' && filled($state)) {
-                                        foreach (EventPresetService::creationDefaults($state) as $field => $value) {
-                                            // Preserve manually customized values when revisiting the first step.
-                                            $previous = EventPresetService::creationDefaults($old);
-                                            if (blank($old) || (array_key_exists($field, $previous) && $get($field) === $previous[$field])) {
-                                                $set($field, $value);
-                                            }
-                                        }
-                                    }
-
-                                    if ($state !== 'other') {
-                                        $set(
-                                            'custom_event_type',
-                                            null
-                                        );
-                                    }
-                                }
-                            )
-                            ->helperText(
-                                'New events receive recommended defaults. Changing the type of an existing event does not reset its saved settings.'
-                            ),
-
-                        TextInput::make(
-                            'custom_event_type'
-                        )
-                            ->label('Custom Event Type')
-                            ->placeholder(
-                                'Example: Medical Research Symposium'
-                            )
-                            ->maxLength(255)
-                            ->required(
-                                fn (Get $get): bool =>
-                                    $get('event_type')
-                                    === 'other'
-                            )
-                            ->visible(
-                                fn (Get $get): bool =>
-                                    $get('event_type')
-                                    === 'other'
-                            ),
 
                         TextInput::make('venue')
                             ->label('Main Venue')
@@ -820,6 +746,7 @@ class EventForm
 
                         Select::make('status')
                             ->label('Status')
+                            ->visible(fn (string $operation): bool => $operation !== 'create')
                             ->options([
                                 'draft' => 'Draft',
                                 'active' => 'Active',
