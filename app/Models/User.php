@@ -205,6 +205,9 @@ class User extends Authenticatable implements FilamentUser
             ->wherePivot(
                 'status',
                 Event::STAFF_STATUS_ACTIVE
+            )->whereIn(
+                'events.organization_id',
+                $this->activeOrganizations()->select('organizations.id')->getQuery(),
             );
     }
 
