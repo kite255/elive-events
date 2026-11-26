@@ -41,6 +41,28 @@ class RegistrationConfirmationSecurityTest extends TestCase
         }
     }
 
+    public function test_payment_recovery_rejects_invalid_tokens_and_unapproved_attendees(): void
+    {
+        $organization = Organization::create(['name' => 'Payment recovery security']);
+        $event = $this->createEvent($organization, 'Payment conference');
+        $otherEvent = $this->createEvent($organization, 'Unrelated conference');
+        $attendee = Attendee::create([
+            'event_id' => $event->id,
+            'full_name' => 'Pending participant',
+            'status' => 'pending_approval',
+            'registration_source' => 'public',
+        ]);
+
+        $url = fn (Event $target, string $token): string => route('public.registration.payment.resume', [
+            'event' => $target->slug,
+            'attendee' => $token,
+        ]);
+
+        $this->post($url($event, (string) $attendee->id))->assertNotFound();
+        $this->post($url($otherEvent, $attendee->public_token))->assertNotFound();
+        $this->post($url($event, $attendee->public_token))->assertForbidden();
+    }
+
     private function createEvent(Organization $organization, string $name): Event
     {
         return Event::create([
