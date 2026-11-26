@@ -358,7 +358,7 @@ class TicketDesigner extends Component
 
         $newPath =
             $this->elementImageUpload->store(
-                'ticket-template-elements',
+                'ticket-template-elements/'.$this->templateType.'/'.$this->templateId,
                 'public'
             );
 
@@ -378,14 +378,7 @@ class TicketDesigner extends Component
             return;
         }
 
-        if (
-            filled($oldPath)
-            && $oldPath !== $newPath
-        ) {
-            Storage::disk('public')->delete(
-                $oldPath
-            );
-        }
+        // Retain previous assets until a trusted reference-aware cleanup is available.
 
         $this->elementImageUpload = null;
 
@@ -439,9 +432,7 @@ class TicketDesigner extends Component
             return;
         }
 
-        Storage::disk('public')->delete(
-            $oldPath
-        );
+        // Detach the image without deleting a client-supplied storage path.
 
         $this->elementImageUpload = null;
 
@@ -480,6 +471,7 @@ class TicketDesigner extends Component
                 'image',
                 'mimes:jpg,jpeg,png,webp',
                 'max:10240',
+                'dimensions:max_width=4000,max_height=4000',
             ],
         ]);
 
@@ -488,7 +480,7 @@ class TicketDesigner extends Component
 
         $newPath =
             $this->backgroundUpload->store(
-                'ticket-template-backgrounds',
+                'ticket-template-backgrounds/'.$this->templateType.'/'.$this->templateId,
                 'public'
             );
 
@@ -497,14 +489,7 @@ class TicketDesigner extends Component
                 $newPath,
         ])->save();
 
-        if (
-            filled($oldPath)
-            && $oldPath !== $newPath
-        ) {
-            Storage::disk('public')->delete(
-                $oldPath
-            );
-        }
+        // Retain previous assets until a trusted reference-aware cleanup is available.
 
         $this->backgroundImagePath =
             $newPath;
@@ -548,11 +533,7 @@ class TicketDesigner extends Component
                 null,
         ])->save();
 
-        if (filled($oldPath)) {
-            Storage::disk('public')->delete(
-                $oldPath
-            );
-        }
+        // Retain the previous background for existing references.
 
         $this->backgroundImagePath =
             null;
