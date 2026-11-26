@@ -417,3 +417,64 @@
         grid-column: span 1 / span 1;
     }
 }
+
+/* Compact dashboard: content-sized rows rather than nested statistic cards. */
+.fi-dashboard-page .elive-sales-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+}
+.fi-dashboard-page .elive-sales-row > div {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    min-width: 0;
+}
+.fi-dashboard-page .elive-sales-row strong {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+.fi-dashboard-page .elive-sales-summary {
+    display: grid;
+    gap: .5rem;
+}
+.fi-dashboard-page .elive-upcoming-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: .75rem;
+    padding-block: .5rem;
+    font-size: .875rem;
+}
+.fi-dashboard-page .elive-upcoming-row + .elive-upcoming-row {
+    border-top: 1px solid var(--elive-border);
+}
+.fi-dashboard-page .elive-upcoming-name {
+    font-weight: 500;
+    color: var(--elive-blue);
+    overflow-wrap: anywhere;
+}
+.dark .fi-dashboard-page .elive-upcoming-name {
+    color: #7dd3fc;
+}
+.fi-dashboard-page .elive-upcoming-date,
+.fi-dashboard-page .elive-upcoming-status {
+    color: var(--elive-muted);
+    font-size: .8125rem;
+}
+.fi-dashboard-page .elive-quick-actions-compact {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+@media (max-width: 640px) {
+    .fi-dashboard-page .elive-sales-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .fi-dashboard-page .elive-upcoming-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .fi-dashboard-page .elive-upcoming-name {
+        grid-column: 1 / -1;
+    }
+}
