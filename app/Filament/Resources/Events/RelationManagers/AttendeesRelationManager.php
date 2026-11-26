@@ -582,6 +582,14 @@ class AttendeesRelationManager extends RelationManager
                             }
                         }),
 
+                    Action::make('registration_payment_link')
+                        ->label('Registration Payment Link')
+                        ->icon('heroicon-o-credit-card')
+                        ->color('info')
+                        ->visible(fn ($record): bool => app(\App\Services\RegistrationPaymentFollowUp::class)->allows($record, auth()->user()))
+                        ->url(fn ($record): string => app(\App\Services\RegistrationPaymentFollowUp::class)->url($record, auth()->user()))
+                        ->openUrlInNewTab(),
+
                     Action::make('reject_registration')
                         ->label('Reject Registration')
                         ->icon('heroicon-o-x-circle')
