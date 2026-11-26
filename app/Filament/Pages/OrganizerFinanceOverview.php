@@ -32,7 +32,7 @@ class OrganizerFinanceOverview extends Page
     {
         $user = Auth::user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -66,7 +66,7 @@ class OrganizerFinanceOverview extends Page
     {
         $user = Auth::user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || ! static::canAccess()) {
             return [];
         }
 
@@ -182,7 +182,7 @@ class OrganizerFinanceOverview extends Page
     ): ?Event {
         $user = Auth::user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || ! static::canAccess()) {
             return null;
         }
 
