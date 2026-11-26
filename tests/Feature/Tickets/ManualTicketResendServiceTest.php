@@ -113,6 +113,64 @@ class ManualTicketResendServiceTest extends TestCase
         );
     }
 
+    public function test_duplicate_resend_is_blocked_but_other_channel_and_later_resend_are_allowed(): void
+    {
+        [$order] = $this->makeTicket();
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        $service = app(ManualTicketResendService::class);
+        config(['ticketing.manual_resend_cooldown_seconds' => 60]);
+
+        $service->queue($order, ['sms'], $admin);
+        $result = $service->queue($order, ['sms', 'email'], $admin);
+        $this->assertSame(['email'], $result['queued']);
+        $this->assertSame(['sms'], $result['skipped']);
+
+        try {
+            $service->queue($order, ['sms'], $admin);
+            $this->fail('Duplicate resend was accepted.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('recently requested', $exception->getMessage());
+        }
+
+        $this->assertSame(2, CommunicationLog::query()->where('ticket_order_id', $order->id)->count());
+        $this->travel(61)->seconds();
+        $this->assertSame(['sms'], $service->queue($order, ['sms'], $admin)['queued']);
+        Queue::assertPushed(SendTicketAccessLinkJob::class, 3);
+    }
+
+    public function test_gate_staff_with_super_admin_flag_cannot_resend(): void
+    {
+        [$order] = $this->makeTicket();
+        $actor = User::factory()->create(['is_super_admin' => true, 'is_gate_staff' => true]);
+
+        try {
+            app(ManualTicketResendService::class)->queue($order, ['sms'], $actor);
+            $this->fail('Gate staff resend was accepted.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('not allowed', $exception->getMessage());
+        }
+
+        Queue::assertNothingPushed();
+        $this->assertDatabaseMissing('communication_logs', ['ticket_order_id' => $order->id]);
+    }
+
+    public function test_stale_paid_order_cannot_be_resent_after_status_changes(): void
+    {
+        [$order] = $this->makeTicket();
+        $admin = User::factory()->create(['is_super_admin' => true]);
+        TicketOrder::query()->whereKey($order->id)->update(['status' => TicketOrder::STATUS_CANCELLED]);
+
+        try {
+            app(ManualTicketResendService::class)->queue($order, ['email'], $admin);
+            $this->fail('Cancelled order resend was accepted.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Only paid', $exception->getMessage());
+        }
+
+        Queue::assertNothingPushed();
+        $this->assertDatabaseMissing('communication_logs', ['ticket_order_id' => $order->id]);
+    }
+
     private function makeTicket(): array
     {
         $organization = Organization::query()->create([
