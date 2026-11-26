@@ -110,6 +110,16 @@ class CheckInStation extends Page
 
         $events = $this->getAvailableEvents();
 
+        if (request()->has('event_id')) {
+            $requested = $events->firstWhere('id', request()->integer('event_id'));
+            abort_unless($requested, 404);
+            $this->eventId = (int) $requested->getKey();
+            $this->selectDefaultEventDay();
+            $this->selectDefaultCheckInPoint();
+
+            return;
+        }
+
         if ($events->count() === 1) {
             $this->eventId = (int) $events->first()->getKey();
 
