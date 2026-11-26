@@ -30,7 +30,7 @@ class TicketScannerPageTest extends TestCase
     public function test_ticket_scanner_view_contains_camera_manual_input_and_result_panel(): void
     {
         $path = resource_path(
-            'views/filament/pages/ticket-scanner.blade.php'
+            'views/filament/pages/partials/ticket-scanner-workspace.blade.php'
         );
 
         $contents = file_get_contents($path);
