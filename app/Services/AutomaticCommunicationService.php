@@ -7,6 +7,7 @@ use App\Models\Attendee;
 use App\Models\CommunicationLog;
 use App\Models\CommunicationTemplate;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class AutomaticCommunicationService
@@ -79,7 +80,7 @@ class AutomaticCommunicationService
         |--------------------------------------------------------------------------
         */
 
-        if (! $attendee->isApproved()) {
+        if (! app(RegistrationCommunicationEligibility::class)->allows($attendee)) {
             return collect();
         }
 
@@ -196,7 +197,7 @@ class AutomaticCommunicationService
             return collect();
         }
 
-        if (! $attendee->isApproved()) {
+        if (! app(RegistrationCommunicationEligibility::class)->allows($attendee)) {
             return collect();
         }
 
@@ -536,87 +537,92 @@ class AutomaticCommunicationService
         |--------------------------------------------------------------------------
         */
 
-        $existingLog =
-            CommunicationLog::query()
-                ->where(
-                    'event_id',
-                    $attendee->event_id
-                )
-                ->where(
-                    'attendee_id',
-                    $attendee->id
-                )
-                ->whereNull(
-                    'communication_campaign_id'
-                )
-                ->where(
-                    'channel',
-                    CommunicationTemplate::CHANNEL_WHATSAPP
-                )
-                ->where(
-                    'recipient',
-                    $recipient
-                )
-                ->where(
-                    'subject',
-                    $templateName
-                )
-                ->whereIn(
-                    'status',
-                    [
-                        CommunicationLog::STATUS_PENDING,
-                        CommunicationLog::STATUS_QUEUED,
-                        CommunicationLog::STATUS_SENDING,
-                        CommunicationLog::STATUS_SENT,
-                        CommunicationLog::STATUS_DELIVERED,
-                    ]
-                )
-                ->first();
+        return DB::transaction(function () use ($attendee, $recipient, $templateName, $message): ?CommunicationLog {
+            Attendee::query()->whereKey($attendee->id)->lockForUpdate()->firstOrFail();
+            $existingLog =
+                CommunicationLog::query()
+                    ->where(
+                        'event_id',
+                        $attendee->event_id
+                    )
+                    ->where(
+                        'attendee_id',
+                        $attendee->id
+                    )
+                    ->whereNull(
+                        'communication_campaign_id'
+                    )
+                    ->where(
+                        'channel',
+                        CommunicationTemplate::CHANNEL_WHATSAPP
+                    )
+                    ->where(
+                        'recipient',
+                        $recipient
+                    )
+                    ->where(
+                        'subject',
+                        $templateName
+                    )
+                    ->whereIn(
+                        'status',
+                        [
+                            CommunicationLog::STATUS_PENDING,
+                            CommunicationLog::STATUS_QUEUED,
+                            CommunicationLog::STATUS_SENDING,
+                            CommunicationLog::STATUS_SENT,
+                            CommunicationLog::STATUS_DELIVERED,
+                            CommunicationLog::STATUS_FAILED,
+                        ]
+                    )
+                    ->first();
 
-        if ($existingLog) {
-            return null;
-        }
+            if ($existingLog) {
+                return null;
+            }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Create WhatsApp communication log
-        |--------------------------------------------------------------------------
-        |
-        | subject stores the Meta template name.
-        |
-        | SendAutomaticCommunicationJob will use this when channel=whatsapp.
-        |
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | Create WhatsApp communication log
+            |--------------------------------------------------------------------------
+            |
+            | subject stores the Meta template name.
+            |
+            | SendAutomaticCommunicationJob will use this when channel=whatsapp.
+            |
+            |--------------------------------------------------------------------------
+            */
 
-        return CommunicationLog::create([
-            'event_id' =>
-                $attendee->event_id,
+            return CommunicationLog::create([
+                'event_id' =>
+                    $attendee->event_id,
 
-            'attendee_id' =>
-                $attendee->id,
+                'attendee_id' =>
+                    $attendee->id,
 
-            'communication_campaign_id' =>
-                null,
+                'communication_campaign_id' =>
+                    null,
+                'purpose' => 'registration_confirmed',
 
-            'channel' =>
-                CommunicationTemplate::CHANNEL_WHATSAPP,
+                'channel' =>
+                    CommunicationTemplate::CHANNEL_WHATSAPP,
 
-            'recipient' =>
-                $recipient,
+                'recipient' =>
+                    $recipient,
 
-            'subject' =>
-                $templateName,
+                'subject' =>
+                    $templateName,
 
-            'message' =>
-                trim($message),
+                'message' =>
+                    trim($message),
 
-            'status' =>
-                CommunicationLog::STATUS_QUEUED,
+                'status' =>
+                    CommunicationLog::STATUS_QUEUED,
 
-            'queued_at' =>
-                now(),
-        ]);
+                'queued_at' =>
+                    now(),
+            ]);
+        });
     }
 
     /*
@@ -694,6 +700,10 @@ class AutomaticCommunicationService
         $event = $attendee->event;
 
         if (! $event) {
+            return collect();
+        }
+
+        if ($trigger === self::TRIGGER_REGISTRATION_CONFIRMED && ! app(RegistrationCommunicationEligibility::class)->allows($attendee)) {
             return collect();
         }
 
@@ -898,81 +908,85 @@ class AutomaticCommunicationService
         |--------------------------------------------------------------------------
         */
 
-        $existingLog =
-            CommunicationLog::query()
-                ->where(
-                    'event_id',
-                    $attendee->event_id
-                )
-                ->where(
-                    'attendee_id',
-                    $attendee->id
-                )
-                ->whereNull(
-                    'communication_campaign_id'
-                )
-                ->where(
-                    'channel',
-                    $template->channel
-                )
-                ->where(
-                    'recipient',
-                    $recipient
-                )
-                ->where(
-                    'message',
-                    $message
-                )
-                ->whereIn(
-                    'status',
-                    [
-                        CommunicationLog::STATUS_PENDING,
-                        CommunicationLog::STATUS_QUEUED,
-                        CommunicationLog::STATUS_SENDING,
-                        CommunicationLog::STATUS_SENT,
-                        CommunicationLog::STATUS_DELIVERED,
-                    ]
-                )
-                ->first();
+        return DB::transaction(function () use ($attendee, $template, $recipient, $subject, $message): ?CommunicationLog {
+            Attendee::query()->whereKey($attendee->id)->lockForUpdate()->firstOrFail();
+            $existingLog =
+                CommunicationLog::query()
+                    ->where(
+                        'event_id',
+                        $attendee->event_id
+                    )
+                    ->where(
+                        'attendee_id',
+                        $attendee->id
+                    )
+                    ->whereNull(
+                        'communication_campaign_id'
+                    )
+                    ->where(
+                        'channel',
+                        $template->channel
+                    )
+                    ->where(
+                        'recipient',
+                        $recipient
+                    )
+                    ->where(
+                        'message',
+                        $message
+                    )
+                    ->whereIn(
+                        'status',
+                        [
+                            CommunicationLog::STATUS_PENDING,
+                            CommunicationLog::STATUS_QUEUED,
+                            CommunicationLog::STATUS_SENDING,
+                            CommunicationLog::STATUS_SENT,
+                            CommunicationLog::STATUS_DELIVERED,
+                            CommunicationLog::STATUS_FAILED,
+                        ]
+                    )
+                    ->first();
 
-        if ($existingLog) {
-            return null;
-        }
+            if ($existingLog) {
+                return null;
+            }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Create Communication Log
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | Create Communication Log
+            |--------------------------------------------------------------------------
+            */
 
-        return CommunicationLog::create([
-            'event_id' =>
-                $attendee->event_id,
+            return CommunicationLog::create([
+                'event_id' =>
+                    $attendee->event_id,
 
-            'attendee_id' =>
-                $attendee->id,
+                'attendee_id' =>
+                    $attendee->id,
 
-            'communication_campaign_id' =>
-                null,
+                'communication_campaign_id' =>
+                    null,
 
-            'channel' =>
-                $template->channel,
+                'channel' =>
+                    $template->channel,
 
-            'recipient' =>
-                $recipient,
+                'recipient' =>
+                    $recipient,
 
-            'subject' =>
-                $subject,
+                'subject' =>
+                    $subject,
 
-            'message' =>
-                $message,
+                'message' =>
+                    $message,
 
-            'status' =>
-                CommunicationLog::STATUS_QUEUED,
+                'status' =>
+                    CommunicationLog::STATUS_QUEUED,
 
-            'queued_at' =>
-                now(),
-        ]);
+                'queued_at' =>
+                    now(),
+            ]);
+        });
     }
 
     /*

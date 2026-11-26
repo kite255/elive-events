@@ -1176,6 +1176,17 @@ class EventForm
                             ->label('Registration Open')
                             ->default(false),
 
+                        TextInput::make('registration_access_code_hash')
+                            ->label('Registration access code')
+                            ->password()
+                            ->autocomplete('new-password')
+                            ->minLength(8)
+                            ->maxLength(72)
+                            ->helperText('Optional. Enter a new code to restrict registration. Leave blank to preserve the existing code. Enter a new code to rotate access.')
+                            ->afterStateHydrated(fn (TextInput $component) => $component->state(null))
+                            ->dehydrated(fn ($state): bool => filled($state))
+                            ->dehydrateStateUsing(fn ($state): string => \Illuminate\Support\Facades\Hash::make($state)),
+
                         Toggle::make(
                             'registration_requires_approval'
                         )
