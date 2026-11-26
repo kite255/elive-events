@@ -19,4 +19,52 @@
             </div>
         </x-filament::section>
     </form>
+    <x-filament::section heading="Send a test email" description="Preview a branded system or ticket delivery email in one inbox.">
+        <form wire:submit="sendTestEmail" class="space-y-4">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="space-y-1">
+                    <label for="system-test-email" class="block text-sm font-medium">Test recipient</label>
+                    <x-filament::input.wrapper>
+                        <x-filament::input id="system-test-email" type="email" wire:model="testEmail" required maxlength="254" />
+                    </x-filament::input.wrapper>
+                    @error('testEmail') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+                <div class="space-y-1">
+                    <label for="system-test-layout" class="block text-sm font-medium">Email layout</label>
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select id="system-test-layout" wire:model.live="testEmailLayout">
+                            <option value="system">System email</option>
+                            <option value="ticket">Ticket Delivery</option>
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
+                    @error('testEmailLayout') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+            </div>
+            @if ($testEmailLayout === 'ticket')
+                <div class="space-y-1">
+                    <label for="system-test-event" class="block text-sm font-medium">Event template</label>
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select id="system-test-event" wire:model="testEventId">
+                            <option value="">Use sample event</option>
+                            @foreach ($this->testEvents as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
+                    <p class="text-xs text-gray-500">The preview uses a sample order and the ticket recovery page as its link.</p>
+                    @error('testEventId') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+            @endif
+            <x-filament::button type="submit" wire:loading.attr="disabled" wire:target="sendTestEmail">
+                Send Test Email
+            </x-filament::button>
+        </form>
+    </x-filament::section>
+
+    <x-filament::section heading="Verify payout alert delivery" description="Send an explicitly marked test email to the saved payout alert recipients. This does not create or change any payout.">
+        <div class="space-y-3">
+            <p class="text-sm text-gray-600 dark:text-gray-300">First save your email settings, then send a test. The success message means jobs were queued, not that an email reached the inbox. Check your queue workers, failed jobs and spam folder if it does not arrive.</p>
+            <x-filament::button type="button" color="gray" icon="heroicon-o-paper-airplane" wire:click="sendTest">Send Test Payout Alert</x-filament::button>
+        </div>
+    </x-filament::section>
 </x-filament-panels::page>
