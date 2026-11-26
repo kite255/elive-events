@@ -678,23 +678,33 @@ class SmsService
     public function segmentCount(
         string $message
     ): int {
-        $length = mb_strlen(
-            trim(
-                $message
-            )
-        );
+        $message = trim($message);
 
-        if ($length === 0) {
+        if ($message === '') {
             return 0;
         }
 
-        if ($length <= 160) {
-            return 1;
+        // GSM 03.38 default alphabet and extension table.
+        // Extension characters consume two septets.
+        $basic = '@£$¥èéùìòÇ'."\n".'Øø'."\r".'ÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà';
+        $extended = "^{}\\[~]|€\f";
+        $characters = mb_str_split($message, 1, 'UTF-8');
+        $units = 0;
+
+        foreach ($characters as $character) {
+            if (mb_strpos($basic, $character, 0, 'UTF-8') !== false) {
+                $units++;
+            } elseif (mb_strpos($extended, $character, 0, 'UTF-8') !== false) {
+                $units += 2;
+            } else {
+                // Supplementary Unicode characters use two UTF-16 code units.
+                $units = intdiv(strlen(mb_convert_encoding($message, 'UTF-16BE', 'UTF-8')), 2);
+
+                return $units <= 70 ? 1 : (int) ceil($units / 67);
+            }
         }
 
-        return (int) ceil(
-            $length / 153
-        );
+        return $units <= 160 ? 1 : (int) ceil($units / 153);
     }
 
     /**
