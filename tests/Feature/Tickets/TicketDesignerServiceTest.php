@@ -515,6 +515,54 @@ class TicketDesignerServiceTest extends TestCase
         );
     }
 
+
+    public function test_stale_resize_does_not_change_saved_canvas(): void
+    {
+        $organization = Organization::create(['name' => 'Resize organization']);
+        $template = OrganizationTicketTemplate::create([
+            'organization_id' => $organization->id, 'name' => 'Resize test',
+            'width' => 1280, 'height' => 466, 'is_active' => true, 'is_default' => false,
+        ]);
+        $page = $this->service()->ensureInitialPage('organization', $template->id);
+        $original = $page->definition;
+        try {
+            $this->service()->resizeTemplate('organization', $template->id, 1080, 1350, 1000, 500);
+            $this->fail('Stale canvas resize succeeded.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('width', $exception->errors());
+        }
+        $this->assertSame(1280, $template->fresh()->width);
+        $this->assertSame(466, $template->fresh()->height);
+        $this->assertSame($original, $page->fresh()->definition);
+    }
+
+    public function test_invalid_page_rolls_back_entire_resize(): void
+    {
+        $organization = Organization::create(['name' => 'Resize rollback organization']);
+        $template = OrganizationTicketTemplate::create([
+            'organization_id' => $organization->id, 'name' => 'Resize rollback',
+            'width' => 1000, 'height' => 500, 'is_active' => true, 'is_default' => false,
+        ]);
+        $first = $this->service()->ensureInitialPage('organization', $template->id);
+        $first->update(['definition' => ['version' => 1, 'elements' => [[
+            'id' => 'shape', 'type' => 'shape', 'x' => 100, 'y' => 100, 'width' => 100, 'height' => 100,
+        ]]]]);
+        $second = $this->service()->createPage('organization', $template->id);
+        $second->update(['definition' => ['version' => 1, 'elements' => [[
+            'id' => 'invalid', 'type' => 'unsupported', 'x' => 100, 'y' => 100, 'width' => 100, 'height' => 100,
+        ]]]]);
+        $original = $first->fresh()->definition;
+        try {
+            $this->service()->resizeTemplate('organization', $template->id, 1000, 500, 2000, 1000);
+            $this->fail('Invalid page did not stop resize.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('elements.0.type', $exception->errors());
+        }
+        $this->assertSame($original, $first->fresh()->definition);
+        $this->assertSame(1000, $template->fresh()->width);
+        $this->assertSame(500, $template->fresh()->height);
+    }
+
     private function service(): TicketDesignerService
     {
         return app(TicketDesignerService::class);
