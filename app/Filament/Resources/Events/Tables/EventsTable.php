@@ -219,6 +219,12 @@ class EventsTable
                     ->placeholder('All Events'),
             ])
             ->recordActions([
+                \Filament\Actions\Action::make('workspace')
+                    ->label('Open')
+                    ->icon('heroicon-o-arrow-right')
+                    ->visible(fn ($record): bool => auth()->user() instanceof \App\Models\User
+                        && \App\Filament\Resources\Events\Pages\EventWorkspace::authorizedEvents(auth()->user())->whereKey($record->getKey())->exists())
+                    ->url(fn ($record): string => \App\Filament\Resources\Events\EventResource::getUrl('workspace', ['record' => $record->getKey()])),
                 EditAction::make()
                     ->label('Edit'),
             ])
