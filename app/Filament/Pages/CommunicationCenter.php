@@ -1054,7 +1054,7 @@ class CommunicationCenter extends Page
                     );
             }
 
-            if ($this->isTicketBuyerAudience() && ! $campaign->wasRecentlyCreated) {
+            if (! $campaign->wasRecentlyCreated) {
                 Notification::make()->title('This campaign was already queued')->warning()->send();
 
                 return;
