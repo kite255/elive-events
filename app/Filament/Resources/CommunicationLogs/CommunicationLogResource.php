@@ -6,6 +6,7 @@ use App\Filament\Resources\CommunicationLogs\Pages\ListCommunicationLogs;
 use App\Filament\Resources\CommunicationLogs\Pages\ViewCommunicationLog;
 use App\Filament\Resources\CommunicationLogs\Tables\CommunicationLogsTable;
 use App\Models\CommunicationLog;
+use App\Models\Event;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -46,7 +47,7 @@ class CommunicationLogResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -61,7 +62,7 @@ class CommunicationLogResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -69,7 +70,9 @@ class CommunicationLogResource extends Resource
             return false;
         }
 
-        return parent::canViewAny();
+        return ($user->isSuperAdmin() || Event::query()->accessibleBy($user)->get()
+            ->contains(fn (Event $event): bool => $user->canManageEventCommunication($event)))
+            && parent::canViewAny();
     }
 
     public static function canView(
@@ -77,7 +80,7 @@ class CommunicationLogResource extends Resource
     ): bool {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -85,9 +88,9 @@ class CommunicationLogResource extends Resource
             return false;
         }
 
-        return parent::canView(
-            $record
-        );
+        return $record instanceof CommunicationLog
+            && static::getEloquentQuery()->whereKey($record->getKey())->exists()
+            && parent::canView($record);
     }
 
     /*
@@ -127,71 +130,25 @@ class CommunicationLogResource extends Resource
 
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return $query->whereRaw(
                 '1 = 0'
             );
         }
 
-        if (
-            method_exists(
-                $user,
-                'hasRole'
-            )
-            && $user->hasRole(
-                'super_admin'
-            )
-        ) {
+        if ($user->isSuperAdmin()) {
             return $query;
         }
 
-        /*
-         * Ticket Organizers must never retrieve
-         * communication log records.
-         */
         if ($user->isTicketOrganizer()) {
-            return $query->whereRaw(
-                '1 = 0'
-            );
+            return $query->whereRaw('1 = 0');
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Organization scoping
-        |--------------------------------------------------------------------------
-        |
-        | Keep communication logs inside organizations accessible to the user.
-        | This preserves the existing organization-scoping behavior.
-        |
-        */
+        $eventIds = Event::query()->accessibleBy($user)->get()
+            ->filter(fn (Event $event): bool => $user->canManageEventCommunication($event))
+            ->pluck('id');
 
-        if (
-            method_exists(
-                $user,
-                'organizations'
-            )
-        ) {
-            $organizationIds =
-                $user->organizations()
-                    ->pluck(
-                        'organizations.id'
-                    );
-
-            return $query->whereHas(
-                'event',
-                fn (
-                    Builder $eventQuery
-                ) =>
-                    $eventQuery->whereIn(
-                        'organization_id',
-                        $organizationIds
-                    )
-            );
-        }
-
-        return $query->whereRaw(
-            '1 = 0'
-        );
+        return $query->whereIn('event_id', $eventIds);
     }
 
     /*
