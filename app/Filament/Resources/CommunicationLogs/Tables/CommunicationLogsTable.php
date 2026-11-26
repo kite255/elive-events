@@ -279,50 +279,23 @@ class CommunicationLogsTable
                     ->label('Retry')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
-                    ->visible(
-                        fn (CommunicationLog $record): bool =>
-                            $record->canRetry()
-                    )
                     ->requiresConfirmation()
-                    ->modalHeading('Retry failed communication?')
-                    ->modalDescription(
-                        'The failed log will be reset and requeued. The retry job must exist in the application for delivery to restart.'
-                    )
-                    ->modalSubmitActionLabel('Retry')
-                    ->action(
-                        function (
-                            CommunicationLog $record
-                        ): void {
-                            $jobClass =
-                                \App\Jobs\RetryCommunicationLogJob::class;
-
-                            if (! class_exists($jobClass)) {
-                                Notification::make()
-                                    ->title('Retry job not installed')
-                                    ->body(
-                                        'Create App\\Jobs\\RetryCommunicationLogJob before enabling automatic retries from this page.'
-                                    )
-                                    ->warning()
-                                    ->send();
-
-                                return;
-                            }
-
-                            $record->prepareForRetry();
-
-                            $jobClass::dispatch(
-                                $record->getKey()
-                            );
-
-                            Notification::make()
-                                ->title('Communication requeued')
-                                ->body(
-                                    'The failed communication has been sent back to the communications queue.'
-                                )
-                                ->success()
-                                ->send();
+                    ->modalHeading('Retry failed SMS?')
+                    ->modalDescription('Only an eligible failed SMS will be requeued.')
+                    ->modalSubmitActionLabel('Retry SMS')
+                    ->visible(fn (CommunicationLog $record): bool =>
+                        auth()->user() instanceof \App\Models\User
+                        && app(\App\Services\CommunicationRetryService::class)->canRetry(auth()->user(), $record))
+                    ->action(function (CommunicationLog $record): void {
+                        $actor = auth()->user();
+                        abort_unless($actor instanceof \App\Models\User, 403);
+                        if (! app(\App\Services\CommunicationRetryService::class)->queue($actor, (int) $record->id)) {
+                            Notification::make()->title('SMS is no longer eligible for retry')->warning()->send();
+                            return;
                         }
-                    ),
+
+                        Notification::make()->title('SMS queued for retry')->success()->send();
+                    }),
             ])
             ->recordUrl(
                 fn (CommunicationLog $record): string =>
