@@ -58,8 +58,14 @@ class EventWorkspace extends Page
 
     public function moduleLinks(): array
     {
-        $event = $this->event();
+        return static::linksFor($this->event());
+    }
+
+    public static function linksFor(Event $event): array
+    {
         $user = auth()->user();
+        abort_unless($user instanceof User && ! $user->is_gate_staff, 403);
+        $event = static::authorizedEvents($user)->whereKey($event->id)->firstOrFail();
         $links = [];
 
         if ($event->canBeManagedBy($user)) {
