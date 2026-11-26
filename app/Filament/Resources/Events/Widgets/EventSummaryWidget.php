@@ -169,6 +169,10 @@ class EventSummaryWidget extends Widget
             'event' => $event,
 
             'summary' => [
+                'setup_checklist' => $event->status === Event::STATUS_DRAFT
+                    ? app(\App\Services\EventSetupChecklist::class)->items($event)
+                    : [],
+
                 'registration_open' =>
                     (bool) $event->registration_is_open,
 
