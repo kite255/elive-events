@@ -332,6 +332,48 @@ class EventPresetService
         )['public_health_fields'];
     }
 
+    /**
+     * Complete, conservative defaults for new events only.
+     * Existing event settings must never be reset by a type change.
+     */
+    public static function creationDefaults(?string $eventType): array
+    {
+        if (blank($eventType)) {
+            return [];
+        }
+
+        $profile = self::featureProfile($eventType);
+
+        return array_replace([
+            'registration_is_open' => false,
+            'registration_show_phone' => true,
+            'registration_require_phone' => true,
+            'registration_show_email' => true,
+            'registration_require_email' => false,
+            'registration_show_organization' => false,
+            'registration_require_organization' => false,
+            'registration_show_position' => false,
+            'registration_require_position' => false,
+            'registration_show_category' => false,
+            'registration_require_category' => false,
+            'registration_show_badge_type' => false,
+            'registration_require_badge_type' => false,
+            'schedule_mode' => 'single_day',
+            'sessions_enabled' => $profile['sessions'],
+            'session_registration_enabled' => $profile['sessions'],
+            'session_check_in_enabled' => $profile['sessions'],
+            'registration_auto_generate_badge' => $profile['badges'],
+            'ticketSetting.ticket_sales_enabled' => false,
+            'ticketSetting.reservation_minutes' => 15,
+            'ticketSetting.max_tickets_per_order' => 10,
+            'ticketSetting.allow_guest_checkout' => true,
+        ], self::preset($eventType), [
+            // Explicit activation is required, regardless of the event type.
+            'registration_is_open' => false,
+            'ticketSetting.ticket_sales_enabled' => false,
+        ]);
+    }
+
     public static function preset(?string $eventType): array
     {
         return match ($eventType) {
