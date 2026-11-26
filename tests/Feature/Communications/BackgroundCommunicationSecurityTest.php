@@ -199,4 +199,37 @@ class BackgroundCommunicationSecurityTest extends TestCase
             ->assertSuccessful();
         Bus::assertNotDispatched(RetryCommunicationLogJob::class);
     }
+
+    public function test_late_failure_callback_preserves_successful_delivery(): void
+    {
+        $campaign = $this->campaign();
+        $log = $campaign->logs()->sole();
+        $log->markSent('provider-success');
+        $log->markDelivered();
+        $before = $log->fresh()->getAttributes();
+
+        (new SendAutomaticCommunicationJob($log->id))->failed(new RuntimeException('Late worker failure'));
+
+        $this->assertSame($before, $log->fresh()->getAttributes());
+        $this->assertTrue($log->fresh()->isDelivered());
+    }
+
+    public function test_provider_timeout_preserves_uncertain_delivery_without_resend(): void
+    {
+        $campaign = $this->campaign();
+        $log = $campaign->logs()->sole();
+        $this->mock(SmsService::class)->shouldReceive('send')->once()
+            ->andThrow(new RuntimeException('Provider timeout'));
+
+        $job = new SendAutomaticCommunicationJob($log->id);
+        $job->handle();
+
+        $this->assertTrue($log->fresh()->isSending());
+        $this->assertStringContainsString('outcome uncertain', $log->fresh()->error);
+        $job->failed(new RuntimeException('Late queue failure'));
+        $job->handle();
+
+        $this->assertTrue($log->fresh()->isSending());
+    }
+
 }
