@@ -98,6 +98,10 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             return;
         }
 
+        if (! in_array($communicationLog->status, [CommunicationLog::STATUS_PENDING, CommunicationLog::STATUS_QUEUED], true)) {
+            return;
+        }
+
         if ($communicationLog->communication_campaign_id !== null) {
             $campaign = $communicationLog->campaign;
             $recipient = $communicationLog->campaignRecipient;
@@ -170,6 +174,7 @@ class SendAutomaticCommunicationJob implements ShouldQueue
         }
         $communicationLog->refresh();
 
+        $providerAttempted = false;
         try {
             $communicationLog->syncCampaignRecipient();
             $this->incrementRecipientAttempts($communicationLog);
@@ -196,6 +201,7 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                 }
             }
 
+            $providerAttempted = true;
             $providerMessageId = match (
                 $communicationLog->channel
             ) {
@@ -221,9 +227,21 @@ class SendAutomaticCommunicationJob implements ShouldQueue
                     ),
             };
 
-            $communicationLog->markSent(
-                $providerMessageId
-            );
+            // A delivery receipt may have arrived before the worker persisted
+            // the provider response. Never downgrade delivered to sent.
+            $updated = CommunicationLog::query()->whereKey($communicationLog->id)
+                ->where('status', CommunicationLog::STATUS_SENDING)
+                ->update([
+                    'status' => CommunicationLog::STATUS_SENT,
+                    'provider_message_id' => $providerMessageId,
+                    'sent_at' => now(),
+                    'error' => null,
+                    'failed_at' => null,
+                ]);
+            $communicationLog->refresh();
+            if ($updated === 1) {
+                $communicationLog->syncCampaignRecipient();
+            }
 
             $this->syncCampaignLifecycle(
                 $communicationLog
@@ -262,6 +280,24 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             report(
                 $exception
             );
+
+            $communicationLog->refresh();
+            if ($communicationLog->isSent()) {
+                return;
+            }
+
+            // Once delivery has been attempted, a timeout or persistence error
+            // does not establish that the provider rejected the message.
+            // Preserve sending for investigation instead of automatic resends.
+            if ($providerAttempted) {
+                CommunicationLog::query()->whereKey($communicationLog->id)
+                    ->where('status', CommunicationLog::STATUS_SENDING)
+                    ->update(['error' => 'Delivery outcome uncertain; reconcile before retrying.']);
+                Log::warning('Communication delivery outcome requires reconciliation.', [
+                    'communication_log_id' => $communicationLog->id,
+                ]);
+                return;
+            }
 
             $isFinalAttempt =
                 $this->attempts()
@@ -1447,10 +1483,20 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             return;
         }
 
-        $communicationLog->markFailed(
-            $exception?->getMessage()
-                ?: 'Automatic communication job failed.'
-        );
+        // Late callbacks must not overwrite successful or uncertain delivery.
+        $updated = CommunicationLog::query()->whereKey($communicationLog->id)
+            ->whereIn('status', [CommunicationLog::STATUS_PENDING, CommunicationLog::STATUS_QUEUED])
+            ->whereNull('sent_at')->whereNull('delivered_at')->whereNull('provider_message_id')
+            ->update([
+                'status' => CommunicationLog::STATUS_FAILED,
+                'failed_at' => now(),
+                'error' => $exception?->getMessage() ?: 'Automatic communication job failed.',
+            ]);
+        if ($updated !== 1) {
+            return;
+        }
+        $communicationLog->refresh();
+        $communicationLog->syncCampaignRecipient();
 
         $this->syncCampaignLifecycle(
             $communicationLog
