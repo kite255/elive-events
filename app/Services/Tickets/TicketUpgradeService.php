@@ -48,6 +48,18 @@ class TicketUpgradeService
                 ->lockForUpdate()
                 ->findOrFail($ticket->getKey());
 
+            if ($initiator !== null) {
+                $actor = User::query()->find($initiator->getKey());
+                if (! $actor || $actor->is_gate_staff || ! (
+                    $actor->isSuperAdmin()
+                    || ($actor->isTicketOrganizer()
+                        ? $actor->assignedTicketingEvents()->where('events.id', $lockedTicket->event_id)->exists()
+                        : $lockedTicket->event?->canBeManagedBy($actor))
+                )) {
+                    throw new RuntimeException('You are not allowed to initiate upgrades for this event.');
+                }
+            }
+
             $this->assertTicketEligible($lockedTicket);
 
             $lockedTarget = TicketType::query()
@@ -122,6 +134,10 @@ class TicketUpgradeService
     {
         if (! $ticket->order) {
             throw new RuntimeException('This ticket is not linked to an order.');
+        }
+
+        if ((int) $ticket->order->event_id !== (int) $ticket->event_id) {
+            throw new RuntimeException('The ticket and order must belong to the same event.');
         }
 
         if (! $ticket->order->isPaid()) {
