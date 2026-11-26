@@ -56,7 +56,7 @@ class CommunicationCampaignResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -71,7 +71,7 @@ class CommunicationCampaignResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -79,7 +79,9 @@ class CommunicationCampaignResource extends Resource
             return false;
         }
 
-        return parent::canViewAny();
+        return ($user->isSuperAdmin() || Event::query()->accessibleBy($user)->get()
+            ->contains(fn (Event $event): bool => $user->canManageEventCommunication($event)))
+            && parent::canViewAny();
     }
 
     public static function canView(
@@ -87,7 +89,7 @@ class CommunicationCampaignResource extends Resource
     ): bool {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -95,9 +97,9 @@ class CommunicationCampaignResource extends Resource
             return false;
         }
 
-        return parent::canView(
-            $record
-        );
+        return $record instanceof CommunicationCampaign
+            && static::getEloquentQuery()->whereKey($record->getKey())->exists()
+            && parent::canView($record);
     }
 
     /*
@@ -144,7 +146,7 @@ class CommunicationCampaignResource extends Resource
 
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return $query->whereRaw(
                 '1 = 0'
             );
