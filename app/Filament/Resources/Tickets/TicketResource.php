@@ -37,7 +37,7 @@ class TicketResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
