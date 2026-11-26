@@ -1,7 +1,7 @@
 <x-filament-widgets::widget>
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="elive-dashboard-toolbar">
         <label for="dashboard-event-switcher" class="text-sm font-medium">Event workspace</label>
-        <div class="min-w-0 flex-1">
+        <div class="elive-dashboard-select">
             <x-filament::input.wrapper>
                 <x-filament::input.select id="dashboard-event-switcher" wire:change="openEvent($event.target.value)">
                     <option value="" selected disabled>Select an event</option>
@@ -11,11 +11,8 @@
                 </x-filament::input.select>
             </x-filament::input.wrapper>
         </div>
-        @if (\App\Filament\Resources\Events\EventResource::canViewAny())
-            <x-filament::link :href="\App\Filament\Resources\Events\EventResource::getUrl('index')">All events</x-filament::link>
-        @endif
         @if (\App\Filament\Resources\Events\EventResource::canCreate())
-            <x-filament::button tag="a" size="sm" icon="heroicon-o-plus" :href="\App\Filament\Resources\Events\EventResource::getUrl('create')">Create event</x-filament::button>
+            <x-filament::button tag="a" color="primary" icon="heroicon-o-plus" class="elive-dashboard-primary" :href="\App\Filament\Resources\Events\EventResource::getUrl('create')">Create event</x-filament::button>
         @endif
     </div>
 </x-filament-widgets::widget>
