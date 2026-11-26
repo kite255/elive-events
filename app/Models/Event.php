@@ -1434,11 +1434,25 @@ class Event extends Model
         );
     }
 
+    public function canResetTicketCheckInsBy(?User $user): bool
+    {
+        if (! $user || $user->is_gate_staff) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || ($this->organization_id !== null && $user->canManageOrganization($this->organization_id));
+    }
+
     public function canBeCheckedInBy(
         ?User $user
     ): bool {
         if (! $user) {
             return false;
+        }
+
+        if ($user->is_gate_staff) {
+            return $user->gateScannerEvents()->whereKey($this->getKey())->exists();
         }
 
         if ($user->isSuperAdmin()) {
