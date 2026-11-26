@@ -56,6 +56,40 @@ class EventWorkspace extends Page
         return $this->event()->name;
     }
 
+    public function moduleLinks(): array
+    {
+        $event = $this->event();
+        $user = auth()->user();
+        $links = [];
+
+        if ($event->canBeManagedBy($user)) {
+            $links[] = [
+                'label' => 'Event settings',
+                'icon' => 'heroicon-o-cog-6-tooth',
+                'url' => EventResource::getUrl('edit', ['record' => $event]),
+            ];
+        }
+
+        if ($event->canBeCheckedInBy($user)
+            && in_array($event->status, [Event::STATUS_ACTIVE, Event::STATUS_DRAFT], true)) {
+            $links[] = [
+                'label' => 'Check-in station',
+                'icon' => 'heroicon-o-qr-code',
+                'url' => \App\Filament\Pages\CheckInStation::getUrl(['event_id' => $event->id]),
+            ];
+        }
+
+        if ($user->canManageEventCommunication($event)) {
+            $links[] = [
+                'label' => 'Communications',
+                'icon' => 'heroicon-o-envelope',
+                'url' => \App\Filament\Pages\CommunicationCenter::getUrl(['event_id' => $event->id]),
+            ];
+        }
+
+        return $links;
+    }
+
     public function metrics(): array
     {
         $event = $this->event();
