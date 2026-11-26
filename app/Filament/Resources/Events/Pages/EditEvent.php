@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources\Events\Pages;
 
+use Illuminate\Support\Facades\URL;
+use Filament\Forms\Components\TextInput;
+use App\Models\Event;
 use App\Exports\AttendeesExport;
 use App\Filament\Pages\AttendanceDashboard;
 use App\Filament\Pages\AttendanceReport;
@@ -42,6 +45,27 @@ class EditEvent extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('share_scanner_link')
+                ->label('Share Scanner Link')
+                ->icon('heroicon-o-link')
+                ->authorize(fn (): bool => $this->getRecord()->canBeManagedBy(auth()->user()))
+                ->visible(fn (): bool => $this->getRecord()->status !== Event::STATUS_CANCELLED)
+                ->modalHeading('Share Ticket Scanner')
+                ->modalDescription('Anyone with this link can check in tickets for this event for 12 hours.')
+                ->schema([
+                    TextInput::make('url')->label('Scanner link')->readOnly()->copyable(),
+                ])
+                ->fillForm(fn (): array => [
+                    'url' => rtrim(config('app.url'), '/').URL::temporarySignedRoute(
+                        'gate.shared-scanner',
+                        now()->addHours(12),
+                        ['event' => $this->getRecord()->getKey()],
+                        absolute: false,
+                    ),
+                ])
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Close'),
+
             Action::make('remove_registration_access_code')
                 ->label('Remove registration access code')
                 ->icon('heroicon-o-lock-open')
