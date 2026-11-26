@@ -87,7 +87,25 @@ return [
     |
     */
 
+    /* Selcom hosted Checkout (disabled until merchant testing). */
+    'selcom' => [
+        'enabled' => (bool) env('SELCOM_ENABLED', false),
+        'vendor_id' => env('SELCOM_VENDOR_ID'),
+        'api_key' => env('SELCOM_API_KEY'),
+        'api_secret' => env('SELCOM_API_SECRET'),
+        'base_url' => env('SELCOM_BASE_URL'),
+        'timeout' => (int) env('SELCOM_TIMEOUT', 30),
+        'billing_address' => env('SELCOM_BILLING_ADDRESS', 'Tanzania'),
+        'billing_city' => env('SELCOM_BILLING_CITY', 'Dar es Salaam'),
+        'billing_region' => env('SELCOM_BILLING_REGION', 'Dar es Salaam'),
+        'billing_postcode' => env('SELCOM_BILLING_POSTCODE', '00000'),
+    ],
+
+
     'pesapal' => [
+
+        // Disabled by default until live card checkout and ticket issuance are verified.
+        'ticket_card_checkout_enabled' => (bool) env('PESAPAL_TICKET_CARD_CHECKOUT_ENABLED', false),
 
         /*
         |----------------------------------------------------------------------
@@ -198,20 +216,6 @@ return [
 
     ],
 
-
-    /* Selcom hosted Checkout (disabled until merchant testing). */
-    'selcom' => [
-        'enabled' => (bool) env('SELCOM_ENABLED', false),
-        'vendor_id' => env('SELCOM_VENDOR_ID'),
-        'api_key' => env('SELCOM_API_KEY'),
-        'api_secret' => env('SELCOM_API_SECRET'),
-        'base_url' => env('SELCOM_BASE_URL'),
-        'timeout' => (int) env('SELCOM_TIMEOUT', 30),
-        'billing_address' => env('SELCOM_BILLING_ADDRESS', 'Tanzania'),
-        'billing_city' => env('SELCOM_BILLING_CITY', 'Dar es Salaam'),
-        'billing_region' => env('SELCOM_BILLING_REGION', 'Dar es Salaam'),
-        'billing_postcode' => env('SELCOM_BILLING_POSTCODE', '00000'),
-    ],
 
     /*
     |--------------------------------------------------------------------------
