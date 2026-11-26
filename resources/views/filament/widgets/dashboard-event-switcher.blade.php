@@ -14,5 +14,8 @@
         @if (\App\Filament\Resources\Events\EventResource::canViewAny())
             <x-filament::link :href="\App\Filament\Resources\Events\EventResource::getUrl('index')">All events</x-filament::link>
         @endif
+        @if (\App\Filament\Resources\Events\EventResource::canCreate())
+            <x-filament::button tag="a" size="sm" icon="heroicon-o-plus" :href="\App\Filament\Resources\Events\EventResource::getUrl('create')">Create event</x-filament::button>
+        @endif
     </div>
 </x-filament-widgets::widget>
