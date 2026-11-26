@@ -315,34 +315,21 @@ class LogsRelationManager extends RelationManager
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalHeading('Retry failed SMS?')
-                    ->modalDescription(
-                        'This SMS will be requeued using the communications queue.'
-                    )
+                    ->modalDescription('Only an eligible failed SMS will be requeued.')
                     ->modalSubmitActionLabel('Retry SMS')
-                    ->visible(
-                        fn (CommunicationLog $record): bool =>
-                            $record->isSms()
-                            && $record->canRetry()
-                    )
-                    ->action(
-                        function (
-                            CommunicationLog $record
-                        ): void {
-                            $record->prepareForRetry();
-
-                            RetryCommunicationLogJob::dispatch(
-                                $record->id
-                            );
-
-                            Notification::make()
-                                ->title('SMS queued for retry')
-                                ->body(
-                                    "Recipient: {$record->recipient}"
-                                )
-                                ->success()
-                                ->send();
+                    ->visible(fn (CommunicationLog $record): bool =>
+                        auth()->user() instanceof \App\Models\User
+                        && app(\App\Services\CommunicationRetryService::class)->canRetry(auth()->user(), $record))
+                    ->action(function (CommunicationLog $record): void {
+                        $actor = auth()->user();
+                        abort_unless($actor instanceof \App\Models\User, 403);
+                        if (! app(\App\Services\CommunicationRetryService::class)->queue($actor, (int) $record->id)) {
+                            Notification::make()->title('SMS is no longer eligible for retry')->warning()->send();
+                            return;
                         }
-                    ),
+
+                        Notification::make()->title('SMS queued for retry')->success()->send();
+                    }),
             ])
             ->recordUrl(
                 fn (CommunicationLog $record): string =>
