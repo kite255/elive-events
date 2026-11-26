@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CommunicationCampaign;
 use App\Models\CommunicationTemplate;
 use App\Models\EventCommunication;
+use App\Models\User;
 use Carbon\CarbonInterface;
 use RuntimeException;
 
@@ -46,9 +47,7 @@ class EventCommunicationCampaignService
         ?int $categoryId = null,
         ?int $createdBy = null
     ): CommunicationCampaign {
-        $communication->loadMissing([
-            'event.organization',
-        ]);
+        $communication = EventCommunication::query()->with('event.organization')->findOrFail($communication->getKey());
 
         $this->validateCommunication(
             $communication
@@ -150,6 +149,20 @@ class EventCommunicationCampaignService
         CarbonInterface $scheduledAt,
         ?int $createdBy = null
     ): void {
+        $communication = EventCommunication::query()->with('event')->findOrFail($communication->getKey());
+        $authenticated = auth()->user();
+        $createdBy ??= $authenticated?->getKey();
+        $actor = $createdBy ? User::query()->find($createdBy) : null;
+        if (! $actor || ! $communication->event || ! $actor->canManageEventCommunication($communication->event)
+            || ($authenticated !== null && ((int) $authenticated->getKey() !== (int) $createdBy
+                || ! $authenticated->canManageEventCommunication($communication->event)))) {
+            throw new RuntimeException('You are not allowed to schedule communications for this event.');
+        }
+        if (! in_array($channel, [CommunicationTemplate::CHANNEL_SMS, CommunicationTemplate::CHANNEL_EMAIL], true)) {
+            throw new RuntimeException('Unsupported scheduled communication channel.');
+        }
+        $this->campaignService->preview($communication->event, $audience, $categoryId, $channel);
+
         $this->validateCommunication(
             $communication
         );
@@ -181,7 +194,7 @@ class EventCommunicationCampaignService
             )
             ->onQueue(
                 'default'
-            );
+            )->afterCommit();
     }
 
     protected function validateCommunication(
