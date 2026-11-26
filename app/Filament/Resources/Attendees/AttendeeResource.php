@@ -11,6 +11,7 @@ use App\Filament\Resources\Attendees\Pages\ViewAttendeeQrCode;
 use App\Filament\Resources\Attendees\Schemas\AttendeeForm;
 use App\Filament\Resources\Attendees\Tables\AttendeesTable;
 use App\Models\Attendee;
+use App\Models\Event;
 use App\Models\Organization;
 use App\Models\User;
 use BackedEnum;
@@ -76,7 +77,7 @@ class AttendeeResource extends Resource
                 'eventDays',
             ]);
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -84,11 +85,39 @@ class AttendeeResource extends Resource
             return $query;
         }
 
-        return $query->whereHas(
-            'event',
-            fn (Builder $eventQuery): Builder =>
-                $eventQuery->accessibleBy($user)
-        );
+        return $query->whereIn('attendees.event_id', static::authorizedAttendeeEvents($user)->select('events.id'));
+    }
+
+    public static function authorizedAttendeeEvents(User $user): Builder
+    {
+        $query = Event::query()->accessibleBy($user);
+
+        if ($user->is_gate_staff) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $scope) use ($user): void {
+            $scope->whereIn('events.organization_id', $user->activeOrganizations()
+                ->where(function (Builder $membership): void {
+                    $membership->where('organization_user.is_owner', true)
+                        ->orWhereIn('organization_user.role', [
+                            User::ORGANIZATION_ROLE_OWNER,
+                            User::ORGANIZATION_ROLE_ADMIN,
+                        ]);
+                })->select('organizations.id')->getQuery())
+                ->orWhereIn('events.id', $user->activeAssignedEvents()
+                    ->wherePivotIn('role', [
+                        User::ORGANIZATION_ROLE_EVENT_MANAGER,
+                        User::ORGANIZATION_ROLE_REGISTRATION_OFFICER,
+                        User::ORGANIZATION_ROLE_CHECK_IN_OFFICER,
+                        User::ORGANIZATION_ROLE_BADGE_OFFICER,
+                        User::ORGANIZATION_ROLE_REPORT_VIEWER,
+                    ])->select('events.id')->getQuery());
+        });
     }
 
     /*
@@ -101,7 +130,7 @@ class AttendeeResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -109,22 +138,14 @@ class AttendeeResource extends Resource
             return true;
         }
 
-        return $user->activeOrganizations()
-            ->get()
-            ->contains(
-                fn (Organization $organization): bool =>
-                    static::userCanViewAttendees(
-                        $user,
-                        $organization
-                    )
-            );
+        return static::authorizedAttendeeEvents($user)->exists();
     }
 
     public static function canCreate(): bool
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -148,7 +169,7 @@ class AttendeeResource extends Resource
 
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -156,20 +177,7 @@ class AttendeeResource extends Resource
             return true;
         }
 
-        $event = $record->event;
-
-        if (! $event || ! $event->organization_id) {
-            return false;
-        }
-
-        if (! $event->isAccessibleBy($user)) {
-            return false;
-        }
-
-        return static::userCanViewAttendees(
-            $user,
-            $event->organization
-        );
+        return static::authorizedAttendeeEvents($user)->whereKey($record->event_id)->exists();
     }
 
     public static function canEdit(Model $record): bool
@@ -180,7 +188,7 @@ class AttendeeResource extends Resource
 
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -205,7 +213,7 @@ class AttendeeResource extends Resource
 
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -232,7 +240,7 @@ class AttendeeResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -258,7 +266,7 @@ class AttendeeResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -285,7 +293,7 @@ class AttendeeResource extends Resource
     ): bool {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -312,7 +320,7 @@ class AttendeeResource extends Resource
     ): bool {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -340,7 +348,7 @@ class AttendeeResource extends Resource
     ): bool {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -428,33 +436,5 @@ class AttendeeResource extends Resource
                 '/{record}/qr-code'
             ),
         ];
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Internal authorization helpers
-    |--------------------------------------------------------------------------
-    */
-
-    private static function userCanViewAttendees(
-        User $user,
-        Organization $organization
-    ): bool {
-        if (! $user->hasActiveOrganizationAccess($organization)) {
-            return false;
-        }
-
-        return $user->hasOrganizationRole(
-            $organization,
-            [
-                User::ORGANIZATION_ROLE_OWNER,
-                User::ORGANIZATION_ROLE_ADMIN,
-                User::ORGANIZATION_ROLE_EVENT_MANAGER,
-                User::ORGANIZATION_ROLE_REGISTRATION_OFFICER,
-                User::ORGANIZATION_ROLE_CHECK_IN_OFFICER,
-                User::ORGANIZATION_ROLE_BADGE_OFFICER,
-                User::ORGANIZATION_ROLE_REPORT_VIEWER,
-            ]
-        );
     }
 }
