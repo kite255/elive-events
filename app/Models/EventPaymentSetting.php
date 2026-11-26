@@ -27,6 +27,30 @@ class EventPaymentSetting extends Model
         'allow_manual_payment',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $setting): void {
+            $user = auth()->user();
+
+            // Trusted unauthenticated system jobs and console operations retain
+            // their existing behavior. Authenticated organizers cannot set
+            // platform fees, even through a manipulated form submission.
+            if ($user === null || ($user instanceof User && $user->isSuperAdmin())) {
+                return;
+            }
+
+            if ($setting->isDirty([
+                'platform_commission_rate',
+                'gateway_fee_rate',
+                'gateway_fee_bearer',
+            ])) {
+                throw new \Illuminate\Auth\Access\AuthorizationException(
+                    'Only eLive platform administrators may change platform fees.'
+                );
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
