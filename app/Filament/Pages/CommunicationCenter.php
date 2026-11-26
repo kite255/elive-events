@@ -6,18 +6,26 @@ use BackedEnum;
 use App\Models\CommunicationCampaign;
 use App\Models\CommunicationTemplate;
 use App\Models\Event;
+use App\Models\TicketOrder;
 use App\Models\User;
 use App\Services\CommunicationCampaignService;
 use App\Services\SmsService;
+use App\Services\Tickets\TicketAccessMessageFactory;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Livewire\WithFileUploads;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Throwable;
 use UnitEnum;
 
 class CommunicationCenter extends Page
 {
+    use WithFileUploads;
+
     protected static string|BackedEnum|null $navigationIcon =
         'heroicon-o-megaphone';
 
@@ -54,6 +62,14 @@ class CommunicationCenter extends Page
 
     public string $message = '';
 
+    public $emailPoster = null;
+
+    public ?string $emailPosterPath = null;
+
+    public string $emailActionUrl = '';
+
+    public string $emailActionLabel = '';
+
     /*
     |--------------------------------------------------------------------------
     | Test recipients
@@ -70,8 +86,10 @@ class CommunicationCenter extends Page
     |--------------------------------------------------------------------------
     */
 
+    #[Locked]
     public array $audienceOptions = [
         'all' => 'All Attendees',
+        CommunicationCampaignService::PAID_TICKET_BUYERS => 'Paid Ticket Buyers',
         'registered' => 'Registered',
         'confirmed' => 'Confirmed',
         'approved' => 'Approved',
@@ -195,6 +213,7 @@ class CommunicationCenter extends Page
         $this->categoryId = null;
         $this->message = '';
         $this->subject = null;
+        $this->resetEmailArtwork();
 
         if ($event = $this->selectedEvent()) {
             $this->campaignName =
@@ -213,6 +232,7 @@ class CommunicationCenter extends Page
         $this->templateId = null;
         $this->subject = null;
         $this->message = '';
+        $this->resetEmailArtwork();
 
         if ($event = $this->selectedEvent()) {
             $this->campaignName =
@@ -226,7 +246,28 @@ class CommunicationCenter extends Page
 
     public function updatedAudience(): void
     {
+        $this->categoryId = null;
         $this->refreshPreview();
+    }
+
+    public function updatedMessage(): void
+    {
+        if ($this->isTicketBuyerAudience() && $this->isSmsChannel()) {
+            $this->refreshPreview();
+        }
+    }
+
+    public function isTicketBuyerAudience(): bool
+    {
+        return $this->audience === CommunicationCampaignService::PAID_TICKET_BUYERS;
+    }
+
+    public function ticketBuyerPlaceholders(): array
+    {
+        return [
+            '#PURCHASER_NAME#', '#TICKET_LINK#', '#ORDER_REFERENCE#', '#TICKET_COUNT#', '#TICKET_TYPE#',
+            '#EVENT_NAME#', '#EVENT_VENUE#', '#EVENT_DATE#', '#EVENT_TIME#',
+        ];
     }
 
     public function updatedCategoryId(): void
@@ -258,6 +299,8 @@ class CommunicationCenter extends Page
                 ? (string) ($template->subject ?? '')
                 : null;
 
+        $this->updatedMessage();
+
         $event =
             $this->selectedEvent();
 
@@ -283,6 +326,7 @@ class CommunicationCenter extends Page
         $this->message = '';
         $this->testPhone = '';
         $this->testEmail = '';
+        $this->resetEmailArtwork();
 
         $this->campaignName = $event
             ? $this->defaultCampaignName(
@@ -291,6 +335,64 @@ class CommunicationCenter extends Page
             : '';
 
         $this->resetValidation();
+        $this->refreshPreview();
+    }
+
+    private function isRevivedWayThankYouCampaign(): bool
+    {
+        $event = $this->selectedEvent();
+
+        return $this->channel === CommunicationTemplate::CHANNEL_EMAIL
+            && $event !== null
+            && str_contains(strtolower($event->name), 'revived way')
+            && str_contains(strtolower($this->campaignName), 'thank you and spotify release');
+    }
+
+    private function resetEmailArtwork(): void
+    {
+        $this->emailPoster = null;
+        $this->emailPosterPath = null;
+        $this->emailActionUrl = '';
+        $this->emailActionLabel = '';
+    }
+
+    private function saveEmailPoster(): void
+    {
+        if ($this->emailPoster !== null) {
+            $path = $this->emailPoster->store('event-campaign-posters', 'public');
+            if (! is_string($path) || $path === '') {
+                throw new \RuntimeException('Poster could not be saved. Check public storage permissions.');
+            }
+
+            $this->emailPosterPath = $path;
+            $this->emailPoster = null;
+        }
+    }
+
+    private function emailPosterUrl(): ?string
+    {
+        if (! $this->emailPosterPath || ! Storage::disk('public')->exists($this->emailPosterPath)) {
+            return null;
+        }
+
+        return url(Storage::disk('public')->url($this->emailPosterPath));
+    }
+
+    public function loadRevivedWayThankYou(): void
+    {
+        $event = $this->selectedEvent();
+        abort_unless($event && str_contains(strtolower($event->name), 'revived way'), 403);
+        $this->authorizeEvent($event);
+
+        $this->channel = CommunicationTemplate::CHANNEL_EMAIL;
+        $this->audience = CommunicationCampaignService::PAID_TICKET_BUYERS;
+        $this->templateId = null;
+        $this->categoryId = null;
+        $this->campaignName = 'The Revived Way - Thank You and Spotify Release';
+        $this->subject = 'Thank You for Being Part of The Revived Way | Album Now on Spotify';
+        $this->message = "Dear #PURCHASER_NAME#,\n\nOn behalf of Revived Music Ministries, thank you for supporting The Revived Way Album Launch Concert. Your presence, prayers, encouragement and support made the celebration special.\n\nThe Revived Way album is now on Spotify! Stream, share and be blessed through the music.\n\nWe pray that these songs continue to inspire and encourage you. We look forward to worshipping with you again!\n\nBlessings,\nRevived Music Ministries";
+        $this->emailActionUrl = 'https://open.spotify.com/album/13nND3Cb2ZIek3XEPdH8Jr';
+        $this->emailActionLabel = 'Listen on Spotify';
         $this->refreshPreview();
     }
 
@@ -323,6 +425,10 @@ class CommunicationCenter extends Page
             return 0;
         }
 
+        if ($this->isTicketBuyerAudience()) {
+            return (int) ($this->preview['max_sms_segments'] ?? 0);
+        }
+
         return app(
             SmsService::class
         )->segmentCount(
@@ -332,6 +438,10 @@ class CommunicationCenter extends Page
 
     public function estimatedSmsUnits(): int
     {
+        if ($this->isTicketBuyerAudience()) {
+            return (int) ($this->preview['sms_segments'] ?? 0);
+        }
+
         return
             (int) ($this->preview['valid'] ?? 0)
             * $this->smsSegmentCount();
@@ -362,8 +472,9 @@ class CommunicationCenter extends Page
         )->preview(
             $event,
             $this->audience,
-            $this->categoryId,
-            $this->channel
+            $this->isTicketBuyerAudience() ? null : $this->categoryId,
+            $this->channel,
+            $this->message,
         );
     }
 
@@ -440,10 +551,10 @@ class CommunicationCenter extends Page
             return;
         }
 
-        $testMessage =
-            $this->renderTestMessage(
-                $event
-            );
+        $testMessage = $this->renderTestMessage($event);
+        if ($this->isTicketBuyerAudience()) {
+            $testMessage = 'TEST: '.$testMessage;
+        }
 
         try {
             $result =
@@ -492,6 +603,9 @@ class CommunicationCenter extends Page
     public function sendTestEmail(): void
     {
         $this->validate([
+            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'emailActionUrl' => ['nullable', 'url', 'starts_with:https://', 'max:2048'],
+            'emailActionLabel' => ['nullable', 'string', 'max:80'],
             'eventId' => [
                 'required',
                 'integer',
@@ -540,6 +654,8 @@ class CommunicationCenter extends Page
             $event
         );
 
+        $this->saveEmailPoster();
+
         $renderedMessage =
             $this->renderTestMessage(
                 $event
@@ -569,6 +685,13 @@ class CommunicationCenter extends Page
                 ]
             );
 
+        if ($this->isTicketBuyerAudience()) {
+            $renderedSubject = '[TEST] '.$this->renderTicketBuyerTest((string) $this->subject, $event);
+            if (str_contains($this->message, '#TICKET_LINK#')) {
+                $renderedMessage = "Test only. The link opens the public ticket finder.\n\n".$renderedMessage;
+            }
+        }
+
         try {
             Mail::send(
                 'emails.elive',
@@ -581,6 +704,10 @@ class CommunicationCenter extends Page
 
                     'attendee' =>
                         null,
+
+                    'ticketCampaignUrl' => $this->isTicketBuyerAudience()
+                        ? route('public.ticket-recovery.show')
+                        : null,
 
                     'event' =>
                         $event,
@@ -598,11 +725,12 @@ class CommunicationCenter extends Page
                     'alertMessage' =>
                         null,
 
-                    'actionUrl' =>
-                        null,
-
-                    'actionLabel' =>
-                        null,
+                    'campaignPosterUrl' => $this->emailPosterUrl(),
+                    'thankYouCampaign' => $this->isRevivedWayThankYouCampaign(),
+                    'actionUrl' => $this->emailActionUrl ?: null,
+                    'actionLabel' => $this->emailActionLabel ?: null,
+                    'actionButtonColor' => str_starts_with($this->emailActionUrl, 'https://open.spotify.com/') ? '#1DB954' : '#007AB2',
+                    'actionPlayIcon' => str_starts_with($this->emailActionUrl, 'https://open.spotify.com/'),
 
                     'actionIntro' =>
                         null,
@@ -654,6 +782,10 @@ class CommunicationCenter extends Page
     private function renderTestMessage(
         Event $event
     ): string {
+        if ($this->isTicketBuyerAudience()) {
+            return $this->renderTicketBuyerTest($this->message, $event);
+        }
+
         $eventDate =
             $event->starts_at
                 ? $event->starts_at->format(
@@ -713,6 +845,28 @@ class CommunicationCenter extends Page
         );
     }
 
+    public function ticketBuyerTestPreview(): ?string
+    {
+        $event = $this->selectedEvent();
+
+        return $event && $this->isTicketBuyerAudience() && filled($this->message)
+            ? $this->renderTicketBuyerTest($this->message, $event)
+            : null;
+    }
+
+    private function renderTicketBuyerTest(string $message, Event $event): string
+    {
+        $order = new TicketOrder(['buyer_name' => 'Test Buyer', 'order_number' => 'TEST-ORDER', 'quantity' => 2]);
+        $order->setRelation('event', $event);
+        $order->setRelation('items', collect());
+
+        return app(TicketAccessMessageFactory::class)->renderForOrder(
+            $message,
+            $order,
+            route('public.ticket-recovery.show'),
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Queue Communication Campaign
@@ -722,6 +876,9 @@ class CommunicationCenter extends Page
     public function queueCampaign(): void
     {
         $this->validate([
+            'emailPoster' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'emailActionUrl' => ['nullable', 'url', 'starts_with:https://', 'max:2048'],
+            'emailActionLabel' => ['nullable', 'string', 'max:80'],
             'eventId' => [
                 'required',
                 'integer',
@@ -729,7 +886,7 @@ class CommunicationCenter extends Page
 
             'channel' => [
                 'required',
-                'in:sms,email,whatsapp',
+                'in:sms,email',
             ],
 
             'campaignName' => [
@@ -740,7 +897,7 @@ class CommunicationCenter extends Page
 
             'audience' => [
                 'required',
-                'in:all,registered,confirmed,approved,pending_approval,waitlisted,checked_in,not_checked_in',
+                Rule::in(array_keys($this->audienceOptions)),
             ],
 
             'categoryId' => [
@@ -768,6 +925,18 @@ class CommunicationCenter extends Page
                 'max:10000',
             ],
         ]);
+
+        if ($this->isTicketBuyerAudience()) {
+            foreach (['subject', 'message'] as $field) {
+                preg_match_all('/#[A-Z_]+#/', (string) $this->{$field}, $placeholders);
+                $unsupported = array_diff($placeholders[0], $this->ticketBuyerPlaceholders());
+                if ($unsupported !== []) {
+                    $this->addError($field, 'Unsupported ticket buyer placeholders: '.implode(', ', array_unique($unsupported)).'.');
+
+                    return;
+                }
+            }
+        }
 
         $event =
             $this->selectedEvent();
@@ -809,7 +978,8 @@ class CommunicationCenter extends Page
         }
 
         if (
-            $this->categoryId
+            ! $this->isTicketBuyerAudience()
+            && $this->categoryId
             && ! $this->categories()->contains(
                 fn ($category): bool =>
                     (int) $category->getKey()
@@ -844,6 +1014,10 @@ class CommunicationCenter extends Page
         }
 
         try {
+            if ($this->channel === CommunicationTemplate::CHANNEL_EMAIL) {
+                $this->saveEmailPoster();
+            }
+
             $service =
                 app(
                     CommunicationCampaignService::class
@@ -859,14 +1033,11 @@ class CommunicationCenter extends Page
                         name: $this->campaignName,
                         message: $this->message,
                         audience: $this->audience,
-                        categoryId: $this->categoryId,
+                        categoryId: $this->isTicketBuyerAudience() ? null : $this->categoryId,
                         template: $template,
                         createdBy: auth()->id()
                     );
-            } elseif (
-                $this->channel
-                === CommunicationTemplate::CHANNEL_EMAIL
-            ) {
+            } else {
                 $campaign =
                     $service->queueEmailCampaign(
                         event: $event,
@@ -874,17 +1045,17 @@ class CommunicationCenter extends Page
                         subject: (string) $this->subject,
                         message: $this->message,
                         audience: $this->audience,
-                        categoryId: $this->categoryId,
+                        categoryId: $this->isTicketBuyerAudience() ? null : $this->categoryId,
                         template: $template,
-                        createdBy: auth()->id()
+                        createdBy: auth()->id(),
+                        emailPosterPath: $this->emailPosterPath,
+                        emailActionUrl: $this->emailActionUrl ?: null,
+                        emailActionLabel: $this->emailActionLabel ?: null
                     );
-            } else {
-                Notification::make()
-                    ->title(
-                        'WhatsApp campaigns are not enabled from this screen yet'
-                    )
-                    ->warning()
-                    ->send();
+            }
+
+            if ($this->isTicketBuyerAudience() && ! $campaign->wasRecentlyCreated) {
+                Notification::make()->title('This campaign was already queued')->warning()->send();
 
                 return;
             }
@@ -908,6 +1079,7 @@ class CommunicationCenter extends Page
             $this->subject = null;
             $this->message = '';
             $this->templateId = null;
+            $this->resetEmailArtwork();
 
             $this->campaignName =
                 $this->defaultCampaignName(
@@ -1121,12 +1293,6 @@ class CommunicationCenter extends Page
             === CommunicationTemplate::CHANNEL_EMAIL;
     }
 
-    public function isWhatsAppChannel(): bool
-    {
-        return $this->channel
-            === CommunicationTemplate::CHANNEL_WHATSAPP;
-    }
-
     public function recipientLabel(): string
     {
         return match ($this->channel) {
@@ -1146,7 +1312,7 @@ class CommunicationCenter extends Page
 
     public function channelOptions(): array
     {
-        return CommunicationTemplate::channelOptions();
+        return array_intersect_key(CommunicationTemplate::channelOptions(), array_flip(['sms', 'email']));
     }
 
     public function channelLabel(): string
