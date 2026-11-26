@@ -1012,8 +1012,8 @@ class EventForm
                     ->columns(3)
                     ->visible(
                         fn (Get $get): bool =>
-                            self::showTicketing($get)
-                            || self::showRegistration($get)
+                            auth()->user()?->isSuperAdmin() === true
+                            && (self::showTicketing($get) || self::showRegistration($get))
                     )
                     ->collapsible(),
 
