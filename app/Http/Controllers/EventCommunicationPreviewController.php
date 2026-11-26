@@ -22,7 +22,7 @@ class EventCommunicationPreviewController extends Controller
 
         abort_unless(
             $event
-            && $event->isAccessibleBy(auth()->user()),
+            && $event->canManageCommunicationBy(auth()->user()),
             403
         );
 
