@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Events\RelationManagers;
 
 use App\Models\Event;
-use App\Services\EventPresetService;
 use App\Models\EventDay;
 use App\Models\EventSession;
 use Filament\Actions\CreateAction;
@@ -29,7 +28,8 @@ class SessionsRelationManager extends RelationManager
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
         return $ownerRecord instanceof Event
-            && (EventPresetService::usesSessions($ownerRecord->event_type));
+            && $ownerRecord->canBeManagedBy(auth()->user())
+            && ($ownerRecord->sessionsAreEnabled() || $ownerRecord->sessions()->exists());
     }
 
     protected static string $relationship = 'sessions';
