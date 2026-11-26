@@ -145,18 +145,6 @@ class PublicRegistrationController extends Controller
             ? strtolower(trim($validated['email'] ?? ''))
             : '';
 
-        $duplicateReason = $this->duplicateRegistrationReason(
-            $event,
-            $fullName,
-            $email
-        );
-
-        if ($duplicateReason) {
-            return back()
-                ->withInput()
-                ->with('error', $duplicateReason);
-        }
-
         $status = match (true) {
             $isFull && $waitlistEnabled => 'waitlisted',
             $event->registration_requires_approval => 'pending_approval',
@@ -218,6 +206,22 @@ class PublicRegistrationController extends Controller
                     $categoryId,
                     $badgeTypeId
                 ): Attendee {
+                    // Serialize public registrations for this event before checking identity.
+                    Event::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+
+                    $duplicateReason = $this->duplicateRegistrationReason(
+                        $event,
+                        $fullName,
+                        $phone,
+                        $email
+                    );
+
+                    if ($duplicateReason) {
+                        throw ValidationException::withMessages([
+                            'full_name' => $duplicateReason,
+                        ]);
+                    }
+
                     $attendee = Attendee::create([
                         'event_id' => $event->id,
                         'category_id' => $categoryId,
@@ -1370,51 +1374,33 @@ class PublicRegistrationController extends Controller
     protected function duplicateRegistrationReason(
         Event $event,
         string $fullName,
+        ?string $phone,
         ?string $email
     ): ?string {
-        $normalizedName = strtolower(
-            trim($fullName)
-        );
+        // Names and shared contact details are not unique on their own.
+        // Without a contact method, identity cannot be established reliably.
+        if (blank($phone) && blank($email)) {
+            return null;
+        }
 
-        $nameExists = Attendee::query()
+        $duplicate = Attendee::query()
             ->where('event_id', $event->id)
-            ->whereNotIn('status', [
-                'rejected',
-                'cancelled',
-            ])
-            ->whereRaw(
-                'LOWER(TRIM(full_name)) = ?',
-                [$normalizedName]
-            )
+            ->whereNotIn('status', ['rejected', 'cancelled'])
+            ->whereRaw('LOWER(TRIM(full_name)) = ?', [mb_strtolower(trim($fullName))])
+            ->where(function ($query) use ($phone, $email): void {
+                if (filled($phone)) {
+                    $query->where('phone', $phone);
+                }
+
+                if (filled($email)) {
+                    $query->orWhereRaw('LOWER(TRIM(email)) = ?', [mb_strtolower(trim($email))]);
+                }
+            })
             ->exists();
 
-        if ($nameExists) {
-            return 'This attendee name is already registered for this event. Please verify the name or contact the event organizer.';
-        }
-
-        if (filled($email)) {
-            $normalizedEmail = strtolower(
-                trim($email)
-            );
-
-            $emailExists = Attendee::query()
-                ->where('event_id', $event->id)
-                ->whereNotIn('status', [
-                    'rejected',
-                    'cancelled',
-                ])
-                ->whereRaw(
-                    'LOWER(TRIM(email)) = ?',
-                    [$normalizedEmail]
-                )
-                ->exists();
-
-            if ($emailExists) {
-                return 'This email address is already registered for this event. Please use a different email address or contact the event organizer.';
-            }
-        }
-
-        return null;
+        return $duplicate
+            ? 'A registration with this name and contact information already exists. Please contact the event organizer if you need assistance.'
+            : null;
     }
 
     protected function registrationStats(Event $event): array
