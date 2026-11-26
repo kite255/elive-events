@@ -22,13 +22,19 @@ class RegistrationStatusService
                 throw ValidationException::withMessages(['status' => 'Registration status has changed. Refresh and try again.']);
             }
 
-            if ($target === 'registered' && $expected === 'waitlisted' && $event->isRegistrationFull()) {
+            if (in_array($target, ['registered', 'pending_approval'], true) && $expected === 'waitlisted' && $event->isRegistrationFull()) {
                 throw ValidationException::withMessages(['status' => 'The event is at capacity. This attendee must remain on the waitlist.']);
             }
 
             if (! (($target === 'registered' && in_array($expected, ['pending_approval', 'waitlisted'], true))
                 || ($target === 'rejected' && in_array($expected, ['pending_approval', 'registered', 'waitlisted'], true)))) {
                 throw ValidationException::withMessages(['status' => 'This registration status change is not allowed.']);
+            }
+
+            // Promotion reserves capacity but does not bypass an event's approval policy.
+            // A subsequent explicit approval can move pending_approval to registered.
+            if ($expected === 'waitlisted' && $target === 'registered' && $event->registration_requires_approval) {
+                $target = 'pending_approval';
             }
 
             $record->forceFill(['status' => $target])->save();
