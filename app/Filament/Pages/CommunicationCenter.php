@@ -64,6 +64,7 @@ class CommunicationCenter extends Page
 
     public $emailPoster = null;
 
+    #[Locked]
     public ?string $emailPosterPath = null;
 
     public string $emailActionUrl = '';
@@ -359,7 +360,15 @@ class CommunicationCenter extends Page
     private function saveEmailPoster(): void
     {
         if ($this->emailPoster !== null) {
-            $path = $this->emailPoster->store('event-campaign-posters', 'public');
+            $event = $this->selectedEvent();
+            abort_unless($event, 404);
+            $this->authorizeEvent($event);
+            $hash = hash_file('sha256', $this->emailPoster->getRealPath());
+            $extension = $this->emailPoster->extension();
+            if (! is_string($hash) || ! in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                throw new \RuntimeException('Invalid campaign poster.');
+            }
+            $path = $this->emailPoster->storeAs('event-campaign-posters/'.$event->id, $hash.'.'.$extension, 'public');
             if (! is_string($path) || $path === '') {
                 throw new \RuntimeException('Poster could not be saved. Check public storage permissions.');
             }
@@ -371,11 +380,8 @@ class CommunicationCenter extends Page
 
     private function emailPosterUrl(): ?string
     {
-        if (! $this->emailPosterPath || ! Storage::disk('public')->exists($this->emailPosterPath)) {
-            return null;
-        }
-
-        return url(Storage::disk('public')->url($this->emailPosterPath));
+        $event = $this->selectedEvent();
+        return $event ? app(\App\Services\CampaignArtworkService::class)->posterUrl($event->id, $this->emailPosterPath) : null;
     }
 
     public function loadRevivedWayThankYou(): void
