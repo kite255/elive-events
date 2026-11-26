@@ -564,7 +564,7 @@ class AttendeesTable
                         ->visible(fn ($record): bool => $record->status === 'pending_approval')
                         ->requiresConfirmation()
                         ->modalHeading('Approve registration?')
-                        ->modalDescription('This attendee will be approved and a badge will be generated.')
+                        ->modalDescription('Approval is saved first. Confirmation and badge release follow payment eligibility.')
                         ->action(function ($record): void {
                             try {
                                 $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'pending_approval', 'registered');
@@ -574,32 +574,27 @@ class AttendeesTable
                             }
 
                             try {
-                                self::generateBadgeForRecord($record);
-
-                                Notification::make()
-                                    ->title('Registration approved')
-                                    ->body('The attendee was approved and the badge was generated.')
-                                    ->success()
-                                    ->send();
+                                if ($record->status === 'registered') {
+                                    \App\Jobs\GeneratePublicRegistrationBadge::dispatch($record->id)->afterCommit();
+                                    app(\App\Services\AutomaticCommunicationService::class)->handleRegistration($record->fresh());
+                                }
+                                Notification::make()->title('Registration status updated')
+                                    ->body('Current status: '.str_replace('_', ' ', $record->status).'. Confirmation and badge release follow payment eligibility.')
+                                    ->success()->send();
                             } catch (Throwable $e) {
-                                self::markBadgeFailed($record);
-
-                                Notification::make()
-                                    ->title('Registration approved, but badge generation failed')
-                                    ->body($e->getMessage())
-                                    ->warning()
-                                    ->send();
+                                report($e);
+                                Notification::make()->title('Status saved, follow-up processing failed')->warning()->send();
                             }
                         }),
 
                     Action::make('move_to_registered')
-                        ->label('Move to Registered')
+                        ->label('Promote from Waitlist')
                         ->icon('heroicon-o-arrow-right-circle')
                         ->color('success')
                         ->visible(fn ($record): bool => $record->status === 'waitlisted')
                         ->requiresConfirmation()
                         ->modalHeading('Move attendee from waitlist?')
-                        ->modalDescription('This attendee will be moved from waitlist to registered. A badge will be generated.')
+                        ->modalDescription('Promotion follows capacity and approval rules. Confirmation and badges follow payment eligibility.')
                         ->action(function ($record): void {
                             try {
                                 $record = app(\App\Services\RegistrationStatusService::class)->transition($record, auth()->user(), 'waitlisted', 'registered');
@@ -609,21 +604,16 @@ class AttendeesTable
                             }
 
                             try {
-                                self::generateBadgeForRecord($record);
-
-                                Notification::make()
-                                    ->title('Attendee moved to registered')
-                                    ->body('The attendee was registered and the badge was generated.')
-                                    ->success()
-                                    ->send();
+                                if ($record->status === 'registered') {
+                                    \App\Jobs\GeneratePublicRegistrationBadge::dispatch($record->id)->afterCommit();
+                                    app(\App\Services\AutomaticCommunicationService::class)->handleRegistration($record->fresh());
+                                }
+                                Notification::make()->title('Registration status updated')
+                                    ->body('Current status: '.str_replace('_', ' ', $record->status).'. Confirmation and badge release follow payment eligibility.')
+                                    ->success()->send();
                             } catch (Throwable $e) {
-                                self::markBadgeFailed($record);
-
-                                Notification::make()
-                                    ->title('Attendee registered, but badge generation failed')
-                                    ->body($e->getMessage())
-                                    ->warning()
-                                    ->send();
+                                report($e);
+                                Notification::make()->title('Status saved, follow-up processing failed')->warning()->send();
                             }
                         }),
 
@@ -747,18 +737,20 @@ class AttendeesTable
                                 $approved++;
 
                                 try {
-                                    self::generateBadgeForRecord($record);
-                                    $badgesGenerated++;
+                                    if ($record->status === 'registered') {
+                                        \App\Jobs\GeneratePublicRegistrationBadge::dispatch($record->id)->afterCommit();
+                                        app(\App\Services\AutomaticCommunicationService::class)->handleRegistration($record->fresh());
+                                        $badgesGenerated++;
+                                    }
                                 } catch (Throwable $e) {
                                     report($e);
                                     $badgeFailed++;
-                                    self::markBadgeFailed($record);
                                 }
                             }
 
                             self::sendBulkResultNotification(
                                 title: 'Registrations approved',
-                                body: "Approved: {$approved}. Badges generated: {$badgesGenerated}. Badge failed: {$badgeFailed}.",
+                                body: "Approved: {$approved}. Follow-up requested: {$badgesGenerated}. Follow-up failed: {$badgeFailed}.",
                                 failed: $badgeFailed
                             );
                             if ($transitionSkipped > 0) {
@@ -767,12 +759,12 @@ class AttendeesTable
                         }),
 
                     BulkAction::make('move_waitlist_to_registered')
-                        ->label('Move Waitlist to Registered')
+                        ->label('Promote Waitlisted Attendees')
                         ->icon('heroicon-o-arrow-right-circle')
                         ->color('success')
                         ->requiresConfirmation()
                         ->modalHeading('Move selected waitlisted attendees?')
-                        ->modalDescription('Selected waitlisted attendees will be moved to registered. Badges will be generated where possible.')
+                        ->modalDescription('Selected attendees will be promoted according to capacity and approval rules.')
                         ->action(function (Collection $records): void {
                             $transitionSkipped = 0;
                             $moved = 0;
@@ -794,18 +786,20 @@ class AttendeesTable
                                 $moved++;
 
                                 try {
-                                    self::generateBadgeForRecord($record);
-                                    $badgesGenerated++;
+                                    if ($record->status === 'registered') {
+                                        \App\Jobs\GeneratePublicRegistrationBadge::dispatch($record->id)->afterCommit();
+                                        app(\App\Services\AutomaticCommunicationService::class)->handleRegistration($record->fresh());
+                                        $badgesGenerated++;
+                                    }
                                 } catch (Throwable $e) {
                                     report($e);
                                     $badgeFailed++;
-                                    self::markBadgeFailed($record);
                                 }
                             }
 
                             self::sendBulkResultNotification(
                                 title: 'Waitlisted attendees moved',
-                                body: "Moved: {$moved}. Badges generated: {$badgesGenerated}. Badge failed: {$badgeFailed}.",
+                                body: "Moved: {$moved}. Follow-up requested: {$badgesGenerated}. Follow-up failed: {$badgeFailed}.",
                                 failed: $badgeFailed
                             );
                             if ($transitionSkipped > 0) {
