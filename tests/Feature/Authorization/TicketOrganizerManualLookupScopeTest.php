@@ -147,7 +147,8 @@ class TicketOrganizerManualLookupScopeTest extends TestCase
             AdminTicketLookupService::class
         )->search(
             $organizer,
-            'shared@example.com'
+            'shared@example.com',
+            1
         );
 
         $ticketIds = collect($results)
