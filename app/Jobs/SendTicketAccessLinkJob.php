@@ -44,13 +44,13 @@ class SendTicketAccessLinkJob implements ShouldQueue
             ])
             ->find($this->communicationLogId);
 
-        if (! $log || $log->isSent()) {
+        if (! $log || ! in_array($log->status, [CommunicationLog::STATUS_PENDING, CommunicationLog::STATUS_QUEUED], true)) {
             return;
         }
 
         $order = $log->ticketOrder;
 
-        if (! $order || ! $order->isPaid()) {
+        if (! $order || ! $order->isPaid() || (int) $order->event_id !== (int) $log->event_id) {
             return;
         }
 
@@ -64,7 +64,7 @@ class SendTicketAccessLinkJob implements ShouldQueue
 
         if (
             $log->purpose === CommunicationLog::PURPOSE_TICKET_UPGRADE_COMPLETED
-            && (! $upgrade || ! $upgrade->isCompleted())
+            && (! $upgrade || ! $upgrade->isCompleted() || (int) $upgrade->ticket_order_id !== (int) $order->id)
         ) {
             return;
         }
@@ -75,8 +75,15 @@ class SendTicketAccessLinkJob implements ShouldQueue
 
         $messages = $messageFactory->make($order, $url, $upgrade);
 
+        $claimed = CommunicationLog::query()->whereKey($log->id)
+            ->whereIn('status', [CommunicationLog::STATUS_PENDING, CommunicationLog::STATUS_QUEUED])
+            ->whereNull('sent_at')->whereNull('delivered_at')->whereNull('provider_message_id')
+            ->update(['status' => CommunicationLog::STATUS_SENDING, 'error' => null, 'failed_at' => null]);
+        if (! $claimed) {
+            return;
+        }
+
         try {
-            $log->markSending();
             $log->increment('attempt_count');
 
             $providerMessageId = match ($log->channel) {
@@ -102,10 +109,17 @@ class SendTicketAccessLinkJob implements ShouldQueue
                 ),
             };
 
-            $log->markSent($providerMessageId);
+            CommunicationLog::query()->whereKey($log->id)
+                ->where('status', CommunicationLog::STATUS_SENDING)
+                ->update(['status' => CommunicationLog::STATUS_SENT, 'provider_message_id' => $providerMessageId,
+                    'sent_at' => now(), 'error' => null, 'failed_at' => null]);
         } catch (Throwable $exception) {
-            $log->markFailed($exception->getMessage());
-            throw $exception;
+            // Provider acceptance may have occurred even when the response was lost.
+            // Preserve the uncertain claim for manual reconciliation, never auto-resend.
+            CommunicationLog::query()->whereKey($log->id)
+                ->where('status', CommunicationLog::STATUS_SENDING)
+                ->update(['error' => 'Ticket delivery outcome uncertain; verify provider before retrying.']);
+            report($exception);
         }
     }
 
@@ -215,7 +229,15 @@ class SendTicketAccessLinkJob implements ShouldQueue
             return;
         }
 
-        $log->markFailed($exception?->getMessage() ?: 'Ticket access delivery failed.');
+        $updated = CommunicationLog::query()->whereKey($log->id)
+            ->whereIn('status', [CommunicationLog::STATUS_PENDING, CommunicationLog::STATUS_QUEUED])
+            ->whereNull('sent_at')->whereNull('delivered_at')->whereNull('provider_message_id')
+            ->update(['status' => CommunicationLog::STATUS_FAILED, 'failed_at' => now(),
+                'error' => 'Ticket access delivery failed before submission.']);
+        if (! $updated) {
+            return;
+        }
+        $log->refresh();
 
         if ($log->isWhatsApp()) {
             app(TicketAccessDeliveryService::class)->queueSmsFallback($log);
