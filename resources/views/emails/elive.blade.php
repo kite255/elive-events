@@ -113,6 +113,7 @@
     $body = trim((string) ($messageBody ?? ''));
     $label = $emailLabel ?? 'Event Communication';
     $isReminder = preg_match('/\breminders?\b/i', $label.' '.($subject ?? '')) === 1;
+    $isThankYouCampaign = (bool) ($thankYouCampaign ?? false);
     $bodyHasGreeting = preg_match('/\A(?:dear|hello|hi|habari)\b[^\r\n]*[,!:]\s*(?:\R|$)/i', $body) === 1;
     $bodyHasSignature = preg_match('/(?:^|\R)\s*(?:the )?elive events(?: team)?[.!]?\s*\z/i', $body) === 1;
 
@@ -129,13 +130,13 @@
     ]);
 
     $details = [];
-    if ($venue !== '' && ! in_array($venue, ['-', '–', '—'], true) && ! $contains([$venue])) {
+    if (! $isThankYouCampaign && $venue !== '' && ! in_array($venue, ['-', '–', '—'], true) && ! $contains([$venue])) {
         $details['Venue'] = $venue;
     }
-    if ($start && (! $containsDate($start) || ($multiDay && ! $containsDate($end)))) {
+    if (! $isThankYouCampaign && $start && (! $containsDate($start) || ($multiDay && ! $containsDate($end)))) {
         $details['Date'] = $start->format('d M Y').($multiDay ? ' – '.$end->format('d M Y') : '');
     }
-    if ($start && ! $contains([$start->format('h:i A'), $start->format('g:i A'), $start->format('H:i')])) {
+    if (! $isThankYouCampaign && $start && ! $contains([$start->format('h:i A'), $start->format('g:i A'), $start->format('H:i')])) {
         $details['Time'] = $start->format('h:i A');
     }
 @endphp
@@ -369,6 +370,16 @@
 
 
                 {{-- ========================================================= --}}
+                {{-- CAMPAIGN POSTER BELOW THE STANDARD EVENT HEADER            --}}
+                {{-- ========================================================= --}}
+                @if(filled($campaignPosterUrl ?? null))
+                    <tr><td style="padding:0;line-height:0;font-size:0;background:#FFFFFF;">
+                        <img src="{{ $campaignPosterUrl }}" alt="Event thank-you poster" width="680"
+                            style="display:block;width:100%;max-width:680px;height:auto;border:0;outline:none;">
+                    </td></tr>
+                @endif
+
+                {{-- ========================================================= --}}
                 {{-- OPTIONAL ALERT                                            --}}
                 {{-- ========================================================= --}}
 
@@ -463,7 +474,15 @@
                                     line-height:1.75;
                                 "
                             >
-                                {!! nl2br(e($messageBody)) !!}
+                                @if(filled($ticketCampaignUrl ?? null))
+                                    {!! nl2br(str_replace(
+                                        e($ticketCampaignUrl),
+                                        '<a href="'.e($ticketCampaignUrl).'">'.e($ticketCampaignUrl).'</a>',
+                                        e($messageBody),
+                                    )) !!}
+                                @else
+                                    {!! nl2br(e($messageBody)) !!}
+                                @endif
                             </div>
                         @endif
                     </td>
@@ -537,7 +556,7 @@
                                 <tr>
                                     <td
                                         align="center"
-                                        bgcolor="#007AB2"
+                                        bgcolor="{{ $actionButtonColor ?? '#007AB2' }}"
                                         style="border-radius:8px;"
                                     >
                                         <a
@@ -545,7 +564,7 @@
                                             target="_blank"
                                             style="
                                                 display:inline-block;
-                                                background:#007AB2;
+                                                background:{{ $actionButtonColor ?? '#007AB2' }};
                                                 color:#FFFFFF;
                                                 text-decoration:none;
                                                 font-size:15px;
@@ -555,7 +574,7 @@
                                                 border-radius:8px;
                                             "
                                         >
-                                            {{ $actionLabel }}
+                                            @if($actionPlayIcon ?? false)<span style="display:inline-block;background:#FFFFFF;border-radius:50%;width:14px;height:14px;line-height:14px;text-align:center;vertical-align:middle;margin-right:7px;"><span style="display:inline-block;width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:6px solid #1DB954;vertical-align:middle;margin-left:2px;"></span></span>@endif{{ $actionLabel }}
                                         </a>
                                     </td>
                                 </tr>
@@ -605,7 +624,7 @@
                 {{-- SIGNATURE                                                 --}}
                 {{-- ========================================================= --}}
 
-                @unless($bodyHasSignature)
+                @unless($bodyHasSignature || $isThankYouCampaign)
                     <tr>
                         <td
                             class="email-padding"
@@ -637,7 +656,7 @@
                         style="
                             background:#161943;
                             color:#FFFFFF;
-                            padding:28px 30px;
+                            padding:20px 18px;
                             font-size:12px;
                             line-height:1.8;
                         "
@@ -657,22 +676,16 @@
                             Smart Events. Seamless Experience.
                         </span>
 
-                        <br><br>
-
-                        <a
-                            href="https://events.elive.co.tz"
-                            target="_blank"
-                            style="
-                                color:#FF9800;
-                                text-decoration:none;
-                                font-weight:700;
-                            "
-                        >
-                            events.elive.co.tz
-                        </a>
-
                         <br>
 
+                        <span style="color:#D8DCE6;line-height:2.2;">
+                            <a href="tel:+255745939140" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">Phone: +255 745 939 140</a>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            <a href="mailto:info@elive.co.tz" style="color:#FFFFFF;text-decoration:none;white-space:nowrap;">Email: info@elive.co.tz</a>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            <a href="https://events.elive.co.tz" target="_blank" style="color:#FF9800;text-decoration:none;font-weight:700;white-space:nowrap;">Web: events.elive.co.tz</a>
+                        </span>
+                        <br>
                         <span style="color:#D8DCE6;">
                             © {{ date('Y') }} eLive Events. All rights reserved.
                         </span>
