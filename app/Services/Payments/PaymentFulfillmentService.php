@@ -81,12 +81,12 @@ class PaymentFulfillmentService
             // Notification failures must not undo committed financial changes.
             try {
                 if ($relation === 'merchandiseOrder') {
-                    app(\\App\\Services\\MerchandisePurchaseNotificationService::class)->queueForPayment($payment);
+                    app(\App\Services\MerchandisePurchaseNotificationService::class)->queueForPayment($payment);
                 } elseif ($relation === 'ticketUpgrade') {
                     $this->ticketAccessDeliveryService->queueUpgradeCompleted($payment->ticketUpgrade);
                 } elseif ($relation === 'ticketOrder') {
                     $this->queueTicketAccessLink($payment);
-                    app(\\App\\Services\\Tickets\\OrganizerTicketSaleNotificationService::class)
+                    app(\App\Services\Tickets\OrganizerTicketSaleNotificationService::class)
                         ->queueForPaidOrder((int) $payment->ticket_order_id);
                 }
             } catch (Throwable $notificationException) {
