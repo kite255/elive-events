@@ -10,6 +10,8 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 final class TicketSvgRenderer
 {
+    public const MAX_SVG_BYTES = 20971520;
+
     private const QR_SOURCE_SIZE = 800;
 
     private const QR_MARGIN = 4;
@@ -73,10 +75,17 @@ final class TicketSvgRenderer
             );
         }
 
+        $size = array_sum(array_map('strlen', $parts));
         foreach ($definition['elements'] as $element) {
             $rendered = $this->renderElement($element, $context, $page);
 
             if ($rendered !== '') {
+                $size += strlen($rendered);
+                if ($size + 6 > self::MAX_SVG_BYTES) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'elements' => ['Rendered ticket page exceeds the 20 MiB output limit.'],
+                    ]);
+                }
                 $parts[] = $rendered;
             }
         }
