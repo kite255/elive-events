@@ -8,6 +8,8 @@ use App\Models\Organization;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Services\Payments\PaymentFulfillmentService;
+use App\Services\AutomaticCommunicationService;
+use App\Services\BadgeGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -105,5 +107,26 @@ class RecoverRegistrationPaymentTest extends TestCase
             ->assertExitCode(1);
 
         $this->assertNull($payment->fresh()->fulfilled_at);
+    }
+
+    public function test_confirmed_recovery_runs_real_fulfillment_once(): void
+    {
+        $payment = $this->payment();
+        $payment->attendee->event->forceFill(['registration_auto_generate_badge' => false])->save();
+
+        $this->mock(BadgeGenerationService::class)->shouldNotReceive('generateForAttendee');
+        $this->mock(AutomaticCommunicationService::class)
+            ->shouldReceive('handleRegistration')->once()->andReturn(collect());
+
+        $this->artisan('payments:recover-registration', ['payment' => $payment->id, '--execute' => true])
+            ->expectsConfirmation('Have you independently verified this exact payment is still completed and not reversed at the provider?', 'yes')
+            ->expectsOutput('Registration fulfillment completed.')
+            ->assertExitCode(0);
+
+        $this->assertNotNull($payment->fresh()->fulfilled_at);
+        $this->assertSame(Payment::STATUS_COMPLETED, $payment->fresh()->status);
+
+        $this->artisan('payments:recover-registration', ['payment' => $payment->id, '--execute' => true])
+            ->assertExitCode(1);
     }
 }
