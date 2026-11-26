@@ -15,6 +15,8 @@ class DashboardQuickActions extends Widget
 
     public static function canView(): bool
     {
-        return auth()->user() instanceof User;
+        $user = auth()->user();
+
+        return $user instanceof User && ! $user->is_gate_staff;
     }
 }
