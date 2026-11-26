@@ -63,47 +63,40 @@ class PaymentService
             );
         }
 
-        $gateway =
-            $this->defaultGatewayForOrganization(
-                (int) $event->organization_id
-            );
-
         return DB::transaction(
             function () use (
                 $attendee,
                 $event,
                 $settings,
-                $gateway,
                 $amount
             ): Payment {
-                /*
-                 * Reuse an existing unpaid registration payment
-                 * instead of creating duplicates when an
-                 * attendee retries.
-                 */
-                $existing =
-                    Payment::query()
-                        ->where(
-                            'attendee_id',
-                            $attendee->getKey()
-                        )
-                        ->where(
-                            'event_id',
-                            $event->getKey()
-                        )
-                        ->whereIn(
-                            'status',
-                            [
-                                Payment::STATUS_PENDING,
-                                Payment::STATUS_PROCESSING,
-                            ]
-                        )
-                        ->latest('id')
-                        ->first();
+                $locked = Attendee::query()->whereKey($attendee->id)->lockForUpdate()->firstOrFail();
+
+                if (! $locked->isApproved()) {
+                    throw new RuntimeException('Registration is not eligible for payment.');
+                }
+
+                // Never create a second registration payment automatically.
+                // An earlier terminal or ambiguous provider attempt requires review.
+                $payments = Payment::query()
+                    ->where('attendee_id', $locked->id)
+                    ->where('event_id', $event->id)
+                    ->whereNull('ticket_order_id')
+                    ->whereNull('ticket_upgrade_id')
+                    ->whereNull('donation_id')
+                    ->whereNull('merchandise_order_id');
+
+                $existing = (clone $payments)
+                    ->where('status', Payment::STATUS_COMPLETED)
+                    ->latest('id')
+                    ->first()
+                    ?? $payments->latest('id')->first();
 
                 if ($existing) {
                     return $existing;
                 }
+
+                $gateway = $this->defaultGatewayForOrganization((int) $event->organization_id);
 
                 return Payment::create([
                     'organization_id' =>
