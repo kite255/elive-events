@@ -13,21 +13,19 @@
     --elive-navy: #161943;
     --elive-blue: #007AB2;
     --elive-orange: #FF9800;
-    --elive-bg: #f5f8fc;
+    --elive-bg: #f5f7fa;
     --elive-surface: #ffffff;
-    --elive-border: #e6ebf2;
+    --elive-border: #e2e8f0;
+    --elive-selected: #eef7fc;
+    --elive-text: #161943;
+    --elive-radius: 12px;
+    --elive-input-radius: 8px;
     --elive-muted: #64748b;
 }
 
 .fi-body,
 .fi-main {
-    background:
-        linear-gradient(
-            180deg,
-            #eef4fb 0%,
-            #f7f9fc 42%,
-            #f8fafc 100%
-        );
+    background: var(--elive-bg);
 }
 
 .fi-page {
@@ -192,4 +190,98 @@
 @media (max-width: 640px) {
     .fi-page { max-width: 100%; }
     .fi-wi-stats-overview-stat { border-radius: 14px; }
+}
+
+
+/* Shared eLive visual language, based on the admission-card reference.
+   Preserve Filament behavior and the stable navy navigation shell. */
+.dark {
+    --elive-bg: #111827;
+    --elive-surface: #18212f;
+    --elive-border: #394557;
+    --elive-text: #f1f5f9;
+    --elive-muted: #cbd5e1;
+    --elive-selected: #142e40;
+}
+
+.fi-body, .fi-main { background: var(--elive-bg); }
+.fi-section, .fi-wi-stats-overview-stat, .fi-ta-ctn, .elive-dashboard-card,
+.fi-sc-wizard, .fi-modal-window, .fi-tabs {
+    border-radius: var(--elive-radius);
+    border: 1px solid var(--elive-border);
+    box-shadow: 0 1px 3px rgb(15 23 42 / .035);
+    background: var(--elive-surface);
+}
+.fi-header-heading, .fi-section-header-heading, .fi-wi-stats-overview-stat-value {
+    color: var(--elive-text);
+    font-weight: 600;
+}
+.fi-section-header-description, .fi-header-subheading, .fi-fo-field-wrp-helper-text {
+    color: var(--elive-muted);
+}
+.fi-input-wrp, .fi-btn, .fi-tabs-item {
+    border-radius: var(--elive-input-radius);
+}
+.fi-input-wrp:focus-within {
+    outline: 2px solid var(--elive-blue);
+    outline-offset: 1px;
+}
+.fi-tabs-item.fi-active, .fi-sc-wizard-header-step.fi-active {
+    background: var(--elive-selected);
+    border-radius: var(--elive-input-radius);
+}
+.fi-tabs-item.fi-active .fi-tabs-item-label { color: var(--elive-blue); }
+.dark .fi-tabs-item.fi-active .fi-tabs-item-label { color: #7dd3fc; }
+.fi-ta-header-cell { font-weight: 600; }
+.fi-topbar nav { background: var(--elive-surface); border-color: var(--elive-border); }
+.fi-wi-stats-overview-stat:hover, .elive-dashboard-card:hover {
+    transform: none;
+    box-shadow: 0 1px 3px rgb(15 23 42 / .035);
+}
+
+/* Reusable choice cards for admission and future selection fields. */
+.elive-admission-cards, .elive-choice-cards { display: grid; gap: 12px; }
+.elive-admission-choice, .elive-choice-card {
+    position: relative; display: flex; align-items: center; gap: 12px;
+    min-height: 74px; padding: 16px 14px;
+    border: 1px solid var(--elive-border); border-radius: var(--elive-input-radius);
+    background: var(--elive-surface); cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+.elive-admission-choice:has(input:checked), .elive-choice-card:has(input:checked) {
+    border-color: var(--elive-blue); box-shadow: inset 0 0 0 1px var(--elive-blue);
+    background: var(--elive-selected);
+}
+.elive-admission-choice:focus-within, .elive-choice-card:focus-within {
+    outline: 2px solid var(--elive-blue); outline-offset: 3px;
+}
+.elive-admission-choice input, .elive-choice-card input {
+    position: absolute; opacity: 0; width: 1px; height: 1px;
+}
+.elive-admission-icon, .elive-choice-icon {
+    color: var(--elive-blue); flex-shrink: 0; width: 20px; height: 20px;
+}
+.dark .elive-admission-icon, .dark .elive-choice-icon { color: #7dd3fc; }
+.elive-admission-copy, .elive-choice-copy { flex: 1; min-width: 0; }
+.elive-admission-title, .elive-choice-title {
+    display: block; color: var(--elive-text); font-size: 15px; font-weight: 600;
+}
+.elive-admission-description, .elive-choice-description {
+    display: block; margin-top: 4px; font-size: 14px; line-height: 1.45;
+    color: var(--elive-muted);
+}
+.elive-admission-dot, .elive-choice-dot {
+    width: 16px; height: 16px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0;
+}
+.elive-admission-choice:has(input:checked) .elive-admission-dot,
+.elive-choice-card:has(input:checked) .elive-choice-dot {
+    background: transparent; border: 2px solid var(--elive-blue);
+    display: grid; place-items: center;
+}
+.elive-admission-choice:has(input:checked) .elive-admission-dot::after,
+.elive-choice-card:has(input:checked) .elive-choice-dot::after {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--elive-blue);
+}
+@media (prefers-reduced-motion: reduce) {
+    .elive-admission-choice, .elive-choice-card { transition: none; }
 }
