@@ -1,14 +1,11 @@
 <x-filament-widgets::widget>
     <x-filament::section heading="Quick actions">
-        <div class="elive-quick-actions-grid">
+        <div class="elive-quick-actions-grid elive-quick-actions-compact">
             @php
                 $links = [
-                    [\App\Filament\Resources\Events\EventResource::class, 'Events', 'canViewAny', 'heroicon-o-calendar-days'],
                     [\App\Filament\Resources\TicketOrders\TicketOrderResource::class, 'Ticket orders', 'canViewAny', 'heroicon-o-ticket'],
-                    [\App\Filament\Pages\OrganizerSalesDashboard::class, 'Sales dashboard', 'canAccess', 'heroicon-o-chart-bar'],
-                    [\App\Filament\Pages\OrganizerFinanceOverview::class, 'My Finance', 'canAccess', 'heroicon-o-wallet'],
-                    [\App\Filament\Pages\AttendanceDashboard::class, 'Attendance', 'canAccess', 'heroicon-o-users'],
-                    [\App\Filament\Pages\CheckInStation::class, 'Check-in station', 'canAccess', 'heroicon-o-qr-code'],
+                    [\App\Filament\Pages\OrganizerSalesDashboard::class, 'Sales', 'canAccess', 'heroicon-o-chart-bar'],
+                    [\App\Filament\Pages\CheckInStation::class, 'Check-in', 'canAccess', 'heroicon-o-qr-code'],
                     [\App\Filament\Pages\CommunicationCenter::class, 'Communications', 'canAccess', 'heroicon-o-envelope'],
                 ];
             @endphp
