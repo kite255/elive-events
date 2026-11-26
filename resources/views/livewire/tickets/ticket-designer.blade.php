@@ -1052,6 +1052,15 @@
 
                 <button
                     type="button"
+                    wire:click="recoverOffCanvasElements"
+                    wire:loading.attr="disabled"
+                    class="designer-button"
+                >
+                    Recover Off-Canvas Elements
+                </button>
+
+                <button
+                    type="button"
                     wire:click="save"
                     class="designer-button primary"
                 >
@@ -1059,6 +1068,12 @@
                 </button>
             </div>
         </div>
+
+        @if ($recoveryNotice)
+            <div role="status" class="background-help">
+                {{ $recoveryNotice }}
+            </div>
+        @endif
 
         @error('definition')
             <div class="error-box">
@@ -1367,7 +1382,7 @@
                             @endphp
 
                             <div
-                                wire:key="designer-element-{{ $elementId }}"
+                                wire:key="designer-element-{{ $elementId }}-{{ $recoveryRevision }}"
                                 x-data="ticketDesignerElement({
                                     id: @js($elementId),
                                     type: @js($elementType),
