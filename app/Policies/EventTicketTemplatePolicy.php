@@ -10,6 +10,10 @@ class EventTicketTemplatePolicy
 {
     public function viewAny(User $user): bool
     {
+        if ($user->is_gate_staff) {
+            return false;
+        }
+
         if ($user->isSuperAdmin()) {
             return true;
         }
@@ -22,6 +26,10 @@ class EventTicketTemplatePolicy
         User $user,
         EventTicketTemplate $template
     ): bool {
+        if ($user->is_gate_staff) {
+            return false;
+        }
+
         if ($user->isSuperAdmin()) {
             return true;
         }
@@ -40,6 +48,10 @@ class EventTicketTemplatePolicy
 
     public function create(User $user): bool
     {
+        if ($user->is_gate_staff) {
+            return false;
+        }
+
         if ($user->isSuperAdmin()) {
             return true;
         }
