@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Events;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\CreateEventCommunication;
 use App\Filament\Resources\Events\Pages\EditEvent;
+use App\Filament\Resources\Events\Pages\EventWorkspace;
 use App\Filament\Resources\Events\Pages\EditEventCommunication;
 use App\Filament\Resources\Events\Pages\ListEvents;
 use App\Filament\Resources\Events\RelationManagers\AttendeeCategoriesRelationManager;
@@ -320,6 +321,8 @@ class EventResource extends Resource
                 CreateEvent::route(
                     '/create'
                 ),
+
+            'workspace' => EventWorkspace::route('/{record}/workspace'),
 
             'edit' =>
                 EditEvent::route(
