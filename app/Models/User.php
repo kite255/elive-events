@@ -587,6 +587,10 @@ class User extends Authenticatable implements FilamentUser
 
     public function canManageEvent(Event $event): bool
     {
+        if ($this->is_gate_staff) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -606,6 +610,10 @@ class User extends Authenticatable implements FilamentUser
     public function canManageEventRegistration(
         Event $event
     ): bool {
+        if ($this->is_gate_staff) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -616,6 +624,10 @@ class User extends Authenticatable implements FilamentUser
     public function canManageEventBadges(
         Event $event
     ): bool {
+        if ($this->is_gate_staff) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -626,6 +638,10 @@ class User extends Authenticatable implements FilamentUser
     public function canManageEventCommunication(
         Event $event
     ): bool {
+        if ($this->is_gate_staff) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
@@ -636,6 +652,10 @@ class User extends Authenticatable implements FilamentUser
     public function canViewEventReports(
         Event $event
     ): bool {
+        if ($this->is_gate_staff) {
+            return false;
+        }
+
         if ($this->isSuperAdmin()) {
             return true;
         }
