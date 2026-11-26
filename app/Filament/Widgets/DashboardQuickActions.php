@@ -7,7 +7,7 @@ use Filament\Widgets\Widget;
 
 class DashboardQuickActions extends Widget
 {
-    protected static ?int $sort = -19;
+    protected static ?int $sort = -7;
 
     protected string $view = 'filament.widgets.dashboard-quick-actions';
 
