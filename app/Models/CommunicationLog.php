@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class CommunicationLog extends Model
 {
     public const PURPOSE_TICKET_ACCESS = 'ticket_access';
+    public const PURPOSE_TICKET_BUYER_CAMPAIGN = 'ticket_buyer_campaign';
     public const PURPOSE_TICKET_ACCESS_RECOVERY = 'ticket_access_recovery';
     public const PURPOSE_TICKET_UPGRADE_COMPLETED = 'ticket_upgrade_completed';
     public const PURPOSE_BADGE_RESEND = 'badge_resend';
