@@ -1124,10 +1124,10 @@ class EventForm
                             ->label('Registration access code')
                             ->password()
                             ->autocomplete('new-password')
-                            ->required(fn (Get $get, string $operation): bool => $operation === 'create' && $get('admission_mode') === 'access_code' && (bool) $get('registration_is_open'))
+                            
                             ->minLength(8)
                             ->maxLength(72)
-                            ->helperText('Optional. Enter a new code to restrict registration. Leave blank to preserve the existing code. Enter a new code to rotate access.')
+                            ->helperText('Optional. Set an access code for free or paid registration. Leave blank for unrestricted new events or to retain an existing code.')
                             ->afterStateHydrated(fn (TextInput $component) => $component->state(null))
                             ->dehydrated(fn ($state): bool => filled($state))
                             ->dehydrateStateUsing(fn ($state): string => \Illuminate\Support\Facades\Hash::make($state)),
@@ -2072,19 +2072,13 @@ class EventForm
         $admission = Section::make('Admission method')
             ->description('Choose a starting configuration. Review the registration and ticket settings below before saving.')
             ->schema([
-                Select::make('admission_mode')
+                \Filament\Forms\Components\ViewField::make('admission_mode')
                     ->label('Admission method')
-                    ->options([
-                        'free_registration' => 'Free public registration',
-                        'paid_registration' => 'Paid registration',
-                        'access_code' => 'Access-code registration',
-                        'tickets' => 'Ticket sales',
-                        'combined' => 'Registration and ticket sales',
-                        'manual' => 'Manual attendee management',
-                    ])
+                    ->hiddenLabel()
+                    ->view('filament.forms.admission-cards')
+                    ->rules(['in:free_registration,paid_registration,tickets,combined,manual'])
                     ->default('manual')
                     ->required()
-                    ->native(false)
                     ->live()
                     ->dehydrated(false)
                     ->afterStateUpdated(function ($state, Set $set): void {
@@ -2092,7 +2086,7 @@ class EventForm
                         $set('ticketSetting.ticket_sales_enabled', in_array($state, ['tickets', 'combined'], true));
                         $set('paymentSetting.payments_enabled', $state === 'paid_registration');
 
-                        if ($state !== 'access_code') {
+                        if (! in_array($state, ['free_registration', 'paid_registration', 'combined'], true)) {
                             $set('registration_access_code_hash', null);
                         }
                     })
