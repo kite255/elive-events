@@ -233,6 +233,16 @@ class CommunicationCampaignService
         $event = Event::query()->findOrFail($event->getKey());
         $this->authorizeCampaignEvent($event, $createdBy);
         $this->validateAudience($event, $audience, $categoryId);
+        $artwork = app(CampaignArtworkService::class);
+        if ($emailPosterPath !== null && ! $artwork->validPoster($event->id, $emailPosterPath)) {
+            throw new RuntimeException('Invalid or unrelated campaign poster.');
+        }
+        if ($emailActionUrl !== null && ! $artwork->validActionUrl($emailActionUrl)) {
+            throw new RuntimeException('Invalid campaign action URL.');
+        }
+        if ($emailActionLabel !== null && mb_strlen($emailActionLabel) > 80) {
+            throw new RuntimeException('Campaign action label is too long.');
+        }
         if ($template) {
             $template = CommunicationTemplate::query()->findOrFail($template->getKey());
         }
