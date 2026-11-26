@@ -8,14 +8,18 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\Attributes\Locked;
+use Illuminate\Support\Facades\Gate;
 use Livewire\WithFileUploads;
 
 class TicketDesigner extends Component
 {
     use WithFileUploads;
 
+    #[Locked]
     public string $templateType;
 
+    #[Locked]
     public int $templateId;
 
     public string $templateName = '';
@@ -24,6 +28,7 @@ class TicketDesigner extends Component
 
     public int $canvasHeight = 1350;
 
+    #[Locked]
     public array $pages = [];
 
     public ?int $activePageId = null;
@@ -40,6 +45,7 @@ class TicketDesigner extends Component
 
     public $backgroundUpload = null;
 
+    #[Locked]
     public ?string $backgroundImagePath = null;
 
     public $elementImageUpload = null;
@@ -59,6 +65,8 @@ class TicketDesigner extends Component
             $templateType,
             $templateId
         );
+
+        Gate::authorize('update', $template);
 
         $this->templateName =
             (string) $template->name;
@@ -85,6 +93,12 @@ class TicketDesigner extends Component
         $this->loadPage(
             (int) $firstPage['id']
         );
+    }
+
+    public function hydrate(): void
+    {
+        $template = app(TicketDesignerService::class)->loadTemplate($this->templateType, $this->templateId);
+        Gate::authorize('update', $template);
     }
 
     public function updatedBackgroundUpload(): void
