@@ -222,6 +222,31 @@ final class TicketTemplateDefinitionValidator
             }
         }
 
+        // Allow intentional partial bleed for decorative elements, but never
+        // allow a completely invisible element or a clipped admission QR.
+        $x = (float) $element['x'];
+        $y = (float) $element['y'];
+        $width = (float) $element['width'];
+        $height = (float) $element['height'];
+        $angle = deg2rad((float) ($element['rotation'] ?? 0));
+        $halfWidth = (abs(cos($angle)) * $width + abs(sin($angle)) * $height) / 2;
+        $halfHeight = (abs(sin($angle)) * $width + abs(cos($angle)) * $height) / 2;
+        $centerX = $x + $width / 2;
+        $centerY = $y + $height / 2;
+        $left = $centerX - $halfWidth;
+        $right = $centerX + $halfWidth;
+        $top = $centerY - $halfHeight;
+        $bottom = $centerY + $halfHeight;
+
+        if ($right <= 0 || $bottom <= 0 || $left >= $canvasWidth || $top >= $canvasHeight) {
+            $this->fail("{$path}.position", 'Element must be visible on the ticket canvas.');
+        }
+
+        if ($type === 'qr' && ($left < -0.001 || $top < -0.001
+            || $right > $canvasWidth + 0.001 || $bottom > $canvasHeight + 0.001)) {
+            $this->fail("{$path}.position", 'The QR code must fit completely inside the ticket canvas.');
+        }
+
         if (array_key_exists('zIndex', $element)) {
             if (
                 ! is_int($element['zIndex'])
