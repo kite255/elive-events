@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Audit\AuditLogService;
 use App\Services\PhoneNumberService;
 use App\Services\WhatsAppService;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -42,75 +43,96 @@ class ManualTicketResendService
 
     public function queue(TicketOrder $order, array $channels, User $actor): array
     {
-        $order = TicketOrder::query()->with('event')->findOrFail($order->getKey());
+        return DB::transaction(function () use ($order, $channels, $actor): array {
+            $order = TicketOrder::query()->with('event')->lockForUpdate()->findOrFail($order->getKey());
 
-        if (! $order->event || ! $this->actorCanResend($actor, $order)) {
-            throw new RuntimeException('You are not allowed to resend tickets for this event.');
-        }
-
-        if (! $order->isPaid()) {
-            throw new RuntimeException('Only paid ticket orders can be resent.');
-        }
-
-        $available = $this->availableChannels($order);
-        $requested = array_values(array_unique(array_map('strval', $channels)));
-
-        if ($requested === []) {
-            throw new RuntimeException('Select at least one delivery channel.');
-        }
-
-        $queued = [];
-        $skipped = [];
-
-        foreach ($requested as $channel) {
-            if (! array_key_exists($channel, $available)) {
-                $skipped[] = $channel;
-                continue;
+            if (! $order->event || ! $this->actorCanResend($actor, $order)) {
+                throw new RuntimeException('You are not allowed to resend tickets for this event.');
             }
 
-            $recipient = $channel === CommunicationLog::CHANNEL_EMAIL
-                ? $this->validEmail($order->buyer_email)
-                : $this->normalizedPhone($order->buyer_phone);
-
-            if ($recipient === null) {
-                $skipped[] = $channel;
-                continue;
+            if (! $order->isPaid()) {
+                throw new RuntimeException('Only paid ticket orders can be resent.');
             }
 
-            $log = CommunicationLog::query()->create([
-                'event_id' => $order->event_id,
-                'ticket_order_id' => $order->id,
-                'purpose' => CommunicationLog::PURPOSE_TICKET_ACCESS_RECOVERY,
-                'channel' => $channel,
-                'recipient' => $recipient,
-                'subject' => $channel === CommunicationLog::CHANNEL_EMAIL ? 'Ticket delivery' : null,
-                'message' => "Secure ticket access link for order {$order->order_number}",
-                'status' => CommunicationLog::STATUS_QUEUED,
-                'queued_at' => now(),
-            ]);
+            $available = $this->availableChannels($order);
+            $requested = array_values(array_unique(array_map('strval', $channels)));
 
-            SendTicketAccessLinkJob::dispatch($log->id)
-                ->onQueue($this->queueForChannel($channel));
+            if ($requested === []) {
+                throw new RuntimeException('Select at least one delivery channel.');
+            }
 
-            $queued[] = $channel;
-        }
+            $queued = [];
+            $skipped = [];
 
-        if ($queued !== []) {
-            $this->auditLogService->record(
-                'ticket.access_resent',
-                $order,
-                $actor,
-                [
-                    'channels' => $queued,
-                    'order_reference' => $order->order_number,
-                ]
-            );
-        }
+            foreach ($requested as $channel) {
+                if (! array_key_exists($channel, $available)) {
+                    $skipped[] = $channel;
+                    continue;
+                }
 
-        return [
-            'queued' => $queued,
-            'skipped' => $skipped,
-        ];
+                $recipient = $channel === CommunicationLog::CHANNEL_EMAIL
+                    ? $this->validEmail($order->buyer_email)
+                    : $this->normalizedPhone($order->buyer_phone);
+
+                if ($recipient === null) {
+                    $skipped[] = $channel;
+                    continue;
+                }
+
+                $cooldown = max(1, (int) config('ticketing.manual_resend_cooldown_seconds', 60));
+                $recent = CommunicationLog::query()
+                    ->where('ticket_order_id', $order->id)
+                    ->where('purpose', CommunicationLog::PURPOSE_TICKET_ACCESS_RECOVERY)
+                    ->where('channel', $channel)
+                    ->where('recipient', $recipient)
+                    ->where('created_at', '>=', now()->subSeconds($cooldown))
+                    ->where('status', '!=', CommunicationLog::STATUS_FAILED)
+                    ->exists();
+
+                if ($recent) {
+                    $skipped[] = $channel;
+                    continue;
+                }
+
+                $log = CommunicationLog::query()->create([
+                    'event_id' => $order->event_id,
+                    'ticket_order_id' => $order->id,
+                    'purpose' => CommunicationLog::PURPOSE_TICKET_ACCESS_RECOVERY,
+                    'channel' => $channel,
+                    'recipient' => $recipient,
+                    'subject' => $channel === CommunicationLog::CHANNEL_EMAIL ? 'Ticket delivery' : null,
+                    'message' => "Secure ticket access link for order {$order->order_number}",
+                    'status' => CommunicationLog::STATUS_QUEUED,
+                    'queued_at' => now(),
+                ]);
+
+                SendTicketAccessLinkJob::dispatch($log->id)
+                    ->onQueue($this->queueForChannel($channel))->afterCommit();
+
+                $queued[] = $channel;
+            }
+
+            if ($queued !== []) {
+                $this->auditLogService->record(
+                    'ticket.access_resent',
+                    $order,
+                    $actor,
+                    [
+                        'channels' => $queued,
+                        'order_reference' => $order->order_number,
+                    ]
+                );
+            }
+
+            if ($queued === []) {
+                throw new RuntimeException('No messages queued. The selected channels are unavailable or were recently requested.');
+            }
+
+            return [
+                'queued' => $queued,
+                'skipped' => $skipped,
+            ];
+        }, 3);
     }
 
     public function maskedContact(TicketOrder $order): array
