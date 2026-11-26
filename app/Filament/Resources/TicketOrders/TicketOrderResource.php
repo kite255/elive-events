@@ -50,7 +50,7 @@ class TicketOrderResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -62,62 +62,26 @@ class TicketOrderResource extends Resource
 
     public static function canCreate(): bool
     {
-        $user = auth()->user();
-
-        if (! $user instanceof User || $user->isTicketOrganizer()) {
-            return false;
-        }
-
-        return parent::canCreate();
+        // Orders are mutated through dedicated ticketing and payment workflows.
+        return false;
     }
 
     public static function canEdit(Model $record): bool
     {
-        $user = auth()->user();
-
-        if (! $user instanceof User || $user->isTicketOrganizer()) {
-            return false;
-        }
-
-        if (! $user->isSuperAdmin()) {
-            $event = $record->event;
-
-            if (! $event || ! $event->canBeManagedBy($user)) {
-                return false;
-            }
-        }
-
-        return parent::canEdit($record);
+        // Orders are mutated through dedicated ticketing and payment workflows.
+        return false;
     }
 
     public static function canDelete(Model $record): bool
     {
-        $user = auth()->user();
-
-        if (! $user instanceof User || $user->isTicketOrganizer()) {
-            return false;
-        }
-
-        if (! $user->isSuperAdmin()) {
-            $event = $record->event;
-
-            if (! $event || ! $event->canBeManagedBy($user)) {
-                return false;
-            }
-        }
-
-        return parent::canDelete($record);
+        // Orders are mutated through dedicated ticketing and payment workflows.
+        return false;
     }
 
     public static function canDeleteAny(): bool
     {
-        $user = auth()->user();
-
-        if (! $user instanceof User || $user->isTicketOrganizer()) {
-            return false;
-        }
-
-        return parent::canDeleteAny();
+        // Orders are mutated through dedicated ticketing and payment workflows.
+        return false;
     }
 
     public static function getEloquentQuery(): Builder
@@ -125,7 +89,7 @@ class TicketOrderResource extends Resource
         $query = parent::getEloquentQuery();
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return $query->whereRaw('1 = 0');
         }
 
