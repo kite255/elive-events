@@ -1408,7 +1408,7 @@ class Event extends Model
     public function canBeManagedBy(
         ?User $user
     ): bool {
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -1491,7 +1491,7 @@ class Event extends Model
     public function canManageRegistrationBy(
         ?User $user
     ): bool {
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -1531,7 +1531,7 @@ class Event extends Model
     public function canManageBadgesBy(
         ?User $user
     ): bool {
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -1571,7 +1571,7 @@ class Event extends Model
     public function canManageCommunicationBy(
         ?User $user
     ): bool {
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -1611,7 +1611,7 @@ class Event extends Model
     public function canViewReportsBy(
         ?User $user
     ): bool {
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
