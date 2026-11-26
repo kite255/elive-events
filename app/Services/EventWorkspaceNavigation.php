@@ -24,7 +24,7 @@ class EventWorkspaceNavigation
         if (in_array($name, ['filament.admin.resources.events.workspace', 'filament.admin.resources.events.edit'], true)) {
             $record = $route->parameter('record');
             $id = $record instanceof Event ? $record->getKey() : $record;
-        } elseif (in_array($name, ['filament.admin.pages.check-in-station', 'filament.admin.pages.communication-center'], true)) {
+        } elseif (in_array($name, ['filament.admin.pages.check-in-station', 'filament.admin.pages.communication-center', 'filament.admin.resources.attendees.index', 'filament.admin.resources.ticket-orders.index'], true)) {
             $id = request()->query('event_id');
         } else {
             return true;
