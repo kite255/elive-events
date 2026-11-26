@@ -26,9 +26,64 @@ class EditEvent extends EditRecord
 {
     protected static string $resource = EventResource::class;
 
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        // Publication is a separate operation on saved settings.
+        if (($data['status'] ?? null) === \App\Models\Event::STATUS_ACTIVE
+            && ! $this->getRecord()->isActive()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.status' => 'Save your event settings first, then use Publish Event.',
+            ]);
+        }
+
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('publish_event')
+                ->label('Publish Event')
+                ->icon('heroicon-o-globe-alt')
+                ->color('primary')
+                ->visible(fn (): bool => $this->getRecord()->isDraft())
+                ->requiresConfirmation()
+                ->modalHeading('Publish this event?')
+                ->modalDescription('Only saved settings are used. Save any pending edits first. Verify payment checkout and message delivery separately before publishing.')
+                ->action(function (): void {
+                    $result = \Illuminate\Support\Facades\DB::transaction(function (): array {
+                        $event = \App\Models\Event::query()->lockForUpdate()->findOrFail($this->getRecord()->getKey());
+                        abort_unless(EventResource::canEdit($event), 403);
+
+                        if (! $event->isDraft()) {
+                            return ['Event is no longer a draft. Reload the page.'];
+                        }
+
+                        $errors = app(\App\Services\EventPublicationReadiness::class)->blockers($event);
+
+                        if ($errors === []) {
+                            $event->status = \App\Models\Event::STATUS_ACTIVE;
+                            $event->save();
+                        }
+
+                        return $errors;
+                    });
+
+                    if ($result !== []) {
+                        Notification::make()
+                            ->title('Event is not ready to publish')
+                            ->body(implode("\n", $result))
+                            ->warning()
+                            ->persistent()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()->title('Event published')->success()->send();
+                    $this->redirect(EventResource::getUrl('edit', ['record' => $this->getRecord()]));
+                }),
+
             ActionGroup::make([
                 Action::make('registration_status')
                     ->label(
