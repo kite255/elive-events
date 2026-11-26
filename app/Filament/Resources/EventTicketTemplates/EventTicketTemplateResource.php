@@ -58,7 +58,7 @@ class EventTicketTemplateResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return false;
         }
 
@@ -95,7 +95,7 @@ class EventTicketTemplateResource extends Resource
 
         $user = auth()->user();
 
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return $query->whereRaw('1 = 0');
         }
 
