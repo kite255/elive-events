@@ -50,11 +50,12 @@ class DashboardRevenueSummary extends Widget
         }
 
         return $orders->groupBy('currency')->orderBy('currency')
-            ->selectRaw('currency, COUNT(*) as paid_orders, SUM(total) as gross_sales')
+            ->selectRaw('currency, COUNT(*) as paid_orders, SUM(total) as gross_sales, COALESCE(SUM(quantity), 0) as tickets_sold')
             ->get()->map(fn ($row) => [
                 'currency' => $row->currency,
                 'paid_orders' => (int) $row->paid_orders,
                 'gross_sales' => $row->gross_sales,
+                'tickets_sold' => (int) $row->tickets_sold,
             ])->all();
     }
 }
