@@ -145,12 +145,6 @@ class PublicRegistrationController extends Controller
             ? strtolower(trim($validated['email'] ?? ''))
             : '';
 
-        $status = match (true) {
-            $isFull && $waitlistEnabled => 'waitlisted',
-            $event->registration_requires_approval => 'pending_approval',
-            default => 'registered',
-        };
-
         /*
         |--------------------------------------------------------------------------
         | Participant type and badge resolution
@@ -202,12 +196,28 @@ class PublicRegistrationController extends Controller
                     $fullName,
                     $phone,
                     $email,
-                    $status,
                     $categoryId,
                     $badgeTypeId
                 ): Attendee {
-                    // Serialize public registrations for this event before checking identity.
-                    Event::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+                    // Re-read admission settings and capacity while holding the event lock.
+                    $lockedEvent = Event::query()
+                        ->whereKey($event->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    if (! $lockedEvent->registration_is_open) {
+                        throw ValidationException::withMessages([
+                            'full_name' => 'Registration for this event is currently closed.',
+                        ]);
+                    }
+
+                    $status = $lockedEvent->nextRegistrationStatus();
+
+                    if ($status === 'closed') {
+                        throw ValidationException::withMessages([
+                            'full_name' => 'Registration is full. The event has reached its capacity.',
+                        ]);
+                    }
 
                     $duplicateReason = $this->duplicateRegistrationReason(
                         $event,
@@ -305,6 +315,7 @@ class PublicRegistrationController extends Controller
         */
 
         $attendee->refresh();
+        $status = $attendee->status;
 
         /*
         |--------------------------------------------------------------------------
