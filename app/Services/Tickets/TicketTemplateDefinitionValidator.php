@@ -6,6 +6,10 @@ use Illuminate\Validation\ValidationException;
 
 final class TicketTemplateDefinitionValidator
 {
+    public const MAX_ELEMENTS = 100;
+
+    public const MAX_IMAGE_ELEMENTS = 12;
+
     private const SUPPORTED_ELEMENT_TYPES = [
         'text',
         'qr',
@@ -67,9 +71,12 @@ final class TicketTemplateDefinitionValidator
             );
         }
 
-        $this->rejectForbiddenKeys(
-            $definition
-        );
+        $encoded = json_encode($definition, 0, 32);
+        if ($encoded === false || strlen($encoded) > 262144) {
+            $this->fail('definition', 'Ticket definition is too large or deeply nested.');
+        }
+
+        $this->rejectForbiddenKeys($definition);
 
         if (
             ! array_key_exists('version', $definition)
@@ -91,6 +98,11 @@ final class TicketTemplateDefinitionValidator
             );
         }
 
+        if (count($definition['elements']) > self::MAX_ELEMENTS) {
+            $this->fail('elements', 'A ticket page may contain at most 100 elements.');
+        }
+
+        $imageCount = 0;
         $usedIds = [];
 
         foreach (
@@ -102,6 +114,11 @@ final class TicketTemplateDefinitionValidator
                     "elements.{$index}",
                     'Each ticket template element must be an object.'
                 );
+            }
+
+            if (in_array($element['type'] ?? null, ['image', 'logo', 'sponsor_logo'], true)
+                && ++$imageCount > self::MAX_IMAGE_ELEMENTS) {
+                $this->fail('elements', 'A ticket page may contain at most 12 image elements.');
             }
 
             $this->validateElement(
