@@ -14,6 +14,13 @@ class TicketDesignerUiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAs(\App\Models\User::factory()->create(['is_super_admin' => true]));
+    }
+
     public function test_designer_renders_main_workspace_regions(): void
     {
         [$type, $templateId] =
