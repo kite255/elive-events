@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\EventCommunication;
+use App\Models\User;
 use App\Services\EventCommunicationCampaignService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -45,6 +46,16 @@ class QueueEventCommunicationCampaignJob implements ShouldQueue
                 );
 
         if (! $communication) {
+            return;
+        }
+
+        $actor = $this->createdBy ? User::query()->find($this->createdBy) : null;
+        if (! $actor || ! $communication->event || ! $actor->canManageEventCommunication($communication->event)
+            || ! $communication->isPublished() || ! $communication->is_public) {
+            Log::warning('Scheduled communication rejected because authorization or publication changed.', [
+                'event_communication_id' => $this->communicationId,
+                'created_by' => $this->createdBy,
+            ]);
             return;
         }
 
