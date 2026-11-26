@@ -177,7 +177,7 @@ class CommunicationCenter extends Page
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -1114,7 +1114,7 @@ class CommunicationCenter extends Page
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return new Collection();
         }
 
