@@ -113,6 +113,20 @@
                         </div>
                     </div>
                 </div>
+
+                @if (auth()->user()?->isSuperAdmin() && isset($events[$this->selectedEventId]))
+                    <div class="mt-4">
+                        <x-filament::button
+                            tag="a"
+                            :href="route('admin.events.reports.download', ['event' => $this->selectedEventId])"
+                            icon="heroicon-o-arrow-down-tray"
+                            wire:loading.class="pointer-events-none opacity-50"
+                            wire:target="selectedEventId"
+                        >
+                            Download Event Reports
+                        </x-filament::button>
+                    </div>
+                @endif
             </section>
 
             {{-- KPI cards --}}
