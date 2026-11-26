@@ -19,7 +19,7 @@ class EventFinanceClearanceService
      */
     public function independentlyVerify(int $entryId, User $verifier, string $note): void
     {
-        if (! $verifier->isSuperAdmin() || mb_strlen(trim($note)) < 12) {
+        if ($verifier->is_gate_staff || ! $verifier->isSuperAdmin() || mb_strlen(trim($note)) < 12) {
             throw ValidationException::withMessages(['verification' => 'Authorized verifier and detailed evidence note required.']);
         }
 
@@ -48,13 +48,13 @@ class EventFinanceClearanceService
      */
     public function singleSuperAdminIs(User $admin): bool
     {
-        if (! $admin->isSuperAdmin()) {
+        if ($admin->is_gate_staff || ! $admin->isSuperAdmin()) {
             return false;
         }
 
         $count = 0;
         foreach (User::query()->cursor() as $candidate) {
-            if ($candidate->isSuperAdmin()) {
+            if (! $candidate->is_gate_staff && $candidate->isSuperAdmin()) {
                 $count++;
                 if ($count > 1) {
                     return false;
@@ -71,7 +71,7 @@ class EventFinanceClearanceService
      */
     public function selfAttest(int $entryId, User $admin, string $note): void
     {
-        if (! $admin->isSuperAdmin() || mb_strlen(trim($note)) < 40) {
+        if ($admin->is_gate_staff || ! $admin->isSuperAdmin() || mb_strlen(trim($note)) < 40) {
             throw ValidationException::withMessages([
                 'verification' => 'Super administrator and a detailed evidence note (40+ characters) required.',
             ]);
@@ -128,7 +128,7 @@ class EventFinanceClearanceService
     public function voidEntry(int $entryId, User $admin, string $reason): void
     {
         $reason = trim($reason);
-        if (! $admin->isSuperAdmin() || mb_strlen($reason) < 20 || mb_strlen($reason) > 2000) {
+        if ($admin->is_gate_staff || ! $admin->isSuperAdmin() || mb_strlen($reason) < 20 || mb_strlen($reason) > 2000) {
             throw ValidationException::withMessages([
                 'void_reason' => 'A super administrator must provide a correction reason of 20–2000 characters.',
             ]);
@@ -177,7 +177,7 @@ class EventFinanceClearanceService
         Event $event, User $admin, string $type, string $amount,
         string $externalReference, string $note
     ): void {
-        if (! $admin->isSuperAdmin()) {
+        if ($admin->is_gate_staff || ! $admin->isSuperAdmin()) {
             throw ValidationException::withMessages(['finance' => 'Platform administration required.']);
         }
 
