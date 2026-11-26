@@ -447,6 +447,28 @@
                 </div>
             </section>
 
+            @if (! empty($summary['setup_checklist']))
+                <section class="elive-info-card" aria-label="Event setup checklist">
+                    <h3 class="elive-info-value">Prepare your event</h3>
+                    <p class="elive-event-description">
+                        Review your saved settings before publishing. Optional items and manual reviews are not publication blockers.
+                    </p>
+                    <ul style="display:grid; gap:.75rem; margin-top:1rem; list-style:none; padding:0;">
+                        @foreach ($summary['setup_checklist'] as $item)
+                            <li style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:.5rem;">
+                                <div style="flex:1; min-width:12rem;">
+                                    <div class="elive-info-value">{{ $item['label'] }}</div>
+                                    <div class="elive-ops-help">{{ $item['detail'] }}</div>
+                                </div>
+                                <span class="elive-pill elive-pill-{{ $item['complete'] === true ? 'success' : ($item['complete'] === false && ! $item['optional'] ? 'warning' : 'info') }}">
+                                    {{ $item['complete'] === true ? 'Configured' : ($item['optional'] ? 'Optional' : ($item['complete'] === false ? 'Needs attention' : 'Review')) }}
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </section>
+            @endif
+
             <section class="elive-info-grid">
                 <div class="elive-info-card">
                     <div class="elive-info-label">
