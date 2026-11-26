@@ -70,6 +70,16 @@
         $registrationPaymentRequired =
             (bool) ($paymentRequired ?? false);
 
+        $paymentOutstanding = $registrationPaymentRequired
+            && ! $registrationPayment?->isCompleted();
+        $canViewBadge = $canViewBadge && ! $paymentOutstanding;
+
+        if ($isSuccessful && $paymentOutstanding) {
+            $successTitle = 'Registration Received';
+            $successMessage = 'Your registration has been received. Complete the required payment to confirm your attendance.';
+            $registrationUrl = null;
+        }
+
         $registrationPaymentStatusClass = 'neutral';
         $registrationPaymentTitle = null;
         $registrationPaymentMessage = null;
@@ -131,14 +141,14 @@
                     'Payment Not Completed';
 
                 $registrationPaymentMessage =
-                    'Your payment was not completed. You can try the payment again.';
+                    'Your payment was not completed. Contact the organizer before attempting another payment.';
 
                 $registrationPaymentActionText =
-                    'Try Payment Again';
+                    'View Payment Status';
 
                 $registrationPaymentActionUrl =
                     route(
-                        'payments.pay',
+                        'payments.status',
                         $registrationPayment
                     );
             } elseif (
@@ -1084,6 +1094,13 @@
                 </div>
 
 
+                @if ($isSuccessful && $registrationPaymentRequired && $registrationPayment->isPending() && blank($registrationPayment->provider_tracking_id) && blank(data_get($registrationPayment->metadata, 'checkout_attempted_at')))
+                    <form method="POST" action="{{ route('public.registration.payment.resume', ['event' => $event->slug, 'attendee' => $attendee->public_token]) }}">
+                        @csrf
+                        <button type="submit" class="button">Continue to Payment</button>
+                    </form>
+                @endif
+
                 @if ($registrationPaymentActionUrl)
 
                     <div class="payment-actions">
@@ -1161,8 +1178,13 @@
 
 
                 <div class="instructions">
-                    Please contact the event organizer if you
-                    were not redirected to the payment page.
+                    @if (session('error'))
+                        <p role="alert">{{ session('error') }}</p>
+                    @endif
+                    <form method="POST" action="{{ route('public.registration.payment.resume', ['event' => $event->slug, 'attendee' => $attendee->public_token]) }}">
+                        @csrf
+                        <button type="submit" class="button">Continue to Payment</button>
+                    </form>
                 </div>
 
             </section>
