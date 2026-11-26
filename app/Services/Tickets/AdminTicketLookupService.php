@@ -19,13 +19,32 @@ class AdminTicketLookupService
     {
         $term = trim((string) $term);
 
-        if ($term === '') {
+        if ($user->is_gate_staff || $term === '') {
             return [];
         }
 
         $search = '%' . $term . '%';
 
-        return Ticket::query()
+        $query = Ticket::query();
+
+        if (! $user->isSuperAdmin()) {
+            if ($user->isTicketOrganizer()) {
+                $query->whereIn('event_id', $user->assignedTicketingEventIds());
+            } else {
+                $managed = $user->activeOrganizations()->where(function (Builder $membership): void {
+                    $membership->where('organization_user.is_owner', true)
+                        ->orWhereIn('organization_user.role', [User::ORGANIZATION_ROLE_OWNER, User::ORGANIZATION_ROLE_ADMIN]);
+                })->pluck('organizations.id');
+                $assigned = $user->activeAssignedEvents()->wherePivotIn('role', [
+                    User::ORGANIZATION_ROLE_EVENT_MANAGER, User::ORGANIZATION_ROLE_REPORT_VIEWER,
+                ])->pluck('events.id');
+                $query->whereHas('event', fn (Builder $event): Builder => $event->where(function (Builder $scope) use ($managed, $assigned): void {
+                    $scope->whereIn('organization_id', $managed)->orWhereIn('events.id', $assigned);
+                }));
+            }
+        }
+
+        return $query
             ->with([
                 'event:id,organization_id,name',
                 'order:id,event_id,order_number,public_token,buyer_name,buyer_phone,buyer_email,total,currency,status,paid_at',
@@ -64,6 +83,10 @@ class AdminTicketLookupService
 
     private function canViewTicket(User $user, Ticket $ticket): bool
     {
+        if ($user->is_gate_staff) {
+            return false;
+        }
+
         if ($user->isSuperAdmin()) {
             return true;
         }
