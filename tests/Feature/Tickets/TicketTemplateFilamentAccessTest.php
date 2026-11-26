@@ -16,6 +16,25 @@ class TicketTemplateFilamentAccessTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_gate_staff_super_admin_cannot_list_or_navigate_to_ticket_templates(): void
+    {
+        [$organization, $event] = $this->createOrganizationAndEvent('Gate organization', 'Gate event');
+        $this->createEventTemplate($event, 'Event template');
+        OrganizationTicketTemplate::create([
+            'organization_id' => $organization->id, 'name' => 'Library template',
+            'width' => 1080, 'height' => 1350, 'is_active' => true, 'is_default' => false,
+        ]);
+        $user = User::factory()->create(['is_super_admin' => true]);
+        $user->forceFill(['is_gate_staff' => true])->save();
+        $this->actingAs($user);
+
+        foreach ([EventTicketTemplateResource::class, OrganizationTicketTemplateResource::class] as $resource) {
+            $this->assertFalse($resource::canViewAny());
+            $this->assertFalse($resource::shouldRegisterNavigation());
+            $this->assertSame(0, $resource::getEloquentQuery()->count());
+        }
+    }
+
     public function test_super_admin_can_access_organization_template_library(): void
     {
         $user = User::factory()->create([
