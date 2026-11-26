@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Events\RelationManagers;
 
 use App\Models\Event;
-use App\Services\EventPresetService;
 use App\Filament\Resources\BadgeTemplates\BadgeTemplateResource;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -33,7 +32,8 @@ class BadgeTemplatesRelationManager extends RelationManager
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
         return $ownerRecord instanceof Event
-            && (EventPresetService::usesBadges($ownerRecord->event_type));
+            && $ownerRecord->canBeManagedBy(auth()->user())
+            && ((bool) $ownerRecord->registration_auto_generate_badge || $ownerRecord->badgeTemplates()->exists() || $ownerRecord->badgeTypes()->exists());
     }
 
     protected static string $relationship = 'badgeTemplates';
