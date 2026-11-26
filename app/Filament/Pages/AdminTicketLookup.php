@@ -44,7 +44,7 @@ class AdminTicketLookup extends Page
     {
         $user = Auth::user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -63,7 +63,7 @@ class AdminTicketLookup extends Page
     {
         $user = Auth::user();
 
-        if (! $user || trim($this->search) === '') {
+        if (! $user || ! static::canAccess() || trim($this->search) === '') {
             return [];
         }
 
@@ -74,7 +74,7 @@ class AdminTicketLookup extends Page
     {
         $user = Auth::user();
 
-        if (! $user) {
+        if (! $user || ! static::canAccess()) {
             abort(403);
         }
 
@@ -112,7 +112,7 @@ class AdminTicketLookup extends Page
     {
         $user = Auth::user();
 
-        if (! $user) {
+        if (! $user || ! static::canAccess()) {
             abort(403);
         }
 
