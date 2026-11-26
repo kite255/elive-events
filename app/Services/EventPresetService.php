@@ -48,7 +48,30 @@ class EventPresetService
         ];
     }
 
-    /**
+    /** Group existing types without changing persisted keys or defaults. */
+    public static function groupedEventTypes(): array
+    {
+        $groups = [
+            'Business & education' => ['conference', 'seminar', 'workshop', 'training', 'corporate_event', 'meeting', 'networking_event', 'product_launch'],
+            'Exhibitions & trade' => ['exhibition', 'expo', 'trade_fair'],
+            'Social & celebrations' => ['wedding', 'send_off', 'engagement', 'birthday', 'graduation'],
+            'Community & religious' => ['church_event', 'community_event', 'charity_event', 'health_event'],
+            'Sports & competitions' => ['bonanza', 'sports_event', 'tournament'],
+            'Entertainment & culture' => ['festival', 'concert', 'cultural_event'],
+            'Official events' => ['vip_ceremony', 'government_event'],
+            'Online & hybrid' => ['webinar', 'hybrid_event'],
+            'Other' => ['other'],
+        ];
+
+        $types = self::eventTypes();
+
+        return array_map(
+            fn (array $keys): array => array_replace(array_fill_keys($keys, ''), array_intersect_key($types, array_flip($keys))),
+            $groups
+        );
+    }
+
+    /** 
      * Defines which major modules are relevant by default
      * for each event type.
      *
