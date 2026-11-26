@@ -87,6 +87,35 @@ class EventWorkspace extends Page
             ];
         }
 
+        $ticketingConfigured = (bool) $event->ticketSetting?->ticket_sales_enabled
+            || $event->ticketTypes()->exists()
+            || $event->ticketOrders()->exists();
+
+        $canManageTickets = $event->canBeManagedBy($user)
+            || ($user->isTicketOrganizer() && $user->assignedTicketingEvents()->whereKey($event->id)->exists());
+
+        if ($ticketingConfigured && $canManageTickets
+            && \App\Filament\Resources\TicketOrders\TicketOrderResource::canViewAny()) {
+            $links[] = [
+                'label' => 'Ticket orders',
+                'icon' => 'heroicon-o-ticket',
+                'url' => \App\Filament\Resources\TicketOrders\TicketOrderResource::getUrl('index', [
+                    'tableFilters' => ['event_id' => ['value' => $event->id]],
+                ]),
+            ];
+        }
+
+        if (($event->canManageRegistrationBy($user) || $event->canViewReportsBy($user))
+            && \App\Filament\Resources\Attendees\AttendeeResource::canViewAny()) {
+            $links[] = [
+                'label' => 'Attendees',
+                'icon' => 'heroicon-o-users',
+                'url' => \App\Filament\Resources\Attendees\AttendeeResource::getUrl('index', [
+                    'tableFilters' => ['event' => ['value' => $event->id]],
+                ]),
+            ];
+        }
+
         return $links;
     }
 
