@@ -40,6 +40,7 @@ class EventForm
     private static function showTicketing(Get $get): bool
     {
         return self::advanced($get)
+            || (bool) $get('ticketSetting.ticket_sales_enabled')
             || EventPresetService::usesTicketing(
                 self::eventType($get)
             );
@@ -54,6 +55,7 @@ class EventForm
     private static function showRegistration(Get $get): bool
     {
         return self::advanced($get)
+            || (bool) $get('registration_is_open') || (bool) $get('paymentSetting.payments_enabled')
             || EventPresetService::usesRegistration(
                 self::eventType($get)
             );
@@ -62,6 +64,7 @@ class EventForm
     private static function showSessions(Get $get): bool
     {
         return self::advanced($get)
+            || (bool) $get('sessions_enabled')
             || EventPresetService::usesSessions(
                 self::eventType($get)
             );
@@ -218,17 +221,19 @@ class EventForm
                             ->afterStateUpdated(
                                 function (
                                     $state,
+                                    $old,
+                                    string $operation,
+                                    Get $get,
                                     Set $set
                                 ): void {
-                                    foreach (
-                                        EventPresetService::preset(
-                                            $state
-                                        ) as $field => $value
-                                    ) {
-                                        $set(
-                                            $field,
-                                            $value
-                                        );
+                                    if ($operation === 'create' && filled($state)) {
+                                        foreach (EventPresetService::creationDefaults($state) as $field => $value) {
+                                            // Preserve manually customized values when revisiting the first step.
+                                            $previous = EventPresetService::creationDefaults($old);
+                                            if (blank($old) || (array_key_exists($field, $previous) && $get($field) === $previous[$field])) {
+                                                $set($field, $value);
+                                            }
+                                        }
                                     }
 
                                     if ($state !== 'other') {
@@ -240,7 +245,7 @@ class EventForm
                                 }
                             )
                             ->helperText(
-                                'The selected type controls recommended defaults and which setup modules are displayed.'
+                                'New events receive recommended defaults. Changing the type of an existing event does not reset its saved settings.'
                             ),
 
                         TextInput::make(
