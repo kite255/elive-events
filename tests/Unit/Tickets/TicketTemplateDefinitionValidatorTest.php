@@ -240,4 +240,49 @@ class TicketTemplateDefinitionValidatorTest extends TestCase
             ],
         ], 1080, 1350);
     }
+
+    public function test_rejects_qr_completely_below_landscape_canvas(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new TicketTemplateDefinitionValidator())->validate([
+            'version' => 1,
+            'elements' => [[
+                'id' => 'qr', 'type' => 'qr', 'binding' => 'ticket_qr',
+                'x' => 554.95, 'y' => 815.79, 'width' => 186.32, 'height' => 186.32,
+            ]],
+        ], 1280, 466);
+    }
+
+    public function test_rejects_clipped_rotated_qr(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new TicketTemplateDefinitionValidator())->validate([
+            'version' => 1,
+            'elements' => [[
+                'id' => 'qr', 'type' => 'qr', 'binding' => 'ticket_qr',
+                'x' => 0, 'y' => 0, 'width' => 200, 'height' => 200, 'rotation' => 45,
+            ]],
+        ], 1280, 466);
+    }
+
+    public function test_accepts_partially_visible_decorative_element(): void
+    {
+        $definition = ['version' => 1, 'elements' => [[
+            'id' => 'shape', 'type' => 'shape',
+            'x' => -50, 'y' => 0, 'width' => 100, 'height' => 100,
+        ]]];
+        $this->assertSame($definition, (new TicketTemplateDefinitionValidator())->validate($definition, 1280, 466));
+    }
+
+    public function test_rejects_completely_invisible_text(): void
+    {
+        $this->expectException(ValidationException::class);
+        (new TicketTemplateDefinitionValidator())->validate([
+            'version' => 1,
+            'elements' => [[
+                'id' => 'text', 'type' => 'text', 'binding' => 'ticket_number',
+                'x' => 100, 'y' => 500, 'width' => 100, 'height' => 50,
+            ]],
+        ], 1280, 466);
+    }
 }
