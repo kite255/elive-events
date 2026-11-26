@@ -30,85 +30,70 @@ class PaymentFulfillmentService
 
     public function fulfill(Payment $payment): Payment
     {
-        $payment = DB::transaction(function () use ($payment): Payment {
-            $lockedPayment = Payment::query()
-                ->with([
-                    'attendee.event.paymentSetting',
-                    'ticketOrder',
-                    'ticketUpgrade',
-                    'donation',
-                ])
-                ->lockForUpdate()
-                ->findOrFail($payment->getKey());
-
-            if ($lockedPayment->status !== Payment::STATUS_COMPLETED) {
-                throw new RuntimeException('Payment must be completed before fulfillment.');
-            }
-
-            if ($lockedPayment->fulfilled_at) {
-                return $lockedPayment;
-            }
-
-            return $lockedPayment;
-        });
-
-        if ($payment->fulfilled_at) {
-            return $payment->fresh();
-        }
-
         try {
-            if ($payment->merchandise_order_id) {
-                $this->fulfillMerchandisePayment($payment);
-                $this->markPaymentFulfilled($payment);
-                try {
-                    app(\App\Services\MerchandisePurchaseNotificationService::class)
-                        ->queueForPayment($payment->fresh());
-                } catch (\Throwable $notificationException) {
-                    report($notificationException);
+            // Keep the payment claim and database-only fulfillment in the same
+            // transaction. A second worker must wait for the committed marker.
+            $relation = DB::transaction(function () use ($payment): ?string {
+                $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
+                if ($lockedPayment->status !== Payment::STATUS_COMPLETED) {
+                    throw new RuntimeException('Payment must be completed before fulfillment.');
                 }
-                return $payment->fresh(['merchandiseOrder']);
-            }
-
-            if ($payment->ticket_upgrade_id) {
-                $upgrade = $this->ticketUpgradeFulfillmentService->fulfill($payment);
-
-                $this->markPaymentFulfilled($payment);
-
-                $this->ticketAccessDeliveryService->queueUpgradeCompleted($upgrade);
-
-                return $payment->fresh(['ticketUpgrade']);
-            }
-
-            if ($payment->donation_id) {
-                $this->fulfillDonationPayment($payment);
-                $this->markPaymentFulfilled($payment);
-
-                return $payment->fresh(['donation']);
-            }
-
-            if ($payment->ticket_order_id) {
-                $this->fulfillTicketPayment($payment);
-                $this->markPaymentFulfilled($payment);
-                $this->queueTicketAccessLink($payment);
-
-                try {
-                    app(\App\Services\Tickets\OrganizerTicketSaleNotificationService::class)
-                        ->queueForPaidOrder((int) $payment->ticket_order_id);
-                } catch (\Throwable $notificationException) {
-                    report($notificationException);
+                if ($lockedPayment->fulfilled_at) {
+                    return null;
                 }
 
-                return $payment->fresh(['ticketOrder']);
+                if ($lockedPayment->merchandise_order_id) {
+                    $this->fulfillMerchandisePayment($lockedPayment);
+                    $relation = 'merchandiseOrder';
+                } elseif ($lockedPayment->ticket_upgrade_id) {
+                    $this->ticketUpgradeFulfillmentService->fulfill($lockedPayment);
+                    $relation = 'ticketUpgrade';
+                } elseif ($lockedPayment->donation_id) {
+                    $this->fulfillDonationPayment($lockedPayment);
+                    $relation = 'donation';
+                } elseif ($lockedPayment->ticket_order_id) {
+                    $this->fulfillTicketPayment($lockedPayment);
+                    $relation = 'ticketOrder';
+                } elseif ($lockedPayment->attendee_id) {
+                    // Registration includes file generation and messaging; retain
+                    // its existing separate workflow until those effects are audited.
+                    return 'attendee';
+                } else {
+                    throw new RuntimeException('Payment has no fulfillment target.');
+                }
+
+                $lockedPayment->forceFill(['fulfilled_at' => now()])->save();
+
+                return $relation;
+            });
+
+            if ($relation === null) {
+                return $payment->fresh();
             }
 
-            if ($payment->attendee_id) {
+            $payment = $payment->fresh([$relation]);
+            if ($relation === 'attendee') {
                 $this->fulfillAttendeePayment($payment);
                 $this->markPaymentFulfilled($payment);
-
                 return $payment->fresh(['attendee']);
             }
 
-            throw new RuntimeException('Payment has no attendee, ticket order, ticket upgrade, or donation to fulfill.');
+            // Notification failures must not undo committed financial changes.
+            try {
+                if ($relation === 'merchandiseOrder') {
+                    app(\\App\\Services\\MerchandisePurchaseNotificationService::class)->queueForPayment($payment);
+                } elseif ($relation === 'ticketUpgrade') {
+                    $this->ticketAccessDeliveryService->queueUpgradeCompleted($payment->ticketUpgrade);
+                } elseif ($relation === 'ticketOrder') {
+                    $this->queueTicketAccessLink($payment);
+                    app(\\App\\Services\\Tickets\\OrganizerTicketSaleNotificationService::class)
+                        ->queueForPaidOrder((int) $payment->ticket_order_id);
+                }
+            } catch (Throwable $notificationException) {
+                report($notificationException);
+            }
+
+            return $payment;
         } catch (Throwable $exception) {
             report($exception);
             throw $exception;
