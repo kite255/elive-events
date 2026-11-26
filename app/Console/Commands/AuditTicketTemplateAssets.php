@@ -45,12 +45,13 @@ class AuditTicketTemplateAssets extends Command
             $parentValid = ($event === null) !== ($org === null) && $template !== null;
             try {
                 if (! $parentValid) {
-                    $issue('Invalid definitions', $source);
+                    $issue('Invalid definitions', $source, 'Missing or ambiguous parent template.');
                 } else {
                     $validator->validate($page->definition ?? [], (int) $template->width, (int) $template->height);
                 }
-            } catch (ValidationException) {
-                $issue('Invalid definitions', $source);
+            } catch (ValidationException $exception) {
+                $message = collect($exception->errors())->map(fn ($messages, $field) => $field.': '.implode('; ', $messages))->implode(' | ');
+                $issue('Invalid definitions', $source, $message);
             }
 
             $paths = [['ticket-template-backgrounds', $page->background_image_path]];
@@ -118,7 +119,7 @@ class AuditTicketTemplateAssets extends Command
 
         $this->table(['Check', 'Count'], collect($counts)->map(fn ($count, $name) => [$name, $count])->values()->all());
         if ($details !== []) {
-            $this->table(['Issue', 'Source', 'Path'], $details);
+            $this->table(['Issue', 'Source', 'Path or validation detail'], $details);
         }
         $this->info('Read-only audit. No files deleted or records modified. Unreferenced candidates are not approved for deletion.');
 
