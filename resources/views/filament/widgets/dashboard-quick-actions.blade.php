@@ -12,11 +12,9 @@
 
             @foreach ($links as [$page, $label, $permission, $icon])
                 @if ($page::$permission())
-                    <a href="{{ $page::getUrl() }}"
-                       class="elive-quick-action">
-                        <x-filament::icon :icon="$icon" class="elive-quick-action-icon" />
-                        <span>{{ $label }}</span>
-                    </a>
+                    <x-filament::button tag="a" color="gray" outlined :icon="$icon" :href="$page::getUrl()" class="elive-dashboard-secondary">
+                        {{ $label }}
+                    </x-filament::button>
                 @endif
             @endforeach
         </div>
