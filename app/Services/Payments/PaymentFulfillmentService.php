@@ -151,6 +151,10 @@ class PaymentFulfillmentService
                 ->lockForUpdate()
                 ->findOrFail($payment->donation_id);
 
+            if ((int) $donation->event_id !== (int) $payment->event_id) {
+                throw new RuntimeException('Donation does not belong to the payment event.');
+            }
+
             if ((string) $donation->currency !== (string) $payment->currency) {
                 throw new RuntimeException('Donation payment currency does not match the donation currency.');
             }
@@ -179,6 +183,11 @@ class PaymentFulfillmentService
 
             if ((int) $lockedOrder->event_id !== (int) $payment->event_id) {
                 throw new RuntimeException('Ticket order does not belong to the payment event.');
+            }
+
+            if (bccomp((string) $lockedOrder->total, (string) $payment->amount, 2) !== 0
+                || strtoupper((string) $lockedOrder->currency) !== strtoupper((string) $payment->currency)) {
+                throw new RuntimeException('Ticket payment amount or currency does not match the order.');
             }
 
             if ($lockedOrder->isCancelled()) {
@@ -286,6 +295,10 @@ class PaymentFulfillmentService
 
         if (! $event) {
             throw new RuntimeException('Payment attendee event is missing.');
+        }
+
+        if ((int) $event->id !== (int) $payment->event_id) {
+            throw new RuntimeException('Attendee does not belong to the payment event.');
         }
 
         $settings = $event->paymentSetting;
