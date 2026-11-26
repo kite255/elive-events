@@ -1167,6 +1167,18 @@
                         <form method="POST" action="{{ route('public.registration.store', $event) }}" data-registration-form style="margin-top: 28px;">
                             @csrf
                             <p class="elive-form-notice" data-form-notice role="alert" tabindex="-1" hidden></p>
+                            @if (filled($event->registration_access_code_hash))
+                                <div id="field-registration-access-code" class="@error('registration_access_code') elive-field-invalid @enderror">
+                                    <h2>Restricted registration</h2>
+                                    <p style="font-size:14px;color:var(--elive-muted)">Enter the access code provided by the event organizer.</p>
+                                    <label for="registration-access-code">Access code *</label>
+                                    <input id="registration-access-code" name="registration_access_code" type="password" autocomplete="off" maxlength="72" required aria-invalid="{{ $errors->has('registration_access_code') ? 'true' : 'false' }}" style="padding:12px">
+                                    @error('registration_access_code')
+                                        <p role="alert" style="color:#b91c1c;font-size:13px">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+
 
                             @php
                                 /*
