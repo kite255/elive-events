@@ -185,7 +185,7 @@ class TicketOrganizerTicketingDirectAccessTest extends TestCase
             ->assertActionHidden('create');
     }
 
-    public function test_super_admin_still_sees_new_ticket_order_action(): void
+    public function test_super_admin_cannot_see_generic_new_ticket_order_action(): void
     {
         $superAdmin = User::query()->create([
             'name' => 'Super Admin',
@@ -197,7 +197,7 @@ class TicketOrganizerTicketingDirectAccessTest extends TestCase
         $this->actingAs($superAdmin);
 
         Livewire::test(ListTicketOrders::class)
-            ->assertActionVisible('create');
+            ->assertActionHidden('create');
     }
 
     private function createTicketOrganizerContext(): array
