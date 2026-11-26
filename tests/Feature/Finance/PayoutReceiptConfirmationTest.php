@@ -20,6 +20,12 @@ class PayoutReceiptConfirmationTest extends TestCase
         $requester = User::factory()->create();
         $other = User::factory()->create();
         $organization = Organization::create(['name' => 'Receipt Test Org']);
+        $requester->organizations()->attach($organization->id, [
+            'role' => User::ORGANIZATION_ROLE_ADMIN,
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+            'is_owner' => false,
+            'joined_at' => now(),
+        ]);
         $event = Event::create([
             'organization_id' => $organization->id,
             'name' => 'Receipt Test Event',
@@ -44,6 +50,30 @@ class PayoutReceiptConfirmationTest extends TestCase
             $this->assertNull($request->fresh()->received_at);
         }
 
+        $requester->organizations()->updateExistingPivot($organization->id, [
+            'status' => User::ORGANIZATION_STATUS_SUSPENDED,
+        ]);
+        try {
+            app(EventPayoutReviewService::class)->confirmReceipt($request, $requester);
+            $this->fail('Suspended requesters must not confirm receipt.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('receipt', $exception->errors());
+            $this->assertNull($request->fresh()->received_at);
+        }
+
+        $requester->organizations()->updateExistingPivot($organization->id, [
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+        ]);
+        $requester->forceFill(['is_gate_staff' => true])->save();
+        try {
+            app(EventPayoutReviewService::class)->confirmReceipt($request, $requester);
+            $this->fail('Gate staff must not confirm receipt.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('receipt', $exception->errors());
+            $this->assertNull($request->fresh()->received_at);
+        }
+        $requester->forceFill(['is_gate_staff' => false])->save();
+
         app(EventPayoutReviewService::class)->confirmReceipt($request, $requester);
         $this->assertNotNull($request->fresh()->received_at);
         $this->assertDatabaseHas('event_payout_audits', [
@@ -60,6 +90,12 @@ class PayoutReceiptConfirmationTest extends TestCase
     {
         $requester = User::factory()->create();
         $organization = Organization::create(['name' => 'Receipt Pending Org']);
+        $requester->organizations()->attach($organization->id, [
+            'role' => User::ORGANIZATION_ROLE_ADMIN,
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+            'is_owner' => false,
+            'joined_at' => now(),
+        ]);
         $event = Event::create([
             'organization_id' => $organization->id,
             'name' => 'Receipt Pending Event',
