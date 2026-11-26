@@ -309,4 +309,29 @@ class TicketPaymentFulfillmentTest extends TestCase
         $this->assertNull($payment->fresh()->fulfilled_at);
         $this->assertSame(0, Ticket::query()->where('ticket_order_id', $order->id)->count());
     }
+
+    public function test_distinct_completed_payment_for_fulfilled_order_requires_reconciliation(): void
+    {
+        ['order' => $order, 'payment' => $first] = $this->createScenario();
+        $second = $first->replicate();
+        $second->reference = 'DUPLICATE-'.uniqid();
+        $second->save();
+
+        $service = app(PaymentFulfillmentService::class);
+        $service->fulfill($first);
+        $fulfilledAt = $first->fresh()->fulfilled_at;
+
+        try {
+            $service->fulfill($second);
+            $this->fail('Second payment must not fulfill the same order.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('manual reconciliation', $exception->getMessage());
+        }
+
+        $this->assertSame(Payment::STATUS_COMPLETED, $second->fresh()->status);
+        $this->assertNull($second->fresh()->fulfilled_at);
+        $this->assertEquals($fulfilledAt, $first->fresh()->fulfilled_at);
+        $this->assertSame(TicketOrder::STATUS_PAID, $order->fresh()->status);
+        $this->assertSame(2, Ticket::query()->where('ticket_order_id', $order->id)->count());
+    }
 }
