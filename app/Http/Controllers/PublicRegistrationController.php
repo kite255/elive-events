@@ -89,6 +89,9 @@ class PublicRegistrationController extends Controller
         $accessCode = $request->input('registration_access_code');
         $request->request->remove('registration_access_code');
         $request->query->remove('registration_access_code');
+        if ($request->isJson()) {
+            $request->json()->remove('registration_access_code');
+        }
 
         $event->load([
             'organization',
@@ -211,7 +214,7 @@ class PublicRegistrationController extends Controller
                         ->lockForUpdate()
                         ->firstOrFail();
 
-                    if (! $lockedEvent->registration_is_open) {
+                    if (! $lockedEvent->isActive() || ! $lockedEvent->registration_is_open) {
                         throw ValidationException::withMessages([
                             'full_name' => 'Registration for this event is currently closed.',
                         ]);
