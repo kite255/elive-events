@@ -664,6 +664,10 @@ Route::get(
     'public.registration.success'
 );
 
+Route::post('/register/{event:slug}/success/{attendee}/payment', [PublicRegistrationController::class, 'resumePayment'])
+    ->middleware('throttle:10,1')
+    ->name('public.registration.payment.resume');
+
 /*
 |--------------------------------------------------------------------------
 | Public Attendee Badge / Confirmation Page
