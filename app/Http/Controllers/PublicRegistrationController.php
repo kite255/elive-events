@@ -85,6 +85,11 @@ class PublicRegistrationController extends Controller
 
     public function store(Request $request, Event $event): RedirectResponse
     {
+        // Prevent validation redirects from flashing the secret into session input.
+        $accessCode = $request->input('registration_access_code');
+        $request->request->remove('registration_access_code');
+        $request->query->remove('registration_access_code');
+
         $event->load([
             'organization',
             'registrationFields',
@@ -196,6 +201,7 @@ class PublicRegistrationController extends Controller
                     $fullName,
                     $phone,
                     $email,
+                    $accessCode,
                     $categoryId,
                     $badgeTypeId
                 ): Attendee {
@@ -208,6 +214,14 @@ class PublicRegistrationController extends Controller
                     if (! $lockedEvent->registration_is_open) {
                         throw ValidationException::withMessages([
                             'full_name' => 'Registration for this event is currently closed.',
+                        ]);
+                    }
+
+                    if (filled($lockedEvent->registration_access_code_hash)
+                        && (! is_string($accessCode) || strlen($accessCode) > 72
+                            || ! \Illuminate\Support\Facades\Hash::check($accessCode, $lockedEvent->registration_access_code_hash))) {
+                        throw ValidationException::withMessages([
+                            'registration_access_code' => 'Enter the valid access code provided by the event organizer.',
                         ]);
                     }
 
