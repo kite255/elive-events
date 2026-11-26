@@ -152,7 +152,14 @@ class CommunicationCenter extends Page
             403
         );
 
-        $firstEvent = $this->events()->first();
+        $events = $this->events();
+        $firstEvent = request()->has('event_id')
+            ? $events->firstWhere('id', request()->integer('event_id'))
+            : $events->first();
+
+        if (request()->has('event_id')) {
+            abort_unless($firstEvent, 404);
+        }
 
         if (! $firstEvent) {
             return;
