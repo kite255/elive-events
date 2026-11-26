@@ -17,6 +17,13 @@ class TicketDesignerBackgroundTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAs(\App\Models\User::factory()->create(['is_super_admin' => true]));
+    }
+
     public function test_component_loads_existing_background_for_active_page(): void
     {
         [$type, $template] =
