@@ -281,4 +281,32 @@ class TicketPaymentFulfillmentTest extends TestCase
                 ->count()
         );
     }
+
+    public function test_completed_payment_with_wrong_amount_does_not_issue_tickets(): void
+    {
+        $this->assertMismatchedPaymentRejected(['amount' => 99999]);
+    }
+
+    public function test_completed_payment_with_wrong_currency_does_not_issue_tickets(): void
+    {
+        $this->assertMismatchedPaymentRejected(['currency' => 'USD']);
+    }
+
+    private function assertMismatchedPaymentRejected(array $changes): void
+    {
+        ['order' => $order, 'payment' => $payment] = $this->createScenario();
+        $payment->update($changes);
+
+        try {
+            app(PaymentFulfillmentService::class)->fulfill($payment);
+            $this->fail('Mismatched payment was fulfilled.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Ticket payment amount or currency does not match the order.', $exception->getMessage());
+        }
+
+        $this->assertSame(TicketOrder::STATUS_PROCESSING, $order->fresh()->status);
+        $this->assertNull($order->fresh()->paid_at);
+        $this->assertNull($payment->fresh()->fulfilled_at);
+        $this->assertSame(0, Ticket::query()->where('ticket_order_id', $order->id)->count());
+    }
 }
