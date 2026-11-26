@@ -20,7 +20,8 @@ class DashboardUpcomingEvents extends Widget
     {
         $user = auth()->user();
 
-        return $user instanceof User && ! $user->is_gate_staff;
+        return $user instanceof User && ! $user->is_gate_staff
+            && (new static())->upcomingEvents()->isNotEmpty();
     }
 
     public function upcomingEvents(): Collection
