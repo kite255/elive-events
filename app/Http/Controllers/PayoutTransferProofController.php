@@ -15,7 +15,7 @@ class PayoutTransferProofController
     {
         $user = $request->user();
 
-        abort_unless($user instanceof User && $user->isSuperAdmin(), 403);
+        abort_unless($user instanceof User && ! $user->is_gate_staff && $user->isSuperAdmin(), 403);
 
         $path = $payout->transfer_proof_path;
         abort_unless(
