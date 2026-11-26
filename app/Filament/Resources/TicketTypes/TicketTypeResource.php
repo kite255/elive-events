@@ -8,6 +8,8 @@ use App\Filament\Resources\TicketTypes\Pages\ListTicketTypes;
 use App\Filament\Resources\TicketTypes\Schemas\TicketTypeForm;
 use App\Filament\Resources\TicketTypes\Tables\TicketTypesTable;
 use App\Models\TicketType;
+use App\Models\Event;
+use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -56,66 +58,65 @@ class TicketTypeResource extends Resource
         );
     }
 
-    public static function canCreate(): bool
+    public static function authorizedEvents(?User $user, bool $write = false): Builder
     {
-        $user = auth()->user();
-
-        if ($user?->isTicketOrganizer()) {
-            return false;
+        $query = Event::query()->accessibleBy($user);
+        if (! $user || $user->is_gate_staff) {
+            return $query->whereRaw('1 = 0');
+        }
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+        if ($user->isTicketOrganizer()) {
+            return $write ? $query->whereRaw('1 = 0') : $query->whereIn('events.id', $user->assignedTicketingEventIds());
         }
 
-        return parent::canCreate();
+        return $query->where(function (Builder $scope) use ($user): void {
+            $scope->whereIn('events.organization_id', $user->activeOrganizations()
+                ->where(function (Builder $membership): void {
+                    $membership->where('organization_user.is_owner', true)
+                        ->orWhereIn('organization_user.role', [
+                            User::ORGANIZATION_ROLE_OWNER,
+                            User::ORGANIZATION_ROLE_ADMIN,
+                        ]);
+                })->select('organizations.id')->getQuery())
+                ->orWhereIn('events.id', $user->eventManagerEvents()->select('events.id')->getQuery());
+        });
+    }
+
+    public static function canViewAny(): bool
+    {
+        return static::authorizedEvents(auth()->user())->exists();
+    }
+
+    public static function canView(Model $record): bool
+    {
+        return $record instanceof TicketType && static::authorizedEvents(auth()->user())->whereKey($record->event_id)->exists();
+    }
+
+    public static function canCreate(): bool
+    {
+        return static::authorizedEvents(auth()->user(), true)->exists();
     }
 
     public static function canEdit(Model $record): bool
     {
-        $user = auth()->user();
-
-        if ($user?->isTicketOrganizer()) {
-            return false;
-        }
-
-        return parent::canEdit($record);
+        return $record instanceof TicketType && static::authorizedEvents(auth()->user(), true)->whereKey($record->event_id)->exists();
     }
 
     public static function canDelete(Model $record): bool
     {
-        $user = auth()->user();
-
-        if ($user?->isTicketOrganizer()) {
-            return false;
-        }
-
-        return parent::canDelete($record);
+        return static::canEdit($record);
     }
 
     public static function canDeleteAny(): bool
     {
-        $user = auth()->user();
-
-        if ($user?->isTicketOrganizer()) {
-            return false;
-        }
-
-        return parent::canDeleteAny();
+        return static::canCreate();
     }
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-        $user = auth()->user();
-
-        if (! $user?->isTicketOrganizer()) {
-            return $query;
-        }
-
-        $assignedEventIds = $user->assignedTicketingEventIds();
-
-        if ($assignedEventIds->isEmpty()) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        return $query->whereIn('event_id', $assignedEventIds);
+        return parent::getEloquentQuery()->whereIn('ticket_types.event_id', static::authorizedEvents(auth()->user())->select('events.id'));
     }
 
     public static function getRelations(): array
