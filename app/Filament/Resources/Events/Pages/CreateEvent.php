@@ -15,8 +15,23 @@ class CreateEvent extends CreateRecord
         return EventResource::getUrl('edit', ['record' => $this->getRecord()]);
     }
 
+    protected function afterCreate(): void
+    {
+        app(\App\Services\EventAdmissionConfiguration::class)->persist(
+            $this->getRecord(),
+            (string) ($this->data['admission_mode'] ?? 'manual'),
+        );
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $mode = (string) ($this->data['admission_mode'] ?? 'manual');
+        [$registration] = \App\Services\EventAdmissionConfiguration::flags($mode);
+        $data['registration_is_open'] = $registration;
+        if (! $registration) {
+            $data['registration_access_code_hash'] = null;
+        }
+
         // Public event routes resolve by slug without an organization prefix.
         $data['slug'] = Event::generateUniqueSlug($data['name']);
         $data['status'] = Event::STATUS_DRAFT;
