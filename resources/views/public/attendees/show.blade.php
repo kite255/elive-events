@@ -509,10 +509,14 @@
                                 font-weight:700;
                                 line-height:1.5;
                             ">
-                                Badge is not available yet.
-
                                 @if ($attendee->status === 'pending_approval')
-                                    It will be generated after approval.
+                                    Your badge will be available after approval.
+                                @elseif ($attendee->badge_status === 'failed')
+                                    Your registration is saved, but your badge is not available yet. Please check again later or contact the organizer.
+                                @elseif ($attendee->isApproved() && $event->registration_auto_generate_badge)
+                                    Your badge is being prepared. Please refresh this page shortly.
+                                @else
+                                    Badge is not available yet. Please contact the event organizer.
                                 @endif
                             </div>
 
