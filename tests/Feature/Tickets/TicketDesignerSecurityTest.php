@@ -136,7 +136,7 @@ class TicketDesignerSecurityTest extends TestCase
         $asset = TicketTemplateAsset::create([
             'organization_id' => $other->organization_id,
             'organization_ticket_template_id' => $other->id,
-            'asset_type' => 'logo', 'file_path' => $path,
+            'asset_type' => 'logo', 'label' => 'Foreign test logo', 'file_path' => $path,
             'mime_type' => 'image/png',
         ]);
         $page = app(TicketDesignerService::class)->ensureInitialPage('organization', $template->id);
