@@ -8,9 +8,6 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <x-filament::button tag="a" color="gray" :href="\App\Filament\Resources\Events\EventResource::getUrl('index')">All events</x-filament::button>
-                @if (\App\Filament\Resources\Events\EventResource::canEdit($event))
-                    <x-filament::button tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('edit', ['record' => $event])">Manage event</x-filament::button>
-                @endif
             </div>
         </div>
     </x-filament::section>
@@ -23,4 +20,14 @@
             </div>
         @endforeach
     </div>
+    @php($links = $this->moduleLinks())
+    @if ($links !== [])
+        <div class="elive-quick-actions-grid">
+            @foreach ($links as $link)
+                <x-filament::button tag="a" outlined color="gray" :icon="$link['icon']" :href="$link['url']">
+                    {{ $link['label'] }}
+                </x-filament::button>
+            @endforeach
+        </div>
+    @endif
 </x-filament-panels::page>
