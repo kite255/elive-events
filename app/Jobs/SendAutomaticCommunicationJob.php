@@ -98,6 +98,54 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             return;
         }
 
+        if ($communicationLog->communication_campaign_id !== null) {
+            $campaign = $communicationLog->campaign;
+            $recipient = $communicationLog->campaignRecipient;
+            $attendee = $communicationLog->attendee;
+
+            $invalid = ! $campaign || $campaign->isCancelled()
+                || (int) $campaign->event_id !== (int) $communicationLog->event_id
+                || $campaign->channel !== $communicationLog->channel
+                || ! $recipient
+                || (int) $recipient->communication_campaign_id !== (int) $campaign->id
+                || $recipient->attendee_id != $communicationLog->attendee_id
+                || $recipient->ticket_order_id != $communicationLog->ticket_order_id;
+
+            if (! $invalid && $communicationLog->purpose !== CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN) {
+                $currentContact = $attendee
+                    ? match ($communicationLog->channel) {
+                        CommunicationLog::CHANNEL_EMAIL => strtolower(trim((string) $attendee->email)),
+                        CommunicationLog::CHANNEL_SMS, CommunicationLog::CHANNEL_WHATSAPP =>
+                            app(\App\Services\PhoneNumberService::class)->normalize($attendee->phone),
+                        default => null,
+                    }
+                    : null;
+                $invalid = ! $attendee
+                    || (int) $attendee->event_id !== (int) $campaign->event_id
+                    || in_array($attendee->status, ['rejected', 'cancelled'], true)
+                    || blank($currentContact)
+                    || $currentContact !== $communicationLog->recipient;
+            }
+
+            if ($invalid) {
+                // Do not synchronize a mismatched recipient or campaign.
+                $communicationLog->forceFill([
+                    'status' => CommunicationLog::STATUS_FAILED,
+                    'error' => 'Campaign or recipient is no longer eligible for delivery.',
+                    'failed_at' => now(),
+                ])->save();
+                if ($campaign && $recipient
+                    && (int) $campaign->event_id === (int) $communicationLog->event_id
+                    && (int) $recipient->communication_campaign_id === (int) $campaign->id
+                    && $recipient->attendee_id == $communicationLog->attendee_id
+                    && $recipient->ticket_order_id == $communicationLog->ticket_order_id) {
+                    $communicationLog->syncCampaignRecipient();
+                    $this->syncCampaignLifecycle($communicationLog);
+                }
+                return;
+            }
+        }
+
         $order = null;
         if ($communicationLog->purpose === CommunicationLog::PURPOSE_TICKET_BUYER_CAMPAIGN) {
             $order = $communicationLog->ticketOrder;
