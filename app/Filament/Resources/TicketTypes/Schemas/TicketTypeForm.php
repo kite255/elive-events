@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\TicketTypes\Schemas;
 
-use App\Models\Event;
+use App\Filament\Resources\TicketTypes\TicketTypeResource;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -21,8 +21,9 @@ class TicketTypeForm
                     ->schema([
                         Select::make('event_id')
                             ->label('Event')
+                            ->disabled(fn (string $operation): bool => $operation === 'edit')
                             ->options(
-                                Event::query()
+                                TicketTypeResource::authorizedEvents(auth()->user(), true)
                                     ->orderBy('name')
                                     ->pluck('name', 'id')
                             )
