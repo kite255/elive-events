@@ -160,12 +160,19 @@ class SendAutomaticCommunicationJob implements ShouldQueue
             }
         }
 
-        $this->incrementRecipientAttempts(
-            $communicationLog
-        );
+        // Claim atomically before any provider submission. A second worker
+        // must not send the same log while the first is processing it.
+        $claimed = CommunicationLog::query()->whereKey($communicationLog->id)
+            ->whereIn('status', [CommunicationLog::STATUS_PENDING, CommunicationLog::STATUS_QUEUED])
+            ->update(['status' => CommunicationLog::STATUS_SENDING, 'error' => null, 'failed_at' => null]);
+        if ($claimed !== 1) {
+            return;
+        }
+        $communicationLog->refresh();
 
         try {
-            $communicationLog->markSending();
+            $communicationLog->syncCampaignRecipient();
+            $this->incrementRecipientAttempts($communicationLog);
 
             $this->markCampaignProcessing(
                 $communicationLog
