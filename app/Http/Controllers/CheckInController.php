@@ -19,6 +19,9 @@ class CheckInController extends Controller
             return view('check-in.invalid');
         }
 
+        abort_unless(auth()->user() && ! auth()->user()->is_gate_staff
+            && $attendee->event?->canBeCheckedInBy(auth()->user()), 403);
+
         $result = $checkInService->checkIn(
             attendee: $attendee,
             checkInPointId: null,
@@ -26,9 +29,11 @@ class CheckInController extends Controller
             note: 'Checked in using QR code.'
         );
 
+        abort_if(in_array($result['status'] ?? null, ['access_denied', 'unauthenticated'], true), 403);
+
         if (! $result['success']) {
             return view('check-in.duplicate', [
-                'attendee' => $result['attendee']->fresh(['event', 'category', 'badgeType']),
+                'attendee' => ($result['attendee'] ?? $attendee)->fresh(['event', 'category', 'badgeType']),
                 'checkIn' => $result['check_in'] ?? null,
                 'message' => $result['message'],
             ]);
