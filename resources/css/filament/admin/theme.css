@@ -582,3 +582,20 @@
 @media (max-width: 640px) {
     .elive-dashboard-toolbar > label { flex-basis: 100%; }
 }
+
+/* Local event workspace navigation: no changes to global panel navigation. */
+.elive-workspace-layout { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: .75rem; align-items: start; }
+.elive-workspace-nav { display: grid; gap: .125rem; background: var(--elive-navy); color: #e7ecff; padding: .625rem; border-radius: .625rem; }
+.elive-workspace-type { font-size: .875rem; font-weight: 600; padding: .375rem .5rem; overflow-wrap: anywhere; }
+.elive-workspace-group { font-size: .6875rem; color: #b5bed7; padding: .625rem .5rem .125rem; }
+.elive-workspace-link { display: flex; align-items: center; gap: .5rem; color: #e7ecff; padding: .5rem; border-radius: .375rem; font-size: .875rem; }
+.elive-workspace-link .fi-icon { width: 1rem; height: 1rem; flex-shrink: 0; }
+.elive-workspace-link:is(:hover, :focus-visible), .elive-workspace-active { background: #303e74; color: #fff; }
+.elive-workspace-link:focus-visible { outline: 2px solid var(--elive-orange); outline-offset: 1px; }
+.elive-workspace-back { margin-top: .5rem; border-top: 1px solid #343958; }
+.elive-workspace-content { display: grid; gap: .75rem; min-width: 0; }
+@media (max-width: 900px) {
+    .elive-workspace-layout { grid-template-columns: minmax(0, 1fr); }
+    .elive-workspace-nav { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
+    .elive-workspace-type, .elive-workspace-group { grid-column: 1 / -1; }
+}
