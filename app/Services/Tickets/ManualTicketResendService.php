@@ -42,7 +42,7 @@ class ManualTicketResendService
 
     public function queue(TicketOrder $order, array $channels, User $actor): array
     {
-        $order->loadMissing('event');
+        $order = TicketOrder::query()->with('event')->findOrFail($order->getKey());
 
         if (! $order->event || ! $this->actorCanResend($actor, $order)) {
             throw new RuntimeException('You are not allowed to resend tickets for this event.');
@@ -123,6 +123,10 @@ class ManualTicketResendService
 
     private function actorCanResend(User $actor, TicketOrder $order): bool
     {
+        if ($actor->is_gate_staff) {
+            return false;
+        }
+
         if ($actor->isSuperAdmin()) {
             return true;
         }
