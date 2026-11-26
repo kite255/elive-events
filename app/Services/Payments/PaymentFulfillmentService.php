@@ -46,6 +46,8 @@ class PaymentFulfillmentService
                     $this->fulfillMerchandisePayment($lockedPayment);
                     $relation = 'merchandiseOrder';
                 } elseif ($lockedPayment->ticket_upgrade_id) {
+                    \App\Models\TicketUpgrade::query()->lockForUpdate()->findOrFail($lockedPayment->ticket_upgrade_id);
+                    $this->assertNoPreviouslyFulfilledPayment($lockedPayment, 'ticket_upgrade_id');
                     $this->ticketUpgradeFulfillmentService->fulfill($lockedPayment);
                     $relation = 'ticketUpgrade';
                 } elseif ($lockedPayment->donation_id) {
@@ -100,6 +102,21 @@ class PaymentFulfillmentService
         }
     }
 
+    // Caller holds the shared fulfillment target row lock. Do not lock
+    // competing payment rows: another worker may already hold one.
+    private function assertNoPreviouslyFulfilledPayment(Payment $payment, string $target): void
+    {
+        $previous = Payment::query()
+            ->where($target, $payment->{$target})
+            ->where('id', '!=', $payment->id)
+            ->whereNotNull('fulfilled_at')
+            ->exists();
+
+        if ($previous) {
+            throw new RuntimeException('Another payment already fulfilled this target. Payment requires manual reconciliation.');
+        }
+    }
+
     private function fulfillMerchandisePayment(Payment $payment): void
     {
         DB::transaction(function () use ($payment): void {
@@ -111,6 +128,8 @@ class PaymentFulfillmentService
                 || strtoupper((string) $payment->currency) !== 'TZS') {
                 throw new RuntimeException('Merchandise payment does not match the order.');
             }
+
+            $this->assertNoPreviouslyFulfilledPayment($payment, 'merchandise_order_id');
 
             // A completed gateway payment is not proof that the reservation
             // still owns stock. Late payments must be reviewed or refunded.
@@ -148,6 +167,8 @@ class PaymentFulfillmentService
                 throw new RuntimeException('Donation payment amount does not match the donation amount.');
             }
 
+            $this->assertNoPreviouslyFulfilledPayment($payment, 'donation_id');
+
             if ($donation->status === \App\Models\Donation::STATUS_COMPLETED) {
                 return;
             }
@@ -174,6 +195,8 @@ class PaymentFulfillmentService
                 || strtoupper((string) $lockedOrder->currency) !== strtoupper((string) $payment->currency)) {
                 throw new RuntimeException('Ticket payment amount or currency does not match the order.');
             }
+
+            $this->assertNoPreviouslyFulfilledPayment($payment, 'ticket_order_id');
 
             if ($lockedOrder->isCancelled()) {
                 throw new RuntimeException('Cancelled ticket order cannot be fulfilled.');
