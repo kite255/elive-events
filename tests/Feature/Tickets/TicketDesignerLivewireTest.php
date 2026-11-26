@@ -17,6 +17,13 @@ class TicketDesignerLivewireTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAs(\App\Models\User::factory()->create(['is_super_admin' => true]));
+    }
+
     public function test_component_loads_organization_template_metadata(): void
     {
         $organization = Organization::query()->create([
