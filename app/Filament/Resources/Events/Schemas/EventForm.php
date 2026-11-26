@@ -14,6 +14,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Components\Utilities\Get;
@@ -2039,9 +2041,32 @@ class EventForm
                     ->collapsed(),
         ];
 
-        // Keep the full edit form; guide creation through the same field definitions.
+        // Use the same field definitions for editing, organized into task-based tabs.
         if ($schema->getOperation() !== 'create') {
-            return $schema->components($sections);
+            return $schema->components([
+                Tabs::make('Event configuration')
+                    ->tabs([
+                        Tab::make('General')
+                            ->icon('heroicon-o-calendar-days')
+                            ->schema([$sections[2], $sections[0], $sections[4]]),
+                        Tab::make('Registration')
+                            ->icon('heroicon-o-clipboard-document-list')
+                            ->schema([$sections[8], $sections[11], $sections[15]]),
+                        Tab::make('Tickets and payments')
+                            ->icon('heroicon-o-ticket')
+                            ->schema([$sections[5], $sections[12], $sections[6], $sections[13], $sections[3]]),
+                        Tab::make('Programme')
+                            ->icon('heroicon-o-clock')
+                            ->schema([$sections[7]]),
+                        Tab::make('Public page and media')
+                            ->icon('heroicon-o-photo')
+                            ->schema([$sections[14], $sections[1]]),
+                        Tab::make('Communications')
+                            ->icon('heroicon-o-envelope')
+                            ->schema([$sections[9], $sections[10]]),
+                    ])
+                    ->columnSpanFull(),
+            ]);
         }
 
         $admission = Section::make('Admission method')
