@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\Payments;
 
 use App\Models\Event;
 use App\Models\EventPaymentSetting;
