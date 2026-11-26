@@ -55,8 +55,9 @@ class OrganizationTicketTemplateResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()?->isSuperAdmin()
-            ?? false;
+        $user = auth()->user();
+
+        return $user && ! $user->is_gate_staff && $user->isSuperAdmin();
     }
 
     public static function getEloquentQuery(): Builder
@@ -65,7 +66,7 @@ class OrganizationTicketTemplateResource extends Resource
 
         $user = auth()->user();
 
-        if ($user?->isSuperAdmin()) {
+        if ($user && ! $user->is_gate_staff && $user->isSuperAdmin()) {
             return $query;
         }
 
