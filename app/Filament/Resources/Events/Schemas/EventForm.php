@@ -576,17 +576,23 @@ class EventForm
                             ->afterStateUpdated(
                                 function (
                                     $state,
+                                    $old,
+                                    string $operation,
+                                    Get $get,
                                     Set $set
                                 ): void {
-                                    foreach (
-                                        EventPresetService::preset(
-                                            $state
-                                        ) as $field => $value
-                                    ) {
-                                        $set(
-                                            $field,
-                                            $value
-                                        );
+                                    if ($operation === 'create' && filled($state)) {
+                                        $previous = EventPresetService::creationDefaults($old);
+
+                                        foreach (EventPresetService::creationDefaults($state) as $field => $value) {
+                                            // Admission is selected separately and must survive type changes.
+                                            if (in_array($field, ['registration_is_open', 'ticketSetting.ticket_sales_enabled'], true)) {
+                                                continue;
+                                            }
+                                            if (blank($old) || (array_key_exists($field, $previous) && $get($field) === $previous[$field])) {
+                                                $set($field, $value);
+                                            }
+                                        }
                                     }
 
                                     if ($state !== 'other') {
@@ -598,7 +604,7 @@ class EventForm
                                 }
                             )
                             ->helperText(
-                                'The selected type controls recommended defaults and which setup modules are displayed.'
+                                'Recommended defaults apply to new events. Changing the type of an existing event preserves operational settings.'
                             ),
 
                         TextInput::make(
@@ -1124,10 +1130,9 @@ class EventForm
                             ->label('Registration access code')
                             ->password()
                             ->autocomplete('new-password')
-                            ->required(fn (Get $get, string $operation): bool => $operation === 'create' && $get('admission_mode') === 'access_code' && (bool) $get('registration_is_open'))
                             ->minLength(8)
                             ->maxLength(72)
-                            ->helperText('Optional. Enter a new code to restrict registration. Leave blank to preserve the existing code. Enter a new code to rotate access.')
+                            ->helperText('Optional for free or paid registration. Leave blank to preserve an existing code; enter a new code to rotate access.')
                             ->afterStateHydrated(fn (TextInput $component) => $component->state(null))
                             ->dehydrated(fn ($state): bool => filled($state))
                             ->dehydrateStateUsing(fn ($state): string => \Illuminate\Support\Facades\Hash::make($state)),
@@ -2077,7 +2082,6 @@ class EventForm
                     ->options([
                         'free_registration' => 'Free public registration',
                         'paid_registration' => 'Paid registration',
-                        'access_code' => 'Access-code registration',
                         'tickets' => 'Ticket sales',
                         'combined' => 'Registration and ticket sales',
                         'manual' => 'Manual attendee management',
@@ -2088,11 +2092,11 @@ class EventForm
                     ->live()
                     ->dehydrated(false)
                     ->afterStateUpdated(function ($state, Set $set): void {
-                        $set('registration_is_open', in_array($state, ['free_registration', 'paid_registration', 'access_code', 'combined'], true));
+                        $set('registration_is_open', in_array($state, ['free_registration', 'paid_registration', 'combined'], true));
                         $set('ticketSetting.ticket_sales_enabled', in_array($state, ['tickets', 'combined'], true));
                         $set('paymentSetting.payments_enabled', $state === 'paid_registration');
 
-                        if ($state !== 'access_code') {
+                        if (! in_array($state, ['free_registration', 'paid_registration', 'combined'], true)) {
                             $set('registration_access_code_hash', null);
                         }
                     })
