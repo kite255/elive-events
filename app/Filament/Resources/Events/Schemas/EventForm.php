@@ -120,7 +120,7 @@ class EventForm
         $sections = [
                 Section::make('Event Information')
                     ->description(
-                        'Create the event and select its type. eLive Events automatically shows the modules relevant to that event type.'
+                        'Choose the event category and configure admission and operational features separately.'
                     )
                     ->schema([
                         Select::make('organization_id')
@@ -569,13 +569,13 @@ class EventForm
 
                 Section::make('Event Type and Setup')
                     ->description(
-                        'The form adapts automatically to the selected event type.'
+                        'Event type suggests defaults; admission and operational settings remain configurable.'
                     )
                     ->schema([
                         Select::make('event_type')
                             ->label('Event Type')
                             ->options(
-                                EventPresetService::eventTypes()
+                                EventPresetService::groupedEventTypes()
                             )
                             ->required()
                             ->searchable()
