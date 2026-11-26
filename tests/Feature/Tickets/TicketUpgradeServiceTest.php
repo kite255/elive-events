@@ -9,6 +9,7 @@ use App\Models\TicketOrder;
 use App\Models\TicketOrderItem;
 use App\Models\TicketType;
 use App\Models\TicketUpgrade;
+use App\Models\User;
 use App\Services\Tickets\TicketUpgradeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
@@ -17,6 +18,72 @@ use Tests\TestCase;
 class TicketUpgradeServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_unrelated_user_cannot_initiate_upgrade(): void
+    {
+        ['ticket' => $ticket, 'vip' => $vip] = $this->scenario();
+        $actor = User::factory()->create(['is_super_admin' => false]);
+
+        $this->assertUnauthorizedUpgrade($ticket, $vip, $actor);
+    }
+
+    public function test_gate_staff_cannot_initiate_upgrade_even_with_super_admin_flag(): void
+    {
+        ['ticket' => $ticket, 'vip' => $vip] = $this->scenario();
+        $actor = User::factory()->create(['is_super_admin' => true, 'is_gate_staff' => true]);
+
+        $this->assertUnauthorizedUpgrade($ticket, $vip, $actor);
+    }
+
+    public function test_assigned_ticketing_manager_can_initiate_upgrade_but_suspension_revokes_access(): void
+    {
+        ['ticket' => $ticket, 'vip' => $vip, 'event' => $event] = $this->scenario();
+        $actor = User::factory()->create(['is_super_admin' => false]);
+        $actor->organizations()->attach($event->organization_id, [
+            'role' => User::ORGANIZATION_ROLE_TICKET_ORGANIZER,
+            'status' => User::ORGANIZATION_STATUS_ACTIVE,
+            'is_owner' => false,
+            'joined_at' => now(),
+        ]);
+        $actor->assignToEvent($event, User::ORGANIZATION_ROLE_TICKET_ORGANIZER);
+
+        $upgrade = app(TicketUpgradeService::class)->create($ticket, $vip, $actor);
+        $this->assertEquals($actor->id, $upgrade->initiated_by);
+        $actor->organizations()->updateExistingPivot($event->organization_id, [
+            'status' => User::ORGANIZATION_STATUS_SUSPENDED,
+        ]);
+
+        $this->assertUnauthorizedUpgrade($ticket, $vip, $actor, 1);
+    }
+
+    public function test_cross_event_target_is_rejected_even_for_super_admin(): void
+    {
+        ['ticket' => $ticket, 'vip' => $vip, 'event' => $event] = $this->scenario();
+        $other = Event::create(['organization_id' => $event->organization_id, 'name' => 'Other Upgrade Event', 'slug' => 'other-upgrade-event', 'status' => Event::STATUS_ACTIVE]);
+        $vip->update(['event_id' => $other->id]);
+        $admin = User::factory()->create(['is_super_admin' => true]);
+
+        try {
+            app(TicketUpgradeService::class)->create($ticket, $vip, $admin);
+            $this->fail('Cross-event upgrade accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('same event', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('ticket_upgrades', 0);
+    }
+
+    private function assertUnauthorizedUpgrade(Ticket $ticket, TicketType $target, User $actor, int $expectedCount = 0): void
+    {
+        try {
+            app(TicketUpgradeService::class)->create($ticket, $target, $actor);
+            $this->fail('Unauthorized upgrade accepted.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('not allowed', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('ticket_upgrades', $expectedCount);
+    }
 
     private function scenario(): array
     {
