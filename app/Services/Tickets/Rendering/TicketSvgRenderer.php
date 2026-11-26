@@ -58,7 +58,10 @@ final class TicketSvgRenderer
         ];
 
         $background = $this->assets->dataUri(
-            $page->background_image_path
+            $page->background_image_path,
+            $context->template,
+            $page,
+            true,
         );
 
         if ($background) {
@@ -71,7 +74,7 @@ final class TicketSvgRenderer
         }
 
         foreach ($definition['elements'] as $element) {
-            $rendered = $this->renderElement($element, $context);
+            $rendered = $this->renderElement($element, $context, $page);
 
             if ($rendered !== '') {
                 $parts[] = $rendered;
@@ -95,12 +98,13 @@ final class TicketSvgRenderer
 
     private function renderElement(
         array $element,
-        TicketRenderContext $context
+        TicketRenderContext $context,
+        TicketTemplatePage $page,
     ): string {
         return match ($element['type'] ?? null) {
             'text' => $this->renderText($element, $context),
             'qr' => $this->renderQr($element, $context),
-            'image', 'logo', 'sponsor_logo' => $this->renderImage($element),
+            'image', 'logo', 'sponsor_logo' => $this->renderImage($element, $context, $page),
             'shape' => $this->renderShape($element),
             'line' => $this->renderLine($element),
             default => '',
@@ -184,12 +188,14 @@ final class TicketSvgRenderer
         );
     }
 
-    private function renderImage(array $element): string
+    private function renderImage(array $element, TicketRenderContext $context, TicketTemplatePage $page): string
     {
         $uri = $this->assets->dataUri(
             is_string($element['asset_path'] ?? null)
                 ? $element['asset_path']
-                : null
+                : null,
+            $context->template,
+            $page,
         );
 
         if (! $uri) {
