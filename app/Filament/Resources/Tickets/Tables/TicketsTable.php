@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Tickets\Tables;
 
+use Filament\Forms\Components\Hidden;
+use App\Services\Tickets\TicketCheckInService;
 use App\Filament\Resources\AuditLogs\AuditLogResource;
 use App\Filament\Resources\TicketCheckIns\TicketCheckInResource;
 use App\Models\Event;
@@ -258,6 +260,34 @@ class TicketsTable
                                 ->danger()
                                 ->send();
                         }
+                    }),
+
+                Action::make('undo_check_in')
+                    ->label('Mark Unused')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->authorize(fn (Ticket $record): bool => $record->event?->canResetTicketCheckInsBy(auth()->user()) ?? false)
+                    ->visible(fn (Ticket $record): bool => $record->status === Ticket::STATUS_USED)
+                    ->requiresConfirmation()
+                    ->modalHeading('Mark ticket as unused?')
+                    ->modalDescription('This ticket will be available to scan again.')
+                    ->schema([Hidden::make('check_in_id')->rules(['integer'])])
+                    ->fillForm(fn (Ticket $record): array => ['check_in_id' => $record->checkIns()->value('id')])
+                    ->action(function (Ticket $record, array $data, TicketCheckInService $service): void {
+                        $actor = auth()->user();
+                        abort_unless($record->event?->canResetTicketCheckInsBy($actor), 403);
+
+                        if (filled($data['check_in_id'] ?? null) && $service->undoCheckIn(
+                            $record->event_id,
+                            $record->id,
+                            $actor,
+                            expectedCheckInId: (int) $data['check_in_id'],
+                        )) {
+                            Notification::make()->title('Ticket marked unused')->success()->send();
+
+                            return;
+                        }
+
+                        Notification::make()->title('No matching check-in to undo')->warning()->send();
                     }),
 
                 Action::make('check_in_history')
