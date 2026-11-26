@@ -50,7 +50,7 @@ class PayoutResource extends Resource
     {
         $user = auth()->user();
 
-        return $user instanceof User && (
+        return $user instanceof User && ! $user->is_gate_staff && (
             $user->isSuperAdmin()
             || $user->ticketOrganizerOrganizations()->exists()
             || $user->managedOrganizations()->exists()
@@ -62,7 +62,7 @@ class PayoutResource extends Resource
         $user = auth()->user();
         $query = parent::getEloquentQuery()->with(['event', 'requester']);
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return $query->whereRaw('1 = 0');
         }
 
