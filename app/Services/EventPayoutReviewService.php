@@ -19,7 +19,7 @@ class EventPayoutReviewService
      */
     public function review(EventPayoutRequest $request, User $reviewer, bool $approve, ?string $note = null): EventPayoutRequest
     {
-        if (! $reviewer->isSuperAdmin()) {
+        if ($reviewer->is_gate_staff || ! $reviewer->isSuperAdmin()) {
             throw ValidationException::withMessages(['review' => 'Only a platform administrator can review payouts.']);
         }
 
@@ -85,7 +85,7 @@ class EventPayoutReviewService
      */
     public function recordCompletedTransfer(EventPayoutRequest $request, User $reviewer, string $transferReference, string $method, string $date, string $amount, string $proofPath, ?string $note = null): EventPayoutRequest
     {
-        if (! $reviewer->isSuperAdmin() || trim($transferReference) === '') {
+        if ($reviewer->is_gate_staff || ! $reviewer->isSuperAdmin() || trim($transferReference) === '') {
             throw ValidationException::withMessages(['transfer' => 'Administrator and transfer reference required.']);
         }
 
@@ -168,6 +168,17 @@ class EventPayoutReviewService
         return DB::transaction(function () use ($request, $organizer): EventPayoutRequest {
             Event::query()->whereKey($request->event_id)->lockForUpdate()->firstOrFail();
             $locked = EventPayoutRequest::query()->whereKey($request->getKey())->lockForUpdate()->firstOrFail();
+
+            $event = $locked->event;
+            if ($organizer->is_gate_staff || ! $event || ! (
+                $organizer->isSuperAdmin()
+                || ($organizer->isTicketOrganizer()
+                    ? $organizer->assignedTicketingEvents()->where('events.id', $event->id)->exists()
+                    : ($organizer->canManageOrganization((int) $event->organization_id)
+                        || $organizer->assignedTicketingEvents()->where('events.id', $event->id)->exists()))
+            )) {
+                throw ValidationException::withMessages(['receipt' => 'You no longer have permission to confirm this payout.']);
+            }
 
             if ((int) $locked->requested_by !== (int) $organizer->getKey()) {
                 throw ValidationException::withMessages(['receipt' => 'Only the payout requester may confirm receipt.']);
