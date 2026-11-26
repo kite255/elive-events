@@ -13,9 +13,36 @@ class CampaignArtworkService
         }
 
         $disk = Storage::disk('public');
-        return $disk->exists($path)
-            && $disk->size($path) <= 10 * 1024 * 1024
-            && in_array($disk->mimeType($path), ['image/jpeg', 'image/png', 'image/webp'], true);
+        try {
+            if (! $disk->exists($path) || $disk->size($path) > 10 * 1024 * 1024) {
+                return false;
+            }
+
+            $bytes = $disk->get($path);
+            if (! is_string($bytes) || $bytes === '' || strlen($bytes) > 10 * 1024 * 1024) {
+                return false;
+            }
+
+            if (! hash_equals(pathinfo($path, PATHINFO_FILENAME), hash('sha256', $bytes))) {
+                return false;
+            }
+
+            $image = @getimagesizefromstring($bytes);
+            $expectedType = match (pathinfo($path, PATHINFO_EXTENSION)) {
+                'jpg', 'jpeg' => IMAGETYPE_JPEG,
+                'png' => IMAGETYPE_PNG,
+                'webp' => IMAGETYPE_WEBP,
+                default => null,
+            };
+
+            return is_array($image)
+                && $expectedType !== null
+                && $image[2] === $expectedType
+                && $image[0] > 0
+                && $image[1] > 0;
+        } catch (\Throwable $exception) {
+            return false;
+        }
     }
 
     public function posterUrl(int $eventId, mixed $path): ?string
