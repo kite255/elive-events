@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Event;
 use App\Models\Ticket;
 use App\Services\Tickets\TicketCheckInService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 
 class TicketScannerController extends Controller
 {
@@ -13,6 +16,11 @@ class TicketScannerController extends Controller
         Request $request,
         TicketCheckInService $ticketCheckInService
     ): JsonResponse {
+        $user = $request->user();
+        $gateScanner = $request->routeIs('gate.ticket-scanner.scan');
+
+        abort_unless($gateScanner ? $user->canUseGateScanner() : ! $user->is_gate_staff, 403);
+
         $validated = $request->validate([
             'qr_token' => [
                 'required',
@@ -98,7 +106,7 @@ class TicketScannerController extends Controller
         if (
             $ticket
             && ! $ticket->event?->canBeCheckedInBy(
-                $request->user()
+                $user
             )
         ) {
             abort(403);
@@ -148,8 +156,53 @@ class TicketScannerController extends Controller
                 $checkInCredential
             );
 
-        return response()->json(
-            $result
-        );
+        return $this->scannerResponse($result, $gateScanner ? ['holder_name', 'ticket_number'] : null);
+    }
+
+    public function showShared(Request $request, Event $event): Response
+    {
+        abort_if($event->status === Event::STATUS_CANCELLED, 403);
+
+        return response()->view('gate.shared-ticket-scanner', [
+            'scanUrl' => $request->getRequestUri(),
+            'assignedEvent' => $event->name,
+        ], 200, [
+            'Cache-Control' => 'private, no-store',
+            'Referrer-Policy' => 'no-referrer',
+            'X-Robots-Tag' => 'noindex, nofollow',
+        ]);
+    }
+
+    public function scanShared(Request $request, Event $event, TicketCheckInService $service): JsonResponse
+    {
+        abort_if($event->status === Event::STATUS_CANCELLED, 403);
+
+        abort_if($request->has('undo_token'), 403);
+
+        $validated = $request->validate(['qr_token' => ['required', 'string', 'max:255']]);
+        $result = $service->checkInByCredential($validated['qr_token'], $event->id);
+
+        return $this->scannerResponse($result, ['holder_name', 'ticket_number'])->header('Cache-Control', 'private, no-store');
+    }
+
+    private function scannerResponse(array $result, ?array $ticketFields): JsonResponse
+    {
+        $scannedTicket = $result['ticket'] ?? null;
+
+        if ($scannedTicket instanceof Ticket) {
+            $result['ticket_type'] = $scannedTicket->ticketType?->name;
+
+            if ($checkedInAt = $result['checked_in_at'] ?? null) {
+                $result['checked_in_time_eat'] = Carbon::parse($checkedInAt)
+                    ->timezone('Africa/Dar_es_Salaam')
+                    ->format('d M Y, H:i').' EAT';
+            }
+        }
+
+        if ($ticketFields !== null && $scannedTicket instanceof Ticket) {
+            $result['ticket'] = $scannedTicket->only($ticketFields);
+        }
+
+        return response()->json($result);
     }
 }
