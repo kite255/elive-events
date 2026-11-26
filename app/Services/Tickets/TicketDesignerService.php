@@ -162,37 +162,27 @@ class TicketDesignerService
         int $newWidth,
         int $newHeight
     ): void {
-        if (
-            $oldWidth <= 0
-            || $oldHeight <= 0
-            || $newWidth <= 0
-            || $newHeight <= 0
-        ) {
-            return;
-        }
-
-        if (
-            $oldWidth === $newWidth
-            && $oldHeight === $newHeight
-        ) {
-            return;
-        }
-
         $template = $this->loadTemplate($type, $templateId);
+        $this->validator->validate(['version' => 1, 'elements' => []], $newWidth, $newHeight);
 
-        $scaleX = $newWidth / $oldWidth;
-        $scaleY = $newHeight / $oldHeight;
-        $fontScale = min($scaleX, $scaleY);
+        DB::transaction(function () use ($template, $oldWidth, $oldHeight, $newWidth, $newHeight): void {
+            $template = $template->newQuery()->lockForUpdate()->findOrFail($template->id);
+            $this->authorizeTemplate($template);
+            if ((int) $template->width !== $oldWidth || (int) $template->height !== $oldHeight) {
+                throw ValidationException::withMessages(['width' => ['Canvas dimensions have changed. Reload the template before resizing.']]);
+            }
+            if ($oldWidth <= 0 || $oldHeight <= 0) {
+                throw ValidationException::withMessages(['width' => ['Existing canvas dimensions are invalid.']]);
+            }
+            if ($oldWidth === $newWidth && $oldHeight === $newHeight) {
+                return;
+            }
 
-        DB::transaction(function () use (
-            $template,
-            $scaleX,
-            $scaleY,
-            $fontScale,
-            $newWidth,
-            $newHeight
-        ): void {
-            foreach ($template->pages()->get() as $page) {
+            $scaleX = $newWidth / $oldWidth;
+            $scaleY = $newHeight / $oldHeight;
+            $fontScale = min($scaleX, $scaleY);
+
+            foreach ($template->pages()->lockForUpdate()->get() as $page) {
                 $definition = $page->definition ?? [];
                 $elements = $definition['elements'] ?? [];
 
@@ -237,7 +227,9 @@ class TicketDesignerService
                     if ($isQr) {
                         $size = min(
                             (float) $element['width'],
-                            (float) $element['height']
+                            (float) $element['height'],
+                            $newWidth,
+                            $newHeight
                         );
 
                         $element['width'] = $size;
@@ -283,6 +275,8 @@ class TicketDesignerService
 
                 $definition['elements'] = $elements;
 
+                $this->validator->validate($definition, $newWidth, $newHeight);
+                $this->validateAssetReferences($page, $definition);
                 $page->update([
                     'definition' => $definition,
                 ]);
