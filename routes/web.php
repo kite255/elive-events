@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\EventReportDownloadController;
+
 use App\Http\Controllers\BadgePrintController;
 use App\Http\Controllers\PayoutTransferProofController;
 use App\Http\Controllers\CheckInController;
@@ -802,3 +804,8 @@ Route::get(
     ->name(
         'badges.print'
     );
+
+Route::get('/admin/events/{event:id}/reports/download', EventReportDownloadController::class)
+    ->middleware('auth')
+    ->whereNumber('event')
+    ->name('admin.events.reports.download');
