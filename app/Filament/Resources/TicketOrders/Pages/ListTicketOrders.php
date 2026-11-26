@@ -16,7 +16,7 @@ class ListTicketOrders extends ListRecords
             CreateAction::make()
                 ->visible(
                     fn (): bool =>
-                        ! auth()->user()?->isTicketOrganizer()
+                        TicketOrderResource::canCreate()
                 ),
         ];
     }
