@@ -3,11 +3,14 @@
 namespace App\Services\Tickets;
 
 use App\Models\Ticket;
+use App\Models\User;
+use App\Services\Audit\AuditLogService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class TicketCheckInService
 {
+    public function __construct(private readonly AuditLogService $auditLogService) {}
     public function checkInByQrToken(
         string $rawQrToken
     ): array {
@@ -17,21 +20,27 @@ class TicketCheckInService
     }
 
     public function checkInByCredential(
-        string $credential
+        string $credential,
+        ?int $eventId = null,
     ): array {
         $credential = trim(
             $credential
         );
 
         return DB::transaction(
-            function () use ($credential): array {
+            function () use ($credential, $eventId): array {
                 $qrTokenHash = hash(
                     'sha256',
                     $credential
                 );
 
-                $ticket = Ticket::query()
-                    ->lockForUpdate()
+                $tickets = Ticket::query()->lockForUpdate();
+
+                if ($eventId !== null) {
+                    $tickets->where('event_id', $eventId);
+                }
+
+                $ticket = (clone $tickets)
                     ->where(
                         'qr_token_hash',
                         $qrTokenHash
@@ -39,8 +48,7 @@ class TicketCheckInService
                     ->first();
 
                 if (! $ticket) {
-                    $ticket = Ticket::query()
-                        ->lockForUpdate()
+                    $ticket = (clone $tickets)
                         ->where(
                             'ticket_number',
                             $credential
@@ -107,7 +115,7 @@ class TicketCheckInService
                         null,
 
                     'checked_in_by' =>
-                        Auth::id(),
+                        $eventId === null ? Auth::id() : null,
 
                     'method' =>
                         'qr',
@@ -122,7 +130,7 @@ class TicketCheckInService
                         request()->ip(),
 
                     'note' =>
-                        null,
+                        $eventId === null ? null : 'Shared scanner link',
 
                     'created_at' =>
                         $checkedInAt,
@@ -149,5 +157,50 @@ class TicketCheckInService
             },
             attempts: 3
         );
+    }
+
+    public function undoCheckIn(int $eventId, int $ticketId, User $actor, ?int $expectedCheckInId = null): bool
+    {
+        return DB::transaction(function () use ($eventId, $ticketId, $expectedCheckInId, $actor): bool {
+            $ticket = Ticket::query()->where('event_id', $eventId)->lockForUpdate()->find($ticketId);
+
+            if ($ticket?->status !== Ticket::STATUS_USED || ! $ticket->event?->canResetTicketCheckInsBy($actor)) {
+                return false;
+            }
+
+            $checkIns = DB::table('ticket_check_ins')->where('event_id', $eventId)->where('ticket_id', $ticketId);
+            $checkIn = (clone $checkIns)->first();
+
+            if (! $checkIn || ($expectedCheckInId !== null && (int) $checkIn->id !== $expectedCheckInId)) {
+                return false;
+            }
+
+            $this->auditLogService->record(
+                'ticket.check_in_undone',
+                $ticket,
+                $actor,
+                [
+                    'check_in_id' => $checkIn->id,
+                    'order_number' => $ticket->order?->order_number,
+                    'source' => 'admin',
+                ],
+                [
+                    'status' => $ticket->status,
+                    'checked_in_at' => $checkIn->checked_in_at,
+                    'checked_in_by' => $checkIn->checked_in_by,
+                    'check_in_point_id' => $checkIn->check_in_point_id,
+                    'method' => $checkIn->method,
+                    'device_name' => $checkIn->device_name,
+                    'ip_address' => $checkIn->ip_address,
+                    'note' => $checkIn->note,
+                ],
+                ['status' => Ticket::STATUS_ISSUED, 'used_at' => null],
+            );
+
+            $checkIns->where('id', $checkIn->id)->delete();
+            $ticket->forceFill(['status' => Ticket::STATUS_ISSUED, 'used_at' => null])->save();
+
+            return true;
+        }, attempts: 3);
     }
 }
