@@ -1188,12 +1188,14 @@ class EventForm
                             'registration_is_open'
                         )
                             ->label('Registration Open')
-                            ->default(false),
+                            ->default(false)
+                            ->live(),
 
                         TextInput::make('registration_access_code_hash')
                             ->label('Registration access code')
                             ->password()
                             ->autocomplete('new-password')
+                            ->required(fn (Get $get, string $operation): bool => $operation === 'create' && $get('admission_mode') === 'access_code' && (bool) $get('registration_is_open'))
                             ->minLength(8)
                             ->maxLength(72)
                             ->helperText('Optional. Enter a new code to restrict registration. Leave blank to preserve the existing code. Enter a new code to rotate access.')
@@ -1897,7 +1899,7 @@ class EventForm
                                     )
                             )
                             ->numeric()
-                            ->minValue(0)
+                            ->minValue(0.01)
                             ->step(0.01)
                             ->default(0)
                             ->required(
@@ -2115,6 +2117,36 @@ class EventForm
             return $schema->components($sections);
         }
 
+        $admission = Section::make('Admission method')
+            ->description('Choose a starting configuration. Review the registration and ticket settings below before saving.')
+            ->schema([
+                Select::make('admission_mode')
+                    ->label('Admission method')
+                    ->options([
+                        'free_registration' => 'Free public registration',
+                        'paid_registration' => 'Paid registration',
+                        'access_code' => 'Access-code registration',
+                        'tickets' => 'Ticket sales',
+                        'combined' => 'Registration and ticket sales',
+                        'manual' => 'Manual attendee management',
+                    ])
+                    ->default('manual')
+                    ->required()
+                    ->native(false)
+                    ->live()
+                    ->dehydrated(false)
+                    ->afterStateUpdated(function ($state, Set $set): void {
+                        $set('registration_is_open', in_array($state, ['free_registration', 'paid_registration', 'access_code', 'combined'], true));
+                        $set('ticketSetting.ticket_sales_enabled', in_array($state, ['tickets', 'combined'], true));
+                        $set('paymentSetting.payments_enabled', $state === 'paid_registration');
+
+                        if ($state !== 'access_code') {
+                            $set('registration_access_code_hash', null);
+                        }
+                    })
+                    ->helperText('This is a setup shortcut, not a separate saved event setting. The detailed settings below determine actual admission. Keep the event in Draft until it is ready.'),
+            ]);
+
         return $schema->components([
             Wizard::make([
                 Step::make('Event type')
@@ -2122,7 +2154,7 @@ class EventForm
                 Step::make('Event details')
                     ->schema([$sections[0], $sections[4], $sections[14]]),
                 Step::make('Admission and features')
-                    ->schema([$sections[8], $sections[5], $sections[7], $sections[3], $sections[11], $sections[12], $sections[6], $sections[13]]),
+                    ->schema([$admission, $sections[8], $sections[5], $sections[7], $sections[3], $sections[11], $sections[12], $sections[6], $sections[13]]),
                 Step::make('Appearance and communication')
                     ->schema([$sections[1], $sections[15], $sections[9], $sections[10]]),
             ])->columnSpanFull(),
