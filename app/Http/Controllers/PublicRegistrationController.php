@@ -339,7 +339,7 @@ class PublicRegistrationController extends Controller
                     'public.registration.success',
                     [
                         'event' => $event,
-                        'attendee' => $attendee,
+                        'attendee' => $attendee->public_token,
                     ]
                 )->with(
                     'error',
@@ -380,19 +380,24 @@ class PublicRegistrationController extends Controller
             'public.registration.success',
             [
                 'event' => $event,
-                'attendee' => $attendee,
+                'attendee' => $attendee->public_token,
             ]
         );
     }
 
     public function success(
         Event $event,
-        Attendee $attendee
+        string $attendee
     ): View {
         abort_unless(
-            (int) $attendee->event_id === (int) $event->id,
+            preg_match('/\\A[A-Za-z0-9]{32}\\z/', $attendee) === 1,
             404
         );
+
+        $attendee = Attendee::query()
+            ->where('event_id', $event->id)
+            ->where('public_token', $attendee)
+            ->firstOrFail();
 
         $event->load([
             'organization',
