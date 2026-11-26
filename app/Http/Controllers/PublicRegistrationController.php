@@ -12,7 +12,7 @@ use App\Models\EventSession;
 use App\Models\MerchandiseVariant;
 use App\Models\Payment;
 use App\Services\AutomaticCommunicationService;
-use App\Services\BadgeGenerationService;
+use App\Jobs\GeneratePublicRegistrationBadge;
 use App\Services\PhoneNumberService;
 use App\Services\Payments\PaymentService;
 use Illuminate\Database\Eloquent\Collection;
@@ -367,10 +367,11 @@ class PublicRegistrationController extends Controller
             $event->registration_auto_generate_badge
             && $status === 'registered'
         ) {
-            app(BadgeGenerationService::class)
-                ->generateForAttendee($attendee);
-
-            $attendee->refresh();
+            try {
+                GeneratePublicRegistrationBadge::dispatch($attendee->id)->afterCommit();
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
 
         /*
