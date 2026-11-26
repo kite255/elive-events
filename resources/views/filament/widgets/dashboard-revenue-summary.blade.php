@@ -1,6 +1,7 @@
 <x-filament-widgets::widget>
-    <x-filament::section heading="Ticket sales summary">
-        <x-slot name="headerEnd">
+    <section class="elive-sales-panel" aria-labelledby="dashboard-sales-heading">
+        <div class="elive-sales-heading">
+            <h2 id="dashboard-sales-heading">Ticket sales summary</h2>
             <label class="sr-only" for="dashboard-revenue-period">Revenue period</label>
             <x-filament::input.wrapper>
                 <x-filament::input.select id="dashboard-revenue-period" wire:model.live="period">
@@ -10,7 +11,7 @@
                     <option value="all">All time</option>
                 </x-filament::input.select>
             </x-filament::input.wrapper>
-        </x-slot>
+        </div>
         <div class="elive-sales-summary">
             @forelse ($this->revenue() as $row)
                 <div class="elive-sales-row">
@@ -32,5 +33,5 @@
             @endforelse
             <p class="text-xs text-gray-500 dark:text-gray-400">Paid ticket orders only; excludes upgrades, refunds, donations and merchandise. Not a payout balance.</p>
         </div>
-    </x-filament::section>
+    </section>
 </x-filament-widgets::widget>
