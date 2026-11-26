@@ -10,6 +10,11 @@ class CreateEvent extends CreateRecord
 {
     protected static string $resource = EventResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return EventResource::getUrl('edit', ['record' => $this->getRecord()]);
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Public event routes resolve by slug without an organization prefix.
