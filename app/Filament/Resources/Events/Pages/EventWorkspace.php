@@ -106,7 +106,7 @@ class EventWorkspace extends Page
                 'label' => 'Ticket orders',
                 'icon' => 'heroicon-o-ticket',
                 'url' => \App\Filament\Resources\TicketOrders\TicketOrderResource::getUrl('index', [
-                    'tableFilters' => ['event_id' => ['value' => $event->id]],
+                    'event_id' => $event->id,
                 ]),
             ];
         }
@@ -117,7 +117,7 @@ class EventWorkspace extends Page
                 'label' => 'Attendees',
                 'icon' => 'heroicon-o-users',
                 'url' => \App\Filament\Resources\Attendees\AttendeeResource::getUrl('index', [
-                    'tableFilters' => ['event' => ['value' => $event->id]],
+                    'event_id' => $event->id,
                 ]),
             ];
         }
