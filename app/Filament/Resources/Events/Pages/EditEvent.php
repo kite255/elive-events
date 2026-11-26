@@ -42,6 +42,26 @@ class EditEvent extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('remove_registration_access_code')
+                ->label('Remove registration access code')
+                ->icon('heroicon-o-lock-open')
+                ->color('warning')
+                ->visible(fn (): bool => filled($this->getRecord()->registration_access_code_hash))
+                ->requiresConfirmation()
+                ->modalHeading('Remove registration access restriction?')
+                ->modalDescription('Anyone who can access an open public registration page will be able to register without this code. Save other pending edits first.')
+                ->action(function (): void {
+                    \Illuminate\Support\Facades\DB::transaction(function (): void {
+                        $event = \App\Models\Event::query()->lockForUpdate()->findOrFail($this->getRecord()->getKey());
+                        abort_unless(EventResource::canEdit($event), 403);
+                        $event->registration_access_code_hash = null;
+                        $event->save();
+                    });
+
+                    Notification::make()->title('Registration access code removed')->success()->send();
+                    $this->redirect(EventResource::getUrl('edit', ['record' => $this->getRecord()]));
+                }),
+
             Action::make('publish_event')
                 ->label('Publish Event')
                 ->icon('heroicon-o-globe-alt')
