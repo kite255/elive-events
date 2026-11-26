@@ -6,6 +6,8 @@ use App\Models\EventTicketTemplate;
 use App\Models\OrganizationTicketTemplate;
 use App\Models\TicketTemplatePage;
 use App\Models\TicketTemplateAsset;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,7 +29,7 @@ class TicketDesignerService
         string $type,
         int $templateId
     ): OrganizationTicketTemplate|EventTicketTemplate {
-        return match ($type) {
+        $template = match ($type) {
             self::TYPE_ORGANIZATION =>
                 OrganizationTicketTemplate::query()->findOrFail(
                     $templateId
@@ -42,6 +44,36 @@ class TicketDesignerService
                 "Unsupported ticket template type [{$type}]."
             ),
         };
+
+        $this->authorizeTemplate($template);
+
+        return $template;
+    }
+
+    private function authorizeTemplate(OrganizationTicketTemplate|EventTicketTemplate $template): void
+    {
+        // Preserve trusted console and background service callers without an HTTP actor.
+        // Every authenticated caller must pass the current policy using a fresh user.
+        if (auth()->check()) {
+            $actor = User::query()->find(auth()->id());
+            abort_unless($actor, 403);
+            Gate::forUser($actor)->authorize('update', $template);
+        } elseif (! app()->runningInConsole() || app()->bound('request') && request()->route() !== null) {
+            abort(403);
+        }
+    }
+
+    private function authorizedPage(TicketTemplatePage $page): TicketTemplatePage
+    {
+        $page = TicketTemplatePage::query()->findOrFail($page->id);
+        $eventId = $page->event_ticket_template_id;
+        $organizationId = $page->organization_ticket_template_id;
+        if (($eventId === null) === ($organizationId === null)) {
+            throw new InvalidArgumentException('Ticket template page must have exactly one parent template.');
+        }
+        $this->loadTemplate($eventId !== null ? self::TYPE_EVENT : self::TYPE_ORGANIZATION, (int) ($eventId ?? $organizationId));
+
+        return $page;
     }
 
     public function pages(
@@ -106,6 +138,7 @@ class TicketDesignerService
         TicketTemplatePage $page,
         string $name
     ): TicketTemplatePage {
+        $page = $this->authorizedPage($page);
         $name = trim($name);
 
         if ($name === '') {
@@ -266,7 +299,7 @@ class TicketDesignerService
         TicketTemplatePage $page,
         array $definition
     ): TicketTemplatePage {
-        $page = TicketTemplatePage::query()->findOrFail($page->id);
+        $page = $this->authorizedPage($page);
         $eventTemplateId = $page->event_ticket_template_id;
 
         $organizationTemplateId =
