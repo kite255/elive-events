@@ -122,6 +122,26 @@ class EventWorkspace extends Page
             ];
         }
 
+        if ($event->canBeManagedBy($user)) {
+            $relations = EventResource::getRelations();
+            foreach ([
+                ['Registration', 'heroicon-o-clipboard-document-list', \App\Filament\Resources\Events\RelationManagers\RegistrationFieldsRelationManager::class],
+                ['Programme', 'heroicon-o-calendar-days', \App\Filament\Resources\Events\RelationManagers\SessionsRelationManager::class],
+                ['Badge templates', 'heroicon-o-identification', \App\Filament\Resources\Events\RelationManagers\BadgeTemplatesRelationManager::class],
+                ['Badge types', 'heroicon-o-tag', \App\Filament\Resources\Events\RelationManagers\BadgeTypesRelationManager::class],
+            ] as [$label, $icon, $manager]) {
+                $key = array_search($manager, $relations, true);
+                if ($key !== false && $manager::canViewForRecord($event, EditEvent::class)) {
+                    $links[] = [
+                        'label' => $label,
+                        'icon' => $icon,
+                        'url' => EventResource::getUrl('edit', ['record' => $event, 'relation' => $key]),
+                        'relation' => (string) $key,
+                    ];
+                }
+            }
+        }
+
         return $links;
     }
 
