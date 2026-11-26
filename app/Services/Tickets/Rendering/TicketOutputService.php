@@ -11,6 +11,10 @@ use Symfony\Component\Process\Process;
 
 final class TicketOutputService
 {
+    public const MAX_PAGES = 8;
+    private const MAX_TOTAL_PIXELS = 32000000;
+    private const MAX_TOTAL_BYTES = 33554432;
+
     public function __construct(
         private readonly TicketRenderContextFactory $contexts,
         private readonly TicketSvgRenderer $svgRenderer,
@@ -28,11 +32,23 @@ final class TicketOutputService
             return [];
         }
 
-        return $context->pages
-            ->map(fn ($page): RenderedTicketPage =>
-                $this->svgRenderer->render($context, $page))
-            ->values()
-            ->all();
+        if ($context->pages->count() > self::MAX_PAGES
+            || $context->pages->count() * $context->width * $context->height > self::MAX_TOTAL_PIXELS) {
+            throw new RuntimeException('Ticket template exceeds the page or total pixel limit.');
+        }
+
+        $pages = [];
+        $size = 0;
+        foreach ($context->pages as $page) {
+            $rendered = $this->svgRenderer->render($context, $page);
+            $size += strlen($rendered->svg);
+            if ($size > self::MAX_TOTAL_BYTES) {
+                throw new RuntimeException('Ticket template exceeds the total SVG output limit.');
+            }
+            $pages[] = $rendered;
+        }
+
+        return $pages;
     }
 
     /**
@@ -76,11 +92,20 @@ final class TicketOutputService
             }
         }
 
-        $pages = array_map(fn (RenderedTicketPage $page): array => [
-            'dataUri' => 'data:image/png;base64,' . base64_encode($this->rasterize($page)),
-            'width' => $page->width,
-            'height' => $page->height,
-        ], $renderedPages);
+        $pages = [];
+        $size = 0;
+        foreach ($renderedPages as $page) {
+            $png = $this->rasterize($page);
+            $size += strlen($png);
+            if ($size > self::MAX_TOTAL_BYTES) {
+                throw new RuntimeException('Ticket exceeds the total raster output limit.');
+            }
+            $pages[] = [
+                'dataUri' => 'data:image/png;base64,'.base64_encode($png),
+                'width' => $page->width,
+                'height' => $page->height,
+            ];
+        }
 
         $paper = [
             0,
@@ -91,6 +116,10 @@ final class TicketOutputService
 
         $bytes = Pdf::loadView('public.tickets.pdf', [
             'pages' => $pages,
+        ])->setOptions([
+            'isRemoteEnabled' => false,
+            'isPhpEnabled' => false,
+            'isJavascriptEnabled' => false,
         ])->setPaper($paper)->output();
 
         $safe = preg_replace('/[^A-Za-z0-9_-]+/', '-', $ticket->ticket_number)
@@ -118,7 +147,8 @@ final class TicketOutputService
         $bytes = $process->getOutput();
 
         if (
-            $bytes === ''
+            strlen($bytes) > self::MAX_TOTAL_BYTES
+            || $bytes === ''
             || ! str_starts_with(
                 $bytes,
                 "\x89PNG\r\n\x1a\n"
