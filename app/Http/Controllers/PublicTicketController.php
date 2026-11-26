@@ -381,6 +381,11 @@ class PublicTicketController extends Controller
 
     private function cardGatewayForEvent(Event $event): ?PaymentGateway
     {
+        // Production rollout requires explicit opt-in after live verification.
+        if (! config('services.pesapal.ticket_card_checkout_enabled', false)) {
+            return null;
+        }
+
         // Do not advertise card checkout before Pesapal can create orders.
         if (blank(config('services.pesapal.consumer_key'))
             || blank(config('services.pesapal.consumer_secret'))
@@ -388,9 +393,19 @@ class PublicTicketController extends Controller
             return null;
         }
 
+        // Real production buyers must never be redirected to sandbox checkout.
+        if (app()->environment('production')
+            && config('services.pesapal.environment') !== 'live') {
+            return null;
+        }
+
         return PaymentGateway::query()
             ->where('is_enabled', true)
             ->where('code', 'pesapal')
+            ->when(
+                app()->environment('production'),
+                fn ($query) => $query->where('environment', 'live')
+            )
             ->where(function ($query) use ($event): void {
                 $query->where('organization_id', $event->organization_id)
                     ->orWhereNull('organization_id');
