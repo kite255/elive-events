@@ -40,6 +40,10 @@ class EventForm
 
     private static function showTicketing(Get $get): bool
     {
+        if (filled($get('admission_mode'))) {
+            return in_array($get('admission_mode'), ['tickets', 'combined', 'paid_combined'], true);
+        }
+
         return self::advanced($get)
             || (bool) $get('ticketSetting.ticket_sales_enabled')
             || EventPresetService::usesTicketing(
@@ -55,6 +59,10 @@ class EventForm
 
     private static function showRegistration(Get $get): bool
     {
+        if (filled($get('admission_mode'))) {
+            return in_array($get('admission_mode'), ['free_registration', 'paid_registration', 'combined', 'paid_combined'], true);
+        }
+
         return self::advanced($get)
             || (bool) $get('registration_is_open') || (bool) $get('paymentSetting.payments_enabled')
             || EventPresetService::usesRegistration(
@@ -780,6 +788,8 @@ class EventForm
                             'ticket_sales_enabled'
                         )
                             ->label('Enable Ticket Sales')
+                            ->disabled(fn (string $operation): bool => $operation === 'create')
+                            ->dehydrated()
                             ->helperText(
                                 'Allow customers to purchase admission tickets.'
                             )
@@ -1123,6 +1133,8 @@ class EventForm
                             'registration_is_open'
                         )
                             ->label('Registration Open')
+                            ->disabled(fn (string $operation): bool => $operation === 'create')
+                            ->dehydrated()
                             ->default(false)
                             ->live(),
 
@@ -1783,6 +1795,8 @@ class EventForm
                             ->label(
                                 'Enable Registration Payments'
                             )
+                            ->disabled(fn (string $operation): bool => $operation === 'create')
+                            ->dehydrated()
                             ->default(false)
                             ->live(),
 
@@ -2083,7 +2097,8 @@ class EventForm
                         'free_registration' => 'Free public registration',
                         'paid_registration' => 'Paid registration',
                         'tickets' => 'Ticket sales',
-                        'combined' => 'Registration and ticket sales',
+                        'combined' => 'Free registration and ticket sales',
+                        'paid_combined' => 'Paid registration and ticket sales',
                         'manual' => 'Manual attendee management',
                     ])
                     ->default('manual')
@@ -2092,15 +2107,15 @@ class EventForm
                     ->live()
                     ->dehydrated(false)
                     ->afterStateUpdated(function ($state, Set $set): void {
-                        $set('registration_is_open', in_array($state, ['free_registration', 'paid_registration', 'combined'], true));
-                        $set('ticketSetting.ticket_sales_enabled', in_array($state, ['tickets', 'combined'], true));
-                        $set('paymentSetting.payments_enabled', $state === 'paid_registration');
+                        $set('registration_is_open', in_array($state, ['free_registration', 'paid_registration', 'combined', 'paid_combined'], true));
+                        $set('ticketSetting.ticket_sales_enabled', in_array($state, ['tickets', 'combined', 'paid_combined'], true));
+                        $set('paymentSetting.payments_enabled', in_array($state, ['paid_registration', 'paid_combined'], true));
 
-                        if (! in_array($state, ['free_registration', 'paid_registration', 'combined'], true)) {
+                        if (! in_array($state, ['free_registration', 'paid_registration', 'combined', 'paid_combined'], true)) {
                             $set('registration_access_code_hash', null);
                         }
                     })
-                    ->helperText('This is a setup shortcut, not a separate saved event setting. The detailed settings below determine actual admission. Keep the event in Draft until it is ready.'),
+                    ->helperText('Choose the admission method here. Registration and payment switches follow your selection during creation. You can change them after saving.'),
             ]);
 
         return $schema->components([
