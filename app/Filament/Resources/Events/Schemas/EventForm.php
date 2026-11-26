@@ -14,6 +14,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Wizard;
+use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -103,14 +105,7 @@ class EventForm
 
     public static function configure(Schema $schema): Schema
     {
-        return $schema
-            ->components([
-                /*
-                |--------------------------------------------------------------------------
-                | Event Information
-                |--------------------------------------------------------------------------
-                */
-
+        $sections = [
                 Section::make('Event Information')
                     ->description(
                         'Create the event and select its type. eLive Events automatically shows the modules relevant to that event type.'
@@ -631,17 +626,67 @@ class EventForm
                     ->columns(2)
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Event Profile
-                |--------------------------------------------------------------------------
-                */
-
-                Section::make('Event Setup Profile')
+                Section::make('Event Type and Setup')
                     ->description(
                         'The form adapts automatically to the selected event type.'
                     )
                     ->schema([
+                        Select::make('event_type')
+                            ->label('Event Type')
+                            ->options(
+                                EventPresetService::eventTypes()
+                            )
+                            ->required()
+                            ->searchable()
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(
+                                function (
+                                    $state,
+                                    Set $set
+                                ): void {
+                                    foreach (
+                                        EventPresetService::preset(
+                                            $state
+                                        ) as $field => $value
+                                    ) {
+                                        $set(
+                                            $field,
+                                            $value
+                                        );
+                                    }
+
+                                    if ($state !== 'other') {
+                                        $set(
+                                            'custom_event_type',
+                                            null
+                                        );
+                                    }
+                                }
+                            )
+                            ->helperText(
+                                'The selected type controls recommended defaults and which setup modules are displayed.'
+                            ),
+
+                        TextInput::make(
+                            'custom_event_type'
+                        )
+                            ->label('Custom Event Type')
+                            ->placeholder(
+                                'Example: Medical Research Symposium'
+                            )
+                            ->maxLength(255)
+                            ->required(
+                                fn (Get $get): bool =>
+                                    $get('event_type')
+                                    === 'other'
+                            )
+                            ->visible(
+                                fn (Get $get): bool =>
+                                    $get('event_type')
+                                    === 'other'
+                            ),
+
                         Placeholder::make(
                             'event_profile_information'
                         )
@@ -723,12 +768,6 @@ class EventForm
                     ])
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Donations / Fundraising
-                |--------------------------------------------------------------------------
-                */
-
                 Section::make('Donations / Fundraising')
                     ->description(
                         'Use donation campaigns when this event accepts financial or in-kind support.'
@@ -746,12 +785,6 @@ class EventForm
                             self::showDonations($get)
                     )
                     ->collapsible(),
-
-                /*
-                |--------------------------------------------------------------------------
-                | Schedule and Capacity
-                |--------------------------------------------------------------------------
-                */
 
                 Section::make('Schedule and Capacity')
                     ->description(
@@ -796,12 +829,6 @@ class EventForm
                             ),
                     ])
                     ->columns(2),
-
-                /*
-                |--------------------------------------------------------------------------
-                | Ticket Sales
-                |--------------------------------------------------------------------------
-                */
 
                 Section::make('Ticket Sales')
                     ->description(
@@ -963,12 +990,6 @@ class EventForm
                     )
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Event Finance Settings
-                |--------------------------------------------------------------------------
-                */
-
                 Section::make('Event Finance Settings')
                     ->description(
                         'Configure eLive commission and payment gateway charges for this event. Changes apply only to future paid orders.'
@@ -1045,12 +1066,6 @@ class EventForm
                             || self::showRegistration($get)
                     )
                     ->collapsible(),
-
-                /*
-                |--------------------------------------------------------------------------
-                | Event Structure / Sessions
-                |--------------------------------------------------------------------------
-                */
 
                 Section::make('Event Structure')
                     ->description(
@@ -1156,12 +1171,6 @@ class EventForm
                     )
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Public Registration
-                |--------------------------------------------------------------------------
-                */
-
                 Section::make('Public Registration')
                     ->description(
                         fn (Get $get): string =>
@@ -1257,12 +1266,6 @@ class EventForm
                             self::showRegistration($get)
                     )
                     ->collapsible(),
-
-                /*
-                |--------------------------------------------------------------------------
-                | Registration Communication
-                |--------------------------------------------------------------------------
-                */
 
                 Section::make(
                     'Registration Communication'
@@ -1438,12 +1441,6 @@ class EventForm
                     )
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Ticket Delivery Communication
-                |--------------------------------------------------------------------------
-                */
-
                 Section::make(
                     'Ticket Delivery Communication'
                 )
@@ -1582,12 +1579,6 @@ class EventForm
                             self::showTicketing($get)
                     )
                     ->collapsible(),
-
-                /*
-                |--------------------------------------------------------------------------
-                | Registration Fields
-                |--------------------------------------------------------------------------
-                */
 
                 Section::make(
                     'Registration Fields'
@@ -1837,12 +1828,6 @@ class EventForm
                     )
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Registration Payments
-                |--------------------------------------------------------------------------
-                */
-
                 Section::make(
                     'Registration Payment Settings'
                 )
@@ -1990,12 +1975,6 @@ class EventForm
                     )
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Manual Payment Instructions
-                |--------------------------------------------------------------------------
-                */
-
                 Section::make(
                     'Manual / Offline Payment Instructions'
                 )
@@ -2046,17 +2025,6 @@ class EventForm
                     ->collapsible()
                     ->collapsed(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Event Media
-                |--------------------------------------------------------------------------
-                |
-                | Available for every event type, including concerts.
-                | We currently reuse the existing registration media columns
-                | so this improvement does not require a database migration.
-                |
-                */
-
                 Section::make('Event Media')
                     ->description(
                         'Upload the main public-facing images for this event. These images can be used on event listings, event details, ticket pages, and registration pages.'
@@ -2102,16 +2070,6 @@ class EventForm
                     ->columns(2)
                     ->collapsible(),
 
-                /*
-                |--------------------------------------------------------------------------
-                | Registration Branding
-                |--------------------------------------------------------------------------
-                |
-                | Registration-specific visual styling stays separate from
-                | the event media shared by all event types.
-                |
-                */
-
                 Section::make('Registration Branding')
                     ->description(
                         'Customize colors used on the public attendee or guest registration experience.'
@@ -2145,6 +2103,24 @@ class EventForm
                     )
                     ->collapsible()
                     ->collapsed(),
-            ]);
+        ];
+
+        // Keep the full edit form; guide creation through the same field definitions.
+        if ($schema->getOperation() !== 'create') {
+            return $schema->components($sections);
+        }
+
+        return $schema->components([
+            Wizard::make([
+                Step::make('Event type')
+                    ->schema([$sections[2]]),
+                Step::make('Event details')
+                    ->schema([$sections[0], $sections[4], $sections[14]]),
+                Step::make('Admission and features')
+                    ->schema([$sections[8], $sections[5], $sections[7], $sections[3], $sections[11], $sections[12], $sections[6], $sections[13]]),
+                Step::make('Appearance and communication')
+                    ->schema([$sections[1], $sections[15], $sections[9], $sections[10]]),
+            ])->columnSpanFull(),
+        ]);
     }
 }
