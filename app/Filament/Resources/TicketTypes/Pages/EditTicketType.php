@@ -16,4 +16,11 @@ class EditTicketType extends EditRecord
             DeleteAction::make(),
         ];
     }
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        abort_unless(TicketTypeResource::canEdit($this->getRecord()), 403);
+        unset($data['event_id']);
+
+        return $data;
+    }
 }
