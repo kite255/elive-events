@@ -84,6 +84,10 @@ class EventPayoutService
         string $destinationType,
         string $destinationDetails
     ): EventPayoutRequest {
+        if ($user->is_gate_staff) {
+            throw ValidationException::withMessages(['event' => 'Gate staff cannot request payouts.']);
+        }
+
         if ($user->isTicketOrganizer() && ! $user->assignedTicketingEvents()->where('events.id', $event->getKey())->exists()) {
             throw ValidationException::withMessages(['event' => 'This event is not assigned to your organizer account.']);
         }
