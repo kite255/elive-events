@@ -37,6 +37,9 @@ class BadgePrintStation extends Page
 
     public ?int $eventId = null;
 
+    #[\Livewire\Attributes\Locked]
+    public ?int $workspaceEventId = null;
+
     public ?int $attendeeId = null;
 
     public string $search = '';
@@ -54,6 +57,14 @@ class BadgePrintStation extends Page
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+
+        if (request()->has('event_id')) {
+            $id = request()->query('event_id');
+            abort_unless(is_scalar($id) && ctype_digit((string) $id), 404);
+            $this->workspaceEventId = (int) $id;
+            abort_unless(static::authorizedBadgeEvents(auth()->user())->whereKey($this->workspaceEventId)->exists(), 403);
+            $this->eventId = $this->workspaceEventId;
+        }
 
         $requestedAttendeeId = request()->integer('attendee');
 
@@ -74,7 +85,7 @@ class BadgePrintStation extends Page
             }
         }
 
-        $this->eventId = $this->getEventsProperty()
+        $this->eventId = $this->workspaceEventId ?? $this->getEventsProperty()
             ->first()?->getKey();
     }
 
@@ -82,21 +93,54 @@ class BadgePrintStation extends Page
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
-            return false;
-        }
+        return $user instanceof User && ! $user->is_gate_staff
+            && ($user->isSuperAdmin() || static::authorizedBadgeEvents($user)->exists());
+    }
 
+    public static function authorizedBadgeEvents(?User $user): Builder
+    {
+        $query = Event::query()->accessibleBy($user);
+        if (! $user || $user->is_gate_staff) {
+            return $query->whereRaw('1 = 0');
+        }
         if ($user->isSuperAdmin()) {
-            return true;
+            return $query;
         }
-
         if ($user->isTicketOrganizer()) {
-            return false;
+            return $query->whereRaw('1 = 0');
         }
 
-        return Event::query()
-            ->accessibleBy($user)
-            ->exists();
+        return $query->where(function (Builder $scope) use ($user): void {
+            $scope->whereIn('events.organization_id', $user->activeOrganizations()
+                ->where(function (Builder $membership): void {
+                    $membership->where('organization_user.is_owner', true)
+                        ->orWhereIn('organization_user.role', [
+                            User::ORGANIZATION_ROLE_OWNER,
+                            User::ORGANIZATION_ROLE_ADMIN,
+                        ]);
+                })->select('organizations.id')->getQuery())
+                ->orWhereIn('events.id', $user->activeAssignedEvents()
+                    ->wherePivotIn('role', [
+                        User::ORGANIZATION_ROLE_EVENT_MANAGER,
+                        User::ORGANIZATION_ROLE_BADGE_OFFICER,
+                    ])->select('events.id')->getQuery());
+        });
+    }
+
+    private function scopedBadgeEvents(): Builder
+    {
+        $query = static::authorizedBadgeEvents(auth()->user());
+        if ($this->workspaceEventId !== null) {
+            abort_unless((clone $query)->whereKey($this->workspaceEventId)->exists(), 403);
+            $query->whereKey($this->workspaceEventId);
+        }
+
+        return $query;
+    }
+
+    private function authorizedPrintLogQuery(): Builder
+    {
+        return BadgePrintLog::query()->whereIn('event_id', $this->scopedBadgeEvents()->select('events.id'));
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -106,6 +150,7 @@ class BadgePrintStation extends Page
 
     public function updatedEventId(): void
     {
+        $this->eventId = $this->workspaceEventId ?? $this->eventId;
         $this->attendeeId = null;
         $this->resetPageState();
     }
@@ -140,8 +185,7 @@ class BadgePrintStation extends Page
             return collect();
         }
 
-        return Event::query()
-            ->accessibleBy($user)
+        return $this->scopedBadgeEvents()
             ->orderByDesc('id')
             ->get(['id', 'name']);
     }
@@ -294,7 +338,7 @@ class BadgePrintStation extends Page
             return;
         }
 
-        $previousPrintCount = BadgePrintLog::query()
+        $previousPrintCount = $this->authorizedPrintLogQuery()
             ->where('attendee_id', $attendee->getKey())
             ->count();
 
@@ -411,7 +455,7 @@ class BadgePrintStation extends Page
             ? (clone $query)
                 ->where('badge_status', 'printed')
                 ->count()
-            : BadgePrintLog::query()
+            : $this->authorizedPrintLogQuery()
                 ->when(
                     $this->eventId,
                     fn (Builder $query): Builder =>
@@ -426,7 +470,7 @@ class BadgePrintStation extends Page
                 ->count()
             : 0;
 
-        $printedToday = BadgePrintLog::query()
+        $printedToday = $this->authorizedPrintLogQuery()
             ->when(
                 $this->eventId,
                 fn (Builder $query): Builder =>
@@ -450,7 +494,7 @@ class BadgePrintStation extends Page
 
     public function getRecentPrintsProperty(): Collection
     {
-        return BadgePrintLog::query()
+        return $this->authorizedPrintLogQuery()
             ->with([
                 'attendee',
                 'event',
@@ -468,7 +512,7 @@ class BadgePrintStation extends Page
 
     public function getPrintHistoryCount(int $attendeeId): int
     {
-        return BadgePrintLog::query()
+        return $this->authorizedPrintLogQuery()
             ->where('attendee_id', $attendeeId)
             ->count();
     }
@@ -556,22 +600,6 @@ class BadgePrintStation extends Page
 
     private function authorizedAttendeeQuery(): Builder
     {
-        $user = auth()->user();
-
-        $query = Attendee::query();
-
-        if (! $user instanceof User) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        if ($user->isSuperAdmin()) {
-            return $query;
-        }
-
-        return $query->whereHas(
-            'event',
-            fn (Builder $eventQuery): Builder =>
-                $eventQuery->accessibleBy($user)
-        );
+        return Attendee::query()->whereIn('event_id', $this->scopedBadgeEvents()->select('events.id'));
     }
 }
