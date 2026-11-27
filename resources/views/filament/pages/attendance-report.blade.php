@@ -359,8 +359,11 @@
                             id="attendance-event"
                             class="elive-select"
                             wire:model.live="eventId"
+                            @disabled($workspaceEventId !== null)
                         >
-                            <option value="">All events</option>
+                            @if ($workspaceEventId === null)
+                                <option value="">All events</option>
+                            @endif
 
                             @foreach ($events as $event)
                                 <option value="{{ $event->id }}">
