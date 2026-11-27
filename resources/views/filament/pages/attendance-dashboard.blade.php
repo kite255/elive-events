@@ -523,6 +523,7 @@
                             id="attendance-dashboard-event"
                             class="elive-select"
                             wire:model.live="eventId"
+                            @disabled($workspaceEventId !== null)
                         >
                             @foreach ($events as $event)
                                 <option value="{{ $event->getKey() }}">
