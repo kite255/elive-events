@@ -36,7 +36,9 @@ class EventFinanceWorkspace extends Page
     public static function canViewFinance(Event $event, ?User $user): bool
     {
         return $user instanceof User && ! $user->is_gate_staff
-            && ($user->isSuperAdmin() || $user->canManageOrganization($event->organization_id))
+            && ($user->isSuperAdmin() || ($user->isTicketOrganizer()
+                ? $user->assignedTicketingEvents()->whereKey($event->id)->exists()
+                : $user->canManageOrganization((int) $event->organization_id)))
             && EventWorkspace::authorizedEvents($user)->whereKey($event->id)->exists();
     }
 
@@ -62,7 +64,10 @@ class EventFinanceWorkspace extends Page
 
     public function summary(): array
     {
-        return app(EventFinanceWorkspaceSummary::class)->summarize($this->event()->id);
+        $event = $this->event();
+        $user = auth()->user();
+
+        return app(EventFinanceWorkspaceSummary::class)->summarize($event->id, $user->isSuperAdmin(), $user->isTicketOrganizer() ? $user->id : null);
     }
 
     private function clearanceAdmin(): User
