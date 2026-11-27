@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Events\RelationManagers;
 
 use App\Models\Event;
-use App\Services\EventPresetService;
 use App\Filament\Resources\Attendees\AttendeeResource;
 use App\Models\AttendeeMerchandise;
 use Filament\Actions\Action;
@@ -27,7 +26,9 @@ class MerchandiseOrdersRelationManager extends RelationManager
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
         return $ownerRecord instanceof Event
-            && (EventPresetService::usesRegistration($ownerRecord->event_type) || EventPresetService::usesTicketing($ownerRecord->event_type));
+            && $ownerRecord->canBeManagedBy(auth()->user())
+            && ($ownerRecord->merchandise_section_enabled || $ownerRecord->merchandise()->exists()
+                || $ownerRecord->attendeeMerchandiseOrders()->exists());
     }
 
     protected static string $relationship = 'attendeeMerchandiseOrders';
