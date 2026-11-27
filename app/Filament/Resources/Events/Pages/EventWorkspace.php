@@ -210,6 +210,14 @@ class EventWorkspace extends Page
             }
         }
 
+        if ($ticketingConfigured && EventTicketSalesReport::canViewSales($event, $user)) {
+            $links[] = [
+                'label' => 'Ticket sales report',
+                'icon' => 'heroicon-o-ticket',
+                'url' => EventResource::getUrl('ticket-sales-report', ['record' => $event]),
+            ];
+        }
+
         return $links;
     }
 
