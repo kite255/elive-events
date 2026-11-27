@@ -21,8 +21,8 @@ class DonationsTable
                     ->label('Campaign')
                     ->searchable(),
 
-                TextColumn::make('campaign.event.name')
-                    ->label('Event')
+                TextColumn::make('campaign.organization.name')
+                    ->label('Organization')
                     ->placeholder('—'),
 
                 TextColumn::make('donor_name')
