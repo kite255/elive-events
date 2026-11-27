@@ -40,6 +40,9 @@ class AttendanceReport extends Page
     protected string $view =
         'filament.pages.attendance-report';
 
+    #[\Livewire\Attributes\Locked]
+    public ?int $workspaceEventId = null;
+
     public ?int $eventId = null;
 
     public ?int $eventDayId = null;
@@ -66,29 +69,37 @@ class AttendanceReport extends Page
     {
         abort_unless(static::canAccess(), 403);
 
-        $this->eventId = $this->getEventsProperty()
-            ->first()?->getKey();
+        if (request()->has('event_id')) {
+            $id = request()->query('event_id');
+            abort_unless(is_scalar($id) && ctype_digit((string) $id), 404);
+            $this->workspaceEventId = (int) $id;
+            $this->eventId = $this->workspaceEventId;
+            $this->reportEventIds();
+        } else {
+            $this->eventId = $this->getEventsProperty()->first()?->getKey();
+        }
     }
 
     public static function canAccess(): bool
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
-            return false;
+        return $user instanceof User && ! $user->is_gate_staff
+            && ($user->isSuperAdmin() || \App\Services\EventReportAccess::ids($user)->isNotEmpty());
+    }
+
+    private function reportEventIds(): Collection
+    {
+        $ids = \App\Services\EventReportAccess::ids(auth()->user());
+        if ($this->workspaceEventId !== null) {
+            abort_unless($ids->contains($this->workspaceEventId) && $this->eventId === $this->workspaceEventId, 403);
+
+            return collect([$this->workspaceEventId]);
         }
 
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
+        abort_unless($this->eventId === null || $ids->contains($this->eventId), 403);
 
-        if ($user->isTicketOrganizer()) {
-            return false;
-        }
-
-        return Event::query()
-            ->accessibleBy($user)
-            ->exists();
+        return $ids;
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -98,6 +109,7 @@ class AttendanceReport extends Page
 
     public function updatedEventId(): void
     {
+        $this->reportEventIds();
         $this->eventDayId = null;
         $this->categoryId = null;
         $this->checkInPointId = null;
@@ -164,7 +176,7 @@ class AttendanceReport extends Page
         }
 
         return Event::query()
-            ->accessibleBy($user)
+            ->whereIn('id', $this->reportEventIds())
             ->orderByDesc('starts_at')
             ->orderByDesc('id')
             ->get([
@@ -175,6 +187,7 @@ class AttendanceReport extends Page
 
     public function getEventDaysProperty(): Collection
     {
+        $this->reportEventIds();
         if (! $this->eventId) {
             return collect();
         }
@@ -195,6 +208,7 @@ class AttendanceReport extends Page
 
     public function getSelectedEventDayProperty(): ?EventDay
     {
+        $this->reportEventIds();
         if (! $this->eventId || ! $this->eventDayId) {
             return null;
         }
@@ -207,6 +221,7 @@ class AttendanceReport extends Page
 
     public function getCategoriesProperty(): Collection
     {
+        $this->reportEventIds();
         if (! $this->eventId) {
             return collect();
         }
@@ -223,6 +238,7 @@ class AttendanceReport extends Page
 
     public function getCheckInPointsProperty(): Collection
     {
+        $this->reportEventIds();
         if (! $this->eventId) {
             return collect();
         }
@@ -640,7 +656,7 @@ class AttendanceReport extends Page
 
     private function applyCheckInFilters($query)
     {
-        return $query
+        return $query->whereIn('check_ins.event_id', $this->reportEventIds())
             ->when(
                 $this->eventId,
                 fn ($query) => $query->where(
@@ -715,7 +731,7 @@ class AttendanceReport extends Page
             return collect();
         }
 
-        $latestIdsQuery = CheckIn::query()
+        $latestIdsQuery = CheckIn::query()->whereIn('event_id', $this->reportEventIds())
             ->whereIn(
                 'attendee_id',
                 $attendeeIds
@@ -807,35 +823,11 @@ class AttendanceReport extends Page
 
     private function accessibleEventIds(): Collection
     {
-        $user = auth()->user();
-
-        if (! $user instanceof User) {
-            return collect();
-        }
-
-        return Event::query()
-            ->accessibleBy($user)
-            ->pluck('id');
+        return $this->reportEventIds();
     }
 
     private function authorizedAttendeeQuery(): Builder
     {
-        $user = auth()->user();
-
-        $query = Attendee::query();
-
-        if (! $user instanceof User) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        if ($user->isSuperAdmin()) {
-            return $query;
-        }
-
-        return $query->whereHas(
-            'event',
-            fn (Builder $eventQuery): Builder =>
-                $eventQuery->accessibleBy($user)
-        );
+        return Attendee::query()->whereIn('attendees.event_id', $this->reportEventIds());
     }
 }
