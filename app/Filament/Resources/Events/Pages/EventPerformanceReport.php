@@ -112,28 +112,41 @@ class EventPerformanceReport extends Page
         return $sections;
     }
 
+    private function exportRows(): array
+    {
+        $event = $this->event();
+        $rows = [
+            ['eLive Events — Event performance'],
+            ['Event', $event->name],
+            ['Generated', now()->toDateTimeString(), config('app.timezone')],
+            ['Recorded amounts only. Separate currencies and revenue sources; not settlement evidence.'],
+        ];
+        foreach ($this->sections() as $section) {
+            $rows[] = [];
+            $rows[] = [$section['title']];
+            $rows[] = $section['headings'];
+            foreach ($section['rows'] as $row) {
+                $rows[] = $row;
+            }
+        }
+
+        return $rows;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Action::make('export_performance')->label('Export Excel')->icon('heroicon-o-arrow-down-tray')
                 ->action(function () {
                     $event = $this->event();
-                    $rows = [
-                        ['eLive Events — Event performance'],
-                        ['Event', $event->name],
-                        ['Generated', now()->toDateTimeString(), config('app.timezone')],
-                        ['Recorded amounts only. Separate currencies and revenue sources; not settlement evidence.'],
-                    ];
-                    foreach ($this->sections() as $section) {
-                        $rows[] = [];
-                        $rows[] = [$section['title']];
-                        $rows[] = $section['headings'];
-                        foreach ($section['rows'] as $row) {
-                            $rows[] = $row;
-                        }
-                    }
 
-                    return Excel::download(new EventFinanceStatement($rows), 'event-'.$event->id.'-performance.xlsx');
+                    return Excel::download(new EventFinanceStatement($this->exportRows()), 'event-'.$event->id.'-performance.xlsx');
+                }),
+            Action::make('export_performance_pdf')->label('Export PDF')->icon('heroicon-o-document-arrow-down')
+                ->action(function () {
+                    $event = $this->event();
+
+                    return app(\App\Services\OperationalReportPdf::class)->download($this->exportRows(), 'event-'.$event->id.'-performance.pdf');
                 }),
         ];
     }
