@@ -150,6 +150,16 @@ class EventWorkspace extends Page
             }
         }
 
+        if (\App\Filament\Pages\BadgePrintStation::authorizedBadgeEvents($user)->whereKey($event->id)->exists()
+            && ($event->registration_auto_generate_badge || $event->badgeTypes()->exists()
+                || $event->badgeTemplates()->exists() || $event->attendees()->whereNotNull('badge_path')->exists())) {
+            $links[] = [
+                'label' => 'Badge printing',
+                'icon' => 'heroicon-o-printer',
+                'url' => \App\Filament\Pages\BadgePrintStation::getUrl(['event_id' => $event->id]),
+            ];
+        }
+
         return $links;
     }
 
