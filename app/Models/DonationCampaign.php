@@ -133,7 +133,7 @@ class DonationCampaign extends Model
 
     public function scopeAccessibleBy(Builder $query, ?User $user): Builder
     {
-        if (! $user) {
+        if (! $user || $user->is_gate_staff) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -153,6 +153,10 @@ class DonationCampaign extends Model
 
     public function canBeManagedBy(User $user): bool
     {
+        if ($user->is_gate_staff) {
+            return false;
+        }
+
         if ($user->isSuperAdmin()) {
             return true;
         }
