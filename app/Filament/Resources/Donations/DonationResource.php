@@ -45,7 +45,6 @@ class DonationResource extends Resource
         return parent::getEloquentQuery()
             ->with([
                 'campaign.organization',
-                'campaign.event',
                 'manualSubmission.paymentMethod',
             ])
             ->accessibleBy(auth()->user());
@@ -55,7 +54,7 @@ class DonationResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -67,6 +66,7 @@ class DonationResource extends Resource
     {
         return $record instanceof Donation
             && auth()->user() instanceof User
+            && ! auth()->user()->is_gate_staff
             && $record->campaign?->canBeManagedBy(auth()->user());
     }
 
