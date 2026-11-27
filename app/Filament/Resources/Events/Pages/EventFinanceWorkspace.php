@@ -4,6 +4,10 @@ namespace App\Filament\Resources\Events\Pages;
 
 use App\Filament\Resources\Events\EventResource;
 use App\Models\Event;
+use App\Models\EventPayoutRequest;
+use App\Services\EventPayoutService;
+use App\Services\EventPayoutReviewService;
+use Filament\Actions\ActionGroup;
 use App\Models\User;
 use App\Services\EventFinanceWorkspaceSummary;
 use App\Services\EventFinanceClearanceService;
@@ -153,6 +157,97 @@ class EventFinanceWorkspace extends Page
                     Notification::make()->title('Clearance record updated')->success()->send();
                 });
         }
+
+        $actions[] = ActionGroup::make($this->payoutActions($isAdmin))->label('Payout management')->icon('heroicon-o-banknotes')->button();
+
+        return $actions;
+    }
+
+    private function payoutActor(): User
+    {
+        $this->event();
+        $user = auth()->user();
+        abort_unless($user instanceof User && ! $user->is_gate_staff, 403);
+
+        return $user;
+    }
+
+    private function payoutOptions(string $operation): array
+    {
+        $user = $operation === 'receipt' ? $this->payoutActor() : $this->clearanceAdmin();
+        $query = EventPayoutRequest::query()->where('event_id', $this->eventId);
+        if ($operation === 'receipt') {
+            $query->where('requested_by', $user->id)->where('status', EventPayoutRequest::PAID)->whereNull('received_at');
+        } else {
+            $query->where('status', EventPayoutRequest::REQUESTED);
+            if ($operation === 'approve') {
+                $query->where('currency', 'TZS')->where('requested_by', '!=', $user->id);
+            }
+        }
+
+        return $query->orderByDesc('id')->get(['id', 'reference', 'currency', 'amount'])
+            ->mapWithKeys(fn ($request) => [$request->id => $request->reference.' | '.$request->currency.' '.$request->amount])->all();
+    }
+
+    private function scopedPayout(array $data): EventPayoutRequest
+    {
+        $this->payoutActor();
+        $id = $data['payout_id'] ?? null;
+        abort_unless(is_scalar($id) && ctype_digit((string) $id), 404);
+
+        return EventPayoutRequest::query()->where('event_id', $this->eventId)->whereKey((int) $id)->firstOrFail();
+    }
+
+    private function payoutActions(callable $isAdmin): array
+    {
+        $enabled = fn (): bool => (bool) config('finance.payout_requests_enabled', false);
+        $actions = [
+            Action::make('request_payout')
+                ->label('Request payout')
+                ->visible($enabled)
+                ->authorize($enabled)
+                ->modalDescription('Submit a TZS payout request against recorded ticket earnings. This does not authorize or initiate a transfer.')
+                ->schema([
+                    TextInput::make('amount')->label('Amount (TZS)')->numeric()->minValue(0.01)->required(),
+                    Select::make('destination_type')->options(['bank' => 'Bank', 'mobile_money' => 'Mobile money'])->required(),
+                    Textarea::make('destination_details')->label('Payment destination details')->required()->maxLength(500),
+                ])
+                ->action(function (array $data): void {
+                    $user = $this->payoutActor();
+                    app(EventPayoutService::class)->request($this->event(), $user, (float) $data['amount'], $data['destination_type'], $data['destination_details']);
+                    Notification::make()->title('Payout request submitted')->success()->send();
+                }),
+        ];
+
+        foreach ([true, false] as $approve) {
+            $operation = $approve ? 'approve' : 'reject';
+            $allowed = fn (): bool => $isAdmin() && (! $approve || $enabled());
+            $actions[] = Action::make($operation.'_payout')
+                ->label($approve ? 'Conditionally approve payout' : 'Reject payout')
+                ->visible($allowed)->authorize($allowed)
+                ->modalDescription($approve ? 'Conditional approval only. Confirm settlement and all transfer requirements separately.' : 'Reject the pending request and release its reservation.')
+                ->schema([
+                    Select::make('payout_id')->label('Payout request')->options(fn (): array => $this->payoutOptions($operation))->searchable()->required(),
+                    Textarea::make('note')->label($approve ? 'Review note' : 'Rejection reason')->required(! $approve)->minLength($approve ? 0 : 10)->maxLength(500),
+                ])
+                ->action(function (array $data) use ($approve): void {
+                    $admin = $this->clearanceAdmin();
+                    app(EventPayoutReviewService::class)->review($this->scopedPayout($data), $admin, $approve, $data['note'] ?? null);
+                    Notification::make()->title($approve ? 'Payout conditionally approved' : 'Payout rejected')->success()->send();
+                });
+        }
+
+        $actions[] = Action::make('confirm_payout_receipt')
+            ->label('Confirm receipt')
+            ->modalDescription('Confirm only funds you have actually received.')
+            ->schema([
+                Select::make('payout_id')->label('Paid payout request')->options(fn (): array => $this->payoutOptions('receipt'))->searchable()->required(),
+            ])
+            ->action(function (array $data): void {
+                $user = $this->payoutActor();
+                app(EventPayoutReviewService::class)->confirmReceipt($this->scopedPayout($data), $user);
+                Notification::make()->title('Receipt confirmed')->success()->send();
+            });
 
         return $actions;
     }
