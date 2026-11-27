@@ -24,7 +24,7 @@ class EventWorkspaceNavigation
         if (in_array($name, ['filament.admin.resources.events.workspace', 'filament.admin.resources.events.edit'], true)) {
             $record = $route->parameter('record');
             $id = $record instanceof Event ? $record->getKey() : $record;
-        } elseif (in_array($name, ['filament.admin.pages.check-in-station', 'filament.admin.pages.communication-center', 'filament.admin.resources.attendees.index', 'filament.admin.resources.ticket-orders.index', 'filament.admin.resources.ticket-types.index'], true)) {
+        } elseif (in_array($name, ['filament.admin.pages.check-in-station', 'filament.admin.pages.communication-center', 'filament.admin.pages.badge-print-station', 'filament.admin.resources.attendees.index', 'filament.admin.resources.ticket-orders.index', 'filament.admin.resources.ticket-types.index'], true)) {
             $id = request()->query('event_id');
         } else {
             return true;
@@ -50,7 +50,7 @@ class EventWorkspaceNavigation
         $links = collect(EventWorkspace::linksFor($event))->keyBy('label');
         foreach ([
             'Event management' => ['Registration', 'Attendees', 'Ticket types', 'Ticket orders', 'Programme'],
-            'Operations' => ['Check-in station', 'Badge templates', 'Badge types', 'Communications'],
+            'Operations' => ['Check-in station', 'Badge templates', 'Badge types', 'Badge printing', 'Communications'],
             'Configuration' => ['Event settings'],
         ] as $heading => $labels) {
             $items = [];
