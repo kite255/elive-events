@@ -166,6 +166,24 @@ class EventFinanceWorkspace extends Page
                 });
         }
 
+        $actions[] = ActionGroup::make([
+            Action::make('export_finance_excel')->label('Excel statement')->icon('heroicon-o-table-cells')
+                ->action(function () {
+                    $event = $this->event();
+                    $rows = app(\App\Services\EventFinanceStatementService::class)->rows($event, $this->payoutActor());
+
+                    return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\EventFinanceStatement($rows), 'event-'.$event->id.'-finance.xlsx');
+                }),
+            Action::make('export_finance_pdf')->label('PDF statement')->icon('heroicon-o-document-arrow-down')
+                ->action(function () {
+                    $event = $this->event();
+                    $rows = app(\App\Services\EventFinanceStatementService::class)->rows($event, $this->payoutActor());
+                    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.event-finance-statement', ['rows' => $rows])->setPaper('a4', 'landscape');
+
+                    return response()->streamDownload(fn () => print($pdf->output()), 'event-'.$event->id.'-finance.pdf');
+                }),
+        ])->label('Export')->icon('heroicon-o-arrow-down-tray')->button();
+
         $actions[] = ActionGroup::make($this->payoutActions($isAdmin))->label('Payout management')->icon('heroicon-o-banknotes')->button();
 
         return $actions;
