@@ -80,39 +80,52 @@ class EventTicketSalesReport extends Page
         ];
     }
 
+    private function exportRows(): array
+    {
+        $event = $this->event();
+        $report = $this->report();
+        $rows = [
+            ['eLive Events — Ticket sales report'],
+            ['Event', $event->name],
+            ['Generated', now()->toDateTimeString(), config('app.timezone')],
+            ['Order totals are recorded amounts, not settled cash or refund amounts.'],
+            [],
+            ['Order status summary'],
+            ['Currency', 'Status', 'Orders', 'Ordered quantity', 'Order total'],
+        ];
+        foreach ($report['orders'] as $row) {
+            $rows[] = [$row->currency, $row->status, $row->orders, $row->quantity, $row->total];
+        }
+        $rows[] = [];
+        $rows[] = ['Paid order items by purchased ticket type'];
+        $rows[] = ['Ticket type', 'Currency', 'Quantity', 'Item total'];
+        foreach ($report['types'] as $row) {
+            $rows[] = [$row->ticket_type ?? 'Unknown type #'.$row->ticket_type_id, $row->currency, $row->quantity, $row->item_total];
+        }
+        $rows[] = [];
+        $rows[] = ['Current ticket status'];
+        $rows[] = ['Status', 'Tickets'];
+        foreach ($report['tickets'] as $row) {
+            $rows[] = [$row->status, $row->quantity];
+        }
+
+        return $rows;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Action::make('export_sales')->label('Export Excel')->icon('heroicon-o-arrow-down-tray')
                 ->action(function () {
                     $event = $this->event();
-                    $report = $this->report();
-                    $rows = [
-                        ['eLive Events — Ticket sales report'],
-                        ['Event', $event->name],
-                        ['Generated', now()->toDateTimeString(), config('app.timezone')],
-                        ['Order totals are recorded amounts, not settled cash or refund amounts.'],
-                        [],
-                        ['Order status summary'],
-                        ['Currency', 'Status', 'Orders', 'Ordered quantity', 'Order total'],
-                    ];
-                    foreach ($report['orders'] as $row) {
-                        $rows[] = [$row->currency, $row->status, $row->orders, $row->quantity, $row->total];
-                    }
-                    $rows[] = [];
-                    $rows[] = ['Paid order items by purchased ticket type'];
-                    $rows[] = ['Ticket type', 'Currency', 'Quantity', 'Item total'];
-                    foreach ($report['types'] as $row) {
-                        $rows[] = [$row->ticket_type ?? 'Unknown type #'.$row->ticket_type_id, $row->currency, $row->quantity, $row->item_total];
-                    }
-                    $rows[] = [];
-                    $rows[] = ['Current ticket status'];
-                    $rows[] = ['Status', 'Tickets'];
-                    foreach ($report['tickets'] as $row) {
-                        $rows[] = [$row->status, $row->quantity];
-                    }
 
-                    return Excel::download(new EventFinanceStatement($rows), 'event-'.$event->id.'-ticket-sales.xlsx');
+                    return Excel::download(new EventFinanceStatement($this->exportRows()), 'event-'.$event->id.'-ticket-sales.xlsx');
+                }),
+            Action::make('export_sales_pdf')->label('Export PDF')->icon('heroicon-o-document-arrow-down')
+                ->action(function () {
+                    $event = $this->event();
+
+                    return app(\App\Services\OperationalReportPdf::class)->download($this->exportRows(), 'event-'.$event->id.'-ticket-sales.pdf');
                 }),
         ];
     }
