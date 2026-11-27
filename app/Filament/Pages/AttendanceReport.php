@@ -424,6 +424,38 @@ class AttendanceReport extends Page
         $this->resetPage();
     }
 
+    public function exportPdf(): StreamedResponse
+    {
+        abort_unless(static::canAccess(), 403);
+        $query = $this->filteredQuery();
+        $total = (clone $query)->count();
+        $attendees = (clone $query)->with(['event:id,name', 'category:id,name', 'eventDays:id,event_id,name,event_date'])
+            ->orderBy('id')->limit(500)->get();
+        $rows = [
+            ['eLive Events — Attendance report'],
+            ['Generated', now()->toDateTimeString(), config('app.timezone')],
+            ['Matching records', $total, 'Included', $attendees->count()],
+            ['Filtered report; PDF limited to the first 500 matching records. Use CSV for the full list.'],
+            [],
+            ['Event', 'Attendee', 'Category', 'Badge number', 'Attendance status', 'Check-in time'],
+        ];
+        $checkIns = $this->latestCheckInsFor($attendees->pluck('id'));
+        foreach ($attendees as $attendee) {
+            $checkIn = $checkIns->get($attendee->id);
+            $rows[] = [$attendee->event?->name, $attendee->full_name, $attendee->category?->name, $attendee->badge_number, $checkIn ? 'Checked in' : 'Not checked in', $checkIn?->checked_in_at?->format('Y-m-d H:i:s')];
+        }
+
+        return app(\App\Services\OperationalReportPdf::class)->download($rows, 'attendance-report-'.now()->format('Y-m-d-His').'.pdf');
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('export_pdf')->label('Export PDF')
+                ->icon('heroicon-o-document-arrow-down')->action(fn () => $this->exportPdf()),
+        ];
+    }
+
     public function exportCsv(): StreamedResponse
     {
         $filename = 'attendance-report-'
