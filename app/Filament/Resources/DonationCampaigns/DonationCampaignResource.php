@@ -55,7 +55,7 @@ class DonationCampaignResource extends Resource
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || $user->is_gate_staff) {
             return false;
         }
 
@@ -75,6 +75,7 @@ class DonationCampaignResource extends Resource
     {
         return $record instanceof DonationCampaign
             && auth()->user() instanceof User
+            && ! auth()->user()->is_gate_staff
             && $record->canBeManagedBy(auth()->user());
     }
 
