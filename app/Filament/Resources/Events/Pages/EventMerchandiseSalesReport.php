@@ -94,28 +94,41 @@ class EventMerchandiseSalesReport extends Page
         ];
     }
 
+    private function exportRows(): array
+    {
+        $event = $this->event();
+        $rows = [
+            ['eLive Events — Merchandise sales report'],
+            ['Event', $event->name],
+            ['Generated', now()->toDateTimeString(), config('app.timezone')],
+            ['Public shop orders only. Recorded TZS totals are not settled cash. Stock fields are not guaranteed available inventory.'],
+        ];
+        foreach ($this->sections() as $section) {
+            $rows[] = [];
+            $rows[] = [$section['title']];
+            $rows[] = $section['headings'];
+            foreach ($section['rows'] as $row) {
+                $rows[] = $row;
+            }
+        }
+
+        return $rows;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Action::make('export_merchandise_sales')->label('Export Excel')->icon('heroicon-o-arrow-down-tray')
                 ->action(function () {
                     $event = $this->event();
-                    $rows = [
-                        ['eLive Events — Merchandise sales report'],
-                        ['Event', $event->name],
-                        ['Generated', now()->toDateTimeString(), config('app.timezone')],
-                        ['Public shop orders only. Recorded TZS totals are not settled cash. Stock fields are not guaranteed available inventory.'],
-                    ];
-                    foreach ($this->sections() as $section) {
-                        $rows[] = [];
-                        $rows[] = [$section['title']];
-                        $rows[] = $section['headings'];
-                        foreach ($section['rows'] as $row) {
-                            $rows[] = $row;
-                        }
-                    }
 
-                    return Excel::download(new EventFinanceStatement($rows), 'event-'.$event->id.'-merchandise-sales.xlsx');
+                    return Excel::download(new EventFinanceStatement($this->exportRows()), 'event-'.$event->id.'-merchandise-sales.xlsx');
+                }),
+            Action::make('export_merchandise_sales_pdf')->label('Export PDF')->icon('heroicon-o-document-arrow-down')
+                ->action(function () {
+                    $event = $this->event();
+
+                    return app(\App\Services\OperationalReportPdf::class)->download($this->exportRows(), 'event-'.$event->id.'-merchandise-sales.pdf');
                 }),
         ];
     }
