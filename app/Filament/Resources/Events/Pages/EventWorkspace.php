@@ -189,6 +189,14 @@ class EventWorkspace extends Page
             ];
         }
 
+        if (EventFinancialAudit::canViewAudit($event, $user)) {
+            $links[] = [
+                'label' => 'Financial audit',
+                'icon' => 'heroicon-o-clipboard-document-list',
+                'url' => EventResource::getUrl('financial-audit', ['record' => $event]),
+            ];
+        }
+
         return $links;
     }
 
