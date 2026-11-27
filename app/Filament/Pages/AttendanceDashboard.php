@@ -40,6 +40,9 @@ class AttendanceDashboard extends Page
     |--------------------------------------------------------------------------
     */
 
+    #[\Livewire\Attributes\Locked]
+    public ?int $workspaceEventId = null;
+
     public ?int $eventId = null;
 
     public ?int $eventDayId = null;
@@ -97,15 +100,12 @@ class AttendanceDashboard extends Page
         $this->attendanceByCategory = collect();
         $this->attendanceByDay = collect();
 
-        $requestedEventId = request()->integer('event_id');
-
-        if ($requestedEventId > 0) {
-            $event = $this->getAvailableEvents()
-                ->firstWhere('id', $requestedEventId);
-
-            if ($event) {
-                $this->eventId = (int) $event->getKey();
-            }
+        if (request()->has('event_id')) {
+            $id = request()->query('event_id');
+            abort_unless(is_scalar($id) && ctype_digit((string) $id), 404);
+            $this->workspaceEventId = (int) $id;
+            $this->eventId = $this->workspaceEventId;
+            $this->authorizeSelection();
         }
 
         if (! $this->eventId) {
@@ -124,21 +124,19 @@ class AttendanceDashboard extends Page
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
-            return false;
-        }
+        return $user instanceof User && ! $user->is_gate_staff
+            && ($user->isSuperAdmin() || \App\Services\EventReportAccess::ids($user)->isNotEmpty());
+    }
 
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        if ($user->isTicketOrganizer()) {
-            return false;
-        }
-
-        return Event::query()
-            ->accessibleBy($user)
-            ->exists();
+    private function authorizeSelection(): void
+    {
+        abort_unless(static::canAccess(), 403);
+        $ids = \App\Services\EventReportAccess::ids(auth()->user());
+        abort_unless($this->workspaceEventId === null || $this->workspaceEventId === $this->eventId, 403);
+        abort_unless($this->eventId === null || $ids->contains($this->eventId), 403);
+        abort_unless($this->eventDayId === null || EventDay::query()
+            ->where('event_id', $this->eventId)->whereKey($this->eventDayId)
+            ->where('status', 'active')->exists(), 403);
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -185,7 +183,8 @@ class AttendanceDashboard extends Page
         }
 
         return Event::query()
-            ->accessibleBy($user)
+            ->whereIn('id', \App\Services\EventReportAccess::ids($user))
+            ->when($this->workspaceEventId !== null, fn (Builder $query) => $query->whereKey($this->workspaceEventId))
             ->orderByDesc('starts_at')
             ->orderByDesc('id')
             ->get();
@@ -193,6 +192,7 @@ class AttendanceDashboard extends Page
 
     public function getAvailableEventDays(): Collection
     {
+        $this->authorizeSelection();
         if (! $this->eventId) {
             return collect();
         }
@@ -208,6 +208,7 @@ class AttendanceDashboard extends Page
 
     public function getSelectedEvent(): ?Event
     {
+        $this->authorizeSelection();
         if (! $this->eventId) {
             return null;
         }
@@ -218,6 +219,7 @@ class AttendanceDashboard extends Page
 
     public function getSelectedEventDay(): ?EventDay
     {
+        $this->authorizeSelection();
         if (! $this->eventId || ! $this->eventDayId) {
             return null;
         }
@@ -276,6 +278,7 @@ class AttendanceDashboard extends Page
 
         $this->checkedInAttendees =
             (clone $checkInsQuery)
+                ->whereIn('attendee_id', (clone $attendeesQuery)->select('id'))
                 ->distinct('attendee_id')
                 ->count('attendee_id');
 
@@ -357,6 +360,7 @@ class AttendanceDashboard extends Page
                 'rejected',
                 'cancelled',
                 'waitlisted',
+                'pending_approval',
             ]);
 
         if ($this->eventDayId) {
@@ -480,6 +484,7 @@ class AttendanceDashboard extends Page
                 $expected = (clone $expectedQuery)->count();
 
                 $checkedIn = (clone $checkedQuery)
+                    ->whereIn('attendee_id', (clone $expectedQuery)->select('id'))
                     ->distinct('attendee_id')
                     ->count('attendee_id');
 
@@ -525,12 +530,13 @@ class AttendanceDashboard extends Page
 
         $this->attendanceByDay = $days
             ->map(function (EventDay $day): array {
-                $expected = Attendee::query()
+                $expectedQuery = Attendee::query()
                     ->where('event_id', $this->eventId)
                     ->whereNotIn('status', [
                         'rejected',
                         'cancelled',
                         'waitlisted',
+                'pending_approval',
                     ])
                     ->whereHas(
                         'eventDays',
@@ -539,8 +545,8 @@ class AttendanceDashboard extends Page
                                 'event_days.id',
                                 $day->getKey()
                             )
-                    )
-                    ->count();
+                    );
+                $expected = (clone $expectedQuery)->count();
 
                 $checkedIn = CheckIn::query()
                     ->where('event_id', $this->eventId)
@@ -549,6 +555,7 @@ class AttendanceDashboard extends Page
                         $day->getKey()
                     )
                     ->whereNull('event_session_id')
+                    ->whereIn('attendee_id', (clone $expectedQuery)->select('id'))
                     ->distinct('attendee_id')
                     ->count('attendee_id');
 
