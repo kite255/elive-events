@@ -717,10 +717,11 @@
                             id="badge-print-event"
                             class="elive-select"
                             wire:model.live="eventId"
+                            @disabled($this->workspaceEventId !== null)
                         >
-                            <option value="">
-                                All events
-                            </option>
+                            @if ($this->workspaceEventId === null)
+                                <option value="">All events</option>
+                            @endif
 
                             @foreach ($events as $event)
                                 <option value="{{ $event->id }}">
