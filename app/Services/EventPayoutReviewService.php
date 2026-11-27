@@ -36,6 +36,10 @@ class EventPayoutReviewService
             }
 
             if ($approve) {
+                if ($locked->currency !== 'TZS') {
+                    throw ValidationException::withMessages(['currency' => 'Only TZS payouts are supported by this workflow.']);
+                }
+
                 if ((int) $locked->requested_by === (int) $reviewer->getKey()) {
                     throw ValidationException::withMessages(['review' => 'A requester cannot approve their own payout.']);
                 }
@@ -46,7 +50,8 @@ class EventPayoutReviewService
 
                 // An approval is a commitment only, never authorization to transfer.
                 // Hold the request's existing reservation against recorded net earnings.
-                $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
+                app(EventPayoutService::class)->assertTzsOnly((int) $locked->event_id);
+            $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
                 if ($balance['refund_exception_count'] > 0) {
                     throw ValidationException::withMessages(['review' => 'Refund exceptions must be reconciled before approval.']);
                 }
@@ -107,6 +112,10 @@ class EventPayoutReviewService
                 throw ValidationException::withMessages(['transfer' => 'Payout must be approved before recording a transfer.']);
             }
 
+            if ($locked->currency !== 'TZS') {
+                throw ValidationException::withMessages(['currency' => 'Only TZS payouts are supported by this workflow.']);
+            }
+
             // Conditional approvals may be recorded before clearance; a paid status
             // requires verified settlements and absence of outstanding review items.
             $unverified = DB::table('event_finance_clearance_entries')
@@ -118,7 +127,8 @@ class EventPayoutReviewService
             if ($unverified) {
                 throw ValidationException::withMessages(['transfer' => 'Settlement or reversal evidence is still awaiting independent review.']);
             }
-            $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
+            app(EventPayoutService::class)->assertTzsOnly((int) $locked->event_id);
+                $balance = app(EventPayoutService::class)->ticketBalance((int) $locked->event_id);
             if ($balance['refund_exception_count'] > 0) {
                 throw ValidationException::withMessages(['transfer' => 'Refund exceptions must be reconciled before recording a transfer.']);
             }
