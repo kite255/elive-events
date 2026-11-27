@@ -35,7 +35,7 @@ class MerchandiseProductResource extends Resource
     protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'Shop Products';
 
-    private static function canManageMerchandiseFor(Event $event): bool
+    public static function canManageMerchandiseFor(Event $event): bool
     {
         $user = auth()->user();
 
@@ -85,7 +85,7 @@ class MerchandiseProductResource extends Resource
             TextColumn::make('price_tzs')->label('TZS')->numeric(),
             TextColumn::make('stock_quantity')->label('Stock')->numeric(),
             IconColumn::make('is_active')->boolean(),
-        ])->recordActions([EditAction::make()])->headerActions([CreateAction::make()]);
+        ])->recordActions([EditAction::make()])->headerActions([CreateAction::make()->visible(fn ($livewire): bool => $livewire->workspaceEventId === null && static::canCreate())]);
     }
 
     public static function getEloquentQuery(): Builder
