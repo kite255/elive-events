@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\EventPayoutRequest;
 use App\Models\Payment;
 use App\Models\TicketOrder;
+use Illuminate\Support\Facades\DB;
 
 final class EventFinanceWorkspaceSummary
 {
@@ -14,7 +15,17 @@ final class EventFinanceWorkspaceSummary
         $payments = Payment::query()->where('event_id', $eventId);
         $payouts = EventPayoutRequest::query()->where('event_id', $eventId);
 
+        $clearance = DB::table('event_finance_clearance_entries')->where('event_id', $eventId);
+        $reviewStatus = "CASE WHEN voided_at IS NOT NULL THEN 'voided' WHEN independently_verified_at IS NOT NULL THEN 'independently reviewed' WHEN self_attested_at IS NOT NULL THEN 'self-attested' ELSE 'awaiting review' END";
+
         return [
+            'clearance' => (clone $clearance)->selectRaw("currency, entry_type, {$reviewStatus} as review_status, COUNT(*) as entries, SUM(amount) as amount")
+                ->groupBy('currency', 'entry_type')->groupByRaw($reviewStatus)
+                ->orderBy('currency')->orderBy('entry_type')->get(),
+            'recent_clearance' => (clone $clearance)->select('id', 'currency', 'entry_type', 'amount', 'created_at')
+                ->selectRaw("{$reviewStatus} as review_status")->orderByDesc('id')->limit(20)->get(),
+            'recent_payouts' => (clone $payouts)->select('id', 'reference', 'currency', 'amount', 'status', 'created_at', 'paid_at', 'received_at')
+                ->orderByDesc('id')->limit(20)->get(),
             'ticket_sales' => (clone $orders)->where('status', TicketOrder::STATUS_PAID)
                 ->selectRaw('currency, COUNT(*) as paid_orders, SUM(gross_amount) as gross, SUM(platform_commission_amount) as commission, SUM(gateway_fee_amount) as gateway_fees, SUM(total_charges) as charges, SUM(organizer_net_amount) as net')
                 ->groupBy('currency')->orderBy('currency')->get()->toArray(),
