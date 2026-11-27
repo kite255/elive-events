@@ -162,6 +162,25 @@ class EventWorkspace extends Page
             ];
         }
 
+        $shopConfigured = $event->merchandise_section_enabled
+            || \App\Models\MerchandiseProduct::query()->where('event_id', $event->id)->exists()
+            || \App\Models\MerchandiseOrder::query()->where('event_id', $event->id)->exists();
+
+        if ($shopConfigured) {
+            foreach ([
+                ['Shop products', 'heroicon-o-shopping-bag', \App\Filament\Resources\MerchandiseProducts\MerchandiseProductResource::class],
+                ['Shop orders', 'heroicon-o-clipboard-document-list', \App\Filament\Resources\MerchandiseOrders\MerchandiseOrderResource::class],
+            ] as [$label, $icon, $resource]) {
+                if ($resource::canManageMerchandiseFor($event)) {
+                    $links[] = [
+                        'label' => $label,
+                        'icon' => $icon,
+                        'url' => $resource::getUrl('index', ['event_id' => $event->id]),
+                    ];
+                }
+            }
+        }
+
         return $links;
     }
 
