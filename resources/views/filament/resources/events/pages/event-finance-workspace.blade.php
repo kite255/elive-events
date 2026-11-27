@@ -1,5 +1,6 @@
 <x-filament-panels::page>
     @php($summary = $this->summary())
+    @php($internal = auth()->user()->isSuperAdmin())
     <div class="space-y-4">
         <x-filament::section>
             <x-slot name="heading">Financial records</x-slot>
@@ -31,6 +32,7 @@
             </div>
         </x-filament::section>
         <div class="grid gap-4 lg:grid-cols-2">
+            @if ($internal)
             <x-filament::section>
                 <x-slot name="heading">Completed payment attempts</x-slot>
                 @forelse ($summary['payments'] as $row)
@@ -43,6 +45,7 @@
                 @endforelse
                 <p class="mt-2 text-xs text-gray-500">Includes all recorded payment types; may contain multiple attempts per order. Do not add these amounts to ticket revenue.</p>
             </x-filament::section>
+            @endif
             <x-filament::section>
                 <x-slot name="heading">Payout request records</x-slot>
                 @forelse ($summary['payouts'] as $row)
@@ -56,6 +59,7 @@
                 <p class="mt-2 text-xs text-gray-500">Read-only history. No transfer or payout approval is available here.</p>
             </x-filament::section>
         </div>
+        @if ($internal)
         <x-filament::section>
             <x-slot name="heading">Settlement and clearance records</x-slot>
             <p class="mb-3 text-xs text-gray-500">Manual documentary review only. Self-attestation is not independent verification. Voided and unreviewed entries must not be treated as available cash.</p>
@@ -107,8 +111,9 @@
                 </table>
             </div>
         </x-filament::section>
+        @endif
         <x-filament::section collapsible collapsed>
-            <x-slot name="heading">Recent payout requests (up to 20)</x-slot>
+            <x-slot name="heading">{{ auth()->user()->isTicketOrganizer() ? 'My recent payout requests (up to 20)' : 'Recent payout requests (up to 20)' }}</x-slot>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead><tr class="text-left">
@@ -133,6 +138,7 @@
                 </table>
             </div>
         </x-filament::section>
+        @if ($internal)
         <x-filament::section>
             <x-slot name="heading">Reconciliation exceptions</x-slot>
             @foreach ($summary['exceptions'] as $label => $count)
@@ -142,5 +148,6 @@
                 </div>
             @endforeach
         </x-filament::section>
+        @endif
     </div>
 </x-filament-panels::page>
