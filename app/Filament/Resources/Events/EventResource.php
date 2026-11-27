@@ -324,6 +324,8 @@ class EventResource extends Resource
 
             'workspace' => EventWorkspace::route('/{record}/workspace'),
 
+            'merchandise-sales-report' => \App\Filament\Resources\Events\Pages\EventMerchandiseSalesReport::route('/{record}/merchandise-sales-report'),
+
             'ticket-sales-report' => \App\Filament\Resources\Events\Pages\EventTicketSalesReport::route('/{record}/ticket-sales-report'),
 
             'financial-audit' => \App\Filament\Resources\Events\Pages\EventFinancialAudit::route('/{record}/financial-audit'),
