@@ -57,6 +57,83 @@
             </x-filament::section>
         </div>
         <x-filament::section>
+            <x-slot name="heading">Settlement and clearance records</x-slot>
+            <p class="mb-3 text-xs text-gray-500">Manual documentary review only. Self-attestation is not independent verification. Voided and unreviewed entries must not be treated as available cash.</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead><tr class="text-left">
+                        @foreach (['Currency', 'Entry type', 'Review status', 'Entries', 'Recorded amount'] as $label)
+                            <th class="p-2">{{ $label }}</th>
+                        @endforeach
+                    </tr></thead>
+                    <tbody>
+                        @forelse ($summary['clearance'] as $row)
+                            <tr class="border-t border-gray-200 dark:border-gray-700">
+                                <td class="p-2">{{ $row->currency ?: 'Unknown' }}</td>
+                                <td class="p-2">{{ ucfirst($row->entry_type) }}</td>
+                                <td class="p-2">{{ ucfirst($row->review_status) }}</td>
+                                <td class="p-2">{{ $row->entries }}</td>
+                                <td class="p-2 whitespace-nowrap">{{ $row->amount }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="p-2">No clearance records.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </x-filament::section>
+        <x-filament::section collapsible collapsed>
+            <x-slot name="heading">Recent clearance entries (up to 20)</x-slot>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead><tr class="text-left">
+                        @foreach (['Entry ID', 'Recorded', 'Type', 'Amount', 'Review status'] as $label)
+                            <th class="p-2">{{ $label }}</th>
+                        @endforeach
+                    </tr></thead>
+                    <tbody>
+                        @forelse ($summary['recent_clearance'] as $row)
+                            <tr class="border-t border-gray-200 dark:border-gray-700">
+                                <td class="p-2">{{ $row->id }}</td>
+                                <td class="p-2">{{ $row->created_at }}</td>
+                                <td class="p-2">{{ ucfirst($row->entry_type) }}</td>
+                                <td class="p-2 whitespace-nowrap">{{ $row->currency }} {{ $row->amount }}</td>
+                                <td class="p-2">{{ ucfirst($row->review_status) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="p-2">No entries.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </x-filament::section>
+        <x-filament::section collapsible collapsed>
+            <x-slot name="heading">Recent payout requests (up to 20)</x-slot>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead><tr class="text-left">
+                        @foreach (['Reference', 'Requested', 'Amount', 'Status', 'Paid', 'Receipt confirmed'] as $label)
+                            <th class="p-2">{{ $label }}</th>
+                        @endforeach
+                    </tr></thead>
+                    <tbody>
+                        @forelse ($summary['recent_payouts'] as $row)
+                            <tr class="border-t border-gray-200 dark:border-gray-700">
+                                <td class="p-2">{{ $row->reference }}</td>
+                                <td class="p-2">{{ $row->created_at?->format('d M Y H:i') }}</td>
+                                <td class="p-2 whitespace-nowrap">{{ $row->currency }} {{ $row->amount }}</td>
+                                <td class="p-2">{{ ucfirst($row->status) }}</td>
+                                <td class="p-2">{{ $row->paid_at?->format('d M Y H:i') ?? '—' }}</td>
+                                <td class="p-2">{{ $row->received_at?->format('d M Y H:i') ?? '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="p-2">No payout requests.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </x-filament::section>
+        <x-filament::section>
             <x-slot name="heading">Reconciliation exceptions</x-slot>
             @foreach ($summary['exceptions'] as $label => $count)
                 <div class="flex justify-between gap-3 py-2 text-sm">
