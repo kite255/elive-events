@@ -245,6 +245,36 @@ class AttendeeReport extends Page
         $this->resetPage();
     }
 
+    public function exportPdf(): StreamedResponse
+    {
+        abort_unless(static::canAccess(), 403);
+        $query = $this->filteredQuery();
+        $total = (clone $query)->count();
+        $attendees = (clone $query)->with(['event:id,name', 'category:id,name'])
+            ->orderBy('id')->limit(500)->get();
+        $rows = [
+            ['eLive Events — Attendee report'],
+            ['Generated', now()->toDateTimeString(), config('app.timezone')],
+            ['Matching records', $total, 'Included', $attendees->count()],
+            ['Filtered report; PDF limited to the first 500 matching records. Use CSV for the full list.'],
+            [],
+            ['Event', 'Attendee', 'Category', 'Badge number', 'Registration status', 'Registration source'],
+        ];
+        foreach ($attendees as $attendee) {
+            $rows[] = [$attendee->event?->name, $attendee->full_name, $attendee->category?->name, $attendee->badge_number, $attendee->status, $attendee->registration_source];
+        }
+
+        return app(\App\Services\OperationalReportPdf::class)->download($rows, 'attendee-report-'.now()->format('Y-m-d-His').'.pdf');
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('export_pdf')->label('Export PDF')
+                ->icon('heroicon-o-document-arrow-down')->action(fn () => $this->exportPdf()),
+        ];
+    }
+
     public function exportCsv(): StreamedResponse
     {
         $filename = 'attendee-report-'
