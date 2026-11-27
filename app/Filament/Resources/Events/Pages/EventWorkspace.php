@@ -218,6 +218,14 @@ class EventWorkspace extends Page
             ];
         }
 
+        if ($shopConfigured && EventMerchandiseSalesReport::canViewSales($event, $user)) {
+            $links[] = [
+                'label' => 'Merchandise sales report',
+                'icon' => 'heroicon-o-shopping-bag',
+                'url' => EventResource::getUrl('merchandise-sales-report', ['record' => $event]),
+            ];
+        }
+
         return $links;
     }
 
