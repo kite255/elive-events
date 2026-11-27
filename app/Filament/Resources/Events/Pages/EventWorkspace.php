@@ -136,6 +136,8 @@ class EventWorkspace extends Page
                 ['Registration', 'heroicon-o-clipboard-document-list', \App\Filament\Resources\Events\RelationManagers\RegistrationFieldsRelationManager::class],
                 ['Programme', 'heroicon-o-calendar-days', \App\Filament\Resources\Events\RelationManagers\SessionsRelationManager::class],
                 ['Badge templates', 'heroicon-o-identification', \App\Filament\Resources\Events\RelationManagers\BadgeTemplatesRelationManager::class],
+                ['Merchandise products', 'heroicon-o-shopping-bag', \App\Filament\Resources\Events\RelationManagers\MerchandiseRelationManager::class],
+                ['Attendee merchandise', 'heroicon-o-clipboard-document-list', \App\Filament\Resources\Events\RelationManagers\MerchandiseOrdersRelationManager::class],
                 ['Badge types', 'heroicon-o-tag', \App\Filament\Resources\Events\RelationManagers\BadgeTypesRelationManager::class],
             ] as [$label, $icon, $manager]) {
                 $key = array_search($manager, $relations, true);
