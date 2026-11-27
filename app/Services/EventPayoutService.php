@@ -21,33 +21,62 @@ class EventPayoutService
      * Ticket-only balance. This is NOT a cash-on-hand or payment-provider settlement guarantee.
      * A later reconciliation component must confirm eligible funds before payout execution.
      */
+    /**
+     * The current settlement and payout workflow is TZS-only.
+     * Unknown or foreign currencies require separate reconciliation.
+     */
+    public function assertTzsOnly(int $eventId): void
+    {
+        foreach ([
+            TicketOrder::query()->where('event_id', $eventId)->whereIn('status', [
+                TicketOrder::STATUS_PAID, TicketOrder::STATUS_REFUNDED, TicketOrder::STATUS_PARTIALLY_REFUNDED,
+            ]),
+            Payment::query()->where('event_id', $eventId)->whereNotNull('ticket_order_id')->whereIn('status', [
+                Payment::STATUS_COMPLETED, Payment::STATUS_REFUNDED, Payment::STATUS_PARTIALLY_REFUNDED,
+            ]),
+            EventPayoutRequest::query()->where('event_id', $eventId)->whereIn('status', [
+                EventPayoutRequest::REQUESTED, EventPayoutRequest::APPROVED, EventPayoutRequest::PAID,
+            ]),
+            DB::table('event_finance_clearance_entries')->where('event_id', $eventId)->whereNull('voided_at'),
+        ] as $query) {
+            if ($query->where(fn ($scope) => $scope->whereNull('currency')->orWhere('currency', '!=', 'TZS'))->exists()) {
+                throw ValidationException::withMessages([
+                    'currency' => 'The payout workflow supports TZS only. Reconcile foreign or unknown currency records before proceeding.',
+                ]);
+            }
+        }
+    }
+
     public function ticketBalance(int $eventId): array
     {
         $earned = (float) TicketOrder::query()
             ->where('event_id', $eventId)
+            ->where('currency', 'TZS')
             ->where('status', TicketOrder::STATUS_PAID)
             ->sum('organizer_net_amount');
 
         $paid = (float) EventPayoutRequest::query()
             ->where('event_id', $eventId)
+            ->where('currency', 'TZS')
             ->where('status', EventPayoutRequest::PAID)
             ->sum('amount');
 
         $reserved = (float) EventPayoutRequest::query()
             ->where('event_id', $eventId)
+            ->where('currency', 'TZS')
             ->whereIn('status', [EventPayoutRequest::REQUESTED, EventPayoutRequest::APPROVED])
             ->sum('amount');
 
         $cleared = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->whereNull('voided_at')->where('entry_type', 'settlement')
+            ->where('event_id', $eventId)->where('currency', 'TZS')->whereNull('voided_at')->where('entry_type', 'settlement')
             ->whereNotNull('independently_verified_at')->sum('amount');
         // Separate genuine independent review from the single-admin exception.
         $selfAttested = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->whereNull('voided_at')->where('entry_type', 'settlement')
+            ->where('event_id', $eventId)->where('currency', 'TZS')->whereNull('voided_at')->where('entry_type', 'settlement')
             ->whereNotNull('self_attested_at')->whereNull('independently_verified_at')->sum('amount');
         $acceptedClearance = $cleared + $selfAttested;
         $reversals = (float) DB::table('event_finance_clearance_entries')
-            ->where('event_id', $eventId)->whereNull('voided_at')->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
+            ->where('event_id', $eventId)->where('currency', 'TZS')->whereNull('voided_at')->whereIn('entry_type', ['refund', 'chargeback'])->sum('amount');
 
         $exceptions = TicketOrder::query()->where('event_id', $eventId)
             ->whereIn('status', [TicketOrder::STATUS_REFUNDED, TicketOrder::STATUS_PARTIALLY_REFUNDED])->count();
@@ -112,6 +141,7 @@ class EventPayoutService
 
         return DB::transaction(function () use ($event, $user, $amount, $destinationType, $destinationDetails): EventPayoutRequest {
             Event::query()->whereKey($event->getKey())->lockForUpdate()->firstOrFail();
+            $this->assertTzsOnly((int) $event->getKey());
             $balance = $this->ticketBalance((int) $event->getKey());
 
             if ($balance['refund_exception_count'] > 0) {
