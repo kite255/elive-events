@@ -13,6 +13,9 @@ use App\Services\EventFinanceWorkspaceSummary;
 use App\Services\EventFinanceClearanceService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\DatePicker;
+use Illuminate\Support\Str;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -178,6 +181,8 @@ class EventFinanceWorkspace extends Page
         $query = EventPayoutRequest::query()->where('event_id', $this->eventId);
         if ($operation === 'receipt') {
             $query->where('requested_by', $user->id)->where('status', EventPayoutRequest::PAID)->whereNull('received_at');
+        } elseif ($operation === 'transfer') {
+            $query->where('status', EventPayoutRequest::APPROVED)->where('currency', 'TZS');
         } else {
             $query->where('status', EventPayoutRequest::REQUESTED);
             if ($operation === 'approve') {
@@ -236,6 +241,39 @@ class EventFinanceWorkspace extends Page
                     Notification::make()->title($approve ? 'Payout conditionally approved' : 'Payout rejected')->success()->send();
                 });
         }
+
+        $actions[] = Action::make('record_manual_transfer')
+            ->label('Record completed transfer')
+            ->icon('heroicon-o-banknotes')
+            ->visible($isAdmin)->authorize($isAdmin)
+            ->modalDescription('Record an actual completed external transfer only. This action does not send money. Settlement review and payout approval must already be complete.')
+            ->schema([
+                Select::make('payout_id')->label('Approved payout')->options(fn (): array => $this->payoutOptions('transfer'))->searchable()->required(),
+                Select::make('method')->options(['bank' => 'Bank transfer', 'mpesa' => 'M-Pesa', 'airtel' => 'Airtel Money', 'mixx' => 'Mixx by Yas', 'other' => 'Other'])->required(),
+                TextInput::make('reference')->label('External transfer reference')->required()->maxLength(255),
+                DatePicker::make('date')->label('Actual transfer date')->maxDate(now())->required(),
+                TextInput::make('amount')->label('Transferred amount (TZS)')->numeric()->minValue(0.01)->required(),
+                FileUpload::make('proof')->label('Private transfer receipt')
+                    ->disk('local')->directory(fn (): string => 'payout-proofs/event-'.$this->event()->id.'/user-'.auth()->id())
+                    ->visibility('private')->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                    ->maxSize(5120)->required()->preventFilePathTampering(),
+                Textarea::make('note')->label('Transfer note')->maxLength(2000),
+                \Filament\Forms\Components\Checkbox::make('confirmed')->label('I confirm the funds have already been transferred externally.')->accepted()->required(),
+            ])
+            ->action(function (array $data): void {
+                $admin = $this->clearanceAdmin();
+                $request = $this->scopedPayout($data);
+                $prefix = 'payout-proofs/event-'.$this->eventId.'/user-'.$admin->id.'/';
+                $proof = $data['proof'];
+                abort_unless(is_string($proof) && Str::startsWith($proof, $prefix)
+                    && ! str_contains($proof, '..') && ! str_contains($proof, '\\'), 422);
+                abort_unless(in_array($data['confirmed'] ?? false, [true, 1, '1'], true), 422);
+                app(EventPayoutReviewService::class)->recordCompletedTransfer(
+                    $request, $admin, $data['reference'], $data['method'], $data['date'],
+                    (string) $data['amount'], $proof, $data['note'] ?? null
+                );
+                Notification::make()->title('Completed transfer recorded')->success()->send();
+            });
 
         $actions[] = Action::make('confirm_payout_receipt')
             ->label('Confirm receipt')
