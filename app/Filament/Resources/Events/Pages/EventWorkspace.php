@@ -201,6 +201,7 @@ class EventWorkspace extends Page
             foreach ([
                 ['Attendee report', \App\Filament\Pages\AttendeeReport::class],
                 ['Attendance report', \App\Filament\Pages\AttendanceReport::class],
+                ['Attendance dashboard', \App\Filament\Pages\AttendanceDashboard::class],
             ] as [$label, $page]) {
                 $links[] = [
                     'label' => $label,
