@@ -86,7 +86,17 @@ class TicketTypeResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return static::authorizedEvents(auth()->user())->exists();
+        $user = auth()->user();
+
+        if (! $user instanceof User || $user->is_gate_staff) {
+            return false;
+        }
+
+        // Organizers may open an empty list before their first event assignment.
+        // Record queries and workspace authorization remain assignment-scoped.
+        return $user->isSuperAdmin()
+            || $user->isTicketOrganizer()
+            || static::authorizedEvents($user)->exists();
     }
 
     public static function canView(Model $record): bool
