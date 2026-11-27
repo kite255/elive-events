@@ -197,6 +197,19 @@ class EventWorkspace extends Page
             ];
         }
 
+        if ($event->canViewReportsBy($user) && ! $user->isTicketOrganizer()) {
+            foreach ([
+                ['Attendee report', \App\Filament\Pages\AttendeeReport::class],
+                ['Attendance report', \App\Filament\Pages\AttendanceReport::class],
+            ] as [$label, $page]) {
+                $links[] = [
+                    'label' => $label,
+                    'icon' => 'heroicon-o-clipboard-document-list',
+                    'url' => $page::getUrl(['event_id' => $event->id]),
+                ];
+            }
+        }
+
         return $links;
     }
 
