@@ -56,7 +56,7 @@
                 @empty
                     <p class="text-sm">No payout requests.</p>
                 @endforelse
-                <p class="mt-2 text-xs text-gray-500">Read-only history. No transfer or payout approval is available here.</p>
+                <p class="mt-2 text-xs text-gray-500">Payout totals reflect recorded request statuses. Authorized actions are available in Payout management; recording a transfer does not initiate a bank or mobile money payment.</p>
             </x-filament::section>
         </div>
         @if ($internal)
