@@ -24,7 +24,7 @@ class MerchandiseOrderResource extends Resource
     protected static ?int $navigationSort = 2;
     protected static ?string $navigationLabel = 'Shop Orders';
 
-    private static function canManageMerchandiseFor(Event $event): bool
+    public static function canManageMerchandiseFor(Event $event): bool
     {
         $user = auth()->user();
 
@@ -95,7 +95,7 @@ class MerchandiseOrderResource extends Resource
                 ->icon('heroicon-o-check-circle')->requiresConfirmation()
                 ->visible(fn (MerchandiseOrder $record): bool => $record->status === 'paid'
                     && $record->fulfillment_status === 'not_ready')
-                ->action(fn (MerchandiseOrder $record) => $record->newQuery()
+                ->action(fn (MerchandiseOrder $record) => static::getEloquentQuery()
                     ->whereKey($record->id)->where('status', 'paid')
                     ->where('fulfillment_status', 'not_ready')
                     ->update(['fulfillment_status' => 'ready_for_pickup'])),
@@ -103,7 +103,7 @@ class MerchandiseOrderResource extends Resource
                 ->icon('heroicon-o-shopping-bag')->requiresConfirmation()
                 ->visible(fn (MerchandiseOrder $record): bool => $record->status === 'paid'
                     && $record->fulfillment_status === 'ready_for_pickup')
-                ->action(fn (MerchandiseOrder $record) => $record->newQuery()
+                ->action(fn (MerchandiseOrder $record) => static::getEloquentQuery()
                     ->whereKey($record->id)->where('status', 'paid')
                     ->where('fulfillment_status', 'ready_for_pickup')
                     ->update(['fulfillment_status' => 'collected', 'collected_at' => now()])),
