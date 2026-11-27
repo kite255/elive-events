@@ -324,6 +324,8 @@ class EventResource extends Resource
 
             'workspace' => EventWorkspace::route('/{record}/workspace'),
 
+            'finance' => \App\Filament\Resources\Events\Pages\EventFinanceWorkspace::route('/{record}/finance'),
+
             'edit' =>
                 EditEvent::route(
                     '/{record}/edit'
