@@ -51,6 +51,7 @@ class EventWorkspaceNavigation
         foreach ([
             'Event management' => ['Registration', 'Attendees', 'Ticket types', 'Ticket orders', 'Programme'],
             'Operations' => ['Check-in station', 'Badge templates', 'Badge types', 'Badge printing', 'Communications'],
+            'Merchandise' => ['Merchandise products', 'Attendee merchandise'],
             'Configuration' => ['Event settings'],
         ] as $heading => $labels) {
             $items = [];
