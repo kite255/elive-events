@@ -181,6 +181,14 @@ class EventWorkspace extends Page
             }
         }
 
+        if (EventFinanceWorkspace::canViewFinance($event, $user)) {
+            $links[] = [
+                'label' => 'Finance overview',
+                'icon' => 'heroicon-o-banknotes',
+                'url' => EventResource::getUrl('finance', ['record' => $event]),
+            ];
+        }
+
         return $links;
     }
 
