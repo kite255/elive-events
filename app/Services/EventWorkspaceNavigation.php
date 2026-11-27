@@ -21,7 +21,7 @@ class EventWorkspaceNavigation
         $route = request()->route();
         $name = $route?->getName();
 
-        if (in_array($name, ['filament.admin.resources.events.workspace', 'filament.admin.resources.events.edit', 'filament.admin.resources.events.finance', 'filament.admin.resources.events.financial-audit'], true)) {
+        if (in_array($name, ['filament.admin.resources.events.workspace', 'filament.admin.resources.events.edit', 'filament.admin.resources.events.finance', 'filament.admin.resources.events.financial-audit', 'filament.admin.resources.events.ticket-sales-report'], true)) {
             $record = $route->parameter('record');
             $id = $record instanceof Event ? $record->getKey() : $record;
         } elseif (in_array($name, ['filament.admin.pages.attendee-report', 'filament.admin.pages.attendance-report', 'filament.admin.pages.check-in-station', 'filament.admin.pages.communication-center', 'filament.admin.pages.badge-print-station', 'filament.admin.resources.attendees.index', 'filament.admin.resources.ticket-orders.index', 'filament.admin.resources.ticket-types.index', 'filament.admin.resources.merchandise-products.index', 'filament.admin.resources.merchandise-orders.index'], true)) {
@@ -53,7 +53,7 @@ class EventWorkspaceNavigation
             'Operations' => ['Check-in station', 'Badge templates', 'Badge types', 'Badge printing', 'Communications'],
             'Merchandise' => ['Merchandise products', 'Attendee merchandise', 'Shop products', 'Shop orders'],
             'Finance' => ['Finance overview', 'Financial audit'],
-            'Reports' => ['Attendee report', 'Attendance report'],
+            'Reports' => ['Attendee report', 'Attendance report', 'Ticket sales report'],
             'Configuration' => ['Event settings'],
         ] as $heading => $labels) {
             $items = [];
