@@ -226,6 +226,14 @@ class EventWorkspace extends Page
             ];
         }
 
+        if (EventPerformanceReport::canViewPerformance($event, $user)) {
+            $links[] = [
+                'label' => 'Event performance',
+                'icon' => 'heroicon-o-document-chart-bar',
+                'url' => EventResource::getUrl('performance-report', ['record' => $event]),
+            ];
+        }
+
         return $links;
     }
 
