@@ -15,7 +15,8 @@ class SmsService
      */
     public function send(
         string $recipient,
-        string $message
+        string $message,
+        bool $allowRetry = true
     ): array {
         $recipient = $this->normalizeRecipient(
             $recipient
@@ -139,7 +140,7 @@ class SmsService
                 )
                 ->connectTimeout(10)
                 ->retry(
-                    2,
+                    $allowRetry ? 2 : 1,
                     1000,
                     throw: false
                 )
