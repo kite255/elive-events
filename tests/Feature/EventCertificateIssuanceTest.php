@@ -115,6 +115,45 @@ class EventCertificateIssuanceTest extends TestCase
         app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
     }
 
+    public function test_bulk_selection_dispatches_one_job_per_eligible_attendee(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $second = Attendee::create(['event_id' => $event->id, 'full_name' => 'Second attendee', 'status' => 'checked_in']);
+        $count = app(\App\Services\EventCertificateBulkIssuance::class)->queue($user, $event->id, $template->id, [$attendee->id, $second->id]);
+        $this->assertSame(2, $count);
+        \Illuminate\Support\Facades\Bus::assertDispatchedTimes(\App\Jobs\IssueEventCertificate::class, 2);
+        \Illuminate\Support\Facades\Bus::assertDispatched(\App\Jobs\IssueEventCertificate::class, fn ($job) =>
+            $job->actorId === $user->id && $job->attendeeId === $attendee->id && $job->eventId === $event->id && $job->templateId === $template->id);
+        $this->assertDatabaseCount('event_certificates', 0);
+    }
+
+    public function test_bulk_selection_rejects_ineligible_attendees_before_dispatch(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture('registered');
+        try {
+            app(\App\Services\EventCertificateBulkIssuance::class)->queue($user, $event->id, $template->id, [$attendee->id]);
+            $this->fail('Ineligible attendee unexpectedly accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('attendees', $exception->errors());
+        }
+        \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\IssueEventCertificate::class);
+    }
+
+    public function test_queued_issuance_can_be_replayed_without_duplicate_certificate(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $job = new \App\Jobs\IssueEventCertificate($user->id, $event->id, $attendee->id, $template->id, 'checked_in');
+        app()->call([$job, 'handle']);
+        app()->call([$job, 'handle']);
+        $this->assertDatabaseCount('event_certificates', 1);
+        $this->assertDatabaseHas('event_certificates', ['attendee_id' => $attendee->id, 'status' => 'issued']);
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
