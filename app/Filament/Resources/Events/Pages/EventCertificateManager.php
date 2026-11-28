@@ -257,6 +257,35 @@ class EventCertificateManager extends Page
             ->body('Public verification now identifies this certificate as revoked.')->success()->send();
     }
 
+    public function deliveryStatuses(array $ids): array
+    {
+        $event = $this->event();
+
+        return \Illuminate\Support\Facades\DB::table('event_certificate_deliveries as delivery')
+            ->join('event_certificates as certificate', 'certificate.id', '=', 'delivery.event_certificate_id')
+            ->where('certificate.event_id', $event->id)
+            ->whereIn('certificate.id', array_slice($ids, 0, 15))
+            ->select('delivery.event_certificate_id', 'delivery.channel', 'delivery.status')
+            ->get()->groupBy('event_certificate_id')
+            ->map(fn ($rows) => $rows->pluck('status', 'channel')->all())->all();
+    }
+
+    public function sendCertificate(int $id, string $channel): void
+    {
+        $this->event();
+        try {
+            app(\App\Services\EventCertificateDeliveryQueue::class)->queue($this->user(), $this->eventId, $id, $channel);
+            Notification::make()->title('Certificate delivery queued')
+                ->body('Provider acceptance and recipient delivery are not yet confirmed.')->success()->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()->title('Delivery unavailable')
+                ->body(collect($exception->errors())->flatten()->first())->danger()->send();
+        } catch (Throwable $exception) {
+            Notification::make()->title('Delivery submission could not be confirmed')
+                ->body('Review the certificate status and recipient contact before attempting another submission.')->danger()->send();
+        }
+    }
+
     public function download(int $id): StreamedResponse
     {
         $certificate = $this->event()->certificates()->whereKey($id)
