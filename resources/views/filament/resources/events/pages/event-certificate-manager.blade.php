@@ -12,6 +12,8 @@
         <div class="flex flex-wrap gap-2">
             <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('workspace', ['record' => $event])">Event workspace</x-filament::button>
             <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-templates', ['record' => $event])">Templates</x-filament::button>
+            <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-report', ['record' => $event])">Reports</x-filament::button>
+            <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-audit', ['record' => $event])">Audit history</x-filament::button>
             <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-settings', ['record' => $event])">Settings</x-filament::button>
         </div>
     </div>
