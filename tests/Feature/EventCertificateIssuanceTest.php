@@ -154,6 +154,53 @@ class EventCertificateIssuanceTest extends TestCase
         $this->assertDatabaseHas('event_certificates', ['attendee_id' => $attendee->id, 'status' => 'issued']);
     }
 
+    public function test_batch_recovery_is_read_only_by_default_and_flags_stale_items_on_apply(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture();
+        app(\App\Services\EventCertificateBulkIssuance::class)->queue($user, $event->id, $template->id, [$attendee->id]);
+        $item = \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->first();
+        \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('id', $item->id)->update(['updated_at' => now()->subHours(3)]);
+        $recovery = app(\App\Services\EventCertificateBatchRecovery::class);
+        $this->assertSame(1, $recovery->inspect($event->id)['stale']);
+        $this->assertDatabaseHas('event_certificate_batch_items', ['id' => $item->id, 'status' => 'queued']);
+        $this->assertSame(1, $recovery->inspect($event->id, true)['marked_failed']);
+        $this->assertDatabaseHas('event_certificate_batch_items', ['id' => $item->id, 'status' => 'failed', 'failure_code' => 'stale_review_required']);
+        \Illuminate\Support\Facades\Bus::assertDispatchedTimes(\App\Jobs\IssueEventCertificate::class, 1);
+    }
+
+    public function test_batch_recovery_reconciles_already_issued_certificate(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        \Illuminate\Support\Facades\Storage::fake('local');
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture();
+        app(\App\Services\EventCertificateBulkIssuance::class)->queue($user, $event->id, $template->id, [$attendee->id]);
+        $item = \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->first();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('id', $item->id)->update(['status' => 'processing', 'updated_at' => now()->subHours(3)]);
+        $result = app(\App\Services\EventCertificateBatchRecovery::class)->inspect($event->id, true);
+        $this->assertSame(1, $result['reconciled']);
+        $this->assertDatabaseHas('event_certificate_batch_items', ['id' => $item->id, 'status' => 'issued']);
+        $this->assertDatabaseCount('event_certificates', 1);
+    }
+
+    public function test_batch_retry_only_dispatches_failed_recipients(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $second = Attendee::create(['event_id' => $event->id, 'full_name' => 'Second attendee', 'status' => 'checked_in']);
+        app(\App\Services\EventCertificateBulkIssuance::class)->queue($user, $event->id, $template->id, [$attendee->id, $second->id]);
+        $batch = \Illuminate\Support\Facades\DB::table('event_certificate_batches')->first();
+        \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('attendee_id', $attendee->id)->update(['status' => 'failed']);
+        $this->assertSame(1, app(\App\Services\EventCertificateBatchRetry::class)->retry($user, $event->id, $batch->id));
+        $this->assertDatabaseHas('event_certificate_batch_items', ['attendee_id' => $attendee->id, 'status' => 'queued']);
+        \Illuminate\Support\Facades\Bus::assertDispatchedTimes(\App\Jobs\IssueEventCertificate::class, 3);
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
