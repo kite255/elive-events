@@ -52,10 +52,13 @@
             </div>
             <div class="flex gap-2">
                 <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-templates', ['record'=>$draft->event_id])">Back to templates</x-filament::button>
+                @if (! empty($draft->definition['elements']))
+                    <x-filament::button color="gray" wire:click="downloadPreview" wire:loading.attr="disabled" wire:target="downloadPreview,saveDesign,imageUpload,uploadImage">Download saved PDF preview</x-filament::button>
+                @endif
                 <x-filament::button wire:click="saveDesign" wire:loading.attr="disabled" wire:target="saveDesign,imageUpload,uploadImage">Save draft</x-filament::button>
             </div>
         </div>
-        <p class="text-sm text-gray-500">Preview uses sample labels. The QR placeholder is not scannable and saving does not issue certificates.</p>
+        <p class="text-sm text-gray-500">Preview uses sample labels. Save changes before downloading a PDF preview. The QR placeholder is not scannable and saving does not issue certificates.</p>
         @if ($errors->any())
             <div class="text-sm text-danger-600">{{ $errors->first() }}</div>
         @endif
