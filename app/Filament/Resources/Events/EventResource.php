@@ -325,6 +325,7 @@ class EventResource extends Resource
 
             'workspace' => EventWorkspace::route('/{record}/workspace'),
 
+            'certificate-audit' => \App\Filament\Resources\Events\Pages\EventCertificateAuditHistory::route('/{record}/certificate-audit'),
             'certificate-report' => \App\Filament\Resources\Events\Pages\EventCertificateReport::route('/{record}/certificate-report'),
             'certificates' => \App\Filament\Resources\Events\Pages\EventCertificateManager::route('/{record}/certificates'),
             'certificate-settings' => \App\Filament\Resources\Events\Pages\EventCertificateSettings::route('/{record}/certificate-settings'),
