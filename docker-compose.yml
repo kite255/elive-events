@@ -63,6 +63,31 @@ services:
     networks:
       - elive_events_network
 
+  worker-certificates:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: elive_events_worker_certificates
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: >
+      php artisan queue:work redis
+      --queue=certificates
+      --sleep=2
+      --tries=5
+      --backoff=30
+      --timeout=60
+      --memory=256
+      --max-time=3600
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - elive_events_network
+
   scheduler:
     build:
       context: .
