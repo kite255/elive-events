@@ -21,7 +21,7 @@ class EventWorkspaceNavigation
         $route = request()->route();
         $name = $route?->getName();
 
-        if (in_array($name, ['filament.admin.resources.events.workspace', 'filament.admin.resources.events.edit', 'filament.admin.resources.events.finance', 'filament.admin.resources.events.financial-audit', 'filament.admin.resources.events.ticket-sales-report', 'filament.admin.resources.events.merchandise-sales-report', 'filament.admin.resources.events.performance-report'], true)) {
+        if (in_array($name, ['filament.admin.resources.events.workspace', 'filament.admin.resources.events.ticket-template-designer', 'filament.admin.resources.events.edit', 'filament.admin.resources.events.finance', 'filament.admin.resources.events.financial-audit', 'filament.admin.resources.events.ticket-sales-report', 'filament.admin.resources.events.merchandise-sales-report', 'filament.admin.resources.events.performance-report'], true)) {
             $record = $route->parameter('record');
             $id = $record instanceof Event ? $record->getKey() : $record;
         } elseif (in_array($name, ['filament.admin.pages.attendee-report', 'filament.admin.pages.attendance-report', 'filament.admin.pages.attendance-dashboard', 'filament.admin.pages.check-in-station', 'filament.admin.pages.communication-center', 'filament.admin.pages.badge-print-station', 'filament.admin.resources.attendees.index', 'filament.admin.resources.attendees.create', 'filament.admin.resources.attendees.import', 'filament.admin.resources.ticket-orders.index', 'filament.admin.resources.ticket-types.index', 'filament.admin.resources.ticket-types.create', 'filament.admin.resources.merchandise-products.index', 'filament.admin.resources.merchandise-products.create', 'filament.admin.resources.merchandise-orders.index'], true)) {
@@ -75,9 +75,9 @@ class EventWorkspaceNavigation
             foreach ($labels as $label) {
                 if ($link = $links->get($label)) {
                     $items[] = NavigationItem::make($label)->icon($link['icon'])->url($link['url'])
-                        ->isActiveWhen(fn (): bool => request()->url() === strtok($link['url'], '?')
+                        ->isActiveWhen(fn (): bool => ($name === 'filament.admin.resources.events.ticket-template-designer' && $label === 'Ticket templates') || (request()->url() === strtok($link['url'], '?')
                             && ($name !== 'filament.admin.resources.events.edit'
-                                || (string) request()->query('relation', '') === ($link['relation'] ?? '')));
+                                || (string) request()->query('relation', '') === ($link['relation'] ?? ''))));
                 }
             }
             if ($items !== []) {
