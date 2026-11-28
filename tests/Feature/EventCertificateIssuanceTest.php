@@ -358,6 +358,52 @@ class EventCertificateIssuanceTest extends TestCase
         $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $id, 'status' => 'failed', 'failure_code' => 'preflight_failed']);
     }
 
+    public function test_delivery_retry_dispatches_only_confirmed_preflight_failure(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        \Illuminate\Support\Facades\Storage::fake('local');
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['email' => 'recipient@example.com']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'email');
+        \Illuminate\Support\Facades\DB::table('event_certificate_deliveries')->where('id', $id)
+            ->update(['status' => 'failed', 'failure_code' => 'preflight_failed']);
+        app(\App\Services\EventCertificateDeliveryRetry::class)->retry($user, $event->id, $issued->id, 'email');
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $id, 'status' => 'queued', 'failure_code' => null]);
+        \Illuminate\Support\Facades\Bus::assertDispatchedTimes(\App\Jobs\DeliverEventCertificate::class, 1);
+        try {
+            app(\App\Services\EventCertificateDeliveryRetry::class)->retry($user, $event->id, $issued->id, 'email');
+            $this->fail('Duplicate retry unexpectedly accepted.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+        \Illuminate\Support\Facades\Bus::assertDispatchedTimes(\App\Jobs\DeliverEventCertificate::class, 1);
+    }
+
+    public function test_delivery_retry_rejects_uncertain_submission(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        \Illuminate\Support\Facades\Storage::fake('local');
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['email' => 'recipient@example.com']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'email');
+        \Illuminate\Support\Facades\DB::table('event_certificate_deliveries')->where('id', $id)
+            ->update(['status' => 'uncertain', 'failure_code' => 'submission_unconfirmed']);
+        try {
+            app(\App\Services\EventCertificateDeliveryRetry::class)->retry($user, $event->id, $issued->id, 'email');
+            $this->fail('Uncertain submission unexpectedly retried.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+        \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\DeliverEventCertificate::class);
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $id, 'status' => 'uncertain']);
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
