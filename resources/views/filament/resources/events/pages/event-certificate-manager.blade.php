@@ -23,6 +23,29 @@
             </x-filament::section>
         @endforeach
     </div>
+    @if ($revokingId)
+        <x-filament::section>
+            <x-slot name="heading">Revoke certificate</x-slot>
+            @php($revoking = $event->certificates()->whereKey($revokingId)->where('status', 'issued')->first())
+            @if ($revoking)
+                <p class="text-sm font-medium">{{ $revoking->issuance_snapshot['attendee_name'] ?? '' }} · {{ $revoking->certificate_number }}</p>
+                <p class="mt-2 text-sm text-gray-500">This permanently invalidates public verification. The original PDF and audit records are retained.</p>
+                <form wire:submit="revokeCertificate" class="mt-3 space-y-3">
+                    <label class="block text-sm">Reason for revocation
+                        <textarea wire:model="revocationReason" required minlength="10" maxlength="1000" rows="3" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900"></textarea>
+                        @error('revocationReason') <span class="text-danger-600">{{ $message }}</span> @enderror
+                    </label>
+                    <div class="flex justify-end gap-2">
+                        <x-filament::button type="button" color="gray" wire:click="cancelRevocation">Cancel</x-filament::button>
+                        <x-filament::button type="submit" color="danger" wire:confirm="Permanently revoke this certificate?" wire:loading.attr="disabled" wire:target="revokeCertificate">Revoke certificate</x-filament::button>
+                    </div>
+                </form>
+            @else
+                <p class="text-sm text-gray-500">This certificate is no longer available for revocation.</p>
+                <x-filament::button color="gray" wire:click="cancelRevocation">Close</x-filament::button>
+            @endif
+        </x-filament::section>
+    @endif
     @unless ($enabled)
         <p class="text-sm text-gray-500">Issuance is disabled for this event. Existing certificate records remain available.</p>
     @endunless
@@ -146,6 +169,7 @@
                                 <td class="p-3"><div class="flex flex-wrap gap-2">
                                     @if ($certificate->status === 'issued')
                                         <x-filament::button size="sm" wire:click="download({{ $certificate->id }})" wire:loading.attr="disabled" wire:target="download">Download</x-filament::button>
+                                        <x-filament::button size="sm" color="danger" wire:click="beginRevocation({{ $certificate->id }})">Revoke</x-filament::button>
                                     @endif
                                     @if (in_array($certificate->status, ['issued', 'revoked'], true))
                                         <x-filament::button size="sm" color="gray" tag="a" target="_blank" rel="noopener noreferrer" :href="route('public.certificates.verify', ['token' => $certificate->verification_token])">Verify</x-filament::button>
