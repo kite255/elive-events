@@ -27,6 +27,16 @@ use App\Models\Event;
 use App\Http\Controllers\PublicMerchandiseController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/c/{token}', function (string $token) {
+    $id = \Illuminate\Support\Facades\DB::table('event_certificate_download_tokens')
+        ->where('token_hash', hash('sha256', $token))->where('expires_at', '>', now())
+        ->value('event_certificate_id');
+    abort_unless($id, 404);
+
+    return app(\App\Http\Controllers\PublicCertificateDownloadController::class)((int) $id);
+})->where('token', '[A-Za-z0-9_-]{24}')
+    ->middleware('throttle:30,1')->name('public.certificates.short-download');
+
 Route::get('/certificates/download/{certificate}', \App\Http\Controllers\PublicCertificateDownloadController::class)
     ->whereNumber('certificate')
     ->middleware(['signed', 'throttle:30,1'])
