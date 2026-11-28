@@ -53,19 +53,29 @@
         </div>
         @if ($tab === 'eligible')
             @php($rows = $this->eligible())
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium">{{ count($selectedAttendees) }} selected</span>
+                <x-filament::button size="sm" color="gray" wire:click="selectVisible" :disabled="! $enabled">Select this page</x-filament::button>
+                <x-filament::button size="sm" color="gray" wire:click="clearSelection">Clear</x-filament::button>
+                <x-filament::button size="sm" :disabled="! $enabled || ! $templateId || ! count($selectedAttendees) || count($selectedAttendees) > 100" wire:click="issueSelected" wire:confirm="Queue {{ count($selectedAttendees) }} certificates using the selected template? No messages will be sent." wire:loading.attr="disabled" wire:target="issueSelected">Issue selected</x-filament::button>
+            </div>
+            @error('selectedAttendees') <p class="mt-2 text-sm text-danger-600">{{ $message }}</p> @enderror
+            @error('selectedAttendees.*') <p class="mt-2 text-sm text-danger-600">{{ $message }}</p> @enderror
+            <p class="mt-2 text-xs text-gray-500">Select up to 100 attendees. Selection persists across pages; selecting this page replaces the previous selection.</p>
             <p class="mt-3 text-sm text-gray-500">{{ $settings?->eligibility_rule === 'manual' ? 'Manual selection: confirm each recipient individually.' : 'Attendees matching the configured eligibility rule without an existing certificate.' }}</p>
             <div class="mt-3 overflow-x-auto">
                 <table class="w-full text-left text-sm">
-                    <thead><tr class="border-b border-gray-200 dark:border-gray-700"><th class="p-3">Attendee</th><th class="p-3">Registration status</th><th class="p-3">Actions</th></tr></thead>
+                    <thead><tr class="border-b border-gray-200 dark:border-gray-700"><th class="p-3">Select</th><th class="p-3">Attendee</th><th class="p-3">Registration status</th><th class="p-3">Actions</th></tr></thead>
                     <tbody>
                         @forelse ($rows as $attendee)
                             <tr wire:key="eligible-{{ $attendee->id }}" class="border-b border-gray-100 dark:border-gray-800">
+                                <td class="p-3"><input type="checkbox" wire:model.live="selectedAttendees" value="{{ $attendee->id }}" aria-label="Select {{ $attendee->full_name }}" class="rounded border-gray-300"></td>
                                 <td class="p-3 font-medium">{{ $attendee->full_name }}</td>
                                 <td class="p-3">{{ ucfirst(str_replace('_', ' ', $attendee->status)) }}</td>
                                 <td class="p-3"><x-filament::button size="sm" :disabled="! $enabled || ! $templateId" wire:click="issue({{ $attendee->id }})" wire:confirm="Issue a certificate to this attendee using the selected template?" wire:loading.attr="disabled" wire:target="issue">Issue</x-filament::button></td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="p-6 text-center text-gray-500">No eligible attendees found.</td></tr>
+                            <tr><td colspan="4" class="p-6 text-center text-gray-500">No eligible attendees found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
