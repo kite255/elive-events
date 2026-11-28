@@ -46,8 +46,12 @@ final class IssueEventCertificate implements ShouldQueue
             if (in_array($item->status, ['issued', 'skipped'], true)) {
                 return;
             }
-            \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('id', $this->batchItemId)
+            $claimed = \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('id', $this->batchItemId)
+                ->whereIn('status', ['queued', 'processing'])
                 ->update(['status' => 'processing', 'attempts' => \Illuminate\Support\Facades\DB::raw('attempts + 1'), 'failure_code' => null, 'updated_at' => now()]);
+            if (! $claimed) {
+                return;
+            }
         }
         $actor = User::query()->findOrFail($this->actorId);
         $event = $access->authorize($actor, $this->eventId);
