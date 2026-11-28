@@ -22,29 +22,29 @@ final class EventCertificateFinalization
         $disk = Storage::disk('local');
         $path = null;
 
-        try {
-            return DB::transaction(function () use ($access, $user, $eventId, $certificateId, $manualSelection, $disk, &$path): EventCertificate {
-                Event::query()->whereKey($eventId)->lockForUpdate()->firstOrFail();
-                $event = $access->authorize($user, $eventId);
-                $settings = $event->certificateSettings()->first();
-                abort_unless($settings?->enabled && ! $event->isCancelled(), 422, 'Certificates are unavailable for this event.');
-                $certificate = $event->certificates()->whereKey($certificateId)->lockForUpdate()->firstOrFail();
-                abort_unless($certificate->status === EventCertificate::STATUS_PENDING && ! $certificate->pdf_path && ! $certificate->issued_at, 422, 'Only pending certificates can be finalized.');
-                $event->certificateTemplates()->whereKey($certificate->event_certificate_template_id)
-                    ->where('is_active', true)->lockForUpdate()->firstOrFail();
-                $attendee = $access->eligibleAttendees($user, $eventId, $manualSelection ? [$certificate->attendee_id] : [])
-                    ->whereKey($certificate->attendee_id)->lockForUpdate()->firstOrFail();
-                $snapshot = $certificate->issuance_snapshot;
-                abort_unless($snapshot['attendee_name'] === $attendee->full_name
-                    && $snapshot['eligibility_rule'] === $settings->eligibility_rule, 422, 'Attendee name or eligibility settings changed after preparation. Review the pending record.');
-                $issuedAt = now();
-                $pdf = app(EventCertificatePdf::class)->render($certificate, $issuedAt);
-                $path = 'certificates/event-'.$eventId.'/certificate-'.$certificate->id.'/'.Str::uuid().'.pdf';
-                abort_unless($disk->put($path, $pdf, 'private'), 503, 'Certificate storage failed.');
-                $stored = $disk->get($path);
-                $hash = hash('sha256', $pdf);
-                abort_unless(is_string($stored) && hash_equals($hash, hash('sha256', $stored)), 503, 'Certificate storage integrity check failed.');
+        // Render the immutable pending snapshot before taking the event-wide lock.
+        // Revalidate all mutable eligibility and authorization conditions at commit.
+        $candidate = $this->validatedCandidate($user, $eventId, $certificateId, $manualSelection, false);
+        $issuedAt = now();
+        $pdf = app(EventCertificatePdf::class)->render($candidate, $issuedAt);
+        $hash = hash('sha256', $pdf);
 
+        try {
+            $path = 'certificates/event-'.$eventId.'/certificate-'.$candidate->id.'/'.Str::uuid().'.pdf';
+            abort_unless($disk->put($path, $pdf, 'private'), 503, 'Certificate storage failed.');
+            $stored = $disk->get($path);
+            abort_unless(is_string($stored) && hash_equals($hash, hash('sha256', $stored)), 503, 'Certificate storage integrity check failed.');
+            unset($pdf, $stored);
+
+            return DB::transaction(function () use ($user, $eventId, $certificateId, $manualSelection, $candidate, $issuedAt, $hash, $path): EventCertificate {
+                $certificate = $this->validatedCandidate($user, $eventId, $certificateId, $manualSelection, true);
+                abort_unless($certificate->issuance_snapshot === $candidate->issuance_snapshot
+                    && $certificate->certificate_number === $candidate->certificate_number
+                    && $certificate->verification_token === $candidate->verification_token
+                    && (int) $certificate->attendee_id === (int) $candidate->attendee_id
+                    && (int) $certificate->event_certificate_template_id === (int) $candidate->event_certificate_template_id,
+                    422, 'Certificate snapshot changed during rendering.');
+                abort_unless($issuedAt->toDateString() === now()->toDateString(), 422, 'Issuance date changed during rendering. Retry.');
                 $certificate->forceFill([
                     'pdf_path' => $path,
                     'status' => EventCertificate::STATUS_ISSUED,
@@ -56,7 +56,7 @@ final class EventCertificateFinalization
                     'event_certificate_id' => $certificate->id,
                     'actor_id' => $user->id,
                     'action' => 'issued',
-                    'metadata' => ['pdf_sha256' => $hash, 'eligibility_rule' => $settings->eligibility_rule, 'manual_selection' => $manualSelection],
+                    'metadata' => ['pdf_sha256' => $hash, 'eligibility_rule' => $certificate->issuance_snapshot['eligibility_rule'], 'manual_selection' => $manualSelection],
                 ])->save();
 
                 return $certificate;
@@ -75,4 +75,31 @@ final class EventCertificateFinalization
             throw $exception;
         }
     }
+
+    private function validatedCandidate(User $user, int $eventId, int $certificateId, bool $manualSelection, bool $lock): EventCertificate
+    {
+        $access = app(EventCertificateAccess::class);
+        if ($lock) {
+            Event::query()->whereKey($eventId)->lockForUpdate()->firstOrFail();
+        }
+        // Reload the actor so role changes during PDF rendering are respected.
+        $user = User::query()->findOrFail($user->id);
+        $event = $access->authorize($user, $eventId);
+        $settings = $event->certificateSettings()->first();
+        abort_unless($settings?->enabled && ! $event->isCancelled(), 422, 'Certificates are unavailable for this event.');
+        $query = $event->certificates()->whereKey($certificateId);
+        $certificate = ($lock ? $query->lockForUpdate() : $query)->firstOrFail();
+        abort_unless($certificate->status === EventCertificate::STATUS_PENDING && ! $certificate->pdf_path && ! $certificate->issued_at, 422, 'Only pending certificates can be finalized.');
+        $template = $event->certificateTemplates()->whereKey($certificate->event_certificate_template_id)->where('is_active', true);
+        ($lock ? $template->lockForUpdate() : $template)->firstOrFail();
+        $attendee = $access->eligibleAttendees($user, $eventId, $manualSelection ? [$certificate->attendee_id] : [])
+            ->whereKey($certificate->attendee_id);
+        $attendee = ($lock ? $attendee->lockForUpdate() : $attendee)->firstOrFail();
+        $snapshot = $certificate->issuance_snapshot;
+        abort_unless($snapshot['attendee_name'] === $attendee->full_name
+            && $snapshot['eligibility_rule'] === $settings->eligibility_rule, 422, 'Attendee name or eligibility settings changed after preparation. Review the pending record.');
+
+        return $certificate;
+    }
+
 }
