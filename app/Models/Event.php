@@ -1932,4 +1932,24 @@ class Event extends Model
         return (bool)
             $this->show_merchandise_images;
     }
+
+    public function certificateSettings(): HasOne
+    {
+        return $this->hasOne(EventCertificateSetting::class);
+    }
+
+    public function certificateTemplates(): HasMany
+    {
+        return $this->hasMany(EventCertificateTemplate::class);
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(EventCertificate::class);
+    }
+
+    public function certificatesAreEnabled(): bool
+    {
+        return (bool) $this->certificateSettings?->enabled;
+    }
 }
