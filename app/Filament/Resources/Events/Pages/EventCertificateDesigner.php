@@ -127,6 +127,19 @@ class EventCertificateDesigner extends Page
         Notification::make()->title('Certificate image uploaded')->success()->send();
     }
 
+    public function downloadPreview(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->draft();
+        $user = auth()->user();
+        abort_unless($user instanceof User, 403);
+        $bytes = app(\App\Services\EventCertificatePreviewPdf::class)->render($user, $this->eventId, $this->templateId);
+
+        return response()->streamDownload(fn () => print($bytes), 'certificate-sample-'.$this->templateId.'.pdf', [
+            'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
     public function saveDesign(): void
     {
         $this->draft();
