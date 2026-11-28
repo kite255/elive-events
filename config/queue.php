@@ -15,6 +15,8 @@ return [
 
     'default' => env('QUEUE_CONNECTION', 'database'),
 
+    'certificate_queue' => env('CERTIFICATE_QUEUE', 'default'),
+
     /*
     |--------------------------------------------------------------------------
     | Queue Connections
