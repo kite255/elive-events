@@ -30,8 +30,31 @@ final class EventCertificateBulkIssuance
 
         $connection = config('queue.default');
         abort_unless(in_array(config('queue.connections.'.$connection.'.driver'), ['database', 'redis'], true), 503, 'Bulk issuance requires an asynchronous queue connection.');
-        foreach ($ids as $id) {
-            IssueEventCertificate::dispatch($user->id, $eventId, (int) $id, $templateId, $settings->eligibility_rule)->afterCommit();
+        $items = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $eventId, $templateId, $settings, $ids): array {
+            $now = now();
+            $batchId = \Illuminate\Support\Facades\DB::table('event_certificate_batches')->insertGetId([
+                'event_id' => $eventId, 'event_certificate_template_id' => $templateId,
+                'actor_id' => $user->id, 'eligibility_rule' => $settings->eligibility_rule,
+                'created_at' => $now, 'updated_at' => $now,
+            ]);
+            $items = [];
+            foreach ($ids as $id) {
+                $items[(int) $id] = \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->insertGetId([
+                    'event_certificate_batch_id' => $batchId, 'attendee_id' => $id,
+                    'status' => 'queued', 'created_at' => $now, 'updated_at' => $now,
+                ]);
+            }
+            return $items;
+        });
+
+        foreach ($items as $id => $itemId) {
+            try {
+                IssueEventCertificate::dispatch($user->id, $eventId, $id, $templateId, $settings->eligibility_rule, $itemId)->afterCommit();
+            } catch (\Throwable $exception) {
+                report($exception);
+                \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('id', $itemId)
+                    ->where('status', 'queued')->update(['status' => 'failed', 'failure_code' => 'dispatch_failed', 'updated_at' => now()]);
+            }
         }
 
         return count($ids);
