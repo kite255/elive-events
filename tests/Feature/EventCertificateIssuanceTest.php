@@ -70,6 +70,51 @@ class EventCertificateIssuanceTest extends TestCase
         $this->assertNull($certificate->fresh()->issued_at);
     }
 
+    public function test_finalization_stores_pdf_and_enables_public_verification(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $url = route('public.certificates.verify', ['token' => $certificate->verification_token]);
+        $this->get($url)->assertNotFound();
+
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $this->assertSame(EventCertificate::STATUS_ISSUED, $issued->status);
+        $this->assertEquals($user->id, $issued->issued_by);
+        $this->assertNotNull($issued->issued_at);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($issued->pdf_path);
+        $this->assertStringStartsWith('%PDF-', \Illuminate\Support\Facades\Storage::disk('local')->get($issued->pdf_path));
+        $this->assertDatabaseHas('event_certificate_audits', ['event_certificate_id' => $issued->id, 'action' => 'issued']);
+        $this->get($url)->assertOk()->assertSee('Valid certificate')->assertSee('Test Attendee');
+    }
+
+    public function test_failed_render_leaves_certificate_pending(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        config(['app.url' => 'invalid']);
+        try {
+            app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+            $this->fail('Invalid URL unexpectedly finalized.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+        $this->assertSame(EventCertificate::STATUS_PENDING, $certificate->fresh()->status);
+        $this->assertNull($certificate->fresh()->pdf_path);
+        $this->assertDatabaseMissing('event_certificate_audits', ['event_certificate_id' => $certificate->id, 'action' => 'issued']);
+        $this->assertSame([], \Illuminate\Support\Facades\Storage::disk('local')->allFiles('certificates'));
+    }
+
+    public function test_changed_eligibility_blocks_finalization(): void
+    {
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $attendee->update(['status' => 'cancelled']);
+        $this->expectException(ModelNotFoundException::class);
+        app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
