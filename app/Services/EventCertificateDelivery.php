@@ -33,7 +33,7 @@ final class EventCertificateDelivery
                 Validator::make(['recipient' => $recipient], ['recipient' => ['required', 'email:rfc', 'max:254']])->validate();
             } else {
                 // Conservative initial scope: Tanzanian mobile numbers only.
-                $recipient = ltrim($recipient, '+');
+                $recipient = app(SmsService::class)->normalizeRecipient($recipient);
                 abort_unless(preg_match('/^255[67][0-9]{8}$/D', $recipient), 422, 'A valid Tanzanian mobile number is required.');
             }
             if (DB::table('event_certificate_deliveries')->where('event_certificate_id', $certificateId)->where('channel', $channel)->exists()) {
