@@ -75,9 +75,9 @@ class EventWorkspace extends Page
                 'url' => EventResource::getUrl('edit', ['record' => $event]),
             ];
             $links[] = [
-                'label' => 'Certificate settings',
+                'label' => 'Certificates',
                 'icon' => 'heroicon-o-academic-cap',
-                'url' => EventResource::getUrl('certificate-settings', ['record' => $event]),
+                'url' => EventResource::getUrl('certificates', ['record' => $event]),
             ];
         }
 
