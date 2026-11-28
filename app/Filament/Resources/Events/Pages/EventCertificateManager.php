@@ -221,6 +221,42 @@ class EventCertificateManager extends Page
         }
     }
 
+    #[Locked]
+    public ?int $revokingId = null;
+
+    public string $revocationReason = '';
+
+    public function beginRevocation(int $id): void
+    {
+        $certificate = $this->event()->certificates()->whereKey($id)
+            ->where('status', EventCertificate::STATUS_ISSUED)->firstOrFail();
+        $this->resetValidation();
+        $this->revokingId = $certificate->id;
+        $this->revocationReason = '';
+    }
+
+    public function cancelRevocation(): void
+    {
+        $this->event();
+        $this->revokingId = null;
+        $this->revocationReason = '';
+        $this->resetValidation();
+    }
+
+    public function revokeCertificate(): void
+    {
+        $this->event();
+        abort_unless($this->revokingId, 422);
+        $this->revocationReason = trim($this->revocationReason);
+        $this->validate(['revocationReason' => ['required', 'string', 'min:10', 'max:1000']]);
+        app(\App\Services\EventCertificateRevocation::class)->revoke(
+            $this->user(), $this->eventId, $this->revokingId, $this->revocationReason
+        );
+        $this->cancelRevocation();
+        Notification::make()->title('Certificate revoked')
+            ->body('Public verification now identifies this certificate as revoked.')->success()->send();
+    }
+
     public function download(int $id): StreamedResponse
     {
         $certificate = $this->event()->certificates()->whereKey($id)
