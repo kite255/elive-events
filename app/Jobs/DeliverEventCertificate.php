@@ -55,7 +55,8 @@ final class DeliverEventCertificate implements ShouldQueue
             $audit = $certificate->audits()->where('action', 'issued')->latest('id')->first();
             $bytes = $disk->get($path);
             abort_unless(is_string($bytes) && hash_equals($audit?->metadata['pdf_sha256'] ?? '', hash('sha256', $bytes)), 422);
-            $downloadUrl = app(EventCertificateDownloadLink::class)->generate($certificate);
+            $links = app(EventCertificateDownloadLink::class);
+            $downloadUrl = $delivery->channel === 'sms' ? $links->short($certificate) : $links->generate($certificate);
             $snapshot = $certificate->issuance_snapshot;
             $reference = null;
             if ($delivery->channel === 'email') {
