@@ -30,7 +30,58 @@
         <div class="flex flex-wrap items-center gap-2">
             <x-filament::button :color="$tab === 'records' ? 'primary' : 'gray'" wire:click="switchTab('records')">Certificate records</x-filament::button>
             <x-filament::button :color="$tab === 'eligible' ? 'primary' : 'gray'" wire:click="switchTab('eligible')">Eligible attendees</x-filament::button>
+            <x-filament::button :color="$tab === 'batches' ? 'primary' : 'gray'" wire:click="switchTab('batches')">Issuance batches</x-filament::button>
         </div>
+        @if ($tab === 'batches')
+            <div class="mt-4 space-y-3">
+                @php($batches = $this->batches())
+                @php($batchCounts = $this->batchCounts($batches->pluck('id')->all()))
+                <div class="flex justify-end"><x-filament::button size="sm" color="gray" wire:click="$refresh">Refresh</x-filament::button></div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead><tr class="border-b border-gray-200 dark:border-gray-700">
+                            <th class="p-2">Batch / Template</th><th class="p-2">Total</th><th class="p-2">Queued</th><th class="p-2">Processing</th><th class="p-2">Issued</th><th class="p-2">Failed</th><th class="p-2">Skipped</th><th class="p-2">Actions</th>
+                        </tr></thead>
+                        <tbody>
+                            @forelse ($batches as $batch)
+                                @php($counts = $batchCounts[$batch->id] ?? [])
+                                <tr wire:key="batch-{{ $batch->id }}" class="border-b border-gray-100 dark:border-gray-800">
+                                    <td class="p-2"><div class="font-medium">#{{ $batch->id }} · {{ $batch->template_name }}</div><div class="text-xs text-gray-500">{{ $batch->created_at }}</div></td>
+                                    <td class="p-2">{{ array_sum($counts) }}</td>
+                                    @foreach (['queued', 'processing', 'issued', 'failed', 'skipped'] as $key)
+                                        <td class="p-2">{{ $counts[$key] ?? 0 }}</td>
+                                    @endforeach
+                                    <td class="p-2"><div class="flex flex-wrap gap-2">
+                                        <x-filament::button size="sm" color="gray" wire:click="viewBatch({{ $batch->id }})">Details</x-filament::button>
+                                        @if ($enabled && ($counts['failed'] ?? 0) && (int) $batch->actor_id === (int) auth()->id())
+                                            <x-filament::button size="sm" wire:click="retryBatch({{ $batch->id }})" wire:confirm="Retry failed recipients in this batch? No messages will be sent." wire:loading.attr="disabled" wire:target="retryBatch">Retry failed</x-filament::button>
+                                        @endif
+                                    </div></td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="8" class="p-6 text-center text-gray-500">No issuance batches found.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                {{ $batches->links() }}
+                @if ($viewBatchId)
+                    <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                        <h3 class="font-semibold">Batch #{{ $viewBatchId }} recipients</h3>
+                        <div class="mt-2 max-h-96 overflow-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead><tr><th class="p-2">Attendee</th><th class="p-2">Status</th><th class="p-2">Attempts</th><th class="p-2">Failure</th></tr></thead>
+                                <tbody>
+                                    @foreach ($this->batchDetails() as $item)
+                                        <tr class="border-t border-gray-100 dark:border-gray-800"><td class="p-2">{{ $item->full_name }}</td><td class="p-2">{{ ucfirst($item->status) }}</td><td class="p-2">{{ $item->attempts }}</td><td class="p-2">{{ $item->failure_code ? ucfirst(str_replace('_', ' ', $item->failure_code)) : '—' }}</td></tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        @else
         <div class="mt-4 flex flex-wrap items-end gap-3">
             <label class="block flex-1 text-sm">Search
                 <input type="search" wire:model.live.debounce.400ms="search" maxlength="100" placeholder="Attendee name or certificate number" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900">
@@ -112,5 +163,6 @@
             </div>
         @endif
         <div class="mt-3">{{ $rows->links() }}</div>
+        @endif
     </x-filament::section>
 </x-filament-panels::page>
