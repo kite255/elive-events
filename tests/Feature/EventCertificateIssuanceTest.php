@@ -543,6 +543,63 @@ class EventCertificateIssuanceTest extends TestCase
         $this->get($active)->assertOk();
     }
 
+    public function test_finalization_rechecks_eligibility_after_rendering_and_removes_uncommitted_pdf(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $renderer = app(\App\Services\EventCertificatePdf::class);
+        // Mock the final renderer through its container binding using a proxy.
+        $this->app->instance(\App\Services\EventCertificatePdf::class, new class($renderer, $attendee) {
+            public function __construct(private $renderer, private Attendee $attendee) {}
+            public function render(EventCertificate $certificate, \DateTimeInterface $issuedAt): string
+            {
+                $bytes = $this->renderer->render($certificate, $issuedAt);
+                $this->attendee->update(['status' => 'cancelled']);
+                return $bytes;
+            }
+        });
+        try {
+            app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+            $this->fail('Changed eligibility unexpectedly accepted.');
+        } catch (ModelNotFoundException $exception) {
+            $this->assertSame(EventCertificate::STATUS_PENDING, $certificate->fresh()->status);
+        }
+        $this->assertNull($certificate->fresh()->pdf_path);
+        $this->assertDatabaseMissing('event_certificate_audits', ['event_certificate_id' => $certificate->id, 'action' => 'issued']);
+        $this->assertSame([], \Illuminate\Support\Facades\Storage::disk('local')->allFiles('certificates'));
+    }
+
+    public function test_competing_finalization_preserves_winning_pdf_and_single_issuance_audit(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $renderer = app(\App\Services\EventCertificatePdf::class);
+        $this->app->instance(\App\Services\EventCertificatePdf::class, new class($renderer, $user, $event) {
+            public function __construct(private $renderer, private User $user, private Event $event) {}
+            public function render(EventCertificate $certificate, \DateTimeInterface $issuedAt): string
+            {
+                $bytes = $this->renderer->render($certificate, $issuedAt);
+                app()->instance(\App\Services\EventCertificatePdf::class, $this->renderer);
+                app(\App\Services\EventCertificateFinalization::class)->finalize($this->user, $this->event->id, $certificate->id);
+                return $bytes;
+            }
+        });
+        try {
+            app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+            $this->fail('Competing finalization unexpectedly accepted.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+        $issued = $certificate->fresh();
+        $this->assertSame(EventCertificate::STATUS_ISSUED, $issued->status);
+        $this->assertDatabaseCount('event_certificates', 1);
+        $this->assertSame(1, $issued->audits()->where('action', 'issued')->count());
+        $this->assertSame([$issued->pdf_path], \Illuminate\Support\Facades\Storage::disk('local')->allFiles('certificates'));
+        $this->assertStringStartsWith('%PDF-', \Illuminate\Support\Facades\Storage::disk('local')->get($issued->pdf_path));
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
