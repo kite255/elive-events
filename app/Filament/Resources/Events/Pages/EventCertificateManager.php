@@ -32,6 +32,8 @@ class EventCertificateManager extends Page
     public string $status = '';
     public ?int $templateId = null;
     public array $selectedAttendees = [];
+    #[Locked]
+    public ?int $viewBatchId = null;
 
     public function mount(int|string $record): void
     {
@@ -59,11 +61,64 @@ class EventCertificateManager extends Page
     public function switchTab(string $tab): void
     {
         $this->event();
-        abort_unless(in_array($tab, ['records', 'eligible'], true), 422);
+        abort_unless(in_array($tab, ['records', 'eligible', 'batches'], true), 422);
         $this->tab = $tab;
+        $this->viewBatchId = null;
         $this->selectedAttendees = [];
         $this->search = '';
         $this->resetPage();
+    }
+
+    public function batches()
+    {
+        $event = $this->event();
+        return \Illuminate\Support\Facades\DB::table('event_certificate_batches as batch')
+            ->join('event_certificate_templates as template', 'template.id', '=', 'batch.event_certificate_template_id')
+            ->where('batch.event_id', $event->id)->where('template.event_id', $event->id)
+            ->select('batch.*', 'template.name as template_name')
+            ->orderByDesc('batch.id')->paginate(10);
+    }
+
+    public function batchCounts(array $ids): array
+    {
+        $event = $this->event();
+        return \Illuminate\Support\Facades\DB::table('event_certificate_batch_items as item')
+            ->join('event_certificate_batches as batch', 'batch.id', '=', 'item.event_certificate_batch_id')
+            ->where('batch.event_id', $event->id)->whereIn('batch.id', array_slice($ids, 0, 10))
+            ->selectRaw('item.event_certificate_batch_id, item.status, count(*) as total')
+            ->groupBy('item.event_certificate_batch_id', 'item.status')->get()
+            ->groupBy('event_certificate_batch_id')->map(fn ($rows) => $rows->pluck('total', 'status')->all())->all();
+    }
+
+    public function viewBatch(int $id): void
+    {
+        $event = $this->event();
+        abort_unless(\Illuminate\Support\Facades\DB::table('event_certificate_batches')->where('event_id', $event->id)->where('id', $id)->exists(), 404);
+        $this->viewBatchId = $id;
+    }
+
+    public function batchDetails()
+    {
+        $event = $this->event();
+        return \Illuminate\Support\Facades\DB::table('event_certificate_batch_items as item')
+            ->join('event_certificate_batches as batch', 'batch.id', '=', 'item.event_certificate_batch_id')
+            ->join('attendees as attendee', 'attendee.id', '=', 'item.attendee_id')
+            ->where('batch.event_id', $event->id)->where('attendee.event_id', $event->id)
+            ->where('batch.id', $this->viewBatchId)
+            ->select('item.status', 'item.attempts', 'item.failure_code', 'attendee.full_name')
+            ->orderBy('item.id')->limit(100)->get();
+    }
+
+    public function retryBatch(int $id): void
+    {
+        $this->event();
+        try {
+            $count = app(\App\Services\EventCertificateBatchRetry::class)->retry($this->user(), $this->eventId, $id);
+            Notification::make()->title($count.' failed recipients resubmitted')->success()->send();
+        } catch (Throwable $exception) {
+            report($exception);
+            Notification::make()->title('Retry unavailable')->body('Check batch ownership, eligibility settings and queue configuration.')->danger()->send();
+        }
     }
 
     public function records()
@@ -126,8 +181,9 @@ class EventCertificateManager extends Page
                 $this->user(), $this->eventId, $this->templateId, $this->selectedAttendees
             );
             $this->selectedAttendees = [];
-            Notification::make()->title($count.' certificate jobs submitted')
-                ->body('Check certificate records as processing completes. No messages were sent.')->success()->send();
+            $this->switchTab('batches');
+            Notification::make()->title($count.' certificate recipients recorded')
+                ->body('Check issuance batches for queued and failed recipients. No messages were sent.')->success()->send();
         } catch (\Illuminate\Validation\ValidationException $exception) {
             Notification::make()->title('Selection is no longer valid')
                 ->body(collect($exception->errors())->flatten()->first())->danger()->send();
