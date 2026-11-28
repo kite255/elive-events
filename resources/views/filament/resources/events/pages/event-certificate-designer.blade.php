@@ -1,5 +1,6 @@
 <x-filament-panels::page>
     @php($draft = $this->draft())
+    @php($images = $this->imagePreviews())
     <div x-data="{
         elements: $wire.entangle('elements'),
         width: @js($draft->width),
@@ -7,11 +8,18 @@
         selected: null,
         backgroundColor: $wire.entangle('backgroundColor'),
         drag: null,
+        addImage(id,w,h,kind) {
+            if (this.elements.length >= 50) return;
+            const scale=Math.min(this.width/w,this.height/h,kind==='background'?1:Math.min(1,220/w,160/h));
+            const el={type:'image',asset_id:Number(id),text:'',x:0,y:0,width:Math.max(20,Math.round(w*scale)),height:Math.max(20,Math.round(h*scale)),font_size:32,color:'#161943',font_family:'brand',font_weight:400,font_style:'normal',text_align:'center',line_height:1.2};
+            if (kind==='background') { el.width=this.width; el.height=this.height; this.elements.unshift(el); this.selected=0; }
+            else { this.elements.push(el); this.selected=this.elements.length-1; }
+        },
         fonts: {brand:'inherit',sans:'Arial, sans-serif',serif:'Georgia, serif',mono:'monospace'},
         selectElement(i) {
             this.selected=i;
             const el=this.elements[i];
-            if (el.type==='qr') return;
+            if (el.type==='qr' || el.type==='image') return;
             el.font_family ??= 'brand'; el.font_weight ??= 400; el.font_style ??= 'normal'; el.text_align ??= 'left'; el.line_height ??= 1.2;
         },
         labels: {text:'Custom text',attendee_name:'Attendee name',event_name:'Event name',event_date:'Event date',organization_name:'Organization name',certificate_number:'Certificate number',issued_date:'Issue date',qr:'QR placeholder'},
@@ -44,7 +52,7 @@
             </div>
             <div class="flex gap-2">
                 <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-templates', ['record'=>$draft->event_id])">Back to templates</x-filament::button>
-                <x-filament::button wire:click="saveDesign" wire:loading.attr="disabled" wire:target="saveDesign">Save draft</x-filament::button>
+                <x-filament::button wire:click="saveDesign" wire:loading.attr="disabled" wire:target="saveDesign,imageUpload,uploadImage">Save draft</x-filament::button>
             </div>
         </div>
         <p class="text-sm text-gray-500">Preview uses sample labels. The QR placeholder is not scannable and saving does not issue certificates.</p>
@@ -60,6 +68,22 @@
                     </label>
                     <p class="text-xs text-gray-500">Add an element, then drag it into position or adjust its properties.</p>
                 </div>
+                <div class="mb-4 space-y-2">
+                    <label class="block text-sm font-medium">Images and signatures</label>
+                    <select wire:model="imageKind" class="w-full rounded-lg border-gray-300 text-sm dark:bg-gray-900">
+                        <option value="background">Background</option><option value="logo">Logo</option><option value="signature">Signature</option><option value="stamp">Stamp</option><option value="image">Image</option>
+                    </select>
+                    <input type="file" wire:model="imageUpload" accept="image/png,image/jpeg" class="block w-full text-sm">
+                    @error('imageUpload') <p class="text-sm text-danger-600">{{ $message }}</p> @enderror
+                    <x-filament::button size="sm" wire:click="uploadImage" wire:loading.attr="disabled" wire:target="imageUpload,uploadImage">Upload image</x-filament::button>
+                    <p class="text-xs text-gray-500">PNG or JPG, up to 2 MB. Select an uploaded asset to add it to the canvas.</p>
+                    @foreach ($images as $id => $image)
+                        <button type="button" wire:key="certificate-asset-{{ $id }}" class="flex w-full items-center gap-2 rounded-lg border border-gray-300 p-2 text-left text-sm dark:border-gray-700" x-on:click="addImage(@js($id), @js($image['width']), @js($image['height']), @js($image['kind']))">
+                            <img src="{{ $image['src'] }}" alt="" class="h-8 w-8 object-contain">
+                            <span>{{ ucfirst($image['kind']) }} #{{ $id }}</span>
+                        </button>
+                    @endforeach
+                </div>
                 <div class="grid gap-2">
                     <template x-for="(label,type) in labels" :key="type">
                         <button type="button" class="rounded-lg border border-gray-300 p-2 text-left text-sm dark:border-gray-700" x-on:click="add(type)" x-text="'Add '+label"></button>
@@ -71,7 +95,10 @@
                     <div x-ref="canvas" class="relative overflow-hidden bg-white shadow-sm" :style="{aspectRatio:width+'/'+height,backgroundColor:backgroundColor}" style="container-type:inline-size">
                         <template x-for="(el,i) in elements" :key="i">
                             <div class="absolute cursor-move overflow-hidden select-none border" :class="selected===i?'border-blue-500':'border-transparent'" style="touch-action:none" tabindex="0" x-on:focus="selectElement(i)" :style="{left:(el.x/width*100)+'%',top:(el.y/height*100)+'%',width:(el.width/width*100)+'%',height:(el.height/height*100)+'%',fontSize:(el.font_size/width*100)+'cqw',color:el.color,fontFamily:fonts[el.font_family] || fonts.brand,fontWeight:el.font_weight || 400,fontStyle:el.font_style || 'normal',textAlign:el.text_align || 'left',lineHeight:el.line_height || 1.2,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}" x-on:pointerdown.prevent="start($event,i)" x-on:pointermove="move($event)" x-on:pointerup="drag=null" x-on:pointercancel="drag=null">
-                                <span x-show="el.type!=='qr'" x-text="el.type==='text'?el.text:labels[el.type]"></span>
+                                <span x-show="el.type!=='qr' && el.type!=='image'" x-text="el.type==='text'?el.text:labels[el.type]"></span>
+                                @foreach ($images as $id => $image)
+                                    <img x-show="el.type==='image' && Number(el.asset_id)===@js($id)" src="{{ $image['src'] }}" alt="" draggable="false" class="pointer-events-none h-full w-full object-contain">
+                                @endforeach
                                 <span x-show="el.type==='qr'" class="flex h-full items-center justify-center border border-dashed border-gray-600 text-xs">QR placeholder</span>
                             </div>
                         </template>
@@ -89,7 +116,7 @@
                                 <label class="block text-sm"><span x-text="field.replace('_',' ')"></span><input type="number" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900" x-model.number="elements[selected][field]"></label>
                             </template>
                         </div>
-                        <div x-show="elements[selected].type!=='qr'" class="space-y-2">
+                        <div x-show="!['qr','image'].includes(elements[selected].type)" class="space-y-2">
                             <label class="block text-sm">Font family
                                 <select x-model="elements[selected].font_family" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:bg-gray-900">
                                     <option value="brand">Brand / panel font</option><option value="sans">Sans serif</option><option value="serif">Serif</option><option value="mono">Monospace</option>
