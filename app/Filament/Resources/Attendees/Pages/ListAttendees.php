@@ -54,6 +54,11 @@ class ListAttendees extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            \Filament\Actions\Action::make('import_attendees')
+                ->label('Import attendees')->icon('heroicon-o-arrow-up-tray')
+                ->url(fn (): string => AttendeeResource::getUrl('import', $this->workspaceEventId === null ? [] : ['event_id' => $this->workspaceEventId]))
+                ->visible(fn (): bool => AttendeeResource::canImport() && ($this->workspaceEventId === null
+                    || \App\Models\Event::query()->find($this->workspaceEventId)?->canManageRegistrationBy(auth()->user()))),
             CreateAction::make()
                 ->url(fn (): string => AttendeeResource::getUrl('create', $this->workspaceEventId === null ? [] : ['event_id' => $this->workspaceEventId]))
                 ->visible(fn (): bool => AttendeeResource::canCreate() && ($this->workspaceEventId === null
