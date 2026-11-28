@@ -924,6 +924,7 @@
 
                                 <select
                                     wire:model.live="eventId"
+                                    @disabled($workspaceEventId !== null)
                                     class="elive-select"
                                 >
                                     <option value="">
@@ -1498,7 +1499,7 @@
                         </h2>
 
                         <p class="elive-card-description">
-                            Latest Email, SMS, and WhatsApp campaigns for events you manage.
+                            {{ $workspaceEventId !== null ? 'Latest campaigns for this event.' : 'Latest campaigns for events you manage.' }}
                         </p>
 
                     </div>
