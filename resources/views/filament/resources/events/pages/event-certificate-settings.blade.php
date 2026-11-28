@@ -5,7 +5,7 @@
             <h2 class="text-lg font-semibold">{{ $event->name }}</h2>
             <p class="text-sm text-gray-500">Manage certificate availability and eligibility for this event.</p>
         </div>
-        <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('workspace', ['record' => $event])">Back to event</x-filament::button>
+        <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificates', ['record' => $event])">Certificates</x-filament::button>
         <x-filament::button tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-templates', ['record' => $event])">Certificate templates</x-filament::button>
     </div>
 
