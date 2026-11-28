@@ -268,9 +268,13 @@ class EventCertificateManager extends Page
             ->join('event_certificates as certificate', 'certificate.id', '=', 'delivery.event_certificate_id')
             ->where('certificate.event_id', $event->id)
             ->whereIn('certificate.id', array_slice($ids, 0, 15))
-            ->select('delivery.event_certificate_id', 'delivery.channel', 'delivery.status')
+            ->select('delivery.event_certificate_id', 'delivery.channel', 'delivery.status', 'delivery.actor_id', 'delivery.failure_code', 'delivery.submitted_at', 'delivery.provider_reference')
             ->get()->groupBy('event_certificate_id')
-            ->map(fn ($rows) => $rows->pluck('status', 'channel')->all())->all();
+            ->map(fn ($rows) => $rows->mapWithKeys(fn ($row) => [$row->channel => [
+                'status' => $row->status,
+                'retryable' => (int) $row->actor_id === (int) $this->user()->id && $row->status === 'failed'
+                    && $row->failure_code === 'preflight_failed' && $row->submitted_at === null && $row->provider_reference === null,
+            ]])->all())->all();
     }
 
     public function selectDeliveryPage(): void
@@ -315,6 +319,18 @@ class EventCertificateManager extends Page
         Notification::make()->title($queued.' queued; '.$blocked.' not confirmed')
             ->body('Review channel statuses. Existing delivery records are never automatically resent.')
             ->color($blocked ? 'warning' : 'success')->send();
+    }
+
+    public function retryDelivery(int $id, string $channel): void
+    {
+        $this->event();
+        try {
+            app(\App\Services\EventCertificateDeliveryRetry::class)->retry($this->user(), $this->eventId, $id, $channel);
+            Notification::make()->title('Certificate delivery queued again')->success()->send();
+        } catch (Throwable $exception) {
+            Notification::make()->title('Retry unavailable')
+                ->body('Only your own confirmed pre-submission failures can be retried. Review the original contact and delivery status.')->danger()->send();
+        }
     }
 
     public function sendCertificate(int $id, string $channel): void
