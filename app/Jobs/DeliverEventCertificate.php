@@ -45,7 +45,7 @@ final class DeliverEventCertificate implements ShouldQueue
             $recipient = Crypt::decryptString($delivery->recipient_encrypted);
             $current = trim((string) ($delivery->channel === 'email' ? $attendee->email : $attendee->phone));
             if ($delivery->channel === 'sms') {
-                $current = ltrim($current, '+');
+                $current = app(SmsService::class)->normalizeRecipient($current);
             }
             abort_unless(hash_equals($recipient, $current) && hash_equals($delivery->recipient_hash, hash_hmac('sha256', $recipient, (string) config('app.key'))), 422);
             $path = $certificate->pdf_path;
