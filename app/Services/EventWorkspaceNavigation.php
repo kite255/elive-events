@@ -64,7 +64,7 @@ class EventWorkspaceNavigation
 
         $links = collect(EventWorkspace::linksFor($event))->keyBy('label');
         foreach ([
-            'Event management' => ['Registration', 'Attendees', 'Ticket types', 'Ticket orders', 'Programme'],
+            'Event management' => ['Registration', 'Attendees', 'Ticket types', 'Ticket templates', 'Ticket orders', 'Programme'],
             'Operations' => ['Check-in station', 'Badge templates', 'Badge types', 'Badge printing', 'Communications'],
             'Merchandise' => ['Merchandise products', 'Attendee merchandise', 'Shop products', 'Shop orders'],
             'Finance' => ['Finance overview', 'Financial audit'],
