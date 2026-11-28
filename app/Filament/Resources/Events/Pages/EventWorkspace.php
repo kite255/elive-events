@@ -133,6 +133,7 @@ class EventWorkspace extends Page
         if ($event->canBeManagedBy($user)) {
             $relations = EventResource::getRelations();
             foreach ([
+                ['Ticket templates', 'heroicon-o-document-duplicate', \App\Filament\Resources\Events\RelationManagers\TicketTemplatesRelationManager::class],
                 ['Registration', 'heroicon-o-clipboard-document-list', \App\Filament\Resources\Events\RelationManagers\RegistrationFieldsRelationManager::class],
                 ['Programme', 'heroicon-o-calendar-days', \App\Filament\Resources\Events\RelationManagers\SessionsRelationManager::class],
                 ['Badge templates', 'heroicon-o-identification', \App\Filament\Resources\Events\RelationManagers\BadgeTemplatesRelationManager::class],
