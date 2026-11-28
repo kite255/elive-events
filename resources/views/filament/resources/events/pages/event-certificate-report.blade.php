@@ -33,6 +33,10 @@
         <div class="flex flex-wrap items-end gap-3">
             <label class="flex-1 text-sm">Certificate number<input type="search" wire:model.live.debounce.400ms="search" maxlength="100" class="mt-1 block w-full rounded-lg border-gray-300 dark:bg-gray-900"></label>
             <label class="text-sm">Status<select wire:model.live="status" class="mt-1 block rounded-lg border-gray-300 dark:bg-gray-900"><option value="">All statuses</option><option value="issued">Issued</option><option value="pending">Pending</option><option value="revoked">Revoked</option></select></label>
+            <label class="text-sm">Template<select wire:model.live="templateFilter" class="mt-1 block rounded-lg border-gray-300 dark:bg-gray-900"><option value="">All templates</option>@foreach ($event->certificateTemplates()->orderBy('name')->get(['id','name']) as $template)<option value="{{ $template->id }}">{{ $template->name }}</option>@endforeach</select></label>
+            <label class="text-sm">Issued from<input type="date" wire:model.live="issuedFrom" class="mt-1 block rounded-lg border-gray-300 dark:bg-gray-900"></label>
+            <label class="text-sm">Issued to<input type="date" wire:model.live="issuedTo" class="mt-1 block rounded-lg border-gray-300 dark:bg-gray-900"></label>
+            <label class="text-sm">Delivery channel<select wire:model.live="deliveryFilter" class="mt-1 block rounded-lg border-gray-300 dark:bg-gray-900"><option value="">All channels</option><option value="email">Email</option><option value="sms">SMS</option></select></label>
             <x-filament::button color="gray" wire:click="$refresh">Refresh</x-filament::button>
         </div>
         <p class="mt-2 text-xs text-gray-500">Event-wide summary above; filters apply to records and exported detail. Excel exports up to 5,000 records, PDF up to 500.</p>
