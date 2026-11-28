@@ -32,6 +32,8 @@ class EventCertificateManager extends Page
     public string $status = '';
     public ?int $templateId = null;
     public array $selectedAttendees = [];
+    public array $selectedCertificates = [];
+    public string $deliveryChannel = 'email';
     #[Locked]
     public ?int $viewBatchId = null;
 
@@ -55,8 +57,8 @@ class EventCertificateManager extends Page
         return app(EventCertificateAccess::class)->authorize($this->user(), $this->eventId);
     }
 
-    public function updatedSearch(): void { $this->selectedAttendees = []; $this->resetPage(); }
-    public function updatedStatus(): void { $this->resetPage(); }
+    public function updatedSearch(): void { $this->selectedAttendees = []; $this->selectedCertificates = []; $this->resetPage(); }
+    public function updatedStatus(): void { $this->selectedCertificates = []; $this->resetPage(); }
 
     public function switchTab(string $tab): void
     {
@@ -64,6 +66,7 @@ class EventCertificateManager extends Page
         abort_unless(in_array($tab, ['records', 'eligible', 'batches'], true), 422);
         $this->tab = $tab;
         $this->viewBatchId = null;
+        $this->selectedCertificates = [];
         $this->selectedAttendees = [];
         $this->search = '';
         $this->resetPage();
@@ -268,6 +271,50 @@ class EventCertificateManager extends Page
             ->select('delivery.event_certificate_id', 'delivery.channel', 'delivery.status')
             ->get()->groupBy('event_certificate_id')
             ->map(fn ($rows) => $rows->pluck('status', 'channel')->all())->all();
+    }
+
+    public function selectDeliveryPage(): void
+    {
+        $this->selectedCertificates = $this->records()->getCollection()
+            ->where('status', EventCertificate::STATUS_ISSUED)
+            ->pluck('id')->map(fn ($id) => (string) $id)->all();
+    }
+
+    public function clearDeliverySelection(): void
+    {
+        $this->event();
+        $this->selectedCertificates = [];
+    }
+
+    public function sendSelectedCertificates(): void
+    {
+        $event = $this->event();
+        $this->validate([
+            'deliveryChannel' => ['required', 'in:email,sms'],
+            'selectedCertificates' => ['required', 'array', 'min:1', 'max:100'],
+            'selectedCertificates.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ]);
+        $ids = $event->certificates()->whereIn('id', $this->selectedCertificates)
+            ->where('status', EventCertificate::STATUS_ISSUED)->pluck('id');
+        if ($ids->count() !== count($this->selectedCertificates)) {
+            Notification::make()->title('Selection contains unavailable certificates')->danger()->send();
+            return;
+        }
+
+        $queued = 0;
+        $blocked = 0;
+        foreach ($ids as $id) {
+            try {
+                app(\App\Services\EventCertificateDeliveryQueue::class)->queue($this->user(), $this->eventId, (int) $id, $this->deliveryChannel);
+                $queued++;
+            } catch (Throwable $exception) {
+                $blocked++;
+            }
+        }
+        $this->selectedCertificates = [];
+        Notification::make()->title($queued.' queued; '.$blocked.' not confirmed')
+            ->body('Review channel statuses. Existing delivery records are never automatically resent.')
+            ->color($blocked ? 'warning' : 'success')->send();
     }
 
     public function sendCertificate(int $id, string $channel): void
