@@ -327,6 +327,8 @@ class EventResource extends Resource
 
             'certificate-settings' => \App\Filament\Resources\Events\Pages\EventCertificateSettings::route('/{record}/certificate-settings'),
 
+            'certificate-templates' => \App\Filament\Resources\Events\Pages\EventCertificateTemplateManager::route('/{record}/certificate-templates'),
+
             'ticket-template-designer' => \App\Filament\Resources\Events\Pages\TicketTemplateDesigner::route('/{record}/ticket-templates/{template}/designer'),
 
             'merchandise-sales-report' => \App\Filament\Resources\Events\Pages\EventMerchandiseSalesReport::route('/{record}/merchandise-sales-report'),
