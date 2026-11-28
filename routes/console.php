@@ -157,3 +157,23 @@ Schedule::command('tickets:email-organizer-summaries')
     ->dailyAt('00:20')
     ->timezone('Africa/Dar_es_Salaam')
     ->withoutOverlapping();
+
+
+Artisan::command('certificates:recover-batches {event : Event ID} {--apply : Reconcile stale records after reviewing the queue}', function () {
+    $eventId = filter_var($this->argument('event'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if (! $eventId || ! \App\Models\Event::query()->whereKey($eventId)->exists()) {
+        $this->error('A valid event ID is required.');
+
+        return 1;
+    }
+
+    $apply = (bool) $this->option('apply');
+    $result = app(\App\Services\EventCertificateBatchRecovery::class)->inspect($eventId, $apply);
+    $this->info($apply ? 'Recovery changes applied. No jobs were dispatched.' : 'Read-only inspection. No records changed.');
+    $this->table(['Metric', 'Count'], collect($result)->map(fn ($count, $key) => [$key, $count])->values()->all());
+    if (! $apply) {
+        $this->warn('Inspect worker and queue health before applying recovery.');
+    }
+
+    return 0;
+})->purpose('Inspect or reconcile stale certificate batch recipients for one event');
