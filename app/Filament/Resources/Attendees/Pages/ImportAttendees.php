@@ -30,19 +30,25 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
 
     public ?array $data = [];
 
+    #[\Livewire\Attributes\Locked]
     public ?int $eventId = null;
 
     public ?string $eventName = null;
 
-    public ?string $errorReportUrl = null;
+    #[\Livewire\Attributes\Locked]
+    public ?string $errorReportPath = null;
+
+    #[\Livewire\Attributes\Locked]
+    public ?int $errorReportEventId = null;
 
     public function mount(): void
     {
-        $this->eventId = request()->integer('event_id') ?: null;
-
-        if ($this->eventId) {
-            $event = Event::query()->find($this->eventId);
-            $this->eventName = $event?->name;
+        abort_unless(AttendeeResource::canImport(), 403);
+        if (request()->has('event_id')) {
+            $id = request()->query('event_id');
+            abort_unless(is_scalar($id) && ctype_digit((string) $id), 404);
+            $this->eventId = (int) $id;
+            $this->eventName = $this->authorizedEvent($this->eventId)->name;
         }
 
         $this->form->fill([
@@ -50,6 +56,15 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
             'file' => null,
             'generate_badges' => true,
         ]);
+    }
+
+    private function authorizedEvent(int $id): Event
+    {
+        abort_unless(AttendeeResource::canImport(), 403);
+        $event = Event::query()->accessibleBy(auth()->user())->whereKey($id)->firstOrFail();
+        abort_unless($event->canManageRegistrationBy(auth()->user()), 403);
+
+        return $event;
     }
 
     public function form(Schema $schema): Schema
@@ -61,21 +76,25 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
                     ->schema([
                         Forms\Components\Select::make('event_id')
                             ->label('Event')
-                            ->options(fn () => Event::query()
-                                ->latest()
-                                ->pluck('name', 'id')
-                                ->toArray())
+                            ->options(fn () => Event::query()->accessibleBy(auth()->user())
+                                ->when($this->eventId !== null, fn ($query) => $query->whereKey($this->eventId))
+                                ->latest()->get()
+                                ->filter(fn (Event $event) => $event->canManageRegistrationBy(auth()->user()))
+                                ->pluck('name', 'id')->all())
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->default(fn () => request()->integer('event_id') ?: null)
-                            ->disabled(fn () => request()->filled('event_id'))
+                            ->default(fn () => $this->eventId)
+                            ->disabled(fn () => $this->eventId !== null)
                             ->dehydrated(),
 
                         Forms\Components\FileUpload::make('file')
-                            ->label('Excel File')
-                            ->disk('public')
-                            ->directory('imports/attendees')
+                            ->label('Excel or CSV File')
+                            ->disk('local')
+                            ->visibility('private')
+                            ->directory(fn () => 'imports/attendees/user-'.auth()->id())
+                            ->preventFilePathTampering()
+                            ->maxSize(5120)
                             ->acceptedFileTypes([
                                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                                 'application/vnd.ms-excel',
@@ -102,6 +121,10 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('success')
                 ->action(function () {
+                    abort_unless(AttendeeResource::canImport(), 403);
+                    if ($this->eventId !== null) {
+                        $this->authorizedEvent($this->eventId);
+                    }
                     return Excel::download(
                         new AttendeesImportTemplateExport(),
                         'eLive-events-attendees-import-template.xlsx'
@@ -113,7 +136,7 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
                 ->icon('heroicon-o-arrow-left')
                 ->color('gray')
                 ->visible(fn () => filled($this->eventId))
-                ->url(fn () => EventResource::getUrl('edit', [
+                ->url(fn () => EventResource::getUrl('workspace', [
                     'record' => $this->eventId,
                 ])),
 
@@ -121,15 +144,19 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
                 ->label('Back to Attendees')
                 ->icon('heroicon-o-user-group')
                 ->color('gray')
-                ->url(fn () => AttendeeResource::getUrl('index')),
+                ->url(fn () => AttendeeResource::getUrl('index', $this->eventId === null ? [] : ['event_id' => $this->eventId])),
         ];
     }
 
     public function import(): void
     {
+        abort_unless(AttendeeResource::canImport(), 403);
+        if ($this->eventId !== null) {
+            $this->authorizedEvent($this->eventId);
+        }
         $data = $this->form->getState();
 
-        $eventId = (int) ($data['event_id'] ?? request()->integer('event_id'));
+        $eventId = $this->eventId ?? (int) ($data['event_id'] ?? 0);
         $file = $data['file'] ?? null;
         $generateBadges = (bool) ($data['generate_badges'] ?? false);
 
@@ -143,14 +170,25 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
             return;
         }
 
-        $import = new AttendeesImport($eventId);
+        $event = $this->authorizedEvent($eventId);
+        abort_unless(is_string($file) && str_starts_with($file, 'imports/attendees/user-'.auth()->id().'/')
+            && ! str_contains($file, '..') && ! str_contains($file, '\\')
+            && Storage::disk('local')->exists($file), 422);
+        $this->errorReportPath = null;
+        $this->errorReportEventId = null;
 
-        Excel::import($import, Storage::disk('public')->path($file));
+        $import = new AttendeesImport($eventId);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($event, $import, $file): void {
+            Event::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
+            $this->authorizedEvent($event->id);
+            Excel::import($import, Storage::disk('local')->path($file));
+        });
 
         $message = "Imported: {$import->imported}. Skipped: {$import->skipped}.";
 
         if (! empty($import->errors)) {
-            $this->errorReportUrl = $this->storeErrorReport($import->errors, $eventId);
+            $this->errorReportPath = $this->storeErrorReport($import->errors, $eventId);
+            $this->errorReportEventId = $eventId;
 
             $message .= ' Error report is available for download.';
         }
@@ -184,14 +222,24 @@ class ImportAttendees extends Page implements Forms\Contracts\HasForms
 
     protected function storeErrorReport(array $errors, int $eventId): string
     {
-        $fileName = 'imports/errors/event-' . $eventId . '-import-errors-' . now()->format('Y-m-d-His') . '.xlsx';
+        $fileName = 'imports/errors/user-'.auth()->id().'/event-'.$eventId.'-'.\Illuminate\Support\Str::uuid().'.xlsx';
 
         Excel::store(
             new ImportErrorsExport($errors),
             $fileName,
-            'public'
+            'local'
         );
 
-        return Storage::disk('public')->url($fileName);
+        return $fileName;
+    }
+
+    public function downloadErrorReport(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_unless($this->errorReportEventId && $this->errorReportPath, 404);
+        $this->authorizedEvent($this->errorReportEventId);
+        abort_unless(str_starts_with($this->errorReportPath, 'imports/errors/user-'.auth()->id().'/')
+            && Storage::disk('local')->exists($this->errorReportPath), 404);
+
+        return Storage::disk('local')->download($this->errorReportPath, 'attendee-import-errors.xlsx');
     }
 }
