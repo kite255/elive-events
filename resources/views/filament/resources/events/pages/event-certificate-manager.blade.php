@@ -184,11 +184,14 @@
                                 <td class="p-3 whitespace-nowrap">{{ $certificate->issued_at?->format('d M Y') ?? '—' }}</td>
                                 <td class="p-3">
                                     @foreach (['email' => 'Email', 'sms' => 'SMS'] as $channel => $label)
-                                        @php($deliveryStatus = $deliveryStatuses[$certificate->id][$channel] ?? null)
+                                        @php($deliveryState = $deliveryStatuses[$certificate->id][$channel] ?? [])
+                                        @php($deliveryStatus = $deliveryState['status'] ?? null)
                                         <div class="mb-1 flex flex-wrap items-center gap-2">
                                             <span class="text-xs">{{ $label }}: {{ $deliveryStatus ? ucfirst($deliveryStatus) : 'Not sent' }}</span>
                                             @if ($certificate->status === 'issued' && ! $deliveryStatus)
                                                 <x-filament::button size="xs" color="gray" wire:click="sendCertificate({{ $certificate->id }}, '{{ $channel }}')" wire:confirm="Send this certificate by {{ $label }} to the attendee's recorded contact?" wire:loading.attr="disabled" wire:target="sendCertificate">Send</x-filament::button>
+                                            @elseif ($certificate->status === 'issued' && ($deliveryState['retryable'] ?? false))
+                                                <x-filament::button size="xs" color="gray" wire:click="retryDelivery({{ $certificate->id }}, '{{ $channel }}')" wire:confirm="Retry this confirmed pre-submission failure using the original recipient contact?" wire:loading.attr="disabled" wire:target="retryDelivery">Retry</x-filament::button>
                                             @endif
                                         </div>
                                     @endforeach
