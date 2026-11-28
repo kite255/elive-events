@@ -177,3 +177,21 @@ Artisan::command('certificates:recover-batches {event : Event ID} {--apply : Rec
 
     return 0;
 })->purpose('Inspect or reconcile stale certificate batch recipients for one event');
+
+
+Artisan::command('certificates:recover-deliveries {event : Event ID} {--apply : Flag stale queued deliveries as uncertain}', function () {
+    $eventId = filter_var($this->argument('event'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if (! $eventId || ! \App\Models\Event::query()->whereKey($eventId)->exists()) {
+        $this->error('A valid event ID is required.');
+
+        return 1;
+    }
+
+    $apply = (bool) $this->option('apply');
+    $result = app(\App\Services\EventCertificateDeliveryRecovery::class)->inspect($eventId, $apply);
+    $this->info($apply ? 'Recovery applied. No messages or jobs dispatched.' : 'Read-only inspection. No records changed.');
+    $this->table(['Metric', 'Count'], collect($result)->map(fn ($count, $key) => [$key, $count])->values()->all());
+    $this->warn('Investigate stale processing records and provider status before considering any resend.');
+
+    return 0;
+})->purpose('Inspect interrupted certificate delivery records for one event');
