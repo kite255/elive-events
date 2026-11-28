@@ -102,6 +102,33 @@ class EventCertificateTemplateManager extends Page
         Notification::make()->title('Certificate draft saved')->success()->send();
     }
 
+    public function publishDraft(int $id): void
+    {
+        $this->event();
+        $this->resetValidation();
+        try {
+            app(\App\Services\EventCertificatePublishing::class)->publish($this->user(), $this->eventId, $id);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()->title('Template cannot be published')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()->send();
+
+            return;
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            if ($exception->getStatusCode() !== 422) {
+                throw $exception;
+            }
+            Notification::make()->title('Template cannot be published')
+                ->body($exception->getMessage())->danger()->send();
+
+            return;
+        }
+        $this->cancelEdit();
+        Notification::make()->title('Certificate template published')
+            ->body('The design is now read-only. No certificates have been issued.')
+            ->success()->send();
+    }
+
     public function duplicateDraft(int $id): void
     {
         app(EventCertificateTemplates::class)->duplicate($this->user(), $this->eventId, $id);
