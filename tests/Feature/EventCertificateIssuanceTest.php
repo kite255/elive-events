@@ -22,7 +22,7 @@ class EventCertificateIssuanceTest extends TestCase
     {
         $user = User::factory()->create(['is_super_admin' => true, 'is_gate_staff' => false]);
         $organization = Organization::create(['name' => 'Certificate organization']);
-        $event = Event::create(['organization_id' => $organization->id, 'name' => 'Certificate event', 'status' => Event::STATUS_ACTIVE]);
+        $event = Event::create(['organization_id' => $organization->id, 'name' => 'Certificate event '.\Illuminate\Support\Str::uuid(), 'status' => Event::STATUS_ACTIVE]);
         app(EventCertificateAccess::class)->configure($user, $event->id, true, 'checked_in');
         $attendee = Attendee::create(['event_id' => $event->id, 'full_name' => 'Test Attendee', 'status' => $status]);
         $template = $event->certificateTemplates()->create([
