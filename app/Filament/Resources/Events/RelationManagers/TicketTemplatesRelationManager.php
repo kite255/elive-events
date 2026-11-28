@@ -89,6 +89,9 @@ class TicketTemplatesRelationManager extends RelationManager
                 CreateAction::make()->label('New draft')->mutateDataUsing(fn (array $data): array => $this->draftData($data)),
             ])
             ->recordActions([
+                \Filament\Actions\Action::make('design')->label('Design')->icon('heroicon-o-pencil-square')
+                    ->visible(fn (EventTicketTemplate $record): bool => ! $record->is_active)
+                    ->url(fn (EventTicketTemplate $record): string => \App\Filament\Resources\Events\EventResource::getUrl('ticket-template-designer', ['record' => $this->authorizeEvent()->id, 'template' => $record->id])),
                 EditAction::make()->label('Edit draft')
                     ->visible(fn (EventTicketTemplate $record): bool => ! $record->is_active)
                     ->mutateDataUsing(function (array $data, EventTicketTemplate $record): array {
