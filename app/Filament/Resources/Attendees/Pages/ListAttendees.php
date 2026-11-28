@@ -54,7 +54,10 @@ class ListAttendees extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()->visible(fn (): bool => $this->workspaceEventId === null),
+            CreateAction::make()
+                ->url(fn (): string => AttendeeResource::getUrl('create', $this->workspaceEventId === null ? [] : ['event_id' => $this->workspaceEventId]))
+                ->visible(fn (): bool => AttendeeResource::canCreate() && ($this->workspaceEventId === null
+                    || \App\Models\Event::query()->find($this->workspaceEventId)?->canManageRegistrationBy(auth()->user()))),
         ];
     }
 }
