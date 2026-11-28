@@ -1262,4 +1262,9 @@ class Attendee extends Model
             ]
         );
     }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(EventCertificate::class);
+    }
 }
