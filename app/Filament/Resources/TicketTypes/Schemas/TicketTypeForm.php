@@ -21,7 +21,8 @@ class TicketTypeForm
                     ->schema([
                         Select::make('event_id')
                             ->label('Event')
-                            ->disabled(fn (string $operation): bool => $operation === 'edit')
+                            ->default(fn ($livewire) => $livewire->workspaceEventId ?? null)
+                            ->disabled(fn (string $operation, $livewire): bool => $operation === 'edit' || ($livewire->workspaceEventId ?? null) !== null)
                             ->options(
                                 TicketTypeResource::authorizedEvents(auth()->user(), true)
                                     ->orderBy('name')
