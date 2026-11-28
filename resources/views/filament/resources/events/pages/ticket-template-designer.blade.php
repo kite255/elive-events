@@ -12,14 +12,21 @@
             this.selected=this.elements.length-1;
         },
         drag: null,
+        fonts: {brand:'inherit',sans:'Arial, sans-serif',serif:'Georgia, serif',mono:'monospace'},
+        selectElement(i) {
+            this.selected=i;
+            const el=this.elements[i];
+            if (el.type==='image' || el.type==='qr') return;
+            el.font_family ??= 'brand'; el.font_weight ??= 400; el.font_style ??= 'normal'; el.text_align ??= 'left'; el.line_height ??= 1.2;
+        },
         labels: {text:'Text',event_name:'Event name',ticket_type:'Ticket type',holder_name:'Ticket holder',ticket_number:'Ticket number',event_date:'Event date',venue:'Venue',qr:'QR placeholder'},
         add(type) {
             if (this.elements.length >= 40) return;
             this.elements.push({type, text:type === 'text' ? 'Your text' : '', x:0,y:0,width:Math.min(type === 'qr' ? 100 : 240,this.width),height:Math.min(type === 'qr' ? 100 : 48,this.height),font_size:24,color:'#161943'});
-            this.selected=this.elements.length-1;
+            this.selectElement(this.elements.length-1);
         },
         start(e,i) {
-            this.selected=i;
+            this.selectElement(i);
             const el=this.elements[i], rect=this.$refs.canvas.getBoundingClientRect();
             this.drag={i,px:e.clientX,py:e.clientY,x:Number(el.x),y:Number(el.y),sx:this.width/rect.width,sy:this.height/rect.height};
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -90,7 +97,7 @@
                             <img src="{{ $background }}" alt="" class="pointer-events-none absolute inset-0 h-full w-full object-fill" />
                         @endif
                         <template x-for="(el,i) in elements" :key="i">
-                            <div class="absolute cursor-move overflow-hidden select-none border" :class="selected===i?'border-blue-500':'border-transparent'" style="touch-action:none" :style="{left:(el.x/width*100)+'%',top:(el.y/height*100)+'%',width:(el.width/width*100)+'%',height:(el.height/height*100)+'%',fontSize:(el.font_size/width*100)+'cqw',color:el.color}" x-on:pointerdown.prevent="start($event,i)" x-on:pointermove="move($event)" x-on:pointerup="drag=null" x-on:pointercancel="drag=null">
+                            <div class="absolute cursor-move overflow-hidden select-none border" :class="selected===i?'border-blue-500':'border-transparent'" style="touch-action:none" :style="{left:(el.x/width*100)+'%',top:(el.y/height*100)+'%',width:(el.width/width*100)+'%',height:(el.height/height*100)+'%',fontSize:(el.font_size/width*100)+'cqw',color:el.color,fontFamily:fonts[el.font_family] || fonts.brand,fontWeight:el.font_weight || 400,fontStyle:el.font_style || 'normal',textAlign:el.text_align || 'left',lineHeight:el.line_height || 1.2,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}" x-on:pointerdown.prevent="start($event,i)" x-on:pointermove="move($event)" x-on:pointerup="drag=null" x-on:pointercancel="drag=null">
                                 <span x-show="el.type!=='qr' && el.type!=='image'" x-text="el.type==='text'?el.text:labels[el.type]"></span>
                                 @foreach ($images as $id => $image)
                                     <img x-show="el.type==='image' && Number(el.asset_id) === @js($id)" src="{{ $image['src'] }}" alt="" class="pointer-events-none h-full w-full object-contain" draggable="false">
@@ -108,11 +115,25 @@
                     <div class="space-y-3">
                         <label class="block text-sm" x-show="elements[selected].type==='text'">Text<input class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900" x-model="elements[selected].text" maxlength="300"></label>
                         <div class="grid grid-cols-2 gap-2">
-                            <template x-for="field in ['x','y','width','height','font_size']" :key="field">
+                            <template x-for="field in ['x','y','width','height']" :key="field">
                                 <label class="block text-sm"><span x-text="field.replace('_',' ')"></span><input type="number" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900" x-model.number="elements[selected][field]"></label>
                             </template>
                         </div>
-                        <label class="block text-sm">Color <input type="color" x-model="elements[selected].color"></label>
+                        <div x-show="!['image','qr'].includes(elements[selected].type)" class="space-y-2">
+                            <label class="block text-sm">Font family
+                                <select x-model="elements[selected].font_family" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:bg-gray-900">
+                                    <option value="brand">Brand / panel font</option><option value="sans">Sans serif</option><option value="serif">Serif</option><option value="mono">Monospace</option>
+                                </select>
+                            </label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="block text-sm">Font size<input type="number" min="8" max="100" x-model.number="elements[selected].font_size" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900"></label>
+                                <label class="block text-sm">Weight<select x-model.number="elements[selected].font_weight" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:bg-gray-900"><option value="400">Regular</option><option value="600">Semibold</option><option value="700">Bold</option></select></label>
+                                <label class="block text-sm">Style<select x-model="elements[selected].font_style" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:bg-gray-900"><option value="normal">Normal</option><option value="italic">Italic</option></select></label>
+                                <label class="block text-sm">Alignment<select x-model="elements[selected].text_align" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:bg-gray-900"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+                                <label class="block text-sm">Line spacing<input type="number" min="1" max="2" step="0.1" x-model.number="elements[selected].line_height" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900"></label>
+                                <label class="block text-sm">Color<input type="color" class="mt-1 block" x-model="elements[selected].color"></label>
+                            </div>
+                        </div>
                         <button type="button" class="text-sm text-danger-600" x-on:click="remove()">Remove element</button>
                     </div>
                 </template>
