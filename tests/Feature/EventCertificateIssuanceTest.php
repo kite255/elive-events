@@ -291,6 +291,73 @@ class EventCertificateIssuanceTest extends TestCase
         $this->get($url)->assertNotFound();
     }
 
+    public function test_short_download_token_is_hashed_expires_and_rejects_revocation(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $url = app(\App\Services\EventCertificateDownloadLink::class)->short($issued);
+        $token = basename(parse_url($url, PHP_URL_PATH));
+        $this->assertSame(24, strlen($token));
+        $this->assertDatabaseHas('event_certificate_download_tokens', ['event_certificate_id' => $issued->id, 'token_hash' => hash('sha256', $token)]);
+        $this->get($url)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->travel(31)->days();
+        $this->get($url)->assertNotFound();
+        $this->travelBack();
+        app(\App\Services\EventCertificateRevocation::class)->revoke($user, $event->id, $issued->id, 'Certificate no longer valid.');
+        $this->get($url)->assertNotFound();
+    }
+
+    public function test_sms_delivery_submits_once_and_records_provider_reference(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['phone' => '255712345678']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'sms');
+        $this->mock(\App\Services\SmsService::class, function ($mock) {
+            $mock->shouldReceive('send')->once()->with('255712345678', \Mockery::on(fn ($message) => str_contains($message, '/c/')), false)
+                ->andReturn(['success' => true, 'provider_message_id' => 'test-reference']);
+        });
+        $job = new \App\Jobs\DeliverEventCertificate($id);
+        $job->handle();
+        $job->handle();
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $id, 'status' => 'submitted', 'provider_reference' => 'test-reference']);
+    }
+
+    public function test_ambiguous_sms_submission_is_not_retried(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['phone' => '255712345678']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'sms');
+        $this->mock(\App\Services\SmsService::class, function ($mock) {
+            $mock->shouldReceive('send')->once()->andThrow(new \RuntimeException('Provider timeout'));
+        });
+        $job = new \App\Jobs\DeliverEventCertificate($id);
+        $job->handle();
+        $job->handle();
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $id, 'status' => 'uncertain', 'failure_code' => 'submission_unconfirmed']);
+    }
+
+    public function test_changed_email_prevents_delivery_before_provider_submission(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['email' => 'original@example.com']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'email');
+        $attendee->update(['email' => 'changed@example.com']);
+        \Illuminate\Support\Facades\Mail::shouldReceive('send')->never();
+        (new \App\Jobs\DeliverEventCertificate($id))->handle();
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $id, 'status' => 'failed', 'failure_code' => 'preflight_failed']);
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
