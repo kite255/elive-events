@@ -318,6 +318,7 @@ class EventCertificateIssuanceTest extends TestCase
         $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
         $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'sms');
         $this->mock(\App\Services\SmsService::class, function ($mock) {
+            $mock->shouldReceive('normalizeRecipient')->once()->andReturn('255712345678');
             $mock->shouldReceive('send')->once()->with('255712345678', \Mockery::on(fn ($message) => str_contains($message, '/c/')), false)
                 ->andReturn(['success' => true, 'provider_message_id' => 'test-reference']);
         });
@@ -336,6 +337,7 @@ class EventCertificateIssuanceTest extends TestCase
         $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
         $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'sms');
         $this->mock(\App\Services\SmsService::class, function ($mock) {
+            $mock->shouldReceive('normalizeRecipient')->once()->andReturn('255712345678');
             $mock->shouldReceive('send')->once()->andThrow(new \RuntimeException('Provider timeout'));
         });
         $job = new \App\Jobs\DeliverEventCertificate($id);
@@ -478,6 +480,35 @@ class EventCertificateIssuanceTest extends TestCase
         $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $email, 'status' => 'uncertain']);
         $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $sms, 'status' => 'processing']);
         \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\DeliverEventCertificate::class);
+    }
+
+    public function test_bulk_issuance_rejects_overlapping_unfinished_batches(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        config(['queue.default' => 'database']);
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $service = app(\App\Services\EventCertificateBulkIssuance::class);
+        $this->assertSame(1, $service->queue($user, $event->id, $template->id, [$attendee->id]));
+        try {
+            $service->queue($user, $event->id, $template->id, [$attendee->id]);
+            $this->fail('Duplicate batch unexpectedly accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('attendees', $exception->errors());
+        }
+        $this->assertDatabaseCount('event_certificate_batches', 1);
+        \Illuminate\Support\Facades\Bus::assertDispatchedTimes(\App\Jobs\IssueEventCertificate::class, 1);
+    }
+
+    public function test_certificate_sms_reservation_normalizes_local_number(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['phone' => '0712 345 678']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $id = app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'sms');
+        $row = \Illuminate\Support\Facades\DB::table('event_certificate_deliveries')->where('id', $id)->first();
+        $this->assertSame('255712345678', \Illuminate\Support\Facades\Crypt::decryptString($row->recipient_encrypted));
     }
 
     public function test_duplicate_preparation_is_rejected(): void
