@@ -61,14 +61,13 @@ class AttendeesImport implements ToCollection, WithHeadingRow
                 continue;
             }
 
-            $categoryId = $this->resolveCategoryId($data['category']);
-
-            $badgeTypeId = $this->resolveBadgeTypeId($data['badge_type']);
-
             if ($this->isDuplicate($data)) {
                 $this->addError($rowNumber, 'Duplicate attendee skipped.', $data);
                 continue;
             }
+
+            $categoryId = $this->resolveCategoryId($data['category']);
+            $badgeTypeId = $this->resolveBadgeTypeId($data['badge_type']);
 
             Attendee::create([
                 'event_id' => $this->eventId,
