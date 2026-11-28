@@ -36,7 +36,7 @@
             </div>
             <div class="flex gap-2">
                 <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('edit', ['record'=>$draft->event_id,'relation'=>array_search(\App\Filament\Resources\Events\RelationManagers\TicketTemplatesRelationManager::class,\App\Filament\Resources\Events\EventResource::getRelations(),true)])">Back to templates</x-filament::button>
-                <x-filament::button wire:click="saveDesign" wire:loading.attr="disabled">Save draft</x-filament::button>
+                <x-filament::button wire:click="saveDesign" wire:loading.attr="disabled" wire:target="saveDesign,backgroundUpload,clearBackground">Save draft</x-filament::button>
             </div>
         </div>
         <p class="text-sm text-gray-500">Preview uses sample labels. The QR placeholder is not scannable and saving does not publish tickets.</p>
@@ -46,6 +46,14 @@
         <div class="grid gap-4 lg:grid-cols-4">
             <x-filament::section>
                 <x-slot name="heading">Elements</x-slot>
+                <div class="mb-4 space-y-2">
+                    <label class="block text-sm font-medium">Background image</label>
+                    <input type="file" wire:model="backgroundUpload" accept="image/png,image/jpeg,image/webp" class="block w-full text-sm">
+                    @error('backgroundUpload') <p class="text-sm text-danger-600">{{ $message }}</p> @enderror
+                    <p wire:loading wire:target="backgroundUpload" class="text-xs text-gray-500">Uploading background…</p>
+                    <p class="text-xs text-gray-500">PNG, JPG or WebP, up to 5 MB. Save draft to apply the upload.</p>
+                    <button type="button" wire:click="clearBackground" class="text-sm text-danger-600">Remove background</button>
+                </div>
                 <div class="grid gap-2">
                     <template x-for="(label,type) in labels" :key="type">
                         <button type="button" class="rounded-lg border border-gray-300 p-2 text-left text-sm dark:border-gray-700" x-on:click="add(type)" x-text="'Add '+label"></button>
@@ -55,6 +63,9 @@
             <div class="lg:col-span-2 min-w-0">
                 <div class="rounded-lg bg-gray-100 p-3 dark:bg-gray-900">
                     <div x-ref="canvas" class="relative overflow-hidden bg-white shadow-sm" :style="{aspectRatio:width+'/'+height}" style="container-type:inline-size">
+                        @if ($background = $this->backgroundPreview())
+                            <img src="{{ $background }}" alt="" class="pointer-events-none absolute inset-0 h-full w-full object-fill" />
+                        @endif
                         <template x-for="(el,i) in elements" :key="i">
                             <div class="absolute cursor-move overflow-hidden select-none border" :class="selected===i?'border-blue-500':'border-transparent'" style="touch-action:none" :style="{left:(el.x/width*100)+'%',top:(el.y/height*100)+'%',width:(el.width/width*100)+'%',height:(el.height/height*100)+'%',fontSize:(el.font_size/width*100)+'cqw',color:el.color}" x-on:pointerdown.prevent="start($event,i)" x-on:pointermove="move($event)" x-on:pointerup="drag=null" x-on:pointercancel="drag=null">
                                 <span x-show="el.type!=='qr'" x-text="el.type==='text'?el.text:labels[el.type]"></span>
