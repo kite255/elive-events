@@ -156,16 +156,43 @@
             </div>
         @else
             @php($rows = $this->records())
+            @php($deliveryStatuses = $this->deliveryStatuses($rows->pluck('id')->all()))
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium">{{ count($selectedCertificates) }} selected</span>
+                <x-filament::button size="sm" color="gray" wire:click="selectDeliveryPage">Select issued on page</x-filament::button>
+                <x-filament::button size="sm" color="gray" wire:click="clearDeliverySelection">Clear</x-filament::button>
+                <select wire:model.live="deliveryChannel" aria-label="Delivery channel" class="rounded-lg border-gray-300 text-sm dark:bg-gray-900">
+                    <option value="email">Email</option><option value="sms">SMS</option>
+                </select>
+                <x-filament::button size="sm" :disabled="! count($selectedCertificates) || count($selectedCertificates) > 100" wire:click="sendSelectedCertificates" wire:confirm="Queue {{ count($selectedCertificates) }} selected certificates by {{ strtoupper($deliveryChannel) }}? Existing delivery records will not be resent." wire:loading.attr="disabled" wire:target="sendSelectedCertificates">Send selected</x-filament::button>
+                <x-filament::button size="sm" color="gray" wire:click="$refresh">Refresh</x-filament::button>
+            </div>
+            @error('selectedCertificates') <p class="text-sm text-danger-600">{{ $message }}</p> @enderror
+            @error('selectedCertificates.*') <p class="text-sm text-danger-600">{{ $message }}</p> @enderror
+            @error('deliveryChannel') <p class="text-sm text-danger-600">{{ $message }}</p> @enderror
+            <p class="mt-2 text-xs text-gray-500">Select up to 100 issued certificates. Existing channel records are not resent. Submitted does not mean delivered.</p>
             <div class="mt-3 overflow-x-auto">
                 <table class="w-full text-left text-sm">
-                    <thead><tr class="border-b border-gray-200 dark:border-gray-700"><th class="p-3">Attendee</th><th class="p-3">Certificate number</th><th class="p-3">Status</th><th class="p-3">Issued on</th><th class="p-3">Actions</th></tr></thead>
+                    <thead><tr class="border-b border-gray-200 dark:border-gray-700"><th class="p-3">Select</th><th class="p-3">Attendee</th><th class="p-3">Certificate number</th><th class="p-3">Status</th><th class="p-3">Issued on</th><th class="p-3">Delivery</th><th class="p-3">Actions</th></tr></thead>
                     <tbody>
                         @forelse ($rows as $certificate)
                             <tr wire:key="certificate-{{ $certificate->id }}" class="border-b border-gray-100 dark:border-gray-800">
+                                <td class="p-3">@if ($certificate->status === 'issued')<input type="checkbox" wire:model.live="selectedCertificates" value="{{ $certificate->id }}" aria-label="Select certificate {{ $certificate->certificate_number }}" class="rounded border-gray-300">@endif</td>
                                 <td class="p-3 font-medium">{{ $certificate->issuance_snapshot['attendee_name'] ?? $certificate->attendee?->full_name }}</td>
                                 <td class="p-3">{{ $certificate->certificate_number }}</td>
                                 <td class="p-3">{{ ucfirst($certificate->status) }}</td>
                                 <td class="p-3 whitespace-nowrap">{{ $certificate->issued_at?->format('d M Y') ?? '—' }}</td>
+                                <td class="p-3">
+                                    @foreach (['email' => 'Email', 'sms' => 'SMS'] as $channel => $label)
+                                        @php($deliveryStatus = $deliveryStatuses[$certificate->id][$channel] ?? null)
+                                        <div class="mb-1 flex flex-wrap items-center gap-2">
+                                            <span class="text-xs">{{ $label }}: {{ $deliveryStatus ? ucfirst($deliveryStatus) : 'Not sent' }}</span>
+                                            @if ($certificate->status === 'issued' && ! $deliveryStatus)
+                                                <x-filament::button size="xs" color="gray" wire:click="sendCertificate({{ $certificate->id }}, '{{ $channel }}')" wire:confirm="Send this certificate by {{ $label }} to the attendee's recorded contact?" wire:loading.attr="disabled" wire:target="sendCertificate">Send</x-filament::button>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </td>
                                 <td class="p-3"><div class="flex flex-wrap gap-2">
                                     @if ($certificate->status === 'issued')
                                         <x-filament::button size="sm" wire:click="download({{ $certificate->id }})" wire:loading.attr="disabled" wire:target="download">Download</x-filament::button>
@@ -180,7 +207,7 @@
                                 </div></td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="p-6 text-center text-gray-500">No certificate records found.</td></tr>
+                            <tr><td colspan="7" class="p-6 text-center text-gray-500">No certificate records found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
