@@ -47,6 +47,21 @@ class EventWorkspaceNavigation
                 ->isActiveWhen(fn (): bool => $name === 'filament.admin.resources.events.workspace'),
         ]);
 
+        $otherEvents = EventWorkspace::authorizedEvents($user)
+            ->where('events.id', '!=', $event->id)
+            ->orderByDesc('starts_at')->orderByDesc('events.id')
+            ->limit(8)->get(['events.id', 'events.name']);
+
+        if ($otherEvents->isNotEmpty()) {
+            $builder->group(\Filament\Navigation\NavigationGroup::make('Switch event')
+                ->items($otherEvents->map(
+                    fn (Event $other): NavigationItem => NavigationItem::make($other->name)
+                        ->icon('heroicon-o-calendar')
+                        ->url(EventResource::getUrl('workspace', ['record' => $other->id]))
+                        ->isActiveWhen(fn (): bool => false)
+                )->all())->collapsed());
+        }
+
         $links = collect(EventWorkspace::linksFor($event))->keyBy('label');
         foreach ([
             'Event management' => ['Registration', 'Attendees', 'Ticket types', 'Ticket orders', 'Programme'],
