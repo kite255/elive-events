@@ -4,7 +4,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h2 class="text-lg font-semibold">{{ $event->name }}</h2>
-            <p class="text-sm text-gray-500">Prepare certificate drafts. Publishing and issuance are not available yet.</p>
+            <p class="text-sm text-gray-500">Prepare and publish certificate templates. Published designs are read-only. Certificate issuance is not available yet.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-settings', ['record' => $event])">Settings</x-filament::button>
@@ -46,12 +46,15 @@
                         <tr wire:key="certificate-template-{{ $template->id }}" class="border-b border-gray-100 dark:border-gray-800">
                             <td class="p-3 font-medium">{{ $template->name }}</td>
                             <td class="p-3 whitespace-nowrap">{{ $template->width }} × {{ $template->height }}</td>
-                            <td class="p-3">{{ $template->is_active ? 'Active' : 'Draft' }}</td>
+                            <td class="p-3">{{ $template->is_active ? 'Published' : 'Draft' }}</td>
                             <td class="p-3">
                                 <div class="flex flex-wrap gap-2">
                                     @if (! $template->is_active && ! $template->certificates_count)
                                         <x-filament::button size="sm" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-designer', ['record' => $event, 'template' => $template->id])">Design</x-filament::button>
                                         <x-filament::button size="sm" color="gray" wire:click="editDraft({{ $template->id }})">Edit</x-filament::button>
+                                        @if ($event->certificatesAreEnabled() && ! $event->isCancelled() && ! empty($template->definition['elements']))
+                                            <x-filament::button size="sm" color="success" wire:click="publishDraft({{ $template->id }})" wire:confirm="Publish this template? The saved design will become read-only. This does not issue certificates." wire:loading.attr="disabled" wire:target="publishDraft">Publish</x-filament::button>
+                                        @endif
                                     @endif
                                     @if (! $template->assets_count && empty($template->definition))
                                         <x-filament::button size="sm" color="gray" wire:click="duplicateDraft({{ $template->id }})" wire:loading.attr="disabled" wire:target="duplicateDraft">Duplicate</x-filament::button>
