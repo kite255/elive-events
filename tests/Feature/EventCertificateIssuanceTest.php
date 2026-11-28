@@ -201,6 +201,55 @@ class EventCertificateIssuanceTest extends TestCase
         \Illuminate\Support\Facades\Bus::assertDispatchedTimes(\App\Jobs\IssueEventCertificate::class, 3);
     }
 
+    public function test_revocation_preserves_pdf_and_invalidates_public_verification(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $url = route('public.certificates.verify', ['token' => $issued->verification_token]);
+        $original = \Illuminate\Support\Facades\Storage::disk('local')->get($issued->pdf_path);
+        $revoked = app(\App\Services\EventCertificateRevocation::class)->revoke($user, $event->id, $issued->id, 'Issued to the wrong participant.');
+        $this->assertSame('revoked', $revoked->status);
+        $this->assertNotNull($revoked->revoked_at);
+        $this->assertSame($issued->verification_token, $revoked->verification_token);
+        $this->assertSame($issued->certificate_number, $revoked->certificate_number);
+        $this->assertSame($original, \Illuminate\Support\Facades\Storage::disk('local')->get($revoked->pdf_path));
+        $this->assertDatabaseHas('event_certificate_audits', ['event_certificate_id' => $issued->id, 'actor_id' => $user->id, 'action' => 'revoked']);
+        $this->get($url)->assertOk()->assertSee('Revoked certificate')->assertDontSee('Issued to the wrong participant.');
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        app(\App\Services\EventCertificateRevocation::class)->revoke($user, $event->id, $issued->id, 'Another revocation reason.');
+    }
+
+    public function test_pending_certificate_cannot_be_revoked(): void
+    {
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        app(\App\Services\EventCertificateRevocation::class)->revoke($user, $event->id, $certificate->id, 'Invalid pending certificate.');
+    }
+
+    public function test_gate_staff_cannot_revoke_certificates(): void
+    {
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $gate = User::factory()->create(['is_super_admin' => true, 'is_gate_staff' => true]);
+        try {
+            app(\App\Services\EventCertificateRevocation::class)->revoke($gate, $event->id, $certificate->id, 'Unauthorized revocation attempt.');
+            $this->fail('Gate staff unexpectedly authorized.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+    }
+
+    public function test_revocation_requires_meaningful_reason(): void
+    {
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $this->expectException(ValidationException::class);
+        app(\App\Services\EventCertificateRevocation::class)->revoke($user, $event->id, $certificate->id, '  ');
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
