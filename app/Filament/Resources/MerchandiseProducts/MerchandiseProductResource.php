@@ -53,11 +53,21 @@ class MerchandiseProductResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('event_id')->label('Event')->options(fn () => static::accessibleEvents()->get()->filter(fn (Event $event) => static::canManageMerchandiseFor($event))->pluck('name', 'id')->all())->searchable()->required(),
+            Select::make('event_id')->label('Event')->options(fn () => static::accessibleEvents()->get()->filter(fn (Event $event) => static::canManageMerchandiseFor($event))->pluck('name', 'id')->all())->default(fn ($livewire) => $livewire->workspaceEventId ?? null)
+                ->disabled(fn ($livewire, string $operation) => $operation === 'edit' || ($livewire->workspaceEventId ?? null) !== null)
+                ->live()->afterStateUpdated(fn (\Filament\Schemas\Components\Utilities\Set $set) => $set('event_merchandise_id', null))
+                ->searchable()->required(),
             Select::make('event_merchandise_id')
                 ->label('Existing event merchandise (optional)')
                 ->helperText('Link an existing attendee merchandise item. Linked products cannot accept new public reservations until shared-stock checkout is completed.')
-                ->options(fn () => \App\Models\EventMerchandise::query()->whereIn('event_id', static::accessibleEvents()->pluck('id'))->get()->filter(fn ($item) => $item->event && static::canManageMerchandiseFor($item->event))->pluck('name', 'id')->all())
+                ->options(function (\Filament\Schemas\Components\Utilities\Get $get, $livewire): array {
+                    $id = ($livewire->workspaceEventId ?? null) ?: $get('event_id');
+                    $event = $id ? static::accessibleEvents()->whereKey($id)->first() : null;
+
+                    return $event && static::canManageMerchandiseFor($event)
+                        ? $event->merchandise()->orderBy('name')->pluck('name', 'id')->all()
+                        : [];
+                })
                 ->searchable(),
             TextInput::make('name')->required()->maxLength(255),
             TextInput::make('slug')->required()->maxLength(255)->helperText('Unique within this event.'),
@@ -85,7 +95,10 @@ class MerchandiseProductResource extends Resource
             TextColumn::make('price_tzs')->label('TZS')->numeric(),
             TextColumn::make('stock_quantity')->label('Stock')->numeric(),
             IconColumn::make('is_active')->boolean(),
-        ])->recordActions([EditAction::make()])->headerActions([CreateAction::make()->visible(fn ($livewire): bool => $livewire->workspaceEventId === null && static::canCreate())]);
+        ])->recordActions([EditAction::make()])->headerActions([CreateAction::make()
+            ->url(fn ($livewire): string => static::getUrl('create', ($livewire->workspaceEventId ?? null) === null ? [] : ['event_id' => $livewire->workspaceEventId]))
+            ->visible(fn ($livewire): bool => static::canCreate() && (($livewire->workspaceEventId ?? null) === null
+                || (($event = static::accessibleEvents()->whereKey($livewire->workspaceEventId)->first()) && static::canManageMerchandiseFor($event))))]);
     }
 
     public static function getEloquentQuery(): Builder
