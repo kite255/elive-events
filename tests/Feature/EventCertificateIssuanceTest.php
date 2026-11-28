@@ -404,6 +404,82 @@ class EventCertificateIssuanceTest extends TestCase
         $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $id, 'status' => 'uncertain']);
     }
 
+    public function test_certificate_report_filters_and_summary_are_event_scoped(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        [, $otherEvent, $otherAttendee, $otherTemplate] = $this->fixture();
+        $attendee->update(['email' => 'recipient@example.com']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $issued->id, 'email');
+        app(EventCertificateIssuance::class)->prepare($user, $otherEvent->id, $otherAttendee->id, $otherTemplate->id);
+        Attendee::create(['event_id' => $event->id, 'full_name' => 'Outstanding attendee', 'status' => 'checked_in']);
+
+        $this->actingAs($user);
+        $page = new \App\Filament\Resources\Events\Pages\EventCertificateReport;
+        $page->mount($event->id);
+        $summary = $page->summary();
+        $this->assertEquals(1, $summary['certificates']['issued']);
+        $this->assertArrayNotHasKey('pending', $summary['certificates']);
+        $this->assertEquals(1, $summary['outstanding']);
+        $this->assertEquals(1, $summary['delivery']['email']['queued']);
+        $this->assertSame([$issued->id], $page->records()->getCollection()->pluck('id')->all());
+        $page->templateFilter = (string) $otherTemplate->id;
+        $this->assertSame(0, $page->records()->total());
+        $page->templateFilter = (string) $template->id;
+        $page->deliveryFilter = 'sms';
+        $this->assertSame(0, $page->records()->total());
+        $page->deliveryFilter = 'email';
+        $page->issuedFrom = now()->addDay()->toDateString();
+        $this->assertSame(0, $page->records()->total());
+        $page->issuedFrom = now()->toDateString();
+        $this->assertSame(1, $page->records()->total());
+        $page->issuedFrom = '2026-02-30';
+        $this->assertSame(0, $page->records()->total());
+    }
+
+    public function test_certificate_audit_history_is_event_scoped_and_filterable(): void
+    {
+        [$user, $event, $attendee, $template] = $this->fixture();
+        [, $otherEvent, $otherAttendee, $otherTemplate] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $other = app(EventCertificateIssuance::class)->prepare($user, $otherEvent->id, $otherAttendee->id, $otherTemplate->id);
+        $this->actingAs($user);
+        $page = new \App\Filament\Resources\Events\Pages\EventCertificateAuditHistory;
+        $page->mount($event->id);
+        $this->assertEquals([$certificate->id], $page->records()->getCollection()->pluck('event_certificate_id')->all());
+        $page->actionFilter = 'revoked';
+        $this->assertSame(0, $page->records()->total());
+        $page->actionFilter = 'prepared';
+        $page->search = $other->certificate_number;
+        $this->assertSame(0, $page->records()->total());
+        $page->search = $certificate->certificate_number;
+        $this->assertSame(1, $page->records()->total());
+    }
+
+    public function test_delivery_recovery_does_not_dispatch_or_modify_processing_records(): void
+    {
+        \Illuminate\Support\Facades\Bus::fake();
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['email' => 'recipient@example.com', 'phone' => '255712345678']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $service = app(\App\Services\EventCertificateDelivery::class);
+        $email = $service->reserve($user, $event->id, $issued->id, 'email');
+        $sms = $service->reserve($user, $event->id, $issued->id, 'sms');
+        \Illuminate\Support\Facades\DB::table('event_certificate_deliveries')->where('id', $email)->update(['updated_at' => now()->subHours(3)]);
+        \Illuminate\Support\Facades\DB::table('event_certificate_deliveries')->where('id', $sms)->update(['status' => 'processing', 'updated_at' => now()->subHours(3)]);
+        $recovery = app(\App\Services\EventCertificateDeliveryRecovery::class);
+        $this->assertSame(['stale_queued' => 1, 'stale_processing' => 1, 'marked_uncertain' => 0], $recovery->inspect($event->id));
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $email, 'status' => 'queued']);
+        $this->assertSame(1, $recovery->inspect($event->id, true)['marked_uncertain']);
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $email, 'status' => 'uncertain']);
+        $this->assertDatabaseHas('event_certificate_deliveries', ['id' => $sms, 'status' => 'processing']);
+        \Illuminate\Support\Facades\Bus::assertNotDispatched(\App\Jobs\DeliverEventCertificate::class);
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
