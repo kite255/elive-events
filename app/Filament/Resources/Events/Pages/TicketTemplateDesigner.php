@@ -28,6 +28,10 @@ class TicketTemplateDesigner extends Page
 
     public $backgroundUpload = null;
 
+    public $imageUpload = null;
+
+    public string $imageKind = 'logo';
+
     #[Locked]
     public bool $removeBackground = false;
 
@@ -75,6 +79,64 @@ class TicketTemplateDesigner extends Page
         return 'data:'.$mime.';base64,'.base64_encode($disk->get($path));
     }
 
+    public function imagePreviews(): array
+    {
+        $draft = $this->draft();
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+        $prefix = 'ticket-template-drafts/event-'.$this->eventId.'/template-'.$this->templateId.'/assets/';
+        $images = [];
+
+        foreach ($draft->assets()->whereIn('asset_type', ['logo', 'sponsor_logo', 'image'])->limit(12)->get() as $asset) {
+            $path = $asset->file_path;
+            if (! is_string($path) || ! str_starts_with($path, $prefix) || str_contains($path, '..')
+                || ! $disk->exists($path) || $disk->size($path) > 1048576) {
+                continue;
+            }
+            $mime = $disk->mimeType($path);
+            if (! in_array($mime, ['image/png', 'image/jpeg', 'image/webp'], true)) {
+                continue;
+            }
+            $images[$asset->id] = [
+                'label' => $asset->label,
+                'width' => $asset->width,
+                'height' => $asset->height,
+                'src' => 'data:'.$mime.';base64,'.base64_encode($disk->get($path)),
+            ];
+        }
+
+        return $images;
+    }
+
+    public function uploadImage(): void
+    {
+        $this->draft();
+        $this->validate([
+            'imageUpload' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:1024', 'dimensions:max_width=2000,max_height=2000'],
+            'imageKind' => ['required', 'in:logo,sponsor_logo,image'],
+        ]);
+
+        DB::transaction(function (): void {
+            $draft = EventTicketTemplate::query()->whereKey($this->draft()->id)
+                ->where('event_id', $this->eventId)->where('is_active', false)->lockForUpdate()->firstOrFail();
+            abort_unless($draft->assets()->whereIn('asset_type', ['logo', 'sponsor_logo', 'image'])->count() < 12, 422, 'A draft supports up to 12 uploaded images.');
+            $size = getimagesize($this->imageUpload->getRealPath());
+            abort_unless($size !== false && $size[0] > 0 && $size[1] > 0, 422);
+            $path = $this->imageUpload->store('ticket-template-drafts/event-'.$this->eventId.'/template-'.$this->templateId.'/assets', 'local');
+            abort_unless(is_string($path) && $path !== '', 500);
+            $draft->assets()->create([
+                'organization_id' => $draft->event->organization_id,
+                'asset_type' => $this->imageKind,
+                'label' => mb_substr($this->imageUpload->getClientOriginalName(), 0, 150),
+                'file_path' => $path,
+                'mime_type' => $size['mime'],
+                'width' => $size[0],
+                'height' => $size[1],
+            ]);
+        });
+        $this->imageUpload = null;
+        Notification::make()->title('Image added to draft library')->success()->send();
+    }
+
     public function clearBackground(): void
     {
         $this->draft();
@@ -92,9 +154,10 @@ class TicketTemplateDesigner extends Page
             $draft = EventTicketTemplate::query()->whereKey($draft->id)->where('event_id', $this->eventId)
                 ->where('is_active', false)->lockForUpdate()->firstOrFail();
             $validated = Validator::make(['elements' => $this->elements], [
-                'elements' => ['array', 'max:40'],
-                'elements.*' => ['required', 'array:type,text,x,y,width,height,font_size,color'],
-                'elements.*.type' => ['required', 'in:text,event_name,ticket_type,holder_name,ticket_number,event_date,venue,qr'],
+                'elements' => ['present', 'array', 'max:40'],
+                'elements.*' => ['required', 'array:type,text,x,y,width,height,font_size,color,asset_id'],
+                'elements.*.type' => ['required', 'in:text,event_name,ticket_type,holder_name,ticket_number,event_date,venue,qr,image'],
+                'elements.*.asset_id' => ['nullable', 'integer', 'min:1'],
                 'elements.*.text' => ['nullable', 'string', 'max:300'],
                 'elements.*.x' => ['required', 'integer', 'min:0', 'max:'.$draft->width],
                 'elements.*.y' => ['required', 'integer', 'min:0', 'max:'.$draft->height],
@@ -105,6 +168,10 @@ class TicketTemplateDesigner extends Page
             ])->validate();
 
             foreach ($validated['elements'] as $element) {
+                if ($element['type'] === 'image') {
+                    abort_unless($draft->assets()->whereIn('asset_type', ['logo', 'sponsor_logo', 'image'])
+                        ->whereKey($element['asset_id'] ?? 0)->exists(), 422, 'Select an image belonging to this draft.');
+                }
                 abort_unless($element['x'] + $element['width'] <= $draft->width
                     && $element['y'] + $element['height'] <= $draft->height, 422, 'Keep every element inside the canvas.');
             }
