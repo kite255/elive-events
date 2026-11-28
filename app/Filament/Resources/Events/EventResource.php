@@ -325,6 +325,8 @@ class EventResource extends Resource
 
             'workspace' => EventWorkspace::route('/{record}/workspace'),
 
+            'certificate-settings' => \App\Filament\Resources\Events\Pages\EventCertificateSettings::route('/{record}/certificate-settings'),
+
             'ticket-template-designer' => \App\Filament\Resources\Events\Pages\TicketTemplateDesigner::route('/{record}/ticket-templates/{template}/designer'),
 
             'merchandise-sales-report' => \App\Filament\Resources\Events\Pages\EventMerchandiseSalesReport::route('/{record}/merchandise-sales-report'),
