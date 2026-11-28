@@ -4,9 +4,10 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h2 class="text-lg font-semibold">{{ $event->name }}</h2>
-            <p class="text-sm text-gray-500">Prepare and publish certificate templates. Published designs are read-only. Certificate issuance is not available yet.</p>
+            <p class="text-sm text-gray-500">Prepare and publish certificate templates. Published designs are read-only. Issue certificates from the management page.</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificates', ['record' => $event])">Certificates</x-filament::button>
             <x-filament::button color="gray" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-settings', ['record' => $event])">Settings</x-filament::button>
             <x-filament::button wire:click="newDraft">New draft</x-filament::button>
         </div>
