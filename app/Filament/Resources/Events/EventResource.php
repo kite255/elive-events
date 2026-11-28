@@ -308,6 +308,7 @@ class EventResource extends Resource
             BadgeTypesRelationManager::class,
             CheckInPointsRelationManager::class,
             CheckInsRelationManager::class,
+            \App\Filament\Resources\Events\RelationManagers\TicketTemplatesRelationManager::class,
         ];
     }
 
