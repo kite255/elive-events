@@ -74,6 +74,11 @@ class EventWorkspace extends Page
                 'icon' => 'heroicon-o-cog-6-tooth',
                 'url' => EventResource::getUrl('edit', ['record' => $event]),
             ];
+            $links[] = [
+                'label' => 'Certificate settings',
+                'icon' => 'heroicon-o-academic-cap',
+                'url' => EventResource::getUrl('certificate-settings', ['record' => $event]),
+            ];
         }
 
         if ($event->canBeCheckedInBy($user)
