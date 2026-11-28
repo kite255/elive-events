@@ -155,7 +155,7 @@ class TicketTemplateDesigner extends Page
                 ->where('is_active', false)->lockForUpdate()->firstOrFail();
             $validated = Validator::make(['elements' => $this->elements], [
                 'elements' => ['present', 'array', 'max:40'],
-                'elements.*' => ['required', 'array:type,text,x,y,width,height,font_size,color,asset_id'],
+                'elements.*' => ['required', 'array:type,text,x,y,width,height,font_size,color,asset_id,font_family,font_weight,font_style,text_align,line_height'],
                 'elements.*.type' => ['required', 'in:text,event_name,ticket_type,holder_name,ticket_number,event_date,venue,qr,image'],
                 'elements.*.asset_id' => ['nullable', 'integer', 'min:1'],
                 'elements.*.text' => ['nullable', 'string', 'max:300'],
@@ -164,6 +164,11 @@ class TicketTemplateDesigner extends Page
                 'elements.*.width' => ['required', 'integer', 'min:20', 'max:'.$draft->width],
                 'elements.*.height' => ['required', 'integer', 'min:20', 'max:'.$draft->height],
                 'elements.*.font_size' => ['required', 'integer', 'min:8', 'max:100'],
+                'elements.*.font_family' => ['sometimes', 'required', 'in:brand,sans,serif,mono'],
+                'elements.*.font_weight' => ['sometimes', 'required', 'integer', 'in:400,600,700'],
+                'elements.*.font_style' => ['sometimes', 'required', 'in:normal,italic'],
+                'elements.*.text_align' => ['sometimes', 'required', 'in:left,center,right'],
+                'elements.*.line_height' => ['sometimes', 'required', 'numeric', 'min:1', 'max:2'],
                 'elements.*.color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             ])->validate();
 
