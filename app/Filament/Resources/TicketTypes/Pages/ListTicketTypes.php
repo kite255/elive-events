@@ -49,9 +49,11 @@ class ListTicketTypes extends ListRecords
     {
         return [
             CreateAction::make()
+                ->url(fn (): string => TicketTypeResource::getUrl('create', $this->workspaceEventId === null ? [] : ['event_id' => $this->workspaceEventId]))
                 ->visible(
                     fn (): bool =>
-                        $this->workspaceEventId === null && TicketTypeResource::canCreate()
+                        TicketTypeResource::canCreate()
+                            && ($this->workspaceEventId === null || TicketTypeResource::authorizedEvents(auth()->user(), true)->whereKey($this->workspaceEventId)->exists())
                 ),
         ];
     }
