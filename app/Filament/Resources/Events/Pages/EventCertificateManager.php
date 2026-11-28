@@ -31,6 +31,7 @@ class EventCertificateManager extends Page
     public string $search = '';
     public string $status = '';
     public ?int $templateId = null;
+    public array $selectedAttendees = [];
 
     public function mount(int|string $record): void
     {
@@ -52,7 +53,7 @@ class EventCertificateManager extends Page
         return app(EventCertificateAccess::class)->authorize($this->user(), $this->eventId);
     }
 
-    public function updatedSearch(): void { $this->resetPage(); }
+    public function updatedSearch(): void { $this->selectedAttendees = []; $this->resetPage(); }
     public function updatedStatus(): void { $this->resetPage(); }
 
     public function switchTab(string $tab): void
@@ -60,6 +61,7 @@ class EventCertificateManager extends Page
         $this->event();
         abort_unless(in_array($tab, ['records', 'eligible'], true), 422);
         $this->tab = $tab;
+        $this->selectedAttendees = [];
         $this->search = '';
         $this->resetPage();
     }
@@ -98,6 +100,42 @@ class EventCertificateManager extends Page
         }
 
         return $query->orderBy('full_name')->orderBy('id')->paginate(15);
+    }
+
+    public function selectVisible(): void
+    {
+        $this->selectedAttendees = $this->eligible()->getCollection()->pluck('id')->map(fn ($id) => (string) $id)->all();
+    }
+
+    public function clearSelection(): void
+    {
+        $this->event();
+        $this->selectedAttendees = [];
+    }
+
+    public function issueSelected(): void
+    {
+        $this->event();
+        $this->validate([
+            'templateId' => ['required', 'integer', 'min:1'],
+            'selectedAttendees' => ['required', 'array', 'min:1', 'max:100'],
+            'selectedAttendees.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ]);
+        try {
+            $count = app(\App\Services\EventCertificateBulkIssuance::class)->queue(
+                $this->user(), $this->eventId, $this->templateId, $this->selectedAttendees
+            );
+            $this->selectedAttendees = [];
+            Notification::make()->title($count.' certificate jobs submitted')
+                ->body('Check certificate records as processing completes. No messages were sent.')->success()->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()->title('Selection is no longer valid')
+                ->body(collect($exception->errors())->flatten()->first())->danger()->send();
+        } catch (Throwable $exception) {
+            report($exception);
+            Notification::make()->title('Submission did not complete')
+                ->body('Some jobs may have been queued. Review records before submitting again.')->danger()->send();
+        }
     }
 
     public function issue(int $attendeeId): void
