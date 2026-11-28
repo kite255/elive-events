@@ -56,6 +56,20 @@ class EventCertificateIssuanceTest extends TestCase
         ]);
     }
 
+    public function test_pending_certificate_renders_pdf_without_becoming_issued(): void
+    {
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        config(['app.url' => 'https://events.example.com']);
+        $pdf = app(\App\Services\EventCertificatePdf::class)->render($certificate, now());
+
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertGreaterThan(1000, strlen($pdf));
+        $this->assertSame(EventCertificate::STATUS_PENDING, $certificate->fresh()->status);
+        $this->assertNull($certificate->fresh()->pdf_path);
+        $this->assertNull($certificate->fresh()->issued_at);
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
