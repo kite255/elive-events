@@ -27,6 +27,11 @@ use App\Models\Event;
 use App\Http\Controllers\PublicMerchandiseController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/certificates/download/{certificate}', \App\Http\Controllers\PublicCertificateDownloadController::class)
+    ->whereNumber('certificate')
+    ->middleware(['signed', 'throttle:30,1'])
+    ->name('public.certificates.download');
+
 Route::get('/certificates/verify/{token}', \App\Http\Controllers\PublicCertificateVerificationController::class)
     ->where('token', '[a-f0-9]{64}')
     ->middleware('throttle:60,1')
