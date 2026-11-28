@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Event;
-use App\Models\EventCertificateTemplate;
+use App\Models\Organization;
 use App\Models\User;
 use App\Services\EventCertificateAccess;
 use App\Services\EventCertificatePublishing;
@@ -21,7 +21,8 @@ class EventCertificatePublishingTest extends TestCase
     private function fixture(bool $enabled = true): array
     {
         $user = User::factory()->create(['is_super_admin' => true, 'is_gate_staff' => false]);
-        $event = Event::create(['name' => 'Certificate event', 'status' => Event::STATUS_ACTIVE]);
+        $organization = Organization::create(['name' => 'Certificate test organization']);
+        $event = Event::create(['organization_id' => $organization->id, 'name' => 'Certificate event', 'status' => Event::STATUS_ACTIVE]);
         app(EventCertificateAccess::class)->configure($user, $event->id, $enabled, 'checked_in');
         $draft = $event->certificateTemplates()->create([
             'name' => 'Participation', 'width' => 1123, 'height' => 794,
