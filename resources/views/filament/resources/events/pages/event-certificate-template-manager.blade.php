@@ -50,6 +50,7 @@
                             <td class="p-3">
                                 <div class="flex flex-wrap gap-2">
                                     @if (! $template->is_active && ! $template->certificates_count)
+                                        <x-filament::button size="sm" tag="a" :href="\App\Filament\Resources\Events\EventResource::getUrl('certificate-designer', ['record' => $event, 'template' => $template->id])">Design</x-filament::button>
                                         <x-filament::button size="sm" color="gray" wire:click="editDraft({{ $template->id }})">Edit</x-filament::button>
                                     @endif
                                     @if (! $template->assets_count && empty($template->definition))
