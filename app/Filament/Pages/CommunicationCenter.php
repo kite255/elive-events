@@ -45,6 +45,9 @@ class CommunicationCenter extends Page
     |--------------------------------------------------------------------------
     */
 
+    #[Locked]
+    public ?int $workspaceEventId = null;
+
     public ?int $eventId = null;
 
     public ?int $templateId = null;
@@ -152,12 +155,16 @@ class CommunicationCenter extends Page
             403
         );
 
-        $events = $this->events();
-        $firstEvent = request()->has('event_id')
-            ? $events->firstWhere('id', request()->integer('event_id'))
-            : $events->first();
-
         if (request()->has('event_id')) {
+            $id = request()->query('event_id');
+            abort_unless(is_scalar($id) && ctype_digit((string) $id), 404);
+            $this->workspaceEventId = (int) $id;
+        }
+
+        $events = $this->events();
+        $firstEvent = $events->first();
+
+        if ($this->workspaceEventId !== null) {
             abort_unless($firstEvent, 404);
         }
 
@@ -217,6 +224,7 @@ class CommunicationCenter extends Page
 
     public function updatedEventId(): void
     {
+        abort_unless($this->workspaceEventId === null || $this->eventId === $this->workspaceEventId, 403);
         $this->templateId = null;
         $this->categoryId = null;
         $this->message = '';
@@ -1133,6 +1141,7 @@ class CommunicationCenter extends Page
 
         return Event::query()
             ->accessibleBy($user)
+            ->when($this->workspaceEventId !== null, fn ($query) => $query->whereKey($this->workspaceEventId))
             ->with(
                 'organization:id,name'
             )
@@ -1357,6 +1366,7 @@ class CommunicationCenter extends Page
 
     private function selectedEvent(): ?Event
     {
+        abort_unless($this->workspaceEventId === null || $this->eventId === $this->workspaceEventId, 403);
         if (! $this->eventId) {
             return null;
         }
@@ -1382,6 +1392,9 @@ class CommunicationCenter extends Page
 
         abort_unless(
             $user instanceof User
+            && ! $user->is_gate_staff
+            && ($this->workspaceEventId === null || $event->id === $this->workspaceEventId)
+            && $event->isAccessibleBy($user)
             && $user->canManageEventCommunication(
                 $event
             ),
