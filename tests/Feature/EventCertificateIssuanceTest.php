@@ -511,6 +511,38 @@ class EventCertificateIssuanceTest extends TestCase
         $this->assertSame('255712345678', \Illuminate\Support\Facades\Crypt::decryptString($row->recipient_encrypted));
     }
 
+    public function test_certificate_issuance_uses_configured_queue(): void
+    {
+        config(['queue.certificate_queue' => 'certificates']);
+        $job = new \App\Jobs\IssueEventCertificate(1, 2, 3, 4, 'checked_in');
+        $this->assertSame('certificates', $job->queue);
+        config(['queue.certificate_queue' => 'default']);
+        $this->assertSame('default', (new \App\Jobs\IssueEventCertificate(1, 2, 3, 4, 'checked_in'))->queue);
+    }
+
+    public function test_expired_download_token_cleanup_preserves_active_links_and_certificates(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $links = app(\App\Services\EventCertificateDownloadLink::class);
+        $expired = $links->short($issued);
+        $active = $links->short($issued);
+        $expiredHash = hash('sha256', basename(parse_url($expired, PHP_URL_PATH)));
+        $activeHash = hash('sha256', basename(parse_url($active, PHP_URL_PATH)));
+        \Illuminate\Support\Facades\DB::table('event_certificate_download_tokens')->where('token_hash', $expiredHash)
+            ->update(['expires_at' => now()->subMinute()]);
+        $this->artisan('certificates:prune-download-tokens')->assertExitCode(0);
+        $this->assertDatabaseHas('event_certificate_download_tokens', ['token_hash' => $expiredHash]);
+        $this->artisan('certificates:prune-download-tokens', ['--apply' => true])->assertExitCode(0);
+        $this->assertDatabaseMissing('event_certificate_download_tokens', ['token_hash' => $expiredHash]);
+        $this->assertDatabaseHas('event_certificate_download_tokens', ['token_hash' => $activeHash]);
+        $this->assertDatabaseHas('event_certificates', ['id' => $issued->id, 'status' => 'issued']);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($issued->pdf_path);
+        $this->get($active)->assertOk();
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
