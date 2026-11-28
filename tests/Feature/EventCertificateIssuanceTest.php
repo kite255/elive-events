@@ -250,6 +250,47 @@ class EventCertificateIssuanceTest extends TestCase
         app(\App\Services\EventCertificateRevocation::class)->revoke($user, $event->id, $certificate->id, '  ');
     }
 
+    public function test_delivery_reservation_encrypts_destination_and_prevents_duplicate_channel(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $attendee->update(['email' => 'recipient@example.com']);
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $service = app(\App\Services\EventCertificateDelivery::class);
+        $id = $service->reserve($user, $event->id, $issued->id, 'email');
+        $record = \Illuminate\Support\Facades\DB::table('event_certificate_deliveries')->where('id', $id)->first();
+        $this->assertSame('queued', $record->status);
+        $this->assertNotSame('recipient@example.com', $record->recipient_encrypted);
+        $this->assertSame('recipient@example.com', \Illuminate\Support\Facades\Crypt::decryptString($record->recipient_encrypted));
+        $this->expectException(ValidationException::class);
+        $service->reserve($user, $event->id, $issued->id, 'email');
+    }
+
+    public function test_pending_certificate_cannot_be_reserved_for_delivery(): void
+    {
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        app(\App\Services\EventCertificateDelivery::class)->reserve($user, $event->id, $certificate->id, 'email');
+    }
+
+    public function test_signed_certificate_download_expires_and_revocation_blocks_access(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$user, $event, $attendee, $template] = $this->fixture();
+        $certificate = app(EventCertificateIssuance::class)->prepare($user, $event->id, $attendee->id, $template->id);
+        $issued = app(\App\Services\EventCertificateFinalization::class)->finalize($user, $event->id, $certificate->id);
+        $url = app(\App\Services\EventCertificateDownloadLink::class)->generate($issued);
+        $this->get(route('public.certificates.download', ['certificate' => $issued->id]))->assertForbidden();
+        $this->get($url)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->travel(31)->days();
+        $this->get($url)->assertForbidden();
+        $this->travelBack();
+        app(\App\Services\EventCertificateRevocation::class)->revoke($user, $event->id, $issued->id, 'Certificate no longer valid.');
+        $this->get($url)->assertNotFound();
+    }
+
     public function test_duplicate_preparation_is_rejected(): void
     {
         [$user, $event, $attendee, $template] = $this->fixture();
