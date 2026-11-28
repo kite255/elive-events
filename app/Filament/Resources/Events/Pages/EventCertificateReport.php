@@ -26,6 +26,10 @@ class EventCertificateReport extends Page
     public int $eventId;
     public string $status = '';
     public string $search = '';
+    public string $templateFilter = '';
+    public string $issuedFrom = '';
+    public string $issuedTo = '';
+    public string $deliveryFilter = '';
 
     public function mount(int|string $record): void
     {
@@ -43,6 +47,10 @@ class EventCertificateReport extends Page
 
     public function updatedStatus(): void { $this->resetPage(); }
     public function updatedSearch(): void { $this->resetPage(); }
+    public function updatedTemplateFilter(): void { $this->resetPage(); }
+    public function updatedIssuedFrom(): void { $this->resetPage(); }
+    public function updatedIssuedTo(): void { $this->resetPage(); }
+    public function updatedDeliveryFilter(): void { $this->resetPage(); }
 
     public function summary(): array
     {
@@ -75,6 +83,29 @@ class EventCertificateReport extends Page
         $search = mb_substr(trim($this->search), 0, 100);
         if ($search !== '') {
             $query->where('certificate_number', 'like', '%'.$search.'%');
+        }
+        if ($this->templateFilter !== '') {
+            $query->whereIn('event_certificate_template_id', $this->event()->certificateTemplates()
+                ->whereKey(ctype_digit($this->templateFilter) ? (int) $this->templateFilter : 0)->select('id'));
+        }
+        foreach (['issuedFrom' => '>=', 'issuedTo' => '<='] as $field => $operator) {
+            $value = $this->{$field};
+            if ($value !== '') {
+                $valid = preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $parts)
+                    && checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]);
+                if (! $valid) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->whereDate('issued_at', $operator, $value);
+                }
+            }
+        }
+        if ($this->deliveryFilter !== '') {
+            if (! in_array($this->deliveryFilter, ['email', 'sms'], true)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('id', DB::table('event_certificate_deliveries')->where('channel', $this->deliveryFilter)->select('event_certificate_id'));
+            }
         }
         return $query->orderByDesc('id');
     }
