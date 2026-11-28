@@ -195,3 +195,27 @@ Artisan::command('certificates:recover-deliveries {event : Event ID} {--apply : 
 
     return 0;
 })->purpose('Inspect interrupted certificate delivery records for one event');
+
+
+Artisan::command('certificates:prune-download-tokens {--apply : Delete expired short download tokens}', function () {
+    $cutoff = now();
+    $query = \Illuminate\Support\Facades\DB::table('event_certificate_download_tokens')->where('expires_at', '<=', $cutoff);
+    if (! $this->option('apply')) {
+        $this->info('Read-only inspection. Expired tokens: '.$query->count());
+
+        return 0;
+    }
+
+    $deleted = 0;
+    foreach ((clone $query)->select('id')->lazyById(500) as $token) {
+        $deleted += (clone $query)->where('id', $token->id)->delete();
+    }
+    $this->info('Expired short download tokens deleted: '.$deleted.'. Certificates and PDFs unchanged.');
+
+    return 0;
+})->purpose('Inspect or prune expired certificate short download tokens');
+
+Schedule::command('certificates:prune-download-tokens --apply')
+    ->dailyAt('04:30')
+    ->timezone(config('app.timezone'))
+    ->withoutOverlapping();
