@@ -26,7 +26,18 @@ class AttendeeForm
                     ->schema([
                         Select::make('event_id')
                             ->label('Event')
-                            ->relationship('event', 'name')
+                            ->options(function ($livewire): array {
+                                $user = auth()->user();
+                                if (! $user instanceof \App\Models\User || $user->is_gate_staff) {
+                                    return [];
+                                }
+
+                                return \App\Filament\Resources\Attendees\AttendeeResource::authorizedAttendeeEvents($user)
+                                    ->when(($livewire->workspaceEventId ?? null) !== null, fn (Builder $query) => $query->whereKey($livewire->workspaceEventId))
+                                    ->orderBy('name')->get()
+                                    ->filter(fn ($event) => $event->canManageRegistrationBy($user))
+                                    ->pluck('name', 'id')->all();
+                            })
                             ->searchable()
                             ->preload()
                             ->native(false)
@@ -34,11 +45,10 @@ class AttendeeForm
                             ->placeholder('Select event')
                             ->optionsLimit(50)
                             ->default(
-                                fn () =>
-                                    request()->integer('event_id') ?: null
+                                fn ($livewire) => $livewire->workspaceEventId ?? null
                             )
                             ->disabled(
-                                fn () => request()->filled('event_id')
+                                fn ($livewire, string $operation) => $operation === 'edit' || ($livewire->workspaceEventId ?? null) !== null
                             )
                             ->dehydrated()
                             ->live()
@@ -55,10 +65,18 @@ class AttendeeForm
                                 titleAttribute: 'name',
                                 modifyQueryUsing: function (
                                     Builder $query,
-                                    Get $get
+                                    Get $get,
+                                    $livewire
                                 ): Builder {
-                                    $eventId = $get('event_id')
-                                        ?: request()->integer('event_id');
+                                    $eventId = ($livewire->workspaceEventId ?? null) ?: $get('event_id');
+
+                                    $user = auth()->user();
+                                    $event = $user instanceof \App\Models\User && $eventId
+                                        ? \App\Filament\Resources\Attendees\AttendeeResource::authorizedAttendeeEvents($user)->whereKey($eventId)->first()
+                                        : null;
+                                    if (! $event || ! $event->canManageRegistrationBy($user)) {
+                                        return $query->whereRaw('1 = 0');
+                                    }
 
                                     if ($eventId) {
                                         $query
@@ -81,9 +99,7 @@ class AttendeeForm
                             ->placeholder('Select one or more event days')
                             ->optionsLimit(100)
                             ->disabled(
-                                fn (Get $get): bool =>
-                                    blank($get('event_id'))
-                                    && ! request()->filled('event_id')
+                                fn (Get $get, $livewire): bool => blank(($livewire->workspaceEventId ?? null) ?: $get('event_id'))
                             )
                             ->helperText(
                                 'Select every day this attendee is expected to attend. Leave empty only when the event has no configured days.'
@@ -100,10 +116,18 @@ class AttendeeForm
                                 titleAttribute: 'name',
                                 modifyQueryUsing: function (
                                     Builder $query,
-                                    Get $get
+                                    Get $get,
+                                    $livewire
                                 ): Builder {
-                                    $eventId = $get('event_id')
-                                        ?: request()->integer('event_id');
+                                    $eventId = ($livewire->workspaceEventId ?? null) ?: $get('event_id');
+
+                                    $user = auth()->user();
+                                    $event = $user instanceof \App\Models\User && $eventId
+                                        ? \App\Filament\Resources\Attendees\AttendeeResource::authorizedAttendeeEvents($user)->whereKey($eventId)->first()
+                                        : null;
+                                    if (! $event || ! $event->canManageRegistrationBy($user)) {
+                                        return $query->whereRaw('1 = 0');
+                                    }
 
                                     if ($eventId) {
                                         $query->where(
@@ -121,9 +145,7 @@ class AttendeeForm
                             ->placeholder('Select category')
                             ->optionsLimit(50)
                             ->disabled(
-                                fn (Get $get): bool =>
-                                    blank($get('event_id'))
-                                    && ! request()->filled('event_id')
+                                fn (Get $get, $livewire): bool => blank(($livewire->workspaceEventId ?? null) ?: $get('event_id'))
                             )
                             ->helperText(
                                 'Only categories for the selected event will appear.'
@@ -136,10 +158,18 @@ class AttendeeForm
                                 titleAttribute: 'name',
                                 modifyQueryUsing: function (
                                     Builder $query,
-                                    Get $get
+                                    Get $get,
+                                    $livewire
                                 ): Builder {
-                                    $eventId = $get('event_id')
-                                        ?: request()->integer('event_id');
+                                    $eventId = ($livewire->workspaceEventId ?? null) ?: $get('event_id');
+
+                                    $user = auth()->user();
+                                    $event = $user instanceof \App\Models\User && $eventId
+                                        ? \App\Filament\Resources\Attendees\AttendeeResource::authorizedAttendeeEvents($user)->whereKey($eventId)->first()
+                                        : null;
+                                    if (! $event || ! $event->canManageRegistrationBy($user)) {
+                                        return $query->whereRaw('1 = 0');
+                                    }
 
                                     if ($eventId) {
                                         $query
@@ -156,9 +186,7 @@ class AttendeeForm
                             ->placeholder('Select badge type')
                             ->optionsLimit(50)
                             ->disabled(
-                                fn (Get $get): bool =>
-                                    blank($get('event_id'))
-                                    && ! request()->filled('event_id')
+                                fn (Get $get, $livewire): bool => blank(($livewire->workspaceEventId ?? null) ?: $get('event_id'))
                             )
                             ->helperText(
                                 'Only active badge types for the selected event will appear.'
