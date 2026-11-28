@@ -26,7 +26,9 @@ final class IssueEventCertificate implements ShouldQueue
         public int $templateId,
         public string $eligibilityRule,
         public ?int $batchItemId = null,
-    ) {}
+    ) {
+        $this->onQueue(config('queue.certificate_queue', 'default'));
+    }
 
     public function middleware(): array
     {
