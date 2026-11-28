@@ -11,7 +11,9 @@ class EditMerchandiseProduct extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        abort_unless(\App\Models\Event::query()->find($data['event_id'])?->canBeManagedBy(auth()->user()) === true, 403);
+        $event = MerchandiseProductResource::accessibleEvents()->whereKey($this->record->event_id)->firstOrFail();
+        abort_unless(MerchandiseProductResource::canManageMerchandiseFor($event), 403);
+        $data['event_id'] = $event->id;
 
         if (filled($data['event_merchandise_id'] ?? null)) {
             abort_unless(
