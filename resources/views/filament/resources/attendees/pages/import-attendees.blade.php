@@ -12,7 +12,7 @@
             </h2>
 
             <p style="margin-top: 6px; color: #64748b; font-size: 14px;">
-                Upload an Excel file to add attendees into the selected event.
+                Upload an Excel or CSV file using the template structure to add attendees to the selected event.
             </p>
 
             @if ($eventName)
@@ -52,7 +52,7 @@
             </form>
         </div>
 
-        @if ($errorReportUrl)
+        @if ($errorReportPath)
             <div style="
                 background: #fff7ed;
                 border: 1px solid #fed7aa;
@@ -68,9 +68,9 @@
                     Some attendees were not imported. Download the error report, fix the affected rows, and upload the corrected file again.
                 </p>
 
-                <a
-                    href="{{ $errorReportUrl }}"
-                    target="_blank"
+                <button
+                    type="button"
+                    wire:click="downloadErrorReport"
                     style="
                         display: inline-flex;
                         margin-top: 14px;
@@ -83,7 +83,7 @@
                     "
                 >
                     Download Error Report
-                </a>
+                </button>
             </div>
         @endif
 
