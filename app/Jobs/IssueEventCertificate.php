@@ -25,6 +25,7 @@ final class IssueEventCertificate implements ShouldQueue
         public int $attendeeId,
         public int $templateId,
         public string $eligibilityRule,
+        public ?int $batchItemId = null,
     ) {}
 
     public function middleware(): array
@@ -34,6 +35,20 @@ final class IssueEventCertificate implements ShouldQueue
 
     public function handle(EventCertificateAccess $access, EventCertificateIssuance $issuance, EventCertificateFinalization $finalization): void
     {
+        if ($this->batchItemId !== null) {
+            $item = \Illuminate\Support\Facades\DB::table('event_certificate_batch_items as item')
+                ->join('event_certificate_batches as batch', 'batch.id', '=', 'item.event_certificate_batch_id')
+                ->where('item.id', $this->batchItemId)->where('item.attendee_id', $this->attendeeId)
+                ->where('batch.event_id', $this->eventId)->where('batch.event_certificate_template_id', $this->templateId)
+                ->where('batch.actor_id', $this->actorId)->where('batch.eligibility_rule', $this->eligibilityRule)
+                ->select('item.status')->first();
+            abort_unless($item, 422, 'Invalid batch item.');
+            if (in_array($item->status, ['issued', 'skipped'], true)) {
+                return;
+            }
+            \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('id', $this->batchItemId)
+                ->update(['status' => 'processing', 'attempts' => \Illuminate\Support\Facades\DB::raw('attempts + 1'), 'failure_code' => null, 'updated_at' => now()]);
+        }
         $actor = User::query()->findOrFail($this->actorId);
         $event = $access->authorize($actor, $this->eventId);
         $settings = $event->certificateSettings()->first();
@@ -42,6 +57,7 @@ final class IssueEventCertificate implements ShouldQueue
         $manual = $this->eligibilityRule === 'manual';
         $certificate = $event->certificates()->where('attendee_id', $this->attendeeId)->first();
         if ($certificate && $certificate->status !== EventCertificate::STATUS_PENDING) {
+            $this->mark($certificate->status === EventCertificate::STATUS_ISSUED && (int) $certificate->event_certificate_template_id === $this->templateId ? 'issued' : 'skipped');
             return;
         }
         if (! $certificate) {
@@ -49,5 +65,21 @@ final class IssueEventCertificate implements ShouldQueue
         }
         abort_unless((int) $certificate->event_certificate_template_id === $this->templateId, 422, 'Pending certificate uses another template.');
         $finalization->finalize($actor, $this->eventId, $certificate->id, $manual);
+        $this->mark('issued');
+    }
+
+    private function mark(string $status, ?string $failureCode = null): void
+    {
+        if ($this->batchItemId === null) {
+            return;
+        }
+        \Illuminate\Support\Facades\DB::table('event_certificate_batch_items')->where('id', $this->batchItemId)
+            ->whereNotIn('status', ['issued', 'skipped'])
+            ->update(['status' => $status, 'failure_code' => $failureCode, 'updated_at' => now()]);
+    }
+
+    public function failed(?\Throwable $exception): void
+    {
+        $this->mark('failed', 'processing_failed');
     }
 }
